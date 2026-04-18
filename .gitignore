@@ -1,5 +1,8 @@
 /target
-/kiln-v1
-/kiln-v2
 /AGENT.md
 /.claude
+
+# vscode extension build artifacts
+editor/vscode/node_modules/
+editor/vscode/*.vsix
+editor/vscode/package-lock.json

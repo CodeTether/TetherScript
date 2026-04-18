@@ -4,7 +4,7 @@ A dynamically-typed scripting language with Rust-style ownership, implemented in
 
 Targeted at agent / AI workloads — small and fast to iterate on, with an ownership story that catches aliasing bugs at runtime without making you write type annotations.
 
-## Status: v0.0.3 — lexer + parser + tree-walker + bytecode VM
+## Status: v0.0.4 — + LSP server and VSCode extension
 
 Working: variables, functions, closures, recursion, control flow, lists, maps, strings, explicit `move`, runtime use-after-move detection, method calls, built-ins (`println`, `print`, `len`, `type_of`, `map`). Both runtimes pass the same example suite with byte-identical output.
 
@@ -23,7 +23,14 @@ cargo build --release
 ./target/release/kiln --tokens   examples/hello.kl
 ./target/release/kiln --ast      examples/hello.kl
 ./target/release/kiln --bytecode examples/hello.kl
+
+# language server (for editors)
+./target/release/kiln --lsp
 ```
+
+## Editor support
+
+A VSCode extension lives in [`editor/vscode/`](editor/vscode/). It provides syntax highlighting and wires VSCode up to `kiln --lsp` for live lex / parse diagnostics. See the extension README for install instructions.
 
 ## Design
 
@@ -58,9 +65,12 @@ src/
   bytecode.rs  — Instr / Chunk / FnProto / VmFnObj
   compiler.rs  — AST -> bytecode
   vm.rs        — stack-based bytecode VM
+  lsp.rs       — Language Server Protocol server (JSON-RPC over stdio)
   main.rs      — CLI entry point
 examples/
   hello.kl, fib.kl, closures.kl, ownership.kl, use_after_move.kl
+editor/vscode/
+  VSCode extension: TextMate grammar + LSP client
 ```
 
 ## Roadmap
@@ -70,6 +80,7 @@ examples/
 - [x] Tree-walking interpreter
 - [x] Runtime ownership tracking (move/borrow, Copy scalars, use-after-move panics)
 - [x] Bytecode compiler + VM (parity with tree-walker on all examples)
+- [x] LSP server (lex/parse diagnostics) + VSCode extension
 - [ ] `&mut` exclusivity enforcement
 - [ ] `Result<T, E>` + `?` semantics
 - [ ] `for x in iter` loops

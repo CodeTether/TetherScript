@@ -6,6 +6,7 @@
 //!   kiln --tokens   <file.kl>       # dump tokens and exit
 //!   kiln --ast      <file.kl>       # dump AST and exit
 //!   kiln --bytecode <file.kl>       # dump compiled bytecode and exit
+//!   kiln --lsp                      # serve LSP over stdio
 
 mod token;
 mod lexer;
@@ -16,6 +17,7 @@ mod interp;
 mod bytecode;
 mod compiler;
 mod vm;
+mod lsp;
 
 use std::env;
 use std::fs;
@@ -30,8 +32,16 @@ use vm::VM;
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
-        eprintln!("usage: kiln [--tokens|--ast|--bytecode|--vm] <file.kl>");
+        eprintln!("usage: kiln [--tokens|--ast|--bytecode|--vm|--lsp] <file.kl>");
         process::exit(2);
+    }
+
+    if args[1] == "--lsp" {
+        if let Err(e) = lsp::run() {
+            eprintln!("kiln-lsp: {}", e);
+            process::exit(1);
+        }
+        return;
     }
 
     let (mode, path) = match args[1].as_str() {
