@@ -1,11 +1,12 @@
 [package]
-name = "rk"
-version = "0.0.1"
+name = "kiln"
+version = "0.0.2"
 edition = "2021"
-description = "A dynamically-typed language with Rust-style ownership, compiled to bytecode"
+description = "A dynamically-typed scripting language with Rust-style ownership, implemented as a bytecode VM in Rust"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 
 [[bin]]
-name = "rk"
+name = "kiln"
 path = "src/main.rs"
