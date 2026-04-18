@@ -1,0 +1,11 @@
+// kiln — hello world
+
+fn greet(name) {
+    let greeting = "hello, " + name
+    println(greeting)
+}
+
+fn main() {
+    greet("world")
+    greet("kiln")
+}
