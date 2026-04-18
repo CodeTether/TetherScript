@@ -1,0 +1,60 @@
+{
+  "name": "kiln",
+  "displayName": "Kiln",
+  "description": "Language support for Kiln (.kl) — syntax highlighting, diagnostics from lex and parse errors via LSP.",
+  "version": "0.0.4",
+  "publisher": "kiln-rs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kiln-Rs/kiln"
+  },
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:kiln"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "kiln",
+        "aliases": ["Kiln", "kiln"],
+        "extensions": [".kl"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "kiln",
+        "scopeName": "source.kiln",
+        "path": "./syntaxes/kiln.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "Kiln",
+      "properties": {
+        "kiln.serverPath": {
+          "type": "string",
+          "default": "kiln",
+          "description": "Path to the `kiln` binary used to serve LSP. Must be on PATH or an absolute path."
+        },
+        "kiln.trace.server": {
+          "type": "string",
+          "enum": ["off", "messages", "verbose"],
+          "default": "off",
+          "description": "Trace LSP traffic between VSCode and kiln-lsp."
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.75.0"
+  }
+}

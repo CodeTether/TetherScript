@@ -1,11 +1,12 @@
 [package]
 name = "kiln"
-version = "0.0.3"
+version = "0.0.4"
 edition = "2021"
 description = "A dynamically-typed scripting language with Rust-style ownership, implemented as a bytecode VM in Rust"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
+serde_json = "1"
 
 [[bin]]
 name = "kiln"
