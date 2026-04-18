@@ -1,0 +1,11 @@
+[package]
+name = "rk"
+version = "0.0.1"
+edition = "2021"
+description = "A dynamically-typed language with Rust-style ownership, compiled to bytecode"
+
+[dependencies]
+
+[[bin]]
+name = "rk"
+path = "src/main.rs"
