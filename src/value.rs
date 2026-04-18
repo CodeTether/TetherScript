@@ -23,6 +23,7 @@ use std::fmt;
 use std::rc::Rc;
 
 use crate::ast::Block;
+use crate::bytecode::VmFnObj;
 
 /// A Kiln value. Heap-backed payloads are Rc'd so cloning is cheap and
 /// aliasing is shared by default.
@@ -36,6 +37,7 @@ pub enum Value {
     List(Rc<RefCell<Vec<Value>>>),
     Map(Rc<RefCell<HashMap<String, Value>>>),
     Fn(Rc<FnObj>),
+    VmFn(Rc<VmFnObj>),
     Native(Rc<NativeFn>),
 }
 
@@ -63,7 +65,7 @@ impl Value {
             Value::Str(_)   => "str",
             Value::List(_)  => "list",
             Value::Map(_)   => "map",
-            Value::Fn(_) | Value::Native(_) => "fn",
+            Value::Fn(_) | Value::VmFn(_) | Value::Native(_) => "fn",
         }
     }
 
@@ -76,7 +78,7 @@ impl Value {
             Value::Str(s)     => !s.is_empty(),
             Value::List(xs)   => !xs.borrow().is_empty(),
             Value::Map(m)     => !m.borrow().is_empty(),
-            Value::Fn(_) | Value::Native(_) => true,
+            Value::Fn(_) | Value::VmFn(_) | Value::Native(_) => true,
         }
     }
 
@@ -119,6 +121,7 @@ impl fmt::Display for Value {
                 write!(f, "}}")
             }
             Value::Fn(fo)  => write!(f, "<fn {}>", fo.name.as_deref().unwrap_or("anon")),
+            Value::VmFn(vf) => write!(f, "<fn {}>", vf.name.as_deref().unwrap_or("anon")),
             Value::Native(n) => write!(f, "<native {}>", n.name),
         }
     }

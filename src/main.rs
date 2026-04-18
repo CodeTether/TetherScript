@@ -1,9 +1,11 @@
 //! kiln — a dynamically-typed scripting language with Rust-style ownership.
 //!
 //! Usage:
-//!   kiln <file.kl>
-//!   kiln --tokens <file.kl>     # dump tokens and exit
-//!   kiln --ast    <file.kl>     # dump AST and exit
+//!   kiln <file.kl>                  # run (tree-walking interpreter)
+//!   kiln --vm       <file.kl>       # run (bytecode VM)
+//!   kiln --tokens   <file.kl>       # dump tokens and exit
+//!   kiln --ast      <file.kl>       # dump AST and exit
+//!   kiln --bytecode <file.kl>       # dump compiled bytecode and exit
 
 mod token;
 mod lexer;
@@ -11,26 +13,33 @@ mod ast;
 mod parser;
 mod value;
 mod interp;
+mod bytecode;
+mod compiler;
+mod vm;
 
 use std::env;
 use std::fs;
 use std::process;
 
+use compiler::Compiler;
+use interp::Interpreter;
 use lexer::Lexer;
 use parser::Parser;
-use interp::Interpreter;
+use vm::VM;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
-        eprintln!("usage: kiln [--tokens|--ast] <file.kl>");
+        eprintln!("usage: kiln [--tokens|--ast|--bytecode|--vm] <file.kl>");
         process::exit(2);
     }
 
     let (mode, path) = match args[1].as_str() {
-        "--tokens" if args.len() >= 3 => ("tokens", &args[2]),
-        "--ast"    if args.len() >= 3 => ("ast", &args[2]),
-        _                             => ("run", &args[1]),
+        "--tokens"   if args.len() >= 3 => ("tokens",   &args[2]),
+        "--ast"      if args.len() >= 3 => ("ast",      &args[2]),
+        "--bytecode" if args.len() >= 3 => ("bytecode", &args[2]),
+        "--vm"       if args.len() >= 3 => ("vm",       &args[2]),
+        _                               => ("run", &args[1]),
     };
 
     let src = match fs::read_to_string(path) {
@@ -66,6 +75,22 @@ fn main() {
 
     if mode == "ast" {
         println!("{:#?}", program);
+        return;
+    }
+
+    if mode == "bytecode" {
+        let chunk = Compiler::compile_program(&program);
+        println!("{:#?}", chunk);
+        return;
+    }
+
+    if mode == "vm" {
+        let chunk = Compiler::compile_program(&program);
+        let mut vm = VM::new();
+        if let Err(e) = vm.run(chunk) {
+            eprintln!("kiln: {}", e);
+            process::exit(1);
+        }
         return;
     }
 

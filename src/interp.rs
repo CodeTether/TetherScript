@@ -336,7 +336,7 @@ impl Interpreter {
 
 // ---------- operators ----------
 
-fn apply_unary(op: UnOp, v: Value) -> Result<Value, String> {
+pub(crate) fn apply_unary(op: UnOp, v: Value) -> Result<Value, String> {
     match (op, v) {
         (UnOp::Neg, Value::Int(n))   => Ok(Value::Int(-n)),
         (UnOp::Neg, Value::Float(n)) => Ok(Value::Float(-n)),
@@ -345,7 +345,7 @@ fn apply_unary(op: UnOp, v: Value) -> Result<Value, String> {
     }
 }
 
-fn apply_binary(op: BinOp, l: Value, r: Value) -> Result<Value, String> {
+pub(crate) fn apply_binary(op: BinOp, l: Value, r: Value) -> Result<Value, String> {
     use BinOp::*;
     use Value::*;
     match (op, &l, &r) {
@@ -400,7 +400,7 @@ fn values_eq(a: &Value, b: &Value) -> bool {
     }
 }
 
-fn index_value(target: &Value, index: &Value) -> Result<Value, String> {
+pub(crate) fn index_value(target: &Value, index: &Value) -> Result<Value, String> {
     match (target, index) {
         (Value::List(xs), Value::Int(i)) => {
             let xs = xs.borrow();
@@ -427,14 +427,14 @@ fn index_value(target: &Value, index: &Value) -> Result<Value, String> {
     }
 }
 
-fn field_value(target: &Value, name: &str) -> Result<Value, String> {
+pub(crate) fn field_value(target: &Value, name: &str) -> Result<Value, String> {
     match target {
         Value::Map(m) => Ok(m.borrow().get(name).cloned().unwrap_or(Value::Nil)),
         _ => Err(format!("cannot access field `{}` on {}", name, target.type_name())),
     }
 }
 
-fn call_method(target: &Value, name: &str, args: &[Value]) -> Result<Value, String> {
+pub(crate) fn call_method(target: &Value, name: &str, args: &[Value]) -> Result<Value, String> {
     match (target, name, args) {
         (Value::List(xs), "len", []) => Ok(Value::Int(xs.borrow().len() as i64)),
         (Value::List(xs), "push", [v]) => {
@@ -460,7 +460,7 @@ fn call_method(target: &Value, name: &str, args: &[Value]) -> Result<Value, Stri
 
 // ---------- built-ins ----------
 
-fn install_builtins(env: &Rc<RefCell<Env>>) {
+pub(crate) fn install_builtins(env: &Rc<RefCell<Env>>) {
     let mut e = env.borrow_mut();
 
     let println_fn = Value::Native(Rc::new(NativeFn {
