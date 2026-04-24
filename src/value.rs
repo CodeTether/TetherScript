@@ -1,6 +1,6 @@
 //! Runtime values.
 //!
-//! Every value in Kiln is a `Value`. Heap-backed values (strings, lists, maps,
+//! Every value in TetherScript is a `Value`. Heap-backed values (strings, lists, maps,
 //! functions) carry their payload behind an `Rc` so the interpreter can
 //! clone Values cheaply.
 //!
@@ -25,7 +25,7 @@ use std::rc::Rc;
 use crate::ast::Block;
 use crate::bytecode::VmFnObj;
 
-/// A Kiln value. Heap-backed payloads are Rc'd so cloning is cheap and
+/// A TetherScript value. Heap-backed payloads are Rc'd so cloning is cheap and
 /// aliasing is shared by default.
 #[derive(Clone)]
 pub enum Value {
@@ -39,6 +39,18 @@ pub enum Value {
     Fn(Rc<FnObj>),
     VmFn(Rc<VmFnObj>),
     Native(Rc<NativeFn>),
+    /// Result<T, str> value. v0.1 error type is always a string; full
+    /// generic errors are future work.
+    Result(Rc<ResultValue>),
+    /// First-class capability (authority grant). See src/capability.rs.
+    Capability(Rc<crate::capability::Capability>),
+}
+
+/// `Ok(v)` or `Err(message)`. Held by `Value::Result`.
+#[derive(Clone)]
+pub enum ResultValue {
+    Ok(Value),
+    Err(String),
 }
 
 pub struct FnObj {
@@ -52,39 +64,104 @@ pub struct FnObj {
 pub struct NativeFn {
     pub name: String,
     pub arity: Option<usize>, // None = variadic
-    pub func: Box<dyn Fn(&[Value]) -> Result<Value, String>>,
+    pub func: NativeFunc,
+}
+
+pub type PureNativeFn = dyn Fn(&[Value]) -> Result<Value, String>;
+pub type RuntimeNativeFn = dyn Fn(&mut dyn Runtime, &[Value]) -> Result<Value, String>;
+
+/// Native built-ins come in two flavors.
+///
+/// `Pure` natives only read their argument values — they can't call back into
+/// the runtime. This is the common case (println, len, type_of, …).
+///
+/// `Runtime` natives receive a `&mut dyn Runtime` and can invoke any callable
+/// Value synchronously. That's how things like `http_serve(port, handler)`
+/// dispatch incoming requests back to user-defined TetherScript functions without
+/// the native layer having to know whether the caller is the tree-walker or
+/// the bytecode VM.
+pub enum NativeFunc {
+    Pure(Box<PureNativeFn>),
+    Runtime(Box<RuntimeNativeFn>),
+}
+
+/// Abstraction over the active execution engine. Both the tree-walking
+/// interpreter and the bytecode VM implement this so runtime-aware natives
+/// (see `NativeFunc::Runtime`) can invoke TetherScript callables uniformly.
+pub trait Runtime {
+    /// Synchronously call `callee` with `args` and return its result.
+    /// Errors and panics bubble up as `Err(String)`.
+    fn invoke(&mut self, callee: &Value, args: &[Value]) -> Result<Value, String>;
 }
 
 impl Value {
     pub fn type_name(&self) -> &'static str {
         match self {
-            Value::Nil      => "nil",
-            Value::Int(_)   => "int",
+            Value::Nil => "nil",
+            Value::Int(_) => "int",
             Value::Float(_) => "float",
-            Value::Bool(_)  => "bool",
-            Value::Str(_)   => "str",
-            Value::List(_)  => "list",
-            Value::Map(_)   => "map",
+            Value::Bool(_) => "bool",
+            Value::Str(_) => "str",
+            Value::List(_) => "list",
+            Value::Map(_) => "map",
             Value::Fn(_) | Value::VmFn(_) | Value::Native(_) => "fn",
+            Value::Result(_) => "result",
+            Value::Capability(_) => "capability",
         }
     }
 
     pub fn truthy(&self) -> bool {
         match self {
-            Value::Nil        => false,
-            Value::Bool(b)    => *b,
-            Value::Int(n)     => *n != 0,
-            Value::Float(f)   => *f != 0.0,
-            Value::Str(s)     => !s.is_empty(),
-            Value::List(xs)   => !xs.borrow().is_empty(),
-            Value::Map(m)     => !m.borrow().is_empty(),
+            Value::Nil => false,
+            Value::Bool(b) => *b,
+            Value::Int(n) => *n != 0,
+            Value::Float(f) => *f != 0.0,
+            Value::Str(s) => !s.is_empty(),
+            Value::List(xs) => !xs.borrow().is_empty(),
+            Value::Map(m) => !m.borrow().is_empty(),
             Value::Fn(_) | Value::VmFn(_) | Value::Native(_) => true,
+            Value::Result(r) => matches!(r.as_ref(), ResultValue::Ok(_)),
+            Value::Capability(c) => !c.is_revoked(),
         }
     }
 
     /// Scalars are Copy; heap values are not.
     pub fn is_copy(&self) -> bool {
-        matches!(self, Value::Nil | Value::Int(_) | Value::Float(_) | Value::Bool(_))
+        matches!(
+            self,
+            Value::Nil | Value::Int(_) | Value::Float(_) | Value::Bool(_)
+        )
+    }
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        use Value::*;
+        match (self, other) {
+            (Nil, Nil) => true,
+            (Int(a), Int(b)) => a == b,
+            (Float(a), Float(b)) => a == b,
+            (Bool(a), Bool(b)) => a == b,
+            (Str(a), Str(b)) => a == b,
+            (List(a), List(b)) => *a.borrow() == *b.borrow(),
+            (Map(a), Map(b)) => *a.borrow() == *b.borrow(),
+            (Result(a), Result(b)) => a.as_ref() == b.as_ref(),
+            (Fn(a), Fn(b)) => Rc::ptr_eq(a, b),
+            (VmFn(a), VmFn(b)) => Rc::ptr_eq(a, b),
+            (Native(a), Native(b)) => Rc::ptr_eq(a, b),
+            (Capability(a), Capability(b)) => Rc::ptr_eq(a, b),
+            _ => false,
+        }
+    }
+}
+
+impl PartialEq for ResultValue {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (ResultValue::Ok(a), ResultValue::Ok(b)) => a == b,
+            (ResultValue::Err(a), ResultValue::Err(b)) => a == b,
+            _ => false,
+        }
     }
 }
 
@@ -97,16 +174,18 @@ impl fmt::Debug for Value {
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Value::Nil      => write!(f, "nil"),
-            Value::Int(n)   => write!(f, "{}", n),
+            Value::Nil => write!(f, "nil"),
+            Value::Int(n) => write!(f, "{}", n),
             Value::Float(n) => write!(f, "{}", n),
-            Value::Bool(b)  => write!(f, "{}", b),
-            Value::Str(s)   => write!(f, "{}", s),
+            Value::Bool(b) => write!(f, "{}", b),
+            Value::Str(s) => write!(f, "{}", s),
             Value::List(xs) => {
                 let xs = xs.borrow();
                 write!(f, "[")?;
                 for (i, v) in xs.iter().enumerate() {
-                    if i > 0 { write!(f, ", ")?; }
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
                     write!(f, "{}", v)?;
                 }
                 write!(f, "]")
@@ -115,14 +194,27 @@ impl fmt::Display for Value {
                 let m = m.borrow();
                 write!(f, "{{")?;
                 for (i, (k, v)) in m.iter().enumerate() {
-                    if i > 0 { write!(f, ", ")?; }
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
                     write!(f, "{}: {}", k, v)?;
                 }
                 write!(f, "}}")
             }
-            Value::Fn(fo)  => write!(f, "<fn {}>", fo.name.as_deref().unwrap_or("anon")),
+            Value::Fn(fo) => write!(f, "<fn {}>", fo.name.as_deref().unwrap_or("anon")),
             Value::VmFn(vf) => write!(f, "<fn {}>", vf.name.as_deref().unwrap_or("anon")),
             Value::Native(n) => write!(f, "<native {}>", n.name),
+            Value::Result(r) => match r.as_ref() {
+                ResultValue::Ok(v) => write!(f, "Ok({})", v),
+                ResultValue::Err(e) => write!(f, "Err({:?})", e),
+            },
+            Value::Capability(c) => {
+                if c.is_revoked() {
+                    write!(f, "<capability {} (revoked)>", c.kind)
+                } else {
+                    write!(f, "<capability {}>", c.kind)
+                }
+            }
         }
     }
 }
@@ -145,7 +237,10 @@ pub struct Env {
 
 impl Env {
     pub fn new_global() -> Rc<RefCell<Env>> {
-        Rc::new(RefCell::new(Env { slots: HashMap::new(), parent: None }))
+        Rc::new(RefCell::new(Env {
+            slots: HashMap::new(),
+            parent: None,
+        }))
     }
 
     pub fn child(parent: &Rc<RefCell<Env>>) -> Rc<RefCell<Env>> {
@@ -156,7 +251,8 @@ impl Env {
     }
 
     pub fn define(&mut self, name: &str, value: Value, mutable: bool) {
-        self.slots.insert(name.to_string(), Slot::Live { value, mutable });
+        self.slots
+            .insert(name.to_string(), Slot::Live { value, mutable });
     }
 
     /// Read (borrow) a binding. For copy values this clones; for heap values
@@ -171,7 +267,7 @@ impl Env {
             None => match &self.parent {
                 Some(p) => p.borrow().get(name),
                 None => Err(format!("undefined variable `{}`", name)),
-            }
+            },
         }
     }
 
@@ -186,11 +282,14 @@ impl Env {
                         return Ok(value.clone());
                     }
                     let v = value.clone(); // Rc-clone, cheap
-                    *slot = Slot::Moved { name: name.to_string() };
+                    *slot = Slot::Moved {
+                        name: name.to_string(),
+                    };
                     Ok(v)
                 }
                 Slot::Moved { name } => Err(format!(
-                    "cannot move from `{}`: value was already moved", name
+                    "cannot move from `{}`: value was already moved",
+                    name
                 )),
             }
         } else {
@@ -209,11 +308,15 @@ impl Env {
                     if !*mutable {
                         return Err(format!("cannot assign to immutable binding `{}`", name));
                     }
-                    *slot = Slot::Live { value, mutable: true };
+                    *slot = Slot::Live {
+                        value,
+                        mutable: true,
+                    };
                     Ok(())
                 }
                 Slot::Moved { name } => Err(format!(
-                    "cannot assign to `{}`: slot is a moved tombstone", name
+                    "cannot assign to `{}`: slot is a moved tombstone",
+                    name
                 )),
             }
         } else {

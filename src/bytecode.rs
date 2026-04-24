@@ -25,8 +25,8 @@ pub enum Instr {
 
     // Variables (by name, looked up in the frame's `Env`)
     GetName(u16),
-    GetMove(u16),          // `move x` — take from env, leave tombstone
-    DefLet(u16, bool),     // name_idx, mutable
+    GetMove(u16),      // `move x` — take from env, leave tombstone
+    DefLet(u16, bool), // name_idx, mutable
     Assign(u16),
 
     // Unary
@@ -34,21 +34,30 @@ pub enum Instr {
     Not,
 
     // Binary
-    Add, Sub, Mul, Div, Mod,
-    Eq, NotEq, Lt, Gt, LtEq, GtEq,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    Eq,
+    NotEq,
+    Lt,
+    Gt,
+    LtEq,
+    GtEq,
 
     // Control flow (offsets are relative to the *next* instruction).
     Jump(i32),
     JumpIfFalse(i32),
-    JumpIfFalseKeep(i32),  // leaves value on stack for short-circuit `&&`
-    JumpIfTrueKeep(i32),   // leaves value on stack for short-circuit `||`
+    JumpIfFalseKeep(i32), // leaves value on stack for short-circuit `&&`
+    JumpIfTrueKeep(i32),  // leaves value on stack for short-circuit `||`
 
     // Aggregates
     BuildList(u16),
     Index,
-    SetIndex,              // stack: target, index, value -> value
+    SetIndex, // stack: target, index, value -> value
     GetField(u16),
-    SetField(u16),         // stack: target, value -> value
+    SetField(u16), // stack: target, value -> value
 
     // Method invocation: stack: target, arg1..argN -> result
     Method(u16, u8),
@@ -66,6 +75,10 @@ pub enum Instr {
 
     // Unconditional runtime halt with the stack-top value as the message
     Panic,
+
+    // `expr?` — if stack top is Ok(v), replace with v. If Err(e), unwind
+    // to the nearest call frame and produce Err(e) as that fn's return.
+    Try,
 }
 
 #[derive(Debug, Default)]
