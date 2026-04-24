@@ -1,4 +1,4 @@
-// kiln — hello world
+// tetherscript — hello world
 
 fn greet(name) {
     let greeting = "hello, " + name
@@ -7,5 +7,5 @@ fn greet(name) {
 
 fn main() {
     greet("world")
-    greet("kiln")
+    greet("tetherscript")
 }

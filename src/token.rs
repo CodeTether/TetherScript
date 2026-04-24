@@ -28,38 +28,38 @@ pub enum Token {
     Panic,
 
     // Punctuation
-    LParen,    // (
-    RParen,    // )
-    LBrace,    // {
-    RBrace,    // }
-    LBracket,  // [
-    RBracket,  // ]
-    Comma,     // ,
-    Semi,      // ;
-    Colon,     // :
-    Dot,       // .
-    Arrow,     // ->
-    FatArrow,  // =>
-    Question,  // ?
+    LParen,   // (
+    RParen,   // )
+    LBrace,   // {
+    RBrace,   // }
+    LBracket, // [
+    RBracket, // ]
+    Comma,    // ,
+    Semi,     // ;
+    Colon,    // :
+    Dot,      // .
+    Arrow,    // ->
+    FatArrow, // =>
+    Question, // ?
 
     // Operators
-    Plus,      // +
-    Minus,     // -
-    Star,      // *
-    Slash,     // /
-    Percent,   // %
-    Assign,    // =
-    Eq,        // ==
-    NotEq,     // !=
-    Lt,        // <
-    Gt,        // >
-    LtEq,      // <=
-    GtEq,      // >=
-    And,       // &&
-    Or,        // ||
-    Not,       // !
-    Amp,       // & (borrow)
-    AmpMut,    // &mut (lexed as two tokens; we fuse in parser)
+    Plus,    // +
+    Minus,   // -
+    Star,    // *
+    Slash,   // /
+    Percent, // %
+    Assign,  // =
+    Eq,      // ==
+    NotEq,   // !=
+    Lt,      // <
+    Gt,      // >
+    LtEq,    // <=
+    GtEq,    // >=
+    And,     // &&
+    Or,      // ||
+    Not,     // !
+    Amp,     // & (borrow)
+    AmpMut,  // &mut (lexed as two tokens; we fuse in parser)
 
     // Meta
     Newline,

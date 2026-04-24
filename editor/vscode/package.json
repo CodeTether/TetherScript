@@ -1,12 +1,12 @@
 {
-  "name": "kiln",
-  "displayName": "Kiln",
-  "description": "Language support for Kiln (.kl) — syntax highlighting, diagnostics from lex and parse errors via LSP.",
+  "name": "tetherscript",
+  "displayName": "TetherScript",
+  "description": "Language support for TetherScript (.tether and .kl) — syntax highlighting, diagnostics from lex and parse errors via LSP.",
   "version": "0.0.4",
-  "publisher": "kiln-rs",
+  "publisher": "tetherscript-rs",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Kiln-Rs/kiln"
+    "url": "https://github.com/TetherScript-Rs/tetherscript"
   },
   "engines": {
     "vscode": "^1.75.0"
@@ -15,38 +15,38 @@
     "Programming Languages"
   ],
   "activationEvents": [
-    "onLanguage:kiln"
+    "onLanguage:tetherscript"
   ],
   "main": "./extension.js",
   "contributes": {
     "languages": [
       {
-        "id": "kiln",
-        "aliases": ["Kiln", "kiln"],
-        "extensions": [".kl"],
+        "id": "tetherscript",
+        "aliases": ["TetherScript", "tetherscript"],
+        "extensions": [".tether", ".kl"],
         "configuration": "./language-configuration.json"
       }
     ],
     "grammars": [
       {
-        "language": "kiln",
-        "scopeName": "source.kiln",
-        "path": "./syntaxes/kiln.tmLanguage.json"
+        "language": "tetherscript",
+        "scopeName": "source.tetherscript",
+        "path": "./syntaxes/tetherscript.tmLanguage.json"
       }
     ],
     "configuration": {
-      "title": "Kiln",
+      "title": "TetherScript",
       "properties": {
-        "kiln.serverPath": {
+        "tetherscript.serverPath": {
           "type": "string",
-          "default": "kiln",
-          "description": "Path to the `kiln` binary used to serve LSP. Must be on PATH or an absolute path."
+          "default": "tetherscript",
+          "description": "Path to the `tetherscript` binary used to serve LSP. Must be on PATH or an absolute path."
         },
-        "kiln.trace.server": {
+        "tetherscript.trace.server": {
           "type": "string",
           "enum": ["off", "messages", "verbose"],
           "default": "off",
-          "description": "Trace LSP traffic between VSCode and kiln-lsp."
+          "description": "Trace LSP traffic between VSCode and tetherscript-lsp."
         }
       }
     }

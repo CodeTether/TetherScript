@@ -1,13 +1,16 @@
 [package]
-name = "kiln"
-version = "0.0.4"
+name = "tetherscript"
+version = "1.0.0"
 edition = "2021"
 description = "A dynamically-typed scripting language with Rust-style ownership, implemented as a bytecode VM in Rust"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-serde_json = "1"
+
+[lib]
+name = "tetherscript"
+path = "src/lib.rs"
 
 [[bin]]
-name = "kiln"
+name = "tetherscript"
 path = "src/main.rs"
