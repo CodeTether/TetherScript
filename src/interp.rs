@@ -5,12 +5,19 @@
 //! us a runnable language *today*. The bytecode VM will port these semantics
 //! one-to-one.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::ast::*;
-use crate::value::{Env, FnObj, NativeFn, Slot, Value};
+use crate::http;
+use crate::json;
+use crate::lexer::Lexer;
+use crate::output;
+use crate::parser::Parser;
+use crate::smtp;
+use crate::system;
+use crate::value::{Env, FnObj, NativeFn, NativeFunc, Runtime, Slot, Value};
 
 /// Non-local control flow. Wrapped in Result::Err so we can `?` it through
 /// the evaluator without polluting the happy path.
@@ -18,10 +25,15 @@ pub enum Unwind {
     Error(String),
     Return(Value),
     Panic(String),
+    /// Short-circuit from `expr?` when expr is Err(_). Caught by the
+    /// enclosing function call, which converts it to a `Return(Err(...))`.
+    TryErr(String),
 }
 
 impl From<String> for Unwind {
-    fn from(s: String) -> Self { Unwind::Error(s) }
+    fn from(s: String) -> Self {
+        Unwind::Error(s)
+    }
 }
 
 pub type EvalResult = Result<Value, Unwind>;
@@ -35,6 +47,56 @@ impl Interpreter {
         let globals = Env::new_global();
         install_builtins(&globals);
         Self { globals }
+    }
+
+    /// Interpreter with a restricted built-in set: no `http_serve`, no `eval`.
+    /// Used to run untrusted source passed to `eval(...)` from a hosted REPL.
+    pub fn new_sandboxed() -> Self {
+        let globals = Env::new_global();
+        install_sandbox_builtins(&globals);
+        Self { globals }
+    }
+
+    /// Install a capability at the given global name. The harness calls this
+    /// to grant authority to the agent: `interp.grant("fs", FsAuthority::new(root))`.
+    /// Grants are additive — calling grant twice with the same name replaces
+    /// the binding.
+    pub fn grant(&mut self, name: &str, authority: Rc<dyn crate::capability::Authority>) {
+        let cap = crate::capability::Capability::new_root(name, authority);
+        self.globals
+            .borrow_mut()
+            .define(name, Value::Capability(cap), false);
+    }
+
+    /// Run a program as a REPL snippet: hoist fn decls, evaluate each
+    /// top-level statement in order, and return the last evaluated value
+    /// (or `Nil` if the snippet ended in a statement with no value).
+    /// Unlike `run`, this does NOT auto-invoke `main`.
+    pub fn run_repl(&mut self, program: &Program) -> Result<Value, String> {
+        for stmt in &program.stmts {
+            if let Stmt::FnDecl { name, params, body } = stmt {
+                let func = Value::Fn(Rc::new(FnObj {
+                    params: params.clone(),
+                    body: body.clone(),
+                    closure: self.globals.clone(),
+                    name: Some(name.clone()),
+                }));
+                self.globals.borrow_mut().define(name, func, false);
+            }
+        }
+        let mut last = Value::Nil;
+        for stmt in &program.stmts {
+            if matches!(stmt, Stmt::FnDecl { .. }) {
+                continue;
+            }
+            match self.exec_stmt(stmt, &self.globals.clone()) {
+                Ok(v) => last = v,
+                Err(Unwind::Error(e)) | Err(Unwind::Panic(e)) => return Err(e),
+                Err(Unwind::Return(_)) => return Err("`return` outside of function".into()),
+                Err(Unwind::TryErr(e)) => return Err(format!("unhandled `?` error: {}", e)),
+            }
+        }
+        Ok(last)
     }
 
     pub fn run(&mut self, program: &Program) -> Result<(), String> {
@@ -53,22 +115,28 @@ impl Interpreter {
         }
 
         for stmt in &program.stmts {
-            if matches!(stmt, Stmt::FnDecl { .. }) { continue; }
+            if matches!(stmt, Stmt::FnDecl { .. }) {
+                continue;
+            }
             match self.exec_stmt(stmt, &self.globals.clone()) {
                 Ok(_) => {}
                 Err(Unwind::Error(e)) | Err(Unwind::Panic(e)) => return Err(e),
                 Err(Unwind::Return(_)) => return Err("`return` outside of function".into()),
+                Err(Unwind::TryErr(e)) => {
+                    return Err(format!("unhandled `?` error at top level: {}", e))
+                }
             }
         }
 
         // Conventional entry point: if `main` is defined, call it.
         let has_main = self.globals.borrow().slots.contains_key("main");
         if has_main {
-            let main = self.globals.borrow().get("main").map_err(|e| e)?;
+            let main = self.globals.borrow().get("main")?;
             match self.call(&main, &[]) {
                 Ok(_) => Ok(()),
                 Err(Unwind::Error(e)) | Err(Unwind::Panic(e)) => Err(e),
                 Err(Unwind::Return(_)) => Err("`return` unwound out of main".into()),
+                Err(Unwind::TryErr(e)) => Err(format!("unhandled `?` error from main: {}", e)),
             }
         } else {
             Ok(())
@@ -79,7 +147,11 @@ impl Interpreter {
 
     fn exec_stmt(&self, stmt: &Stmt, env: &Rc<RefCell<Env>>) -> EvalResult {
         match stmt {
-            Stmt::Let { name, mutable, value } => {
+            Stmt::Let {
+                name,
+                mutable,
+                value,
+            } => {
                 let v = self.eval(value, env)?;
                 env.borrow_mut().define(name, v, *mutable);
                 Ok(Value::Nil)
@@ -105,9 +177,16 @@ impl Interpreter {
             match stmt {
                 Stmt::Expr { expr, terminated } => {
                     let v = self.eval(expr, env)?;
-                    if is_last && !terminated { last = v; } else { last = Value::Nil; }
+                    if is_last && !terminated {
+                        last = v;
+                    } else {
+                        last = Value::Nil;
+                    }
                 }
-                _ => { self.exec_stmt(stmt, env)?; last = Value::Nil; }
+                _ => {
+                    self.exec_stmt(stmt, env)?;
+                    last = Value::Nil;
+                }
             }
         }
         Ok(last)
@@ -116,12 +195,13 @@ impl Interpreter {
     // ---------- expressions ----------
 
     fn eval(&self, expr: &Expr, env: &Rc<RefCell<Env>>) -> EvalResult {
+        step_tick()?;
         match expr {
-            Expr::Int(n)   => Ok(Value::Int(*n)),
+            Expr::Int(n) => Ok(Value::Int(*n)),
             Expr::Float(n) => Ok(Value::Float(*n)),
-            Expr::Str(s)   => Ok(Value::Str(Rc::new(s.clone()))),
-            Expr::Bool(b)  => Ok(Value::Bool(*b)),
-            Expr::Nil      => Ok(Value::Nil),
+            Expr::Str(s) => Ok(Value::Str(Rc::new(s.clone()))),
+            Expr::Bool(b) => Ok(Value::Bool(*b)),
+            Expr::Nil => Ok(Value::Nil),
 
             Expr::Ident(name) => Ok(env.borrow().get(name)?),
 
@@ -153,12 +233,16 @@ impl Interpreter {
                 }
                 if *op == BinOp::And {
                     let l = self.eval(lhs, env)?;
-                    if !l.truthy() { return Ok(l); }
+                    if !l.truthy() {
+                        return Ok(l);
+                    }
                     return self.eval(rhs, env);
                 }
                 if *op == BinOp::Or {
                     let l = self.eval(lhs, env)?;
-                    if l.truthy() { return Ok(l); }
+                    if l.truthy() {
+                        return Ok(l);
+                    }
                     return self.eval(rhs, env);
                 }
                 let l = self.eval(lhs, env)?;
@@ -168,14 +252,18 @@ impl Interpreter {
 
             Expr::List(items) => {
                 let mut xs = Vec::with_capacity(items.len());
-                for it in items { xs.push(self.eval(it, env)?); }
+                for it in items {
+                    xs.push(self.eval(it, env)?);
+                }
                 Ok(Value::List(Rc::new(RefCell::new(xs))))
             }
 
             Expr::Call { callee, args } => {
                 let callee = self.eval(callee, env)?;
                 let mut arg_vals = Vec::with_capacity(args.len());
-                for a in args { arg_vals.push(self.eval(a, env)?); }
+                for a in args {
+                    arg_vals.push(self.eval(a, env)?);
+                }
                 self.call(&callee, &arg_vals)
             }
 
@@ -193,11 +281,25 @@ impl Interpreter {
             Expr::Method { target, name, args } => {
                 let t = self.eval(target, env)?;
                 let mut arg_vals = Vec::with_capacity(args.len());
-                for a in args { arg_vals.push(self.eval(a, env)?); }
+                for a in args {
+                    arg_vals.push(self.eval(a, env)?);
+                }
+                // Capabilities dispatch through their Authority trait and
+                // need a Runtime so they can invoke TetherScript callables. All
+                // other method calls go through the flat `call_method`.
+                if let Value::Capability(c) = &t {
+                    let mut rt = InterpRuntime { interp: self };
+                    return call_capability_method(c, name, &arg_vals, &mut rt)
+                        .map_err(Unwind::Error);
+                }
                 call_method(&t, name, &arg_vals).map_err(Unwind::Error)
             }
 
-            Expr::If { cond, then_branch, else_branch } => {
+            Expr::If {
+                cond,
+                then_branch,
+                else_branch,
+            } => {
                 let c = self.eval(cond, env)?;
                 if c.truthy() {
                     let scope = Env::child(env);
@@ -213,7 +315,9 @@ impl Interpreter {
             Expr::While { cond, body } => {
                 loop {
                     let c = self.eval(cond, env)?;
-                    if !c.truthy() { break; }
+                    if !c.truthy() {
+                        break;
+                    }
                     let scope = Env::child(env);
                     self.exec_block(body, &scope)?;
                 }
@@ -225,14 +329,12 @@ impl Interpreter {
                 self.exec_block(block, &scope)
             }
 
-            Expr::Fn { params, body } => {
-                Ok(Value::Fn(Rc::new(FnObj {
-                    params: params.clone(),
-                    body: body.clone(),
-                    closure: env.clone(),
-                    name: None,
-                })))
-            }
+            Expr::Fn { params, body } => Ok(Value::Fn(Rc::new(FnObj {
+                params: params.clone(),
+                body: body.clone(),
+                closure: env.clone(),
+                name: None,
+            }))),
 
             Expr::Return(inner) => {
                 let v = match inner {
@@ -245,6 +347,20 @@ impl Interpreter {
             Expr::Panic(msg) => {
                 let v = self.eval(msg, env)?;
                 Err(Unwind::Panic(format!("panic: {}", v)))
+            }
+
+            Expr::Try(inner) => {
+                let v = self.eval(inner, env)?;
+                match v {
+                    Value::Result(r) => match r.as_ref() {
+                        crate::value::ResultValue::Ok(inner) => Ok(inner.clone()),
+                        crate::value::ResultValue::Err(e) => Err(Unwind::TryErr(e.clone())),
+                    },
+                    other => Err(Unwind::Error(format!(
+                        "? operator applied to {}, expected Result",
+                        other.type_name()
+                    ))),
+                }
             }
         }
     }
@@ -265,7 +381,10 @@ impl Interpreter {
                         let len = xs.len() as i64;
                         let idx = if *idx < 0 { idx + len } else { *idx };
                         if idx < 0 || idx >= len {
-                            return Err(Unwind::Error(format!("index {} out of bounds (len {})", idx, len)));
+                            return Err(Unwind::Error(format!(
+                                "index {} out of bounds (len {})",
+                                idx, len
+                            )));
                         }
                         xs[idx as usize] = value.clone();
                         Ok(value)
@@ -275,7 +394,9 @@ impl Interpreter {
                         Ok(value)
                     }
                     _ => Err(Unwind::Error(format!(
-                        "cannot index-assign into {} with {}", t.type_name(), i.type_name()
+                        "cannot index-assign into {} with {}",
+                        t.type_name(),
+                        i.type_name()
                     ))),
                 }
             }
@@ -287,7 +408,9 @@ impl Interpreter {
                         Ok(value)
                     }
                     _ => Err(Unwind::Error(format!(
-                        "cannot set field `{}` on {}", name, t.type_name()
+                        "cannot set field `{}` on {}",
+                        name,
+                        t.type_name()
                     ))),
                 }
             }
@@ -301,21 +424,33 @@ impl Interpreter {
                 if args.len() != f.params.len() {
                     return Err(Unwind::Error(format!(
                         "{} expected {} args, got {}",
-                        f.name.as_deref().unwrap_or("<fn>"), f.params.len(), args.len()
+                        f.name.as_deref().unwrap_or("<fn>"),
+                        f.params.len(),
+                        args.len()
                     )));
                 }
                 let scope = Env::child(&f.closure);
                 {
                     let mut s = scope.borrow_mut();
                     for (name, val) in f.params.iter().zip(args.iter()) {
-                        s.slots.insert(name.clone(), Slot::Live {
-                            value: val.clone(), mutable: true,
-                        });
+                        s.slots.insert(
+                            name.clone(),
+                            Slot::Live {
+                                value: val.clone(),
+                                mutable: true,
+                            },
+                        );
                     }
                 }
                 match self.exec_block(&f.body, &scope) {
                     Ok(v) => Ok(v),
                     Err(Unwind::Return(v)) => Ok(v),
+                    // `expr?` inside `f` short-circuited with an Err — lift
+                    // it to the function's return value so callers see an
+                    // Err Result, not a runtime error.
+                    Err(Unwind::TryErr(e)) => {
+                        Ok(Value::Result(Rc::new(crate::value::ResultValue::Err(e))))
+                    }
                     Err(other) => Err(other),
                 }
             }
@@ -323,14 +458,32 @@ impl Interpreter {
                 if let Some(arity) = n.arity {
                     if args.len() != arity {
                         return Err(Unwind::Error(format!(
-                            "{} expected {} args, got {}", n.name, arity, args.len()
+                            "{} expected {} args, got {}",
+                            n.name,
+                            arity,
+                            args.len()
                         )));
                     }
                 }
-                (n.func)(args).map_err(Unwind::Error)
+                match &n.func {
+                    NativeFunc::Pure(f) => f(args).map_err(Unwind::Error),
+                    NativeFunc::Runtime(f) => {
+                        let mut rt = InterpRuntime { interp: self };
+                        f(&mut rt, args).map_err(Unwind::Error)
+                    }
+                }
             }
-            other => Err(Unwind::Error(format!("{} is not callable", other.type_name()))),
+            other => Err(Unwind::Error(format!(
+                "{} is not callable",
+                other.type_name()
+            ))),
         }
+    }
+}
+
+impl Default for Interpreter {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -338,9 +491,9 @@ impl Interpreter {
 
 pub(crate) fn apply_unary(op: UnOp, v: Value) -> Result<Value, String> {
     match (op, v) {
-        (UnOp::Neg, Value::Int(n))   => Ok(Value::Int(-n)),
+        (UnOp::Neg, Value::Int(n)) => Ok(Value::Int(-n)),
         (UnOp::Neg, Value::Float(n)) => Ok(Value::Float(-n)),
-        (UnOp::Not, v)               => Ok(Value::Bool(!v.truthy())),
+        (UnOp::Not, v) => Ok(Value::Bool(!v.truthy())),
         (op, v) => Err(format!("cannot apply {:?} to {}", op, v.type_name())),
     }
 }
@@ -350,13 +503,13 @@ pub(crate) fn apply_binary(op: BinOp, l: Value, r: Value) -> Result<Value, Strin
     use Value::*;
     match (op, &l, &r) {
         // Numeric
-        (Add, Int(a), Int(b))     => Ok(Int(a + b)),
-        (Sub, Int(a), Int(b))     => Ok(Int(a - b)),
-        (Mul, Int(a), Int(b))     => Ok(Int(a * b)),
-        (Div, Int(_), Int(0))     => Err("integer division by zero".into()),
-        (Div, Int(a), Int(b))     => Ok(Int(a / b)),
-        (Mod, Int(_), Int(0))     => Err("integer modulo by zero".into()),
-        (Mod, Int(a), Int(b))     => Ok(Int(a % b)),
+        (Add, Int(a), Int(b)) => Ok(Int(a + b)),
+        (Sub, Int(a), Int(b)) => Ok(Int(a - b)),
+        (Mul, Int(a), Int(b)) => Ok(Int(a * b)),
+        (Div, Int(_), Int(0)) => Err("integer division by zero".into()),
+        (Div, Int(a), Int(b)) => Ok(Int(a / b)),
+        (Mod, Int(_), Int(0)) => Err("integer modulo by zero".into()),
+        (Mod, Int(a), Int(b)) => Ok(Int(a % b)),
 
         (Add, Float(a), Float(b)) => Ok(Float(a + b)),
         (Sub, Float(a), Float(b)) => Ok(Float(a - b)),
@@ -364,24 +517,27 @@ pub(crate) fn apply_binary(op: BinOp, l: Value, r: Value) -> Result<Value, Strin
         (Div, Float(a), Float(b)) => Ok(Float(a / b)),
 
         // String concatenation
-        (Add, Str(a), Str(b))     => Ok(Str(Rc::new(format!("{}{}", a, b)))),
-        (Add, Str(a), b)          => Ok(Str(Rc::new(format!("{}{}", a, b)))),
-        (Add, a, Str(b))          => Ok(Str(Rc::new(format!("{}{}", a, b)))),
+        (Add, Str(a), Str(b)) => Ok(Str(Rc::new(format!("{}{}", a, b)))),
+        (Add, Str(a), b) => Ok(Str(Rc::new(format!("{}{}", a, b)))),
+        (Add, a, Str(b)) => Ok(Str(Rc::new(format!("{}{}", a, b)))),
 
         // Comparisons
-        (Eq, a, b)    => Ok(Bool(values_eq(a, b))),
+        (Eq, a, b) => Ok(Bool(values_eq(a, b))),
         (NotEq, a, b) => Ok(Bool(!values_eq(a, b))),
-        (Lt, Int(a), Int(b))     => Ok(Bool(a < b)),
-        (Gt, Int(a), Int(b))     => Ok(Bool(a > b)),
-        (LtEq, Int(a), Int(b))   => Ok(Bool(a <= b)),
-        (GtEq, Int(a), Int(b))   => Ok(Bool(a >= b)),
+        (Lt, Int(a), Int(b)) => Ok(Bool(a < b)),
+        (Gt, Int(a), Int(b)) => Ok(Bool(a > b)),
+        (LtEq, Int(a), Int(b)) => Ok(Bool(a <= b)),
+        (GtEq, Int(a), Int(b)) => Ok(Bool(a >= b)),
         (Lt, Float(a), Float(b)) => Ok(Bool(a < b)),
         (Gt, Float(a), Float(b)) => Ok(Bool(a > b)),
         (LtEq, Float(a), Float(b)) => Ok(Bool(a <= b)),
         (GtEq, Float(a), Float(b)) => Ok(Bool(a >= b)),
 
         (op, a, b) => Err(format!(
-            "cannot apply {:?} to {} and {}", op, a.type_name(), b.type_name()
+            "cannot apply {:?} to {} and {}",
+            op,
+            a.type_name(),
+            b.type_name()
         )),
     }
 }
@@ -389,13 +545,13 @@ pub(crate) fn apply_binary(op: BinOp, l: Value, r: Value) -> Result<Value, Strin
 fn values_eq(a: &Value, b: &Value) -> bool {
     use Value::*;
     match (a, b) {
-        (Nil, Nil)             => true,
-        (Int(a), Int(b))       => a == b,
-        (Float(a), Float(b))   => a == b,
-        (Int(a), Float(b))     => (*a as f64) == *b,
-        (Float(a), Int(b))     => *a == (*b as f64),
-        (Bool(a), Bool(b))     => a == b,
-        (Str(a), Str(b))       => a == b,
+        (Nil, Nil) => true,
+        (Int(a), Int(b)) => a == b,
+        (Float(a), Float(b)) => a == b,
+        (Int(a), Float(b)) => (*a as f64) == *b,
+        (Float(a), Int(b)) => *a == (*b as f64),
+        (Bool(a), Bool(b)) => a == b,
+        (Str(a), Str(b)) => a == b,
         _ => false,
     }
 }
@@ -411,9 +567,7 @@ pub(crate) fn index_value(target: &Value, index: &Value) -> Result<Value, String
             }
             Ok(xs[idx as usize].clone())
         }
-        (Value::Map(m), Value::Str(k)) => {
-            Ok(m.borrow().get(&**k).cloned().unwrap_or(Value::Nil))
-        }
+        (Value::Map(m), Value::Str(k)) => Ok(m.borrow().get(&**k).cloned().unwrap_or(Value::Nil)),
         (Value::Str(s), Value::Int(i)) => {
             let bytes = s.as_bytes();
             let len = bytes.len() as i64;
@@ -421,16 +575,26 @@ pub(crate) fn index_value(target: &Value, index: &Value) -> Result<Value, String
             if idx < 0 || idx >= len {
                 return Err(format!("index {} out of bounds (len {})", i, len));
             }
-            Ok(Value::Str(Rc::new((bytes[idx as usize] as char).to_string())))
+            Ok(Value::Str(Rc::new(
+                (bytes[idx as usize] as char).to_string(),
+            )))
         }
-        (t, i) => Err(format!("cannot index {} with {}", t.type_name(), i.type_name())),
+        (t, i) => Err(format!(
+            "cannot index {} with {}",
+            t.type_name(),
+            i.type_name()
+        )),
     }
 }
 
 pub(crate) fn field_value(target: &Value, name: &str) -> Result<Value, String> {
     match target {
         Value::Map(m) => Ok(m.borrow().get(name).cloned().unwrap_or(Value::Nil)),
-        _ => Err(format!("cannot access field `{}` on {}", name, target.type_name())),
+        _ => Err(format!(
+            "cannot access field `{}` on {}",
+            name,
+            target.type_name()
+        )),
     }
 }
 
@@ -441,75 +605,771 @@ pub(crate) fn call_method(target: &Value, name: &str, args: &[Value]) -> Result<
             xs.borrow_mut().push(v.clone());
             Ok(Value::Nil)
         }
-        (Value::List(xs), "pop", []) => {
-            Ok(xs.borrow_mut().pop().unwrap_or(Value::Nil))
+        (Value::List(xs), "pop", []) => Ok(xs.borrow_mut().pop().unwrap_or(Value::Nil)),
+        (Value::List(xs), "join", [sep]) => {
+            let sep = match sep {
+                Value::Str(sep) => sep.as_str(),
+                other => {
+                    return Err(format!(
+                        "list.join: separator must be str, got {}",
+                        other.type_name()
+                    ))
+                }
+            };
+            let parts: Vec<String> = xs.borrow().iter().map(|value| value.to_string()).collect();
+            Ok(Value::Str(Rc::new(parts.join(sep))))
+        }
+        (Value::List(xs), "contains", [needle]) => {
+            Ok(Value::Bool(xs.borrow().iter().any(|value| value == needle)))
         }
         (Value::Str(s), "len", []) => Ok(Value::Int(s.len() as i64)),
         (Value::Str(s), "upper", []) => Ok(Value::Str(Rc::new(s.to_uppercase()))),
         (Value::Str(s), "lower", []) => Ok(Value::Str(Rc::new(s.to_lowercase()))),
+        (Value::Str(s), "trim", []) => Ok(Value::Str(Rc::new(s.trim().to_string()))),
+        (Value::Str(s), "contains", [needle]) => {
+            let needle = match needle {
+                Value::Str(needle) => needle.as_str(),
+                other => {
+                    return Err(format!(
+                        "str.contains: needle must be str, got {}",
+                        other.type_name()
+                    ))
+                }
+            };
+            Ok(Value::Bool(s.contains(needle)))
+        }
+        (Value::Str(s), "starts_with", [needle]) => {
+            let needle = match needle {
+                Value::Str(needle) => needle.as_str(),
+                other => {
+                    return Err(format!(
+                        "str.starts_with: needle must be str, got {}",
+                        other.type_name()
+                    ))
+                }
+            };
+            Ok(Value::Bool(s.starts_with(needle)))
+        }
+        (Value::Str(s), "ends_with", [needle]) => {
+            let needle = match needle {
+                Value::Str(needle) => needle.as_str(),
+                other => {
+                    return Err(format!(
+                        "str.ends_with: needle must be str, got {}",
+                        other.type_name()
+                    ))
+                }
+            };
+            Ok(Value::Bool(s.ends_with(needle)))
+        }
+        (Value::Str(s), "replace", [from, to]) => {
+            let from = match from {
+                Value::Str(from) => from.as_str(),
+                other => {
+                    return Err(format!(
+                        "str.replace: from must be str, got {}",
+                        other.type_name()
+                    ))
+                }
+            };
+            let to = match to {
+                Value::Str(to) => to.as_str(),
+                other => {
+                    return Err(format!(
+                        "str.replace: to must be str, got {}",
+                        other.type_name()
+                    ))
+                }
+            };
+            Ok(Value::Str(Rc::new(s.replace(from, to))))
+        }
+        (Value::Str(s), "split", [sep]) => {
+            let sep = match sep {
+                Value::Str(sep) => sep.as_str(),
+                other => {
+                    return Err(format!(
+                        "str.split: separator must be str, got {}",
+                        other.type_name()
+                    ))
+                }
+            };
+            let parts = s
+                .split(sep)
+                .map(|part| Value::Str(Rc::new(part.to_string())))
+                .collect();
+            Ok(Value::List(Rc::new(RefCell::new(parts))))
+        }
+        (Value::Str(s), "lines", []) => {
+            let lines = s
+                .lines()
+                .map(|line| Value::Str(Rc::new(line.to_string())))
+                .collect();
+            Ok(Value::List(Rc::new(RefCell::new(lines))))
+        }
         (Value::Map(m), "len", []) => Ok(Value::Int(m.borrow().len() as i64)),
+        (Value::Map(m), "contains", [key]) => {
+            let key = match key {
+                Value::Str(key) => key.as_str(),
+                other => {
+                    return Err(format!(
+                        "map.contains: key must be str, got {}",
+                        other.type_name()
+                    ))
+                }
+            };
+            Ok(Value::Bool(m.borrow().contains_key(key)))
+        }
         (Value::Map(m), "keys", []) => {
-            let keys: Vec<Value> = m.borrow().keys()
+            let keys: Vec<Value> = m
+                .borrow()
+                .keys()
                 .map(|k| Value::Str(Rc::new(k.clone())))
                 .collect();
             Ok(Value::List(Rc::new(RefCell::new(keys))))
         }
+        (Value::Map(m), "values", []) => {
+            let values = m.borrow().values().cloned().collect();
+            Ok(Value::List(Rc::new(RefCell::new(values))))
+        }
+        (Value::Result(r), name, args) => call_result_method(r, name, args),
         (t, n, _) => Err(format!("no method `{}` on {}", n, t.type_name())),
+    }
+}
+
+/// Built-in methods that every capability supports regardless of kind.
+/// `narrow` and `revoke` and `is_revoked` live here; `read`/`write`/`get`/...
+/// dispatch through Authority::invoke.
+pub(crate) fn call_capability_method(
+    cap: &Rc<crate::capability::Capability>,
+    name: &str,
+    args: &[Value],
+    rt: &mut dyn Runtime,
+) -> Result<Value, String> {
+    match (name, args) {
+        ("narrow", [params]) => {
+            let child = cap.narrow(params)?;
+            Ok(Value::Capability(child))
+        }
+        ("narrow", _) => Err("capability.narrow expects one map argument".into()),
+        ("revoke", []) => {
+            cap.revoke();
+            Ok(Value::Nil)
+        }
+        ("is_revoked", []) => Ok(Value::Bool(cap.is_revoked())),
+        ("kind", []) => Ok(Value::Str(Rc::new(cap.kind.clone()))),
+        _ => {
+            // Every authority method returns a TetherScript Result so callers can
+            // use `?` or `.is_ok()` uniformly. Native-side `Ok(v)` lifts to
+            // `Value::Result(Ok(v))`; native-side `Err(e)` lifts to
+            // `Value::Result(Err(e))` — not a runtime error, because the
+            // call itself succeeded (the authority reported a failure).
+            match cap.invoke(rt, name, args) {
+                Ok(v) => Ok(Value::Result(Rc::new(crate::value::ResultValue::Ok(v)))),
+                Err(e) => Ok(Value::Result(Rc::new(crate::value::ResultValue::Err(e)))),
+            }
+        }
+    }
+}
+
+fn call_result_method(
+    r: &Rc<crate::value::ResultValue>,
+    name: &str,
+    args: &[Value],
+) -> Result<Value, String> {
+    use crate::value::ResultValue;
+    match (r.as_ref(), name, args) {
+        (ResultValue::Ok(_), "is_ok", []) => Ok(Value::Bool(true)),
+        (ResultValue::Err(_), "is_ok", []) => Ok(Value::Bool(false)),
+        (ResultValue::Ok(_), "is_err", []) => Ok(Value::Bool(false)),
+        (ResultValue::Err(_), "is_err", []) => Ok(Value::Bool(true)),
+        (ResultValue::Ok(v), "unwrap", []) => Ok(v.clone()),
+        (ResultValue::Err(e), "unwrap", []) => Err(format!("called unwrap on Err({:?})", e)),
+        (ResultValue::Ok(v), "unwrap_or", [_]) => Ok(v.clone()),
+        (ResultValue::Err(_), "unwrap_or", [d]) => Ok(d.clone()),
+        (ResultValue::Ok(v), "ok", []) => Ok(v.clone()),
+        (ResultValue::Err(_), "ok", []) => Ok(Value::Nil),
+        (ResultValue::Ok(_), "err", []) => Ok(Value::Nil),
+        (ResultValue::Err(e), "err", []) => Ok(Value::Str(Rc::new(e.clone()))),
+        (_, n, _) => Err(format!("no method `{}` on result", n)),
+    }
+}
+
+// ---------- step budget (for sandboxed eval) ----------
+
+thread_local! {
+    static STEPS_REMAINING: Cell<Option<u64>> = const { Cell::new(None) };
+}
+
+/// Run `f` with an AST-step budget enforced on `Interpreter::eval` calls.
+/// Outside this wrapper, the interpreter is uncapped.
+pub fn with_step_budget<F, R>(budget: u64, f: F) -> R
+where
+    F: FnOnce() -> R,
+{
+    let prev = STEPS_REMAINING.with(|s| s.replace(Some(budget)));
+    let r = f();
+    STEPS_REMAINING.with(|s| s.set(prev));
+    r
+}
+
+fn step_tick() -> Result<(), Unwind> {
+    let exhausted = STEPS_REMAINING.with(|s| match s.get() {
+        None => false,
+        Some(0) => true,
+        Some(n) => {
+            s.set(Some(n - 1));
+            false
+        }
+    });
+    if exhausted {
+        Err(Unwind::Error(
+            "eval step budget exhausted (possible infinite loop)".into(),
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+// ---------- Runtime bridge ----------
+
+/// Lets runtime-aware natives re-enter the tree-walker to invoke a callable.
+struct InterpRuntime<'a> {
+    interp: &'a Interpreter,
+}
+
+impl<'a> Runtime for InterpRuntime<'a> {
+    fn invoke(&mut self, callee: &Value, args: &[Value]) -> Result<Value, String> {
+        match self.interp.call(callee, args) {
+            Ok(v) => Ok(v),
+            Err(Unwind::Error(e)) | Err(Unwind::Panic(e)) | Err(Unwind::TryErr(e)) => Err(e),
+            Err(Unwind::Return(_)) => Err("`return` unwound out of callback".into()),
+        }
     }
 }
 
 // ---------- built-ins ----------
 
 pub(crate) fn install_builtins(env: &Rc<RefCell<Env>>) {
+    install_pure_builtins(env);
     let mut e = env.borrow_mut();
 
-    let println_fn = Value::Native(Rc::new(NativeFn {
-        name: "println".into(),
-        arity: None,
-        func: Box::new(|args| {
+    e.define(
+        "http_serve",
+        runtime_native("http_serve", Some(2), |rt, args| {
+            http::serve(rt, &args[0], &args[1])
+        }),
+        false,
+    );
+
+    e.define(
+        "http_get",
+        pure_native("http_get", Some(1), |args| Ok(http::get(&args[0]))),
+        false,
+    );
+    e.define(
+        "http_head",
+        pure_native("http_head", Some(1), |args| Ok(http::head(&args[0]))),
+        false,
+    );
+    e.define(
+        "http_post",
+        pure_native("http_post", Some(2), |args| {
+            Ok(http::post(&args[0], &args[1]))
+        }),
+        false,
+    );
+    e.define(
+        "http_request",
+        pure_native("http_request", None, |args| Ok(http::request(args))),
+        false,
+    );
+
+    e.define(
+        "time_now_ms",
+        pure_native("time_now_ms", Some(0), |_args| Ok(system::time_now_ms())),
+        false,
+    );
+    e.define(
+        "sleep_ms",
+        pure_native("sleep_ms", Some(1), |args| Ok(system::sleep_ms(&args[0]))),
+        false,
+    );
+    e.define(
+        "env_get",
+        pure_native("env_get", Some(1), |args| Ok(system::env_get(&args[0]))),
+        false,
+    );
+    e.define(
+        "cwd",
+        pure_native("cwd", Some(0), |_args| Ok(system::cwd())),
+        false,
+    );
+    e.define(
+        "chdir",
+        pure_native("chdir", Some(1), |args| Ok(system::chdir(&args[0]))),
+        false,
+    );
+    e.define(
+        "fs_read",
+        pure_native("fs_read", Some(1), |args| Ok(system::fs_read(&args[0]))),
+        false,
+    );
+    e.define(
+        "fs_write",
+        pure_native("fs_write", Some(2), |args| {
+            Ok(system::fs_write(&args[0], &args[1]))
+        }),
+        false,
+    );
+    e.define(
+        "fs_exists",
+        pure_native("fs_exists", Some(1), |args| Ok(system::fs_exists(&args[0]))),
+        false,
+    );
+    e.define(
+        "fs_list",
+        pure_native("fs_list", Some(1), |args| Ok(system::fs_list(&args[0]))),
+        false,
+    );
+    e.define(
+        "fs_mkdir",
+        pure_native("fs_mkdir", Some(1), |args| Ok(system::fs_mkdir(&args[0]))),
+        false,
+    );
+    e.define(
+        "process_run",
+        pure_native("process_run", None, |args| Ok(system::process_run(args))),
+        false,
+    );
+    e.define(
+        "process_args",
+        pure_native("process_args", Some(0), |_args| Ok(system::process_args())),
+        false,
+    );
+    e.define(
+        "process_pid",
+        pure_native("process_pid", Some(0), |_args| Ok(system::process_pid())),
+        false,
+    );
+    e.define(
+        "process_platform",
+        pure_native("process_platform", Some(0), |_args| {
+            Ok(system::process_platform())
+        }),
+        false,
+    );
+    e.define(
+        "process_arch",
+        pure_native("process_arch", Some(0), |_args| Ok(system::process_arch())),
+        false,
+    );
+    e.define(
+        "os_platform",
+        pure_native("os_platform", Some(0), |_args| Ok(system::os_platform())),
+        false,
+    );
+    e.define(
+        "os_arch",
+        pure_native("os_arch", Some(0), |_args| Ok(system::os_arch())),
+        false,
+    );
+    e.define(
+        "os_tmpdir",
+        pure_native("os_tmpdir", Some(0), |_args| Ok(system::os_tmpdir())),
+        false,
+    );
+    e.define(
+        "os_homedir",
+        pure_native("os_homedir", Some(0), |_args| Ok(system::os_homedir())),
+        false,
+    );
+    e.define(
+        "os_eol",
+        pure_native("os_eol", Some(0), |_args| Ok(system::os_eol())),
+        false,
+    );
+    e.define(
+        "fs_stat",
+        pure_native("fs_stat", Some(1), |args| Ok(system::fs_stat(&args[0]))),
+        false,
+    );
+    e.define(
+        "fs_remove",
+        pure_native("fs_remove", Some(1), |args| Ok(system::fs_remove(&args[0]))),
+        false,
+    );
+    e.define(
+        "fs_rename",
+        pure_native("fs_rename", Some(2), |args| {
+            Ok(system::fs_rename(&args[0], &args[1]))
+        }),
+        false,
+    );
+    e.define(
+        "fs_copy",
+        pure_native("fs_copy", Some(2), |args| {
+            Ok(system::fs_copy(&args[0], &args[1]))
+        }),
+        false,
+    );
+    e.define(
+        "path_sep",
+        pure_native("path_sep", Some(0), |_args| Ok(system::path_sep())),
+        false,
+    );
+    e.define(
+        "path_join",
+        pure_native("path_join", Some(1), |args| Ok(system::path_join(&args[0]))),
+        false,
+    );
+    e.define(
+        "path_dirname",
+        pure_native("path_dirname", Some(1), |args| {
+            Ok(system::path_dirname(&args[0]))
+        }),
+        false,
+    );
+    e.define(
+        "path_basename",
+        pure_native("path_basename", Some(1), |args| {
+            Ok(system::path_basename(&args[0]))
+        }),
+        false,
+    );
+    e.define(
+        "path_extname",
+        pure_native("path_extname", Some(1), |args| {
+            Ok(system::path_extname(&args[0]))
+        }),
+        false,
+    );
+    e.define(
+        "path_normalize",
+        pure_native("path_normalize", Some(1), |args| {
+            Ok(system::path_normalize(&args[0]))
+        }),
+        false,
+    );
+    e.define(
+        "path_resolve",
+        pure_native("path_resolve", Some(1), |args| {
+            Ok(system::path_resolve(&args[0]))
+        }),
+        false,
+    );
+    e.define(
+        "url_parse",
+        pure_native("url_parse", Some(1), |args| Ok(system::url_parse(&args[0]))),
+        false,
+    );
+    e.define(
+        "sha256_hex",
+        pure_native("sha256_hex", Some(1), |args| {
+            Ok(system::sha256_hex(&args[0]))
+        }),
+        false,
+    );
+    e.define(
+        "base64_encode",
+        pure_native("base64_encode", Some(1), |args| {
+            Ok(system::base64_encode(&args[0]))
+        }),
+        false,
+    );
+    e.define(
+        "base64_decode",
+        pure_native("base64_decode", Some(1), |args| {
+            Ok(system::base64_decode(&args[0]))
+        }),
+        false,
+    );
+
+    e.define(
+        "smtp_send",
+        pure_native("smtp_send", Some(6), |args| {
+            smtp::send(&args[0], &args[1], &args[2], &args[3], &args[4], &args[5])
+        }),
+        false,
+    );
+
+    e.define(
+        "json_parse",
+        pure_native("json_parse", Some(1), |args| json::parse(&args[0])),
+        false,
+    );
+    e.define(
+        "json_encode",
+        pure_native("json_encode", Some(1), |args| json::encode(&args[0])),
+        false,
+    );
+    e.define(
+        "json_encode_pretty",
+        pure_native("json_encode_pretty", Some(1), |args| {
+            json::encode_pretty(&args[0])
+        }),
+        false,
+    );
+
+    e.define(
+        "eval",
+        pure_native("eval", Some(1), |args| eval_source(&args[0])),
+        false,
+    );
+}
+
+/// Subset of built-ins safe to expose to untrusted source running inside
+/// `eval()`: no network, no nested `eval`. Same `println`/`print`/`len`/
+/// `type_of`/`map` set every other example uses.
+fn install_sandbox_builtins(env: &Rc<RefCell<Env>>) {
+    install_pure_builtins(env);
+}
+
+fn install_pure_builtins(env: &Rc<RefCell<Env>>) {
+    let mut e = env.borrow_mut();
+
+    e.define(
+        "println",
+        pure_native("println", None, |args| {
             let s: Vec<String> = args.iter().map(|v| v.to_string()).collect();
-            println!("{}", s.join(" "));
+            output::writeln(&s.join(" "));
             Ok(Value::Nil)
         }),
-    }));
-    e.define("println", println_fn, false);
+        false,
+    );
 
-    let print_fn = Value::Native(Rc::new(NativeFn {
-        name: "print".into(),
-        arity: None,
-        func: Box::new(|args| {
+    e.define(
+        "print",
+        pure_native("print", None, |args| {
             let s: Vec<String> = args.iter().map(|v| v.to_string()).collect();
-            print!("{}", s.join(" "));
+            output::write(&s.join(" "));
             Ok(Value::Nil)
         }),
-    }));
-    e.define("print", print_fn, false);
+        false,
+    );
 
-    let len_fn = Value::Native(Rc::new(NativeFn {
-        name: "len".into(),
-        arity: Some(1),
-        func: Box::new(|args| match &args[0] {
-            Value::Str(s)  => Ok(Value::Int(s.len() as i64)),
+    e.define(
+        "len",
+        pure_native("len", Some(1), |args| match &args[0] {
+            Value::Str(s) => Ok(Value::Int(s.len() as i64)),
             Value::List(x) => Ok(Value::Int(x.borrow().len() as i64)),
-            Value::Map(m)  => Ok(Value::Int(m.borrow().len() as i64)),
+            Value::Map(m) => Ok(Value::Int(m.borrow().len() as i64)),
             v => Err(format!("len: {} has no length", v.type_name())),
         }),
-    }));
-    e.define("len", len_fn, false);
+        false,
+    );
 
-    let type_of_fn = Value::Native(Rc::new(NativeFn {
-        name: "type_of".into(),
-        arity: Some(1),
-        func: Box::new(|args| Ok(Value::Str(Rc::new(args[0].type_name().into())))),
-    }));
-    e.define("type_of", type_of_fn, false);
+    e.define(
+        "type_of",
+        pure_native("type_of", Some(1), |args| {
+            Ok(Value::Str(Rc::new(args[0].type_name().into())))
+        }),
+        false,
+    );
 
-    let map_fn = Value::Native(Rc::new(NativeFn {
-        name: "map".into(),
-        arity: Some(0),
-        func: Box::new(|_args| {
+    e.define(
+        "map",
+        pure_native("map", Some(0), |_args| {
             Ok(Value::Map(Rc::new(RefCell::new(HashMap::new()))))
         }),
-    }));
-    e.define("map", map_fn, false);
+        false,
+    );
+
+    e.define(
+        "str",
+        pure_native("str", Some(1), |args| Ok(system::value_to_string(&args[0]))),
+        false,
+    );
+    e.define(
+        "parse_int",
+        pure_native("parse_int", Some(1), |args| Ok(system::parse_int(&args[0]))),
+        false,
+    );
+    e.define(
+        "parse_float",
+        pure_native("parse_float", Some(1), |args| {
+            Ok(system::parse_float(&args[0]))
+        }),
+        false,
+    );
+    e.define(
+        "assert",
+        pure_native("assert", None, system::assert_builtin),
+        false,
+    );
+
+    e.define(
+        "Ok",
+        pure_native("Ok", Some(1), |args| {
+            Ok(Value::Result(Rc::new(crate::value::ResultValue::Ok(
+                args[0].clone(),
+            ))))
+        }),
+        false,
+    );
+
+    e.define(
+        "Err",
+        pure_native("Err", Some(1), |args| {
+            let msg = match &args[0] {
+                Value::Str(s) => (**s).clone(),
+                other => other.to_string(),
+            };
+            Ok(Value::Result(Rc::new(crate::value::ResultValue::Err(msg))))
+        }),
+        false,
+    );
+}
+
+const EVAL_STEP_BUDGET: u64 = 200_000;
+const EVAL_OUTPUT_LIMIT: usize = 64 * 1024;
+
+fn eval_source(arg: &Value) -> Result<Value, String> {
+    let src = match arg {
+        Value::Str(s) => (**s).clone(),
+        other => {
+            return Err(format!(
+                "eval: source must be a string, got {}",
+                other.type_name()
+            ))
+        }
+    };
+    let (captured, result) = output::with_capture(EVAL_OUTPUT_LIMIT, || {
+        with_step_budget(EVAL_STEP_BUDGET, || run_sandboxed(&src))
+    });
+    Ok(Value::Str(Rc::new(format_eval_output(captured, result))))
+}
+
+fn run_sandboxed(src: &str) -> Result<Value, String> {
+    let tokens = Lexer::new(src)
+        .tokenize()
+        .map_err(|e| format!("lex error at {}:{}: {}", e.line, e.col, e.msg))?;
+    let program = Parser::new(tokens)
+        .parse_program()
+        .map_err(|e| format!("parse error at {}:{}: {}", e.line, e.col, e.msg))?;
+    let mut interp = Interpreter::new_sandboxed();
+    interp.run_repl(&program)
+}
+
+fn format_eval_output(mut out: String, result: Result<Value, String>) -> String {
+    match result {
+        Ok(Value::Nil) => {
+            if out.is_empty() {
+                out.push_str("=> nil\n");
+            }
+        }
+        Ok(v) => {
+            if !out.is_empty() && !out.ends_with('\n') {
+                out.push('\n');
+            }
+            out.push_str("=> ");
+            out.push_str(&v.to_string());
+            out.push('\n');
+        }
+        Err(e) => {
+            if !out.is_empty() && !out.ends_with('\n') {
+                out.push('\n');
+            }
+            out.push_str("error: ");
+            out.push_str(&e);
+            out.push('\n');
+        }
+    }
+    out
+}
+
+fn pure_native<F>(name: &str, arity: Option<usize>, func: F) -> Value
+where
+    F: Fn(&[Value]) -> Result<Value, String> + 'static,
+{
+    Value::Native(Rc::new(NativeFn {
+        name: name.to_string(),
+        arity,
+        func: NativeFunc::Pure(Box::new(func)),
+    }))
+}
+
+fn runtime_native<F>(name: &str, arity: Option<usize>, func: F) -> Value
+where
+    F: Fn(&mut dyn Runtime, &[Value]) -> Result<Value, String> + 'static,
+{
+    Value::Native(Rc::new(NativeFn {
+        name: name.to_string(),
+        arity,
+        func: NativeFunc::Runtime(Box::new(func)),
+    }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::compiler::Compiler;
+    use crate::lexer::Lexer;
+    use crate::parser::Parser;
+    use crate::vm::VM;
+
+    fn parse(source: &str) -> Program {
+        let tokens = Lexer::new(source).tokenize().unwrap();
+        Parser::new(tokens).parse_program().unwrap()
+    }
+
+    #[test]
+    fn standard_tools_work_in_interpreter() {
+        let source = r#"
+fn main() {
+    let parts = " alpha,beta ".trim().split(",")
+    assert(parts.join("|") == "alpha|beta", "split/join failed")
+    assert(parts.contains("alpha"), "list contains failed")
+    assert("tetherscript".starts_with("tether"), "starts_with failed")
+    assert("tetherscript".ends_with("script"), "ends_with failed")
+    assert("tetherscript".replace("script", "") == "tether", "replace failed")
+
+    let m = map()
+    m.answer = 42
+    assert(m.contains("answer"), "map contains failed")
+    assert(m.values().contains(42), "map values failed")
+
+    assert(str(42) == "42", "str failed")
+    assert(parse_int("42").unwrap() == 42, "parse_int failed")
+    assert(parse_float("2.5").unwrap() == 2.5, "parse_float failed")
+    assert(time_now_ms() > 0, "time failed")
+    assert(process_pid() > 0, "pid failed")
+    assert(process_platform().len() > 0, "platform failed")
+    assert(os_arch().len() > 0, "arch failed")
+    assert(path_basename("alpha/beta.txt").unwrap() == "beta.txt", "basename failed")
+    assert(path_extname("alpha/beta.txt").unwrap() == ".txt", "extname failed")
+    assert(sha256_hex("tetherscript").unwrap() == "a724f07d8f90ed2c1c123a60fa8d8118f95f96dc4de19121bf91306a6bdbdb55", "sha failed")
+    assert(base64_decode(base64_encode("tetherscript").unwrap()).unwrap() == "tetherscript", "base64 failed")
+    assert(url_parse("http://example.com/a?b=c").unwrap().host == "example.com", "url failed")
+}
+"#;
+        let program = parse(source);
+        let mut interp = Interpreter::new();
+        interp.run(&program).unwrap();
+    }
+
+    #[test]
+    fn standard_tools_work_in_vm() {
+        let source = r#"
+fn main() {
+    let parts = " alpha,beta ".trim().split(",")
+    assert(parts.join("|") == "alpha|beta", "split/join failed")
+    assert(parts.contains("beta"), "list contains failed")
+    assert("tetherscript".contains("script"), "contains failed")
+
+    let m = map()
+    m.answer = 42
+    assert(m.keys().contains("answer"), "map keys failed")
+
+    assert(str(42) == "42", "str failed")
+    assert(parse_int("42").unwrap() == 42, "parse_int failed")
+    assert(time_now_ms() > 0, "time failed")
+    assert(path_basename("alpha/beta.txt").unwrap() == "beta.txt", "basename failed")
+    assert(base64_decode(base64_encode("tetherscript").unwrap()).unwrap() == "tetherscript", "base64 failed")
+}
+"#;
+        let program = parse(source);
+        let chunk = Compiler::compile_program(&program);
+        let mut vm = VM::new();
+        vm.run(chunk).unwrap();
+    }
 }

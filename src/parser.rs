@@ -52,7 +52,9 @@ impl Parser {
 
     fn bump(&mut self) -> Spanned {
         let t = self.tokens[self.pos].clone();
-        if !self.at_end() { self.pos += 1; }
+        if !self.at_end() {
+            self.pos += 1;
+        }
         t
     }
 
@@ -61,21 +63,35 @@ impl Parser {
     }
 
     fn eat(&mut self, t: &Token) -> bool {
-        if self.check(t) { self.bump(); true } else { false }
+        if self.check(t) {
+            self.bump();
+            true
+        } else {
+            false
+        }
     }
 
     fn expect(&mut self, t: &Token, what: &str) -> Result<Spanned, ParseError> {
-        if self.check(t) { Ok(self.bump()) }
-        else { Err(self.error(format!("expected {}, got {:?}", what, self.peek()))) }
+        if self.check(t) {
+            Ok(self.bump())
+        } else {
+            Err(self.error(format!("expected {}, got {:?}", what, self.peek())))
+        }
     }
 
     fn skip_newlines(&mut self) {
-        while matches!(self.peek(), Token::Newline) { self.bump(); }
+        while matches!(self.peek(), Token::Newline) {
+            self.bump();
+        }
     }
 
     fn error(&self, msg: String) -> ParseError {
         let s = self.peek_spanned();
-        ParseError { msg, line: s.line, col: s.col }
+        ParseError {
+            msg,
+            line: s.line,
+            col: s.col,
+        }
     }
 
     // ---------- statements ----------
@@ -85,10 +101,14 @@ impl Parser {
             Token::Let => self.parse_let(),
             // `fn` followed by an identifier is a declaration; `fn (` is an
             // anonymous function expression (e.g. returned from a block).
-            Token::Fn if matches!(
-                self.tokens.get(self.pos + 1).map(|s| &s.token),
-                Some(Token::Ident(_))
-            ) => self.parse_fn_decl(),
+            Token::Fn
+                if matches!(
+                    self.tokens.get(self.pos + 1).map(|s| &s.token),
+                    Some(Token::Ident(_))
+                ) =>
+            {
+                self.parse_fn_decl()
+            }
             _ => self.parse_expr_stmt(),
         }
     }
@@ -103,7 +123,11 @@ impl Parser {
         self.expect(&Token::Assign, "`=`")?;
         let value = self.parse_expr()?;
         self.consume_stmt_end();
-        Ok(Stmt::Let { name, mutable, value })
+        Ok(Stmt::Let {
+            name,
+            mutable,
+            value,
+        })
     }
 
     fn parse_fn_decl(&mut self) -> Result<Stmt, ParseError> {
@@ -124,11 +148,15 @@ impl Parser {
         while !self.check(&Token::RParen) {
             let name = match self.bump().token {
                 Token::Ident(s) => s,
-                other => return Err(self.error(format!("expected parameter name, got {:?}", other))),
+                other => {
+                    return Err(self.error(format!("expected parameter name, got {:?}", other)))
+                }
             };
             params.push(name);
             self.skip_newlines();
-            if !self.eat(&Token::Comma) { break; }
+            if !self.eat(&Token::Comma) {
+                break;
+            }
             self.skip_newlines();
         }
         self.expect(&Token::RParen, "`)`")?;
@@ -175,7 +203,9 @@ impl Parser {
 
         loop {
             let op_prec = infix_prec(self.peek());
-            if op_prec < min { break; }
+            if op_prec < min {
+                break;
+            }
 
             lhs = self.parse_infix(lhs, op_prec)?;
         }
@@ -185,22 +215,46 @@ impl Parser {
 
     fn parse_prefix(&mut self) -> Result<Expr, ParseError> {
         match self.peek().clone() {
-            Token::Int(n)    => { self.bump(); Ok(Expr::Int(n)) }
-            Token::Float(f)  => { self.bump(); Ok(Expr::Float(f)) }
-            Token::Str(s)    => { self.bump(); Ok(Expr::Str(s)) }
-            Token::Bool(b)   => { self.bump(); Ok(Expr::Bool(b)) }
-            Token::Nil       => { self.bump(); Ok(Expr::Nil) }
-            Token::Ident(s)  => { self.bump(); Ok(Expr::Ident(s)) }
+            Token::Int(n) => {
+                self.bump();
+                Ok(Expr::Int(n))
+            }
+            Token::Float(f) => {
+                self.bump();
+                Ok(Expr::Float(f))
+            }
+            Token::Str(s) => {
+                self.bump();
+                Ok(Expr::Str(s))
+            }
+            Token::Bool(b) => {
+                self.bump();
+                Ok(Expr::Bool(b))
+            }
+            Token::Nil => {
+                self.bump();
+                Ok(Expr::Nil)
+            }
+            Token::Ident(s) => {
+                self.bump();
+                Ok(Expr::Ident(s))
+            }
 
             Token::Minus => {
                 self.bump();
                 let rhs = self.parse_precedence(Prec::Unary)?;
-                Ok(Expr::Unary { op: UnOp::Neg, rhs: Box::new(rhs) })
+                Ok(Expr::Unary {
+                    op: UnOp::Neg,
+                    rhs: Box::new(rhs),
+                })
             }
             Token::Not => {
                 self.bump();
                 let rhs = self.parse_precedence(Prec::Unary)?;
-                Ok(Expr::Unary { op: UnOp::Not, rhs: Box::new(rhs) })
+                Ok(Expr::Unary {
+                    op: UnOp::Not,
+                    rhs: Box::new(rhs),
+                })
             }
             Token::Move => {
                 self.bump();
@@ -234,7 +288,9 @@ impl Parser {
                 while !self.check(&Token::RBracket) {
                     items.push(self.parse_expr()?);
                     self.skip_newlines();
-                    if !self.eat(&Token::Comma) { break; }
+                    if !self.eat(&Token::Comma) {
+                        break;
+                    }
                     self.skip_newlines();
                 }
                 self.expect(&Token::RBracket, "`]`")?;
@@ -246,11 +302,11 @@ impl Parser {
                 Ok(Expr::Block(Box::new(block)))
             }
 
-            Token::If     => self.parse_if(),
-            Token::While  => self.parse_while(),
-            Token::Fn     => self.parse_fn_expr(),
+            Token::If => self.parse_if(),
+            Token::While => self.parse_while(),
+            Token::Fn => self.parse_fn_expr(),
             Token::Return => self.parse_return(),
-            Token::Panic  => self.parse_panic(),
+            Token::Panic => self.parse_panic(),
 
             other => Err(self.error(format!("unexpected token in expression: {:?}", other))),
         }
@@ -264,7 +320,10 @@ impl Parser {
             Token::LParen => {
                 self.bump();
                 let args = self.parse_call_args()?;
-                return Ok(Expr::Call { callee: Box::new(lhs), args });
+                return Ok(Expr::Call {
+                    callee: Box::new(lhs),
+                    args,
+                });
             }
             Token::LBracket => {
                 self.bump();
@@ -272,48 +331,72 @@ impl Parser {
                 let idx = self.parse_expr()?;
                 self.skip_newlines();
                 self.expect(&Token::RBracket, "`]`")?;
-                return Ok(Expr::Index { target: Box::new(lhs), index: Box::new(idx) });
+                return Ok(Expr::Index {
+                    target: Box::new(lhs),
+                    index: Box::new(idx),
+                });
+            }
+            Token::Question => {
+                self.bump();
+                return Ok(Expr::Try(Box::new(lhs)));
             }
             Token::Dot => {
                 self.bump();
                 let name = match self.bump().token {
                     Token::Ident(s) => s,
-                    other => return Err(self.error(format!("expected field name, got {:?}", other))),
+                    other => {
+                        return Err(self.error(format!("expected field name, got {:?}", other)))
+                    }
                 };
                 if self.eat(&Token::LParen) {
                     let args = self.parse_call_args()?;
-                    return Ok(Expr::Method { target: Box::new(lhs), name, args });
+                    return Ok(Expr::Method {
+                        target: Box::new(lhs),
+                        name,
+                        args,
+                    });
                 }
-                return Ok(Expr::Field { target: Box::new(lhs), name });
+                return Ok(Expr::Field {
+                    target: Box::new(lhs),
+                    name,
+                });
             }
             _ => {}
         }
 
         // Binary operators
         let op = match tok {
-            Token::Plus   => BinOp::Add,
-            Token::Minus  => BinOp::Sub,
-            Token::Star   => BinOp::Mul,
-            Token::Slash  => BinOp::Div,
-            Token::Percent=> BinOp::Mod,
-            Token::Eq     => BinOp::Eq,
-            Token::NotEq  => BinOp::NotEq,
-            Token::Lt     => BinOp::Lt,
-            Token::Gt     => BinOp::Gt,
-            Token::LtEq   => BinOp::LtEq,
-            Token::GtEq   => BinOp::GtEq,
-            Token::And    => BinOp::And,
-            Token::Or     => BinOp::Or,
+            Token::Plus => BinOp::Add,
+            Token::Minus => BinOp::Sub,
+            Token::Star => BinOp::Mul,
+            Token::Slash => BinOp::Div,
+            Token::Percent => BinOp::Mod,
+            Token::Eq => BinOp::Eq,
+            Token::NotEq => BinOp::NotEq,
+            Token::Lt => BinOp::Lt,
+            Token::Gt => BinOp::Gt,
+            Token::LtEq => BinOp::LtEq,
+            Token::GtEq => BinOp::GtEq,
+            Token::And => BinOp::And,
+            Token::Or => BinOp::Or,
             Token::Assign => BinOp::Assign,
             _ => return Err(self.error(format!("unexpected infix token: {:?}", tok))),
         };
         self.bump();
 
         // Right-associative for assignment, left-associative for everything else.
-        let next_min = if op == BinOp::Assign { prec } else { prec.next() };
+        let next_min = if op == BinOp::Assign {
+            prec
+        } else {
+            prec.next()
+        };
         self.skip_newlines();
         let rhs = self.parse_precedence(next_min)?;
-        Ok(Expr::Binary { op, lhs: Box::new(lhs), rhs: Box::new(rhs) })
+        Ok(Expr::Binary {
+            op,
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+        })
     }
 
     fn parse_call_args(&mut self) -> Result<Vec<Expr>, ParseError> {
@@ -322,7 +405,9 @@ impl Parser {
         while !self.check(&Token::RParen) {
             args.push(self.parse_expr()?);
             self.skip_newlines();
-            if !self.eat(&Token::Comma) { break; }
+            if !self.eat(&Token::Comma) {
+                break;
+            }
             self.skip_newlines();
         }
         self.expect(&Token::RParen, "`)`")?;
@@ -337,21 +422,33 @@ impl Parser {
             // `else if` chain: synthesize a block wrapping the next if.
             if matches!(self.peek(), Token::If) {
                 let inner = self.parse_if()?;
-                Some(Box::new(Block { stmts: vec![Stmt::Expr { expr: inner, terminated: false }] }))
+                Some(Box::new(Block {
+                    stmts: vec![Stmt::Expr {
+                        expr: inner,
+                        terminated: false,
+                    }],
+                }))
             } else {
                 Some(Box::new(self.parse_block()?))
             }
         } else {
             None
         };
-        Ok(Expr::If { cond: Box::new(cond), then_branch, else_branch })
+        Ok(Expr::If {
+            cond: Box::new(cond),
+            then_branch,
+            else_branch,
+        })
     }
 
     fn parse_while(&mut self) -> Result<Expr, ParseError> {
         self.bump(); // `while`
         let cond = self.parse_expr()?;
         let body = Box::new(self.parse_block()?);
-        Ok(Expr::While { cond: Box::new(cond), body })
+        Ok(Expr::While {
+            cond: Box::new(cond),
+            body,
+        })
     }
 
     fn parse_fn_expr(&mut self) -> Result<Expr, ParseError> {
@@ -363,7 +460,7 @@ impl Parser {
 
     fn parse_return(&mut self) -> Result<Expr, ParseError> {
         self.bump(); // `return`
-        // Optional expression; if the next thing terminates the stmt, bare return.
+                     // Optional expression; if the next thing terminates the stmt, bare return.
         let expr = match self.peek() {
             Token::Semi | Token::Newline | Token::RBrace | Token::Eof => None,
             _ => Some(Box::new(self.parse_expr()?)),
@@ -383,30 +480,30 @@ impl Parser {
 #[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
 pub enum Prec {
     None,
-    Assign,  // =
-    Or,      // ||
-    And,     // &&
-    Equality,// == !=
-    Compare, // < > <= >=
-    Term,    // + -
-    Factor,  // * / %
-    Unary,   // -x, !x, move x, &x
-    Call,    // f() x[] x.y
+    Assign,   // =
+    Or,       // ||
+    And,      // &&
+    Equality, // == !=
+    Compare,  // < > <= >=
+    Term,     // + -
+    Factor,   // * / %
+    Unary,    // -x, !x, move x, &x
+    Call,     // f() x[] x.y
 }
 
 impl Prec {
     fn next(self) -> Prec {
         match self {
-            Prec::None     => Prec::Assign,
-            Prec::Assign   => Prec::Or,
-            Prec::Or       => Prec::And,
-            Prec::And      => Prec::Equality,
+            Prec::None => Prec::Assign,
+            Prec::Assign => Prec::Or,
+            Prec::Or => Prec::And,
+            Prec::And => Prec::Equality,
             Prec::Equality => Prec::Compare,
-            Prec::Compare  => Prec::Term,
-            Prec::Term     => Prec::Factor,
-            Prec::Factor   => Prec::Unary,
-            Prec::Unary    => Prec::Call,
-            Prec::Call     => Prec::Call,
+            Prec::Compare => Prec::Term,
+            Prec::Term => Prec::Factor,
+            Prec::Factor => Prec::Unary,
+            Prec::Unary => Prec::Call,
+            Prec::Call => Prec::Call,
         }
     }
 }
@@ -414,13 +511,13 @@ impl Prec {
 fn infix_prec(t: &Token) -> Prec {
     match t {
         Token::Assign => Prec::Assign,
-        Token::Or     => Prec::Or,
-        Token::And    => Prec::And,
+        Token::Or => Prec::Or,
+        Token::And => Prec::And,
         Token::Eq | Token::NotEq => Prec::Equality,
         Token::Lt | Token::Gt | Token::LtEq | Token::GtEq => Prec::Compare,
         Token::Plus | Token::Minus => Prec::Term,
         Token::Star | Token::Slash | Token::Percent => Prec::Factor,
-        Token::LParen | Token::LBracket | Token::Dot => Prec::Call,
+        Token::LParen | Token::LBracket | Token::Dot | Token::Question => Prec::Call,
         _ => Prec::None,
     }
 }

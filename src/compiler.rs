@@ -18,7 +18,9 @@ pub struct Compiler {
 
 impl Compiler {
     pub fn new() -> Self {
-        Self { chunk: Chunk::default() }
+        Self {
+            chunk: Chunk::default(),
+        }
     }
 
     /// Compile a top-level program into a chunk. Top-level `fn` declarations
@@ -32,7 +34,9 @@ impl Compiler {
             }
         }
         for stmt in &program.stmts {
-            if matches!(stmt, Stmt::FnDecl { .. }) { continue; }
+            if matches!(stmt, Stmt::FnDecl { .. }) {
+                continue;
+            }
             c.compile_stmt(stmt);
         }
         c.emit(Instr::Nil);
@@ -65,10 +69,10 @@ impl Compiler {
     fn patch_jump(&mut self, pos: usize) {
         let offset = self.chunk.code.len() as i32 - (pos + 1) as i32;
         self.chunk.code[pos] = match &self.chunk.code[pos] {
-            Instr::Jump(_)             => Instr::Jump(offset),
-            Instr::JumpIfFalse(_)      => Instr::JumpIfFalse(offset),
-            Instr::JumpIfFalseKeep(_)  => Instr::JumpIfFalseKeep(offset),
-            Instr::JumpIfTrueKeep(_)   => Instr::JumpIfTrueKeep(offset),
+            Instr::Jump(_) => Instr::Jump(offset),
+            Instr::JumpIfFalse(_) => Instr::JumpIfFalse(offset),
+            Instr::JumpIfFalseKeep(_) => Instr::JumpIfFalseKeep(offset),
+            Instr::JumpIfTrueKeep(_) => Instr::JumpIfTrueKeep(offset),
             other => panic!("patch_jump on non-jump instruction: {:?}", other),
         };
     }
@@ -95,7 +99,11 @@ impl Compiler {
 
     fn compile_stmt(&mut self, stmt: &Stmt) {
         match stmt {
-            Stmt::Let { name, mutable, value } => {
+            Stmt::Let {
+                name,
+                mutable,
+                value,
+            } => {
                 self.compile_expr(value);
                 let idx = self.intern_name(name);
                 self.emit(Instr::DefLet(idx, *mutable));
@@ -126,18 +134,28 @@ impl Compiler {
                         // value stays on stack as the block's value
                     } else {
                         self.emit(Instr::Pop);
-                        if is_last { self.emit(Instr::Nil); }
+                        if is_last {
+                            self.emit(Instr::Nil);
+                        }
                     }
                 }
-                Stmt::Let { name, mutable, value } => {
+                Stmt::Let {
+                    name,
+                    mutable,
+                    value,
+                } => {
                     self.compile_expr(value);
                     let idx = self.intern_name(name);
                     self.emit(Instr::DefLet(idx, *mutable));
-                    if is_last { self.emit(Instr::Nil); }
+                    if is_last {
+                        self.emit(Instr::Nil);
+                    }
                 }
                 Stmt::FnDecl { name, params, body } => {
                     self.compile_fn_decl(name, params, body);
-                    if is_last { self.emit(Instr::Nil); }
+                    if is_last {
+                        self.emit(Instr::Nil);
+                    }
                 }
             }
         }
@@ -157,8 +175,12 @@ impl Compiler {
                 let c = self.add_const(Value::Str(Rc::new(s.clone())));
                 self.emit(Instr::Const(c));
             }
-            Expr::Bool(b) => { self.emit(if *b { Instr::True } else { Instr::False }); }
-            Expr::Nil => { self.emit(Instr::Nil); }
+            Expr::Bool(b) => {
+                self.emit(if *b { Instr::True } else { Instr::False });
+            }
+            Expr::Nil => {
+                self.emit(Instr::Nil);
+            }
 
             Expr::Ident(name) => {
                 let idx = self.intern_name(name);
@@ -210,24 +232,33 @@ impl Compiler {
                 self.compile_expr(lhs);
                 self.compile_expr(rhs);
                 self.emit(match op {
-                    BinOp::Add => Instr::Add, BinOp::Sub => Instr::Sub,
-                    BinOp::Mul => Instr::Mul, BinOp::Div => Instr::Div,
+                    BinOp::Add => Instr::Add,
+                    BinOp::Sub => Instr::Sub,
+                    BinOp::Mul => Instr::Mul,
+                    BinOp::Div => Instr::Div,
                     BinOp::Mod => Instr::Mod,
-                    BinOp::Eq => Instr::Eq,  BinOp::NotEq => Instr::NotEq,
-                    BinOp::Lt => Instr::Lt,  BinOp::Gt => Instr::Gt,
-                    BinOp::LtEq => Instr::LtEq, BinOp::GtEq => Instr::GtEq,
+                    BinOp::Eq => Instr::Eq,
+                    BinOp::NotEq => Instr::NotEq,
+                    BinOp::Lt => Instr::Lt,
+                    BinOp::Gt => Instr::Gt,
+                    BinOp::LtEq => Instr::LtEq,
+                    BinOp::GtEq => Instr::GtEq,
                     BinOp::And | BinOp::Or | BinOp::Assign => unreachable!(),
                 });
             }
 
             Expr::List(items) => {
-                for it in items { self.compile_expr(it); }
+                for it in items {
+                    self.compile_expr(it);
+                }
                 self.emit(Instr::BuildList(items.len() as u16));
             }
 
             Expr::Call { callee, args } => {
                 self.compile_expr(callee);
-                for a in args { self.compile_expr(a); }
+                for a in args {
+                    self.compile_expr(a);
+                }
                 self.emit(Instr::Call(args.len() as u8));
             }
 
@@ -245,12 +276,18 @@ impl Compiler {
 
             Expr::Method { target, name, args } => {
                 self.compile_expr(target);
-                for a in args { self.compile_expr(a); }
+                for a in args {
+                    self.compile_expr(a);
+                }
                 let idx = self.intern_name(name);
                 self.emit(Instr::Method(idx, args.len() as u8));
             }
 
-            Expr::If { cond, then_branch, else_branch } => {
+            Expr::If {
+                cond,
+                then_branch,
+                else_branch,
+            } => {
                 self.compile_expr(cond);
                 let jf = self.emit(Instr::JumpIfFalse(0));
                 self.emit(Instr::PushScope);
@@ -298,7 +335,9 @@ impl Compiler {
             Expr::Return(inner) => {
                 match inner {
                     Some(e) => self.compile_expr(e),
-                    None => { self.emit(Instr::Nil); }
+                    None => {
+                        self.emit(Instr::Nil);
+                    }
                 }
                 self.emit(Instr::Return);
             }
@@ -306,6 +345,11 @@ impl Compiler {
             Expr::Panic(msg) => {
                 self.compile_expr(msg);
                 self.emit(Instr::Panic);
+            }
+
+            Expr::Try(inner) => {
+                self.compile_expr(inner);
+                self.emit(Instr::Try);
             }
         }
     }
@@ -330,12 +374,16 @@ impl Compiler {
                 self.emit(Instr::SetField(idx));
             }
             _ => {
-                let c = self.add_const(Value::Str(Rc::new(
-                    "invalid assignment target".into(),
-                )));
+                let c = self.add_const(Value::Str(Rc::new("invalid assignment target".into())));
                 self.emit(Instr::Const(c));
                 self.emit(Instr::Panic);
             }
         }
+    }
+}
+
+impl Default for Compiler {
+    fn default() -> Self {
+        Self::new()
     }
 }
