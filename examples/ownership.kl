@@ -27,7 +27,7 @@ fn main() {
 
     // Uncomment to see the runtime panic:
     //   println(xs)
-    // kiln: use of moved value `xs` (value was moved earlier and cannot be used again)
+    // tetherscript: use of moved value `xs` (value was moved earlier and cannot be used again)
 
     println("scalars are Copy, so this is fine:")
     let n = 42

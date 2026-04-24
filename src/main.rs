@@ -1,23 +1,29 @@
-//! kiln — a dynamically-typed scripting language with Rust-style ownership.
+//! tetherscript — a dynamically-typed scripting language with Rust-style ownership.
 //!
 //! Usage:
-//!   kiln <file.kl>                  # run (tree-walking interpreter)
-//!   kiln --vm       <file.kl>       # run (bytecode VM)
-//!   kiln --tokens   <file.kl>       # dump tokens and exit
-//!   kiln --ast      <file.kl>       # dump AST and exit
-//!   kiln --bytecode <file.kl>       # dump compiled bytecode and exit
-//!   kiln --lsp                      # serve LSP over stdio
+//!   tetherscript <file.kl>                  # run (tree-walking interpreter)
+//!   tetherscript --vm       <file.kl>       # run (bytecode VM)
+//!   tetherscript --tokens   <file.kl>       # dump tokens and exit
+//!   tetherscript --ast      <file.kl>       # dump AST and exit
+//!   tetherscript --bytecode <file.kl>       # dump compiled bytecode and exit
+//!   tetherscript --lsp                      # serve LSP over stdio
 
-mod token;
-mod lexer;
 mod ast;
-mod parser;
-mod value;
-mod interp;
 mod bytecode;
+mod capability;
 mod compiler;
-mod vm;
+mod http;
+mod interp;
+mod json;
+mod lexer;
 mod lsp;
+mod output;
+mod parser;
+mod smtp;
+mod system;
+mod token;
+mod value;
+mod vm;
 
 use std::env;
 use std::fs;
@@ -32,30 +38,30 @@ use vm::VM;
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
-        eprintln!("usage: kiln [--tokens|--ast|--bytecode|--vm|--lsp] <file.kl>");
+        eprintln!("usage: tetherscript [--tokens|--ast|--bytecode|--vm|--lsp] <file.kl>");
         process::exit(2);
     }
 
     if args[1] == "--lsp" {
         if let Err(e) = lsp::run() {
-            eprintln!("kiln-lsp: {}", e);
+            eprintln!("tetherscript-lsp: {}", e);
             process::exit(1);
         }
         return;
     }
 
     let (mode, path) = match args[1].as_str() {
-        "--tokens"   if args.len() >= 3 => ("tokens",   &args[2]),
-        "--ast"      if args.len() >= 3 => ("ast",      &args[2]),
+        "--tokens" if args.len() >= 3 => ("tokens", &args[2]),
+        "--ast" if args.len() >= 3 => ("ast", &args[2]),
         "--bytecode" if args.len() >= 3 => ("bytecode", &args[2]),
-        "--vm"       if args.len() >= 3 => ("vm",       &args[2]),
-        _                               => ("run", &args[1]),
+        "--vm" if args.len() >= 3 => ("vm", &args[2]),
+        _ => ("run", &args[1]),
     };
 
     let src = match fs::read_to_string(path) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("kiln: can't read {}: {}", path, e);
+            eprintln!("tetherscript: can't read {}: {}", path, e);
             process::exit(1);
         }
     };
@@ -63,7 +69,7 @@ fn main() {
     let tokens = match Lexer::new(&src).tokenize() {
         Ok(t) => t,
         Err(e) => {
-            eprintln!("kiln: lex error at {}:{}: {}", e.line, e.col, e.msg);
+            eprintln!("tetherscript: lex error at {}:{}: {}", e.line, e.col, e.msg);
             process::exit(1);
         }
     };
@@ -78,7 +84,10 @@ fn main() {
     let program = match Parser::new(tokens).parse_program() {
         Ok(p) => p,
         Err(e) => {
-            eprintln!("kiln: parse error at {}:{}: {}", e.line, e.col, e.msg);
+            eprintln!(
+                "tetherscript: parse error at {}:{}: {}",
+                e.line, e.col, e.msg
+            );
             process::exit(1);
         }
     };
@@ -98,7 +107,7 @@ fn main() {
         let chunk = Compiler::compile_program(&program);
         let mut vm = VM::new();
         if let Err(e) = vm.run(chunk) {
-            eprintln!("kiln: {}", e);
+            eprintln!("tetherscript: {}", e);
             process::exit(1);
         }
         return;
@@ -106,7 +115,7 @@ fn main() {
 
     let mut interp = Interpreter::new();
     if let Err(e) = interp.run(&program) {
-        eprintln!("kiln: {}", e);
+        eprintln!("tetherscript: {}", e);
         process::exit(1);
     }
 }

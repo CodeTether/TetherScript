@@ -4,8 +4,8 @@ const { LanguageClient, TransportKind } = require('vscode-languageclient/node');
 let client;
 
 function activate(context) {
-  const config = workspace.getConfiguration('kiln');
-  const command = config.get('serverPath') || 'kiln';
+  const config = workspace.getConfiguration('tetherscript');
+  const command = config.get('serverPath') || 'tetherscript';
 
   const serverOptions = {
     run:   { command, args: ['--lsp'], transport: TransportKind.stdio },
@@ -13,13 +13,13 @@ function activate(context) {
   };
 
   const clientOptions = {
-    documentSelector: [{ scheme: 'file', language: 'kiln' }],
+    documentSelector: [{ scheme: 'file', language: 'tetherscript' }],
     synchronize: {
-      fileEvents: workspace.createFileSystemWatcher('**/*.kl'),
+      fileEvents: workspace.createFileSystemWatcher('**/*.{tether,kl}'),
     },
   };
 
-  client = new LanguageClient('kiln', 'Kiln', serverOptions, clientOptions);
+  client = new LanguageClient('tetherscript', 'TetherScript', serverOptions, clientOptions);
   client.start();
 }
 
