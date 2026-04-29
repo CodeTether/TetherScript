@@ -1,34 +1,40 @@
-# Kiln
+# TetherScript
 
-Kiln is a small, embeddable scripting language for Rust hosts and AI-agent workflows.
-It is dynamically typed, uses Rust-like syntax, and keeps authority explicit through
-host-granted capabilities.
+TetherScript is a small, embeddable scripting language for Rust hosts and AI-agent
+workflows. It is dynamically typed, uses Rust-like syntax, and is implemented in
+Rust with two runtimes: a tree-walking interpreter and a stack-based bytecode VM.
 
-Kiln is meant for project policy, validators, workflow glue, plugin hooks, and other
-fast-changing behavior that should not require rebuilding a Rust application.
+The project was originally named Kiln. Current user-facing copy should use
+**TetherScript**. The package, library, and binary are named `tetherscript`.
+
+TetherScript is meant for project policy, validators, workflow glue, plugin hooks,
+and other fast-changing behavior that should not require rebuilding a Rust
+application.
 
 ## Status
 
-Kiln currently includes:
+TetherScript currently includes:
 
 - A tree-walking interpreter used as the reference runtime.
 - A stack-based bytecode VM targeting the same observable semantics.
-- Dynamic values: integers, floats, booleans, strings, lists, maps, functions, native functions, `nil`, and `Result`.
-- Variables, lexical scopes, functions, closures, recursion, `if`/`else`, `while`, and `for x in iterable` loops.
+- Dynamic values: integers, floats, booleans, strings, lists, maps, functions,
+  native functions, `nil`, and `Result`.
+- Variables, lexical scopes, functions, closures, recursion, `if`/`else`,
+  `while`, and `for x in iterable` loops.
 - Runtime ownership tracking with explicit `move` and use-after-move errors.
 - `Result` values and `?` propagation for expected failures.
 - Method calls on built-in values.
 - JSON parsing/encoding implemented in-tree.
-- Blocking HTTP client and HTTP/1.1 server support.
+- Blocking HTTP client helpers and a blocking HTTP/1.1 server.
 - SMTP sending support.
-- Standard tools for filesystem, process, environment, path, time, Base64, SHA-256, and URL parsing.
-- Host-granted filesystem and HTTP capabilities with narrowing and revocation.
-- A Rust plugin host for loading Kiln source and calling named hooks.
+- Standard tools for filesystem, process, environment, path, time, Base64,
+  SHA-256, and URL parsing.
+- A Rust plugin host for loading TetherScript source and calling named hooks.
 - A small LSP server plus VSCode extension.
 
-The long-term direction is controlled extensibility for Rust applications: Kiln source
-is editable and inspectable, while the Rust host remains responsible for trust,
-capabilities, auditing, and resource budgets.
+The long-term direction is controlled extensibility for Rust applications:
+TetherScript source is editable and inspectable, while the Rust host remains
+responsible for trust, capabilities, auditing, and resource budgets.
 
 ## Quick start
 
@@ -36,80 +42,47 @@ capabilities, auditing, and resource budgets.
 cargo build --release
 
 # Run with the reference interpreter
-./target/release/kiln examples/hello.kl
-./target/release/kiln examples/fib.kl
+./target/release/tetherscript examples/hello.kl
+./target/release/tetherscript examples/fib.kl
 
 # Run with the bytecode VM
-./target/release/kiln --vm examples/hello.kl
-./target/release/kiln --vm examples/fib.kl
+./target/release/tetherscript --vm examples/hello.kl
+./target/release/tetherscript --vm examples/fib.kl
 
 # Inspect the frontend / compiler output
-./target/release/kiln --tokens   examples/hello.kl
-./target/release/kiln --ast      examples/hello.kl
-./target/release/kiln --bytecode examples/hello.kl
+./target/release/tetherscript --tokens   examples/hello.kl
+./target/release/tetherscript --ast      examples/hello.kl
+./target/release/tetherscript --bytecode examples/hello.kl
 
 # Serve LSP over stdio for editors
-./target/release/kiln --lsp
+./target/release/tetherscript --lsp
 ```
 
-If your local checkout still uses the transitional binary name, replace `kiln` with
-`tetherscript` in the commands above.
-
-## Capabilities
-
-Kiln treats authority as a value. A host grants a capability, Kiln code passes or
-narrows it, and revocation fails closed. This is the core safety model for agent- and
-plugin-written source.
-
-```bash
-./target/release/kiln --grant-fs ./examples/cap_workspace examples/capability_fs.kl
-./target/release/kiln --grant-fs . examples/policy.tether
-./target/release/kiln --vm --grant-fs . examples/policy.tether
-```
-
-Inside a Kiln program:
+## Language example
 
 ```kl
-let cache = fs.narrow(ro_params)   // attenuate to read-only
-fs_user.read("config.toml")?       // errors flow through Result + ?
-fs.revoke()                        // kills fs and narrowed children
-```
+fn fib(n) {
+    if n < 2 {
+        return n
+    }
+    fib(n - 1) + fib(n - 2)
+}
 
-See:
-
-- [`examples/capability_fs.kl`](examples/capability_fs.kl) for filesystem grants, narrowing, subdelegation, path-escape rejection, and cascading revocation.
-- [`examples/capability_http.kl`](examples/capability_http.kl) for host-granted HTTP authority.
-- [`examples/policy.tether`](examples/policy.tether) for a compact policy script.
-- [`examples/embed_policy.rs`](examples/embed_policy.rs) for calling Kiln from Rust with an explicit grant.
-
-## Plugin hooks
-
-Kiln can be embedded as a local plugin language. A Rust host can load Kiln source,
-grant narrow authority, and call named functions as hooks.
-
-CLI helpers exist for exercising the plugin surface:
-
-```bash
-./target/release/kiln --plugin examples/kiln_extension.kl metadata
-./target/release/kiln --plugin examples/kiln_extension.kl validate '{"path":"README.md"}'
-./target/release/kiln --codetether-manifest examples/kiln_extension.kl
-```
-
-This is the intended boundary:
-
-```text
-Rust host / agent system -> Kiln hook -> granted capability -> structured result
+fn main() {
+    println(fib(10))
+}
 ```
 
 ## HTTP server
 
-Kiln ships with a dependency-free blocking HTTP/1.1 server exposed as `http_serve`:
+TetherScript ships with a dependency-free blocking HTTP/1.1 server exposed as
+`http_serve`:
 
 ```kl
 fn handle(req) {
     let resp = map()
     resp.status = 200
-    resp.body = "hello from kiln\n"
+    resp.body = "hello from tetherscript\n"
     return resp
 }
 
@@ -122,50 +95,72 @@ The handler receives a request map with `method`, `path`, `query`, `headers`, an
 `body`. It may return either a string, sent as `200 text/plain`, or a map with
 optional `status`, `headers`, and `body`.
 
-See [`examples/http_hello.kl`](examples/http_hello.kl).
+## Standard tools
 
-## Docker
+The runtime includes dependency-free standard tools exposed as built-ins,
+including:
 
-A [`Dockerfile`](Dockerfile) builds a static musl binary and ships it in a small final
-image with the examples directory.
+- `json_parse`, `json_encode`, `json_encode_pretty`
+- `http_get`, `http_head`, `http_post`, `http_request`, `http_serve`
+- `smtp_send`
+- `fs_read`, `fs_write`, `fs_exists`, `fs_list`, `fs_mkdir`, `fs_stat`,
+  `fs_remove`, `fs_rename`, `fs_copy`
+- `process_run`, `process_args`, `process_pid`, `process_platform`,
+  `process_arch`
+- `env_get`, `cwd`, `chdir`
+- `path_join`, `path_dirname`, `path_basename`, `path_extname`,
+  `path_normalize`, `path_resolve`, `path_sep`
+- `time_now_ms`, `sleep_ms`
+- `sha256_hex`, `base64_encode`, `base64_decode`, `url_parse`
 
-```bash
-docker build -t kiln .
-docker run --rm -p 8787:8787 kiln
+See [`docs/standard-tools.md`](docs/standard-tools.md) for more detail.
 
-# Or run a specific example
-docker run --rm -p 8787:8787 kiln /examples/http_hello.kl
+## Plugin embedding
+
+TetherScript can be embedded as a local plugin language. A Rust host can load
+TetherScript source, grant host-provided authority, and call named functions as
+hooks.
+
+This is the intended boundary:
+
+```text
+Rust host / agent system -> TetherScript hook -> granted host capability -> structured result
 ```
 
-Or with Compose:
-
-```bash
-docker compose up --build
-```
+See [`docs/tetherscript-and-codetether.md`](docs/tetherscript-and-codetether.md)
+for the CodeTether integration model.
 
 ## Editor support
 
 A VSCode extension lives in [`editor/vscode/`](editor/vscode/). It provides syntax
-highlighting and connects VSCode to the Kiln LSP server for live lex/parse diagnostics.
+highlighting and connects VSCode to `tetherscript --lsp` for live lex/parse
+diagnostics.
 
 ## Design principles
 
 - **Dynamic types** — no type annotations are required.
-- **Rust-like syntax** — `fn`, `let`, `let mut`, braces, `&`, `&mut`, `move`, and expression-oriented blocks.
-- **Runtime-checked ownership** — heap values can be moved; use-after-move is reported at runtime.
-- **Copy scalars, move heap values** — scalar values remain usable after `move`; lists/maps/strings transfer ownership.
-- **Recoverable errors** — `Result` and `?` handle expected failure; `panic` is for bugs.
-- **Explicit authority** — host effects should flow through granted capabilities rather than ambient access.
-- **Zero-dependency goal** — the runtime avoids third-party crates unless a future governance decision justifies them.
+- **Rust-like syntax** — `fn`, `let`, `let mut`, braces, `&`, `&mut`, `move`,
+  and expression-oriented blocks.
+- **Runtime-checked ownership** — heap values can be moved; use-after-move is
+  reported at runtime.
+- **Copy scalars, move heap values** — scalar values remain usable after `move`;
+  lists/maps/strings transfer ownership.
+- **Recoverable errors** — `Result` and `?` handle expected failure; `panic` is
+  for bugs.
+- **Embeddable host boundary** — host effects should flow through explicit host
+  integration rather than unreviewable shell glue.
+- **Zero-dependency goal** — the runtime avoids third-party crates unless a
+  future governance decision justifies them.
 
 ## What is not done yet
 
 - Runtime `&mut` aliasing / XOR-mutability enforcement.
 - Modules and imports.
 - Formatter and REPL.
-- More complete LSP features such as completions, hover, go-to-definition, and exact spans.
+- More complete LSP features such as completions, hover, go-to-definition, and
+  exact spans.
 - Capability audit logs and richer resource budgets.
-- Moving all ambient host tools behind explicit capabilities where practical.
+- Moving ambient host tools behind explicit capabilities where practical.
 - VM local-slot optimization; variable lookup is still name-based.
 - Async scheduler.
 
@@ -176,13 +171,8 @@ src/
   ast.rs         — AST node definitions
   bytecode.rs    — bytecode instruction/chunk/function types
   capability.rs  — capability trait/object model
-  cli.rs         — CLI entry point logic
-  codetether.rs  — manifest adapter for CodeTether-style plugin discovery
   compiler.rs    — AST to bytecode compiler
-  experiment.rs  — source-emission experiment harness
-  fs_cap.rs      — filesystem capability implementation
   http.rs        — HTTP client/server built-ins
-  http_cap.rs    — HTTP capability implementation
   interp.rs      — tree-walking interpreter
   json.rs        — in-tree JSON parser/encoder
   lexer.rs       — lexer
@@ -198,13 +188,10 @@ src/
   vm.rs          — bytecode VM
 examples/
   hello.kl, fib.kl, closures.kl, ownership.kl, use_after_move.kl
-  capability_fs.kl, capability_http.kl, http_hello.kl, json.kl
-  policy.tether, kiln_extension.kl, smtp_local.kl, send_riley.kl
-  embed_policy.rs
 editor/vscode/
   VSCode grammar and LSP client
 docs/
-  design and ecosystem notes
+  standard tools and CodeTether integration notes
 ```
 
 ## Roadmap
@@ -219,7 +206,7 @@ docs/
 - [x] `for x in iterable` loops
 - [x] JSON support
 - [x] HTTP client/server support
-- [x] Filesystem and HTTP capabilities
+- [x] Standard filesystem/process/env/path/time/hash/base64/url tools
 - [x] Rust embedding/plugin host
 - [ ] Runtime `&mut` exclusivity enforcement
 - [ ] Modules and imports
