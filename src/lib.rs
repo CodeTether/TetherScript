@@ -1,6 +1,7 @@
 //! TetherScript library surface for embedding the language in host Rust projects.
 
 pub mod ast;
+pub mod browser;
 pub mod bytecode;
 pub mod capability;
 pub mod compiler;
