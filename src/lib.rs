@@ -17,5 +17,6 @@ pub mod rpc_cap;
 pub mod smtp;
 pub mod system;
 pub mod token;
+pub mod tls;
 pub mod value;
 pub mod vm;

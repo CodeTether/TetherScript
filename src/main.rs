@@ -33,6 +33,7 @@ mod rpc_cap;
 mod smtp;
 mod system;
 mod token;
+mod tls;
 mod value;
 mod vm;
 
@@ -106,6 +107,7 @@ fn cmd_run(args: &[String]) {
     let mut step_budget: Option<u64> = None;
     let mut fs_grant: Option<String> = None;
     let mut provider_grant: Option<String> = None;
+    let mut provider_key: Option<String> = None;
     let mut rpc_grant: Option<String> = None;
     let mut path: Option<String> = None;
 
@@ -147,14 +149,23 @@ fn cmd_run(args: &[String]) {
             "--grant-provider" => {
                 i += 1;
                 if i >= args.len() {
-                    eprintln!("tetherscript run: --grant-provider requires an http:// endpoint");
+                    eprintln!("tetherscript run: --grant-provider requires an http(s):// endpoint");
                     process::exit(2);
                 }
-                if !args[i].starts_with("http://") {
-                    eprintln!("tetherscript run: --grant-provider endpoint must start with http://");
+                if !args[i].starts_with("http://") && !args[i].starts_with("https://") {
+                    eprintln!("tetherscript run: --grant-provider endpoint must start with http:// or https://");
                     process::exit(2);
                 }
                 provider_grant = Some(args[i].clone());
+                i += 1;
+            }
+            "--grant-provider-key" => {
+                i += 1;
+                if i >= args.len() {
+                    eprintln!("tetherscript run: --grant-provider-key requires an API key argument");
+                    process::exit(2);
+                }
+                provider_key = Some(args[i].clone());
                 i += 1;
             }
             "--grant-rpc" => {
@@ -194,7 +205,7 @@ fn cmd_run(args: &[String]) {
         }
     };
 
-    execute_file(&path, vm_mode, step_budget, &fs_grant, &provider_grant, &rpc_grant);
+    execute_file(&path, vm_mode, step_budget, &fs_grant, &provider_grant, &provider_key, &rpc_grant);
 }
 
 fn cmd_inspect(args: &[String]) {
@@ -357,6 +368,7 @@ fn cmd_run_legacy(args: &[String]) {
     let mut step_budget: Option<u64> = None;
     let mut fs_grant: Option<String> = None;
     let mut provider_grant: Option<String> = None;
+    let mut provider_key: Option<String> = None;
     let mut rpc_grant: Option<String> = None;
     let mut path: Option<String> = None;
 
@@ -394,14 +406,23 @@ fn cmd_run_legacy(args: &[String]) {
             "--grant-provider" => {
                 i += 1;
                 if i >= args.len() {
-                    eprintln!("tetherscript: --grant-provider requires an http:// endpoint");
+                    eprintln!("tetherscript: --grant-provider requires an http(s):// endpoint");
                     process::exit(2);
                 }
-                if !args[i].starts_with("http://") {
-                    eprintln!("tetherscript: --grant-provider endpoint must start with http://");
+                if !args[i].starts_with("http://") && !args[i].starts_with("https://") {
+                    eprintln!("tetherscript: --grant-provider endpoint must start with http:// or https://");
                     process::exit(2);
                 }
                 provider_grant = Some(args[i].clone());
+                i += 1;
+            }
+            "--grant-provider-key" => {
+                i += 1;
+                if i >= args.len() {
+                    eprintln!("tetherscript: --grant-provider-key requires an API key argument");
+                    process::exit(2);
+                }
+                provider_key = Some(args[i].clone());
                 i += 1;
             }
             "--grant-rpc" => {
@@ -450,7 +471,7 @@ fn cmd_run_legacy(args: &[String]) {
         }
     };
 
-    execute_file(&path, vm_mode, step_budget, &fs_grant, &provider_grant, &rpc_grant);
+    execute_file(&path, vm_mode, step_budget, &fs_grant, &provider_grant, &provider_key, &rpc_grant);
 }
 
 // ---------------------------------------------------------------------------
@@ -473,6 +494,7 @@ fn execute_file(
     step_budget: Option<u64>,
     fs_grant: &Option<String>,
     provider_grant: &Option<String>,
+    provider_key: &Option<String>,
     rpc_grant: &Option<String>,
 ) {
     let src = read_source(path);
@@ -496,7 +518,7 @@ fn execute_file(
     if vm_mode {
         let chunk = Compiler::compile_program(&program);
         let mut vm = VM::new();
-        grant_capabilities_vm(&mut vm, fs_grant, provider_grant, rpc_grant);
+        grant_capabilities_vm(&mut vm, fs_grant, provider_grant, provider_key, rpc_grant);
         let result = if let Some(budget) = step_budget {
             interp::with_step_budget(budget, || vm.run(chunk))
         } else {
@@ -508,7 +530,7 @@ fn execute_file(
         }
     } else {
         let mut interp = Interpreter::new();
-        grant_capabilities_interp(&mut interp, fs_grant, provider_grant, rpc_grant);
+        grant_capabilities_interp(&mut interp, fs_grant, provider_grant, provider_key, rpc_grant);
         let result = if let Some(budget) = step_budget {
             interp::with_step_budget(budget, || interp.run(&program))
         } else {
@@ -525,13 +547,18 @@ fn grant_capabilities_vm(
     vm: &mut VM,
     fs_grant: &Option<String>,
     provider_grant: &Option<String>,
+    provider_key: &Option<String>,
     rpc_grant: &Option<String>,
 ) {
     if let Some(root) = fs_grant {
         vm.grant("fs", fs_cap::FsAuthority::new(root));
     }
     if let Some(endpoint) = provider_grant {
-        vm.grant("provider", provider_cap::ProviderAuthority::new(endpoint));
+        let auth = provider_cap::ProviderAuthority::new(endpoint);
+        let auth = if let Some(key) = provider_key {
+            provider_cap::ProviderAuthority::with_bound_header(auth, "Authorization", &format!("Bearer {}", key))
+        } else { auth };
+        vm.grant("provider", auth);
     }
     if let Some(endpoint) = rpc_grant {
         vm.grant("rpc", rpc_cap::RpcAuthority::new(endpoint));
@@ -542,13 +569,18 @@ fn grant_capabilities_interp(
     interp: &mut Interpreter,
     fs_grant: &Option<String>,
     provider_grant: &Option<String>,
+    provider_key: &Option<String>,
     rpc_grant: &Option<String>,
 ) {
     if let Some(root) = fs_grant {
         interp.grant("fs", fs_cap::FsAuthority::new(root));
     }
     if let Some(endpoint) = provider_grant {
-        interp.grant("provider", provider_cap::ProviderAuthority::new(endpoint));
+        let auth = provider_cap::ProviderAuthority::new(endpoint);
+        let auth = if let Some(key) = provider_key {
+            provider_cap::ProviderAuthority::with_bound_header(auth, "Authorization", &format!("Bearer {}", key))
+        } else { auth };
+        interp.grant("provider", auth);
     }
     if let Some(endpoint) = rpc_grant {
         interp.grant("rpc", rpc_cap::RpcAuthority::new(endpoint));
@@ -603,6 +635,8 @@ fn print_help() {
     println!("    tetherscript run --vm fib.tether");
     println!("    tetherscript run --grant-fs . policy.tether");
     println!("    tetherscript run --grant-provider http://localhost:11434 chat.tether");
+    println!("    tetherscript run --grant-provider https://api.cerebras.ai glm_chat.tether");
+    println!("    tetherscript run --grant-provider https://api.cerebras.ai glm_chat.tether");
     println!("    tetherscript run --grant-rpc http://127.0.0.1:36627 agent.tether");
     println!("    tetherscript inspect --tokens hello.tether");
     println!("    tetherscript inspect --ast hello.tether");
@@ -624,7 +658,8 @@ fn print_run_help() {
     println!("    --vm                    Use bytecode VM instead of tree-walking interpreter");
     println!("    --step-budget <n>       Set max execution steps (default: unlimited)");
     println!("    --grant-fs <dir>        Grant filesystem capability scoped to <dir>");
-    println!("    --grant-provider <url>  Grant LLM provider capability (http://host:port)");
+    println!("    --grant-provider <url>  Grant LLM provider capability (http:// or https://host:port)");
+    println!("    --grant-provider-key <k> API key for the provider (sent as Bearer token)");
     println!("    --grant-rpc <url>       Grant JSON-RPC capability (http://host:port)");
     println!("    -h, --help              Print this help message");
     println!();

@@ -1,25 +1,31 @@
 //! `ProviderAuthority` — LLM provider calls as a capability.
 //!
-//! Grants TetherScript the right to call LLM chat completion APIs over HTTP.
+//! Grants TetherScript the right to call LLM chat completion APIs over HTTP(S).
 //! Uses the OpenAI-compatible `/v1/chat/completions` endpoint shape, which is
-//! also supported by Ollama, vLLM, LM Studio, and many other backends.
+//! also supported by Ollama, vLLM, LM Studio, Cerebras, and many other backends.
 //!
 //! # Protocol
 //!
-//! The provider speaks plain HTTP/1.1 (no TLS) using `std::net::TcpStream`,
-//! consistent with TetherScript's zero-dependency stance. This covers:
+//! The provider speaks HTTP/1.1 over plain TCP or TLS (via `native-tls`):
 //!
 //! - **Ollama** (`http://localhost:11434`)
 //! - **LM Studio** (`http://localhost:1234`)
+//! - **Cerebras** (`https://api.cerebras.ai`) — GLM 4.7 and other models
 //! - **vLLM** (behind a local reverse proxy or direct)
-//! - **Any OpenAI-compatible API** behind a TLS-terminating proxy
+//! - **Any OpenAI-compatible API** (http or https)
 //!
-//! For HTTPS endpoints, deploy a local reverse proxy (nginx, caddy) that
-//! terminates TLS and forwards to `http://localhost`.
+//! # GLM 4.7 / Cerebras support
+//!
+//! The provider supports GLM 4.7-specific parameters:
+//! - `max_completion_tokens` (GLM 4.7 uses this instead of `max_tokens`)
+//! - `reasoning_effort` (`"none"` to disable, omit to enable)
+//! - `clear_thinking` (preserve reasoning traces across turns)
+//! - `top_p` (sampling parameter)
+//!
+//! Streaming responses include `delta.reasoning` content for thinking models,
+//! surfaced alongside `delta.content` tokens.
 //!
 //! # SSE streaming
-//!
-//! Both non-streaming and streaming (SSE) responses are supported:
 //!
 //! - `chat(messages)` — collects the full response and returns the assistant
 //!   message content as a string.
@@ -30,8 +36,8 @@
 //!
 //! # Security
 //!
-//! - **Endpoint scope**: the capability is scoped to a specific `http://`
-//!   host + port at grant time. The script cannot call a different server.
+//! - **Endpoint scope**: the capability is scoped to a specific `http://` or
+//!   `https://` host + port at grant time. The script cannot call a different server.
 //! - **Model scope**: optionally restrict which models the script can request.
 //! - **Bound headers**: API keys are attached as bound headers at grant time
 //!   and are invisible to TetherScript code.
@@ -52,20 +58,37 @@ use std::net::TcpStream;
 use std::rc::Rc;
 use std::time::Duration;
 
+use crate::tls::TlsConnector;
+
 use crate::capability::Authority;
 use crate::json;
 use crate::value::{Runtime, Value};
 
 const PROVIDER_TIMEOUT: Duration = Duration::from_secs(120);
-const PROVIDER_USER_AGENT: &str = "tetherscript-provider/0.1";
+const PROVIDER_USER_AGENT: &str = "tetherscript-provider/0.2";
 const MAX_RESPONSE_BYTES: usize = 8 * 1024 * 1024;
 const MAX_SSE_LINE_BYTES: usize = 1024 * 1024;
 
+/// TLS or plain HTTP scheme.
+#[derive(Clone, Debug, PartialEq)]
+enum Scheme {
+    Http,
+    Https,
+}
+
+/// Trait object for a stream that supports both Read and Write.
+trait NetStream: Read + Write {}
+impl NetStream for TcpStream {}
+impl NetStream for crate::tls::TlsStream {}
+
 pub struct ProviderAuthority {
-    /// Allowed endpoint: `http://host[:port]`. Must be http:// (no TLS).
+    /// Allowed endpoint: `http://host[:port]` or `https://host[:port]`.
     endpoint: String,
-    /// Parsed (host, port) from endpoint.
+    /// TLS or plain.
+    scheme: Scheme,
+    /// Parsed host from endpoint.
     host: String,
+    /// Parsed port from endpoint.
     port: u16,
     /// Allowed model names. Empty = allow any model.
     models: HashSet<String>,
@@ -83,10 +106,11 @@ impl ProviderAuthority {
     /// Create a new provider capability scoped to the given HTTP endpoint.
     /// Endpoint must be `http://host[:port]`.
     pub fn new(endpoint: &str) -> Rc<dyn Authority> {
-        let (host, port) = parse_endpoint(endpoint)
-            .unwrap_or_else(|| ("localhost".into(), 80));
+        let (scheme, host, port) = parse_endpoint(endpoint)
+            .unwrap_or_else(|| (Scheme::Http, "localhost".into(), 80));
         Rc::new(ProviderAuthority {
             endpoint: endpoint.trim_end_matches('/').to_string(),
+            scheme,
             host,
             port,
             models: HashSet::new(),
@@ -111,6 +135,7 @@ impl ProviderAuthority {
         bound.push((name.to_string(), value.to_string()));
         Rc::new(ProviderAuthority {
             endpoint: this.endpoint.clone(),
+            scheme: this.scheme.clone(),
             host: this.host.clone(),
             port: this.port,
             models: this.models.clone(),
@@ -134,6 +159,7 @@ impl ProviderAuthority {
         models.insert(model.to_string());
         Rc::new(ProviderAuthority {
             endpoint: this.endpoint.clone(),
+            scheme: this.scheme.clone(),
             host: this.host.clone(),
             port: this.port,
             models,
@@ -155,6 +181,7 @@ impl ProviderAuthority {
             .expect("with_path: authority is not ProviderAuthority");
         Rc::new(ProviderAuthority {
             endpoint: this.endpoint.clone(),
+            scheme: this.scheme.clone(),
             host: this.host.clone(),
             port: this.port,
             models: this.models.clone(),
@@ -215,6 +242,31 @@ impl ProviderAuthority {
                 if let Some(Value::Str(s)) = m.get("stream") {
                     body.insert("stream".to_string(), Value::Str(s.clone()));
                 }
+
+                // top_p sampling (used by GLM 4.7 and others)
+                if let Some(Value::Float(p)) = m.get("top_p") {
+                    body.insert("top_p".to_string(), Value::Float(*p));
+                }
+
+                // GLM 4.7 / Cerebras parameters
+                if let Some(Value::Int(mt)) = m.get("max_completion_tokens") {
+                    let capped = if self.max_tokens > 0 {
+                        (*mt).min(self.max_tokens as i64)
+                    } else {
+                        *mt
+                    };
+                    body.insert("max_completion_tokens".to_string(), Value::Int(capped));
+                }
+                if let Some(Value::Str(effort)) = m.get("reasoning_effort") {
+                    body.insert("reasoning_effort".to_string(), Value::Str(effort.clone()));
+                }
+                if let Some(Value::Bool(ct)) = m.get("clear_thinking") {
+                    body.insert("clear_thinking".to_string(), Value::Bool(*ct));
+                }
+                // Bool-valued stream parameter
+                if let Some(Value::Bool(b)) = m.get("stream") {
+                    body.insert("stream".to_string(), Value::Bool(*b));
+                }
             }
         }
 
@@ -229,7 +281,7 @@ impl ProviderAuthority {
 
     /// Send HTTP POST and collect full response (non-streaming).
     fn do_chat(&self, body: &str) -> Result<Value, String> {
-        let response_bytes = self.http_post(body, false)?;
+        let response_bytes = self.http_post(body)?;
         let response_text = String::from_utf8_lossy(&response_bytes).into_owned();
 
         // Parse the JSON response
@@ -241,7 +293,7 @@ impl ProviderAuthority {
 
     /// Send HTTP POST and return the raw JSON response as a parsed value.
     fn do_chat_json(&self, body: &str) -> Result<Value, String> {
-        let response_bytes = self.http_post(body, false)?;
+        let response_bytes = self.http_post(body)?;
         let response_text = String::from_utf8_lossy(&response_bytes).into_owned();
         json::parse_str(&response_text)
     }
@@ -265,13 +317,13 @@ impl ProviderAuthority {
         };
 
         let mut stream = self.connect()?;
-        self.write_request(&mut stream, &patched_body)?;
+        self.write_request(&mut *stream, &patched_body)?;
 
         let mut reader = BufReader::new(stream);
         let mut accumulated = String::new();
 
         loop {
-            let line = read_sse_line(&mut reader)?;
+            let line = read_line(&mut reader)?;
             let line = match line {
                 Some(l) => l,
                 None => break, // EOF
@@ -295,9 +347,19 @@ impl ProviderAuthority {
 
             // Parse the SSE chunk JSON
             let chunk = json::parse_str(data)?;
-            let delta = extract_stream_delta(&chunk);
+            let (content_delta, reasoning_delta) = extract_stream_deltas(&chunk);
 
-            if let Some(delta_text) = delta {
+            // Surface reasoning tokens (GLM 4.7 thinking models)
+            if let Some(reasoning_text) = reasoning_delta {
+                accumulated.push_str(&reasoning_text);
+                let args = vec![
+                    Value::Str(Rc::new(accumulated.clone())),
+                    Value::Str(Rc::new(reasoning_text)),
+                ];
+                rt.invoke(handler, &args)?;
+            }
+
+            if let Some(delta_text) = content_delta {
                 accumulated.push_str(&delta_text);
 
                 // Call the handler: handler(accumulated, delta_text)
@@ -312,30 +374,46 @@ impl ProviderAuthority {
         Ok(Value::Str(Rc::new(accumulated)))
     }
 
-    fn http_post(&self, body: &str, _stream: bool) -> Result<Vec<u8>, String> {
+    fn http_post(&self, body: &str) -> Result<Vec<u8>, String> {
         let mut stream = self.connect()?;
-        self.write_request(&mut stream, body)?;
+        self.write_request(&mut *stream, body)?;
         self.read_response(stream)
     }
 
-    fn connect(&self) -> Result<TcpStream, String> {
-        let stream = TcpStream::connect((self.host.as_str(), self.port)).map_err(|e| {
-            format!(
-                "provider: connect to {}:{} failed: {}",
-                self.host, self.port, e
-            )
-        })?;
-        stream
-            .set_read_timeout(Some(self.timeout))
-            .map_err(|e| format!("provider: set read timeout: {}", e))?;
-        stream
-            .set_write_timeout(Some(self.timeout))
-            .map_err(|e| format!("provider: set write timeout: {}", e))?;
-        Ok(stream)
+    fn connect(&self) -> Result<Box<dyn NetStream>, String> {
+        match self.scheme {
+            Scheme::Http => {
+                let tcp = TcpStream::connect((self.host.as_str(), self.port)).map_err(|e| {
+                    format!(
+                        "provider: connect to {}:{} failed: {}",
+                        self.host, self.port, e
+                    )
+                })?;
+                tcp.set_read_timeout(Some(self.timeout))
+                    .map_err(|e| format!("provider: set read timeout: {}", e))?;
+                tcp.set_write_timeout(Some(self.timeout))
+                    .map_err(|e| format!("provider: set write timeout: {}", e))?;
+                Ok(Box::new(tcp))
+            }
+            Scheme::Https => {
+                let connector = TlsConnector::new()
+                    .map_err(|e| format!("provider: create TLS connector: {}", e))?;
+                let tls_stream = connector
+                    .connect(&self.host, self.port)
+                    .map_err(|e| {
+                        format!("provider: TLS handshake with {} failed: {}", self.host, e)
+                    })?;
+                Ok(Box::new(tls_stream))
+            }
+        }
     }
 
-    fn write_request(&self, stream: &mut TcpStream, body: &str) -> Result<(), String> {
-        let host_header = if self.port == 80 {
+    fn write_request(&self, stream: &mut dyn Write, body: &str) -> Result<(), String> {
+        let default_port: u16 = match self.scheme {
+            Scheme::Http => 80,
+            Scheme::Https => 443,
+        };
+        let host_header = if self.port == default_port {
             self.host.clone()
         } else {
             format!("{}:{}", self.host, self.port)
@@ -375,11 +453,11 @@ impl ProviderAuthority {
         Ok(())
     }
 
-    fn read_response(&self, stream: TcpStream) -> Result<Vec<u8>, String> {
+    fn read_response(&self, stream: Box<dyn NetStream>) -> Result<Vec<u8>, String> {
         let mut reader = BufReader::new(stream);
 
         // Read status line
-        let status_line = read_http_line(&mut reader)?
+        let status_line = read_line(&mut reader)?
             .ok_or_else(|| "provider: empty response".to_string())?;
         let status = parse_status_code(&status_line)?;
         if !(200..300).contains(&status) {
@@ -394,7 +472,7 @@ impl ProviderAuthority {
         let mut content_length: Option<usize> = None;
         let mut chunked = false;
         loop {
-            let line = read_http_line(&mut reader)?
+            let line = read_line(&mut reader)?
                 .ok_or_else(|| "provider: unexpected EOF reading headers".to_string())?;
             let trimmed = line.trim_end_matches(['\r', '\n']);
             if trimmed.is_empty() {
@@ -452,14 +530,14 @@ impl ProviderAuthority {
     }
 }
 
-// --- SSE helpers ---
+// --- I/O helpers (generic over NetStream trait object) ---
 
-fn read_sse_line(reader: &mut BufReader<TcpStream>) -> Result<Option<String>, String> {
+fn read_line(reader: &mut BufReader<Box<dyn NetStream>>) -> Result<Option<String>, String> {
     let mut out = Vec::new();
     loop {
         let available = reader
             .fill_buf()
-            .map_err(|e| format!("provider: read SSE: {}", e))?;
+            .map_err(|e| format!("provider: read: {}", e))?;
         if available.is_empty() {
             if out.is_empty() {
                 return Ok(None);
@@ -472,7 +550,7 @@ fn read_sse_line(reader: &mut BufReader<TcpStream>) -> Result<Option<String>, St
             .map_or(available.len(), |pos| pos + 1);
         if out.len() + take_len > MAX_SSE_LINE_BYTES {
             return Err(format!(
-                "provider: SSE line exceeds {} bytes",
+                "provider: line exceeds {} bytes",
                 MAX_SSE_LINE_BYTES
             ));
         }
@@ -485,43 +563,13 @@ fn read_sse_line(reader: &mut BufReader<TcpStream>) -> Result<Option<String>, St
     }
     String::from_utf8(out)
         .map(Some)
-        .map_err(|e| format!("provider: invalid UTF-8 in SSE: {}", e))
-}
-
-fn read_http_line(reader: &mut BufReader<TcpStream>) -> Result<Option<String>, String> {
-    let mut out = Vec::new();
-    loop {
-        let available = reader
-            .fill_buf()
-            .map_err(|e| format!("provider: read: {}", e))?;
-        if available.is_empty() {
-            return if out.is_empty() {
-                Ok(None)
-            } else {
-                String::from_utf8(out)
-                    .map(Some)
-                    .map_err(|e| format!("provider: invalid UTF-8: {}", e))
-            };
-        }
-        let take_len = available
-            .iter()
-            .position(|b| *b == b'\n')
-            .map_or(available.len(), |pos| pos + 1);
-        out.extend_from_slice(&available[..take_len]);
-        reader.consume(take_len);
-        if out.last() == Some(&b'\n') {
-            break;
-        }
-    }
-    String::from_utf8(out)
-        .map(Some)
         .map_err(|e| format!("provider: invalid UTF-8: {}", e))
 }
 
-fn read_chunked(reader: &mut BufReader<TcpStream>) -> Result<Vec<u8>, String> {
+fn read_chunked(reader: &mut BufReader<Box<dyn NetStream>>) -> Result<Vec<u8>, String> {
     let mut body = Vec::new();
     loop {
-        let line = read_http_line(reader)?
+        let line = read_line(reader)?
             .ok_or_else(|| "provider: unexpected EOF reading chunk size".to_string())?;
         let size_text = line
             .trim_end_matches(['\r', '\n'])
@@ -615,50 +663,77 @@ fn extract_chat_content(response: &Value) -> Result<Value, String> {
     }
 }
 
-/// Extract the delta content from a streaming SSE chunk.
-fn extract_stream_delta(chunk: &Value) -> Option<String> {
-    // Chunk shape: { choices: [{ delta: { content: "..." } }] }
+/// Extract both `content` and `reasoning` deltas from a streaming SSE chunk.
+/// GLM 4.7 uses `delta.reasoning` for thinking tokens and `delta.content`
+/// for output tokens.
+fn extract_stream_deltas(chunk: &Value) -> (Option<String>, Option<String>) {
     let choices = match chunk {
-        Value::Map(m) => m.borrow().get("choices").cloned()?,
-        _ => return None,
+        Value::Map(m) => m.borrow().get("choices").cloned(),
+        _ => return (None, None),
     };
     let choices_list = match choices {
-        Value::List(l) => l,
-        _ => return None,
+        Some(Value::List(l)) => l,
+        _ => return (None, None),
     };
-    let first = choices_list.borrow().first().cloned()?;
+    let first = match choices_list.borrow().first().cloned() {
+        Some(v) => v,
+        None => return (None, None),
+    };
     let delta = match &first {
-        Value::Map(m) => m.borrow().get("delta").cloned()?,
-        _ => return None,
+        Value::Map(m) => m.borrow().get("delta").cloned(),
+        _ => return (None, None),
     };
     match delta {
-        Value::Map(m) => match m.borrow().get("content").cloned() {
-            Some(Value::Str(s)) => Some(s.to_string()),
-            _ => None,
-        },
-        _ => None,
+        Some(Value::Map(m)) => {
+            let m = m.borrow();
+            let content = match m.get("content").cloned() {
+                Some(Value::Str(s)) => Some(s.to_string()),
+                _ => None,
+            };
+            let reasoning = match m.get("reasoning").cloned() {
+                Some(Value::Str(s)) => Some(s.to_string()),
+                _ => None,
+            };
+            (content, reasoning)
+        }
+        _ => (None, None),
     }
 }
 
 // --- Endpoint parsing ---
 
-fn parse_endpoint(endpoint: &str) -> Option<(String, u16)> {
-    let rest = endpoint.strip_prefix("http://")?;
+/// Parse an endpoint URL into (scheme, host, port).
+fn parse_endpoint(endpoint: &str) -> Option<(Scheme, String, u16)> {
+    let (scheme, rest) = if let Some(r) = endpoint.strip_prefix("https://") {
+        (Scheme::Https, r)
+    } else if let Some(r) = endpoint.strip_prefix("http://") {
+        (Scheme::Http, r)
+    } else {
+        return None;
+    };
     if rest.is_empty() {
         return None;
     }
     let authority = rest.split_once('/').map(|(a, _)| a).unwrap_or(rest);
+    let default_port: u16 = match scheme {
+        Scheme::Http => 80,
+        Scheme::Https => 443,
+    };
+
     let (host, port) = match authority.rsplit_once(':') {
         Some((h, p)) => {
-            let port: u16 = p.parse().ok()?;
-            (h.to_string(), port)
+            if let Ok(port) = p.parse::<u16>() {
+                (h.to_string(), port)
+            } else {
+                (authority.to_string(), default_port)
+            }
         }
-        None => (authority.to_string(), 80),
+        None => (authority.to_string(), default_port),
     };
     if host.is_empty() {
         return None;
     }
-    Some((host, port))
+    Some((scheme, host, port))
 }
 
 // --- Authority trait impl ---
@@ -723,6 +798,7 @@ impl Authority for ProviderAuthority {
 
         Ok(Rc::new(ProviderAuthority {
             endpoint: self.endpoint.clone(),
+            scheme: self.scheme.clone(),
             host: self.host.clone(),
             port: self.port,
             models: new_models,
@@ -738,19 +814,13 @@ impl Authority for ProviderAuthority {
             // chat(messages, [overrides]) -> string content
             "chat" => {
                 let body = self.build_request_body(args)?;
-                let result = self.do_chat(&body)?;
-                Ok(Value::Result(Rc::new(
-                    crate::value::ResultValue::Ok(result),
-                )))
+                self.do_chat(&body)
             }
 
             // chat_json(messages, [overrides]) -> parsed JSON response
             "chat_json" => {
                 let body = self.build_request_body(args)?;
-                let result = self.do_chat_json(&body)?;
-                Ok(Value::Result(Rc::new(
-                    crate::value::ResultValue::Ok(result),
-                )))
+                self.do_chat_json(&body)
             }
 
             // stream(messages, handler, [overrides]) -> accumulated string
@@ -768,10 +838,7 @@ impl Authority for ProviderAuthority {
                     vec![args[0].clone()]
                 };
                 let body = self.build_request_body(&body_args)?;
-                let result = self.do_stream(rt, &body, handler)?;
-                Ok(Value::Result(Rc::new(
-                    crate::value::ResultValue::Ok(result),
-                )))
+                self.do_stream(rt, &body, handler)
             }
 
             // models() -> list of allowed model names
@@ -792,6 +859,16 @@ impl Authority for ProviderAuthority {
                     Value::Str(Rc::new(self.endpoint.clone())),
                 );
                 m.insert("path".into(), Value::Str(Rc::new(self.path.clone())));
+                m.insert(
+                    "scheme".into(),
+                    Value::Str(Rc::new(
+                        match self.scheme {
+                            Scheme::Http => "http",
+                            Scheme::Https => "https",
+                        }
+                        .to_string(),
+                    )),
+                );
                 m.insert(
                     "models".into(),
                     Value::List(Rc::new(RefCell::new(
@@ -845,20 +922,40 @@ mod tests {
 
     #[test]
     fn parses_http_endpoints() {
-        assert_eq!(
-            parse_endpoint("http://localhost:11434"),
-            Some(("localhost".into(), 11434))
-        );
-        assert_eq!(
-            parse_endpoint("http://192.168.1.100:8080"),
-            Some(("192.168.1.100".into(), 8080))
-        );
-        assert_eq!(
-            parse_endpoint("http://example.com"),
-            Some(("example.com".into(), 80))
-        );
-        assert_eq!(parse_endpoint("https://example.com"), None);
+        let (scheme, host, port) = parse_endpoint("http://localhost:11434").unwrap();
+        assert!(matches!(scheme, Scheme::Http));
+        assert_eq!(host, "localhost");
+        assert_eq!(port, 11434);
+
+        let (scheme, host, port) = parse_endpoint("http://192.168.1.100:8080").unwrap();
+        assert!(matches!(scheme, Scheme::Http));
+        assert_eq!(host, "192.168.1.100");
+        assert_eq!(port, 8080);
+
+        let (scheme, host, port) = parse_endpoint("http://example.com").unwrap();
+        assert!(matches!(scheme, Scheme::Http));
+        assert_eq!(host, "example.com");
+        assert_eq!(port, 80);
+
         assert_eq!(parse_endpoint("not-a-url"), None);
+    }
+
+    #[test]
+    fn parses_https_endpoints() {
+        let (scheme, host, port) = parse_endpoint("https://api.cerebras.ai").unwrap();
+        assert!(matches!(scheme, Scheme::Https));
+        assert_eq!(host, "api.cerebras.ai");
+        assert_eq!(port, 443);
+
+        let (scheme, host, port) = parse_endpoint("https://api.cerebras.ai:8443").unwrap();
+        assert!(matches!(scheme, Scheme::Https));
+        assert_eq!(host, "api.cerebras.ai");
+        assert_eq!(port, 8443);
+
+        let (scheme, host, port) = parse_endpoint("https://example.com").unwrap();
+        assert!(matches!(scheme, Scheme::Https));
+        assert_eq!(host, "example.com");
+        assert_eq!(port, 443);
     }
 
     #[test]
@@ -879,7 +976,7 @@ mod tests {
     }
 
     #[test]
-    fn extracts_stream_delta() {
+    fn extracts_stream_delta_content() {
         let chunk_json = r#"{
             "choices": [{
                 "delta": {
@@ -888,7 +985,24 @@ mod tests {
             }]
         }"#;
         let chunk = json::parse_str(chunk_json).unwrap();
-        assert_eq!(extract_stream_delta(&chunk), Some("Hello".to_string()));
+        let (content, reasoning) = extract_stream_deltas(&chunk);
+        assert_eq!(content, Some("Hello".to_string()));
+        assert_eq!(reasoning, None);
+    }
+
+    #[test]
+    fn extracts_stream_delta_reasoning() {
+        let chunk_json = r#"{
+            "choices": [{
+                "delta": {
+                    "reasoning": "Let me think..."
+                }
+            }]
+        }"#;
+        let chunk = json::parse_str(chunk_json).unwrap();
+        let (content, reasoning) = extract_stream_deltas(&chunk);
+        assert_eq!(content, None);
+        assert_eq!(reasoning, Some("Let me think...".to_string()));
     }
 
     #[test]
@@ -901,7 +1015,9 @@ mod tests {
             }]
         }"#;
         let chunk = json::parse_str(chunk_json).unwrap();
-        assert_eq!(extract_stream_delta(&chunk), None);
+        let (content, reasoning) = extract_stream_deltas(&chunk);
+        assert!(content.is_none());
+        assert!(reasoning.is_none());
     }
 
     #[test]
@@ -913,7 +1029,9 @@ mod tests {
             }]
         }"#;
         let chunk = json::parse_str(chunk_json).unwrap();
-        assert_eq!(extract_stream_delta(&chunk), None);
+        let (content, reasoning) = extract_stream_deltas(&chunk);
+        assert!(content.is_none());
+        assert!(reasoning.is_none());
     }
 
     #[test]
