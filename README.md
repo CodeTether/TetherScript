@@ -4,8 +4,7 @@ TetherScript is a small, embeddable scripting language for Rust hosts and AI-age
 workflows. It is dynamically typed, uses Rust-like syntax, and is implemented in
 Rust with two runtimes: a tree-walking interpreter and a stack-based bytecode VM.
 
-The project was originally named Kiln. Current user-facing copy should use
-**TetherScript**. The package, library, and binary are named `tetherscript`.
+The package, library, and binary are named `tetherscript`.
 
 TetherScript is meant for project policy, validators, workflow glue, plugin hooks,
 and other fast-changing behavior that should not require rebuilding a Rust
