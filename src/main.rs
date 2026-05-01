@@ -1,11 +1,11 @@
 //! tetherscript — a dynamically-typed scripting language with Rust-style ownership.
 //!
 //! Usage:
-//!   tetherscript <file.kl>                  # run (tree-walking interpreter)
-//!   tetherscript --vm       <file.kl>       # run (bytecode VM)
-//!   tetherscript --tokens   <file.kl>       # dump tokens and exit
-//!   tetherscript --ast      <file.kl>       # dump AST and exit
-//!   tetherscript --bytecode <file.kl>       # dump compiled bytecode and exit
+//!   tetherscript <file.tether>                  # run (tree-walking interpreter)
+//!   tetherscript --vm       <file.tether>       # run (bytecode VM)
+//!   tetherscript --tokens   <file.tether>       # dump tokens and exit
+//!   tetherscript --ast      <file.tether>       # dump AST and exit
+//!   tetherscript --bytecode <file.tether>       # dump compiled bytecode and exit
 //!   tetherscript --lsp                      # serve LSP over stdio
 
 mod ast;
@@ -21,6 +21,7 @@ mod lsp;
 mod output;
 mod parser;
 mod provider_cap;
+mod rpc_cap;
 mod smtp;
 mod system;
 mod token;
@@ -40,7 +41,7 @@ use vm::VM;
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
-        eprintln!("usage: tetherscript [--tokens|--ast|--bytecode|--vm|--lsp] [--step-budget <n>] [--grant-fs <root>] [--grant-provider <endpoint>] <file.kl>");
+        eprintln!("usage: tetherscript [--tokens|--ast|--bytecode|--vm|--lsp] [--step-budget <n>] [--grant-fs <root>] [--grant-provider <endpoint>] [--grant-rpc <endpoint>] <file.tether>");
         process::exit(2);
     }
 
@@ -57,6 +58,7 @@ fn main() {
     let mut step_budget: Option<u64> = None;
     let mut fs_grant: Option<String> = None;
     let mut provider_grant: Option<String> = None;
+    let mut rpc_grant: Option<String> = None;
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
@@ -109,6 +111,19 @@ fn main() {
                     process::exit(2);
                 }
                 provider_grant = Some(endpoint.clone());
+                i += 2;
+            }
+            "--grant-rpc" => {
+                if i + 1 >= args.len() {
+                    eprintln!("tetherscript: --grant-rpc requires an http:// endpoint argument");
+                    process::exit(2);
+                }
+                let endpoint = &args[i + 1];
+                if !endpoint.starts_with("http://") {
+                    eprintln!("tetherscript: --grant-rpc endpoint must start with http://");
+                    process::exit(2);
+                }
+                rpc_grant = Some(endpoint.clone());
                 i += 2;
             }
             other => {
@@ -183,6 +198,9 @@ fn main() {
         if let Some(endpoint) = &provider_grant {
             vm.grant("provider", provider_cap::ProviderAuthority::new(endpoint));
         }
+        if let Some(endpoint) = &rpc_grant {
+            vm.grant("rpc", rpc_cap::RpcAuthority::new(endpoint));
+        }
         let result = if let Some(budget) = step_budget {
             interp::with_step_budget(budget, || vm.run(chunk))
         } else {
@@ -201,6 +219,9 @@ fn main() {
     }
     if let Some(endpoint) = &provider_grant {
         interp.grant("provider", provider_cap::ProviderAuthority::new(endpoint));
+    }
+    if let Some(endpoint) = &rpc_grant {
+        interp.grant("rpc", rpc_cap::RpcAuthority::new(endpoint));
     }
     let result = if let Some(budget) = step_budget {
         interp::with_step_budget(budget, || interp.run(&program))

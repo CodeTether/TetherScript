@@ -1,7 +1,7 @@
 //! Embeddable TetherScript plugin runtime.
 //!
 //! A Rust host creates a [`PluginHost`], grants project-specific capabilities,
-//! loads `.tether` or legacy `.kl` source, then calls named hook functions. Plugins run with the
+//! loads `.tether` or legacy `.tether` source, then calls named hook functions. Plugins run with the
 //! sandboxed built-in set by default; all host authority must be explicit.
 
 use std::cell::RefCell;

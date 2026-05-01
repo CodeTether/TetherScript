@@ -24,10 +24,10 @@ kiln --prompt fetch-and-save > prompt.txt
 
 # 2. Feed it to whatever model you're testing. Capture its reply
 #    (which should be Kiln source) to a file:
-cat prompt.txt | your-model-cli > model_output.kl
+cat prompt.txt | your-model-cli > model_output.tether
 
 # 3. Classify:
-kiln --experiment fetch-and-save model_output.kl
+kiln --experiment fetch-and-save model_output.tether
 # → JSON record on stderr, program stdout on stdout
 # → exit 0 on SUCCESS, 1 otherwise
 ```
@@ -39,7 +39,7 @@ the distillation pipeline expects to ingest.
 ## Running a suite
 
 ```bash
-for f in outputs/*.kl; do
+for f in outputs/*.tether; do
     kiln --experiment fetch-and-save "$f" 2>> trajectories.jsonl 1>/dev/null
 done
 

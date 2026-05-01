@@ -1,7 +1,7 @@
 // Capability validation example.
 //
 // Run with:
-//     tetherscript --grant-fs ./examples/cap_workspace examples/capability_fs.kl
+//     tetherscript --grant-fs ./examples/cap_workspace examples/capability_fs.tether
 //
 // Exercises every invariant the capability model is supposed to uphold:
 //   1. The agent can act through the granted `fs` capability.

@@ -1,7 +1,7 @@
 // Dogfood plugin: extends the TetherScript binary through the embedded plugin host.
 //
 // Run:
-//     tetherscript --plugin examples/tetherscript_extension.kl validate
+//     tetherscript --plugin examples/tetherscript_extension.tether validate
 
 fn plugin() {
     let meta = map()

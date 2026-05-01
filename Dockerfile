@@ -4,7 +4,7 @@
 #
 # Build:   docker build -t kiln .
 # Run:     docker run --rm -p 8787:8787 kiln
-# Custom:  docker run --rm -p 8787:8787 kiln /examples/http_hello.kl
+# Custom:  docker run --rm -p 8787:8787 kiln /examples/http_hello.tether
 
 FROM rust:1-alpine AS builder
 RUN apk add --no-cache musl-dev
@@ -20,4 +20,4 @@ COPY examples /examples
 EXPOSE 8787
 USER 1000:1000
 ENTRYPOINT ["/kiln"]
-CMD ["/examples/landing.kl"]
+CMD ["/examples/landing.tether"]

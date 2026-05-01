@@ -303,7 +303,7 @@ It should provide:
 - Modules and imports.
 - A formatter.
 - A REPL for local development.
-- A test runner for `.tether` files and legacy `.kl` files.
+- A test runner for `.tether` files and legacy `.tether` files.
 - A capability manifest model.
 - Interpreter and VM semantic parity.
 

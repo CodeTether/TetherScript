@@ -4,7 +4,7 @@
 // Run with:
 //     tetherscript --grant-fs ./examples/cap_workspace \
 //          --grant-http https://example.com \
-//          examples/capability_http.kl
+//          examples/capability_http.tether
 
 fn fetch_to_file(http_cap, fs_cap, url, path) {
     let resp = http_cap.get(url)?

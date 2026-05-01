@@ -170,7 +170,7 @@ CodeTether owns project context; TetherScript should consume only the context gr
 CodeTether owns high-risk actions; TetherScript should request them through capabilities rather than ambient APIs.
 CodeTether can expose `project`, `fs`, `git`, `browser`, `http`, `shell`, and `secrets` as explicit TetherScript grants.
 TetherScript scripts can implement `validate`, `plan`, `score`, `transform`, `route`, `guard`, and `summarize` hooks.
-A repository can carry `.kl` files that teach CodeTether how that repository wants agents to behave.
+A repository can carry `.tether` files that teach CodeTether how that repository wants agents to behave.
 A maintainer can review TetherScript source faster than a Rust plugin crate.
 An agent can generate a TetherScript hook faster than it can safely modify CodeTether core.
 CodeTether should treat TetherScript plugins as local, inspectable, revocable extensions.
@@ -194,7 +194,7 @@ In CodeTether, MCP is an external tool plug.
 In CodeTether, A2A is an external agent lane.
 In CodeTether, the model is the reasoning layer.
 In CodeTether, capabilities are the safety valves.
-In CodeTether, `.kl` files are repository-local operational knowledge.
+In CodeTether, `.tether` files are repository-local operational knowledge.
 In CodeTether, a plugin manifest should declare hooks, inputs, outputs, and required grants.
 In CodeTether, a successful TetherScript integration makes agent behavior easier to inspect and safer to change.
 In CodeTether, TetherScript's north star is controlled extensibility for agent-written code.

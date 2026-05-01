@@ -41,17 +41,17 @@ responsible for trust, capabilities, auditing, and resource budgets.
 cargo build --release
 
 # Run with the reference interpreter
-./target/release/tetherscript examples/hello.kl
-./target/release/tetherscript examples/fib.kl
+./target/release/tetherscript examples/hello.tether
+./target/release/tetherscript examples/fib.tether
 
 # Run with the bytecode VM
-./target/release/tetherscript --vm examples/hello.kl
-./target/release/tetherscript --vm examples/fib.kl
+./target/release/tetherscript --vm examples/hello.tether
+./target/release/tetherscript --vm examples/fib.tether
 
 # Inspect the frontend / compiler output
-./target/release/tetherscript --tokens   examples/hello.kl
-./target/release/tetherscript --ast      examples/hello.kl
-./target/release/tetherscript --bytecode examples/hello.kl
+./target/release/tetherscript --tokens   examples/hello.tether
+./target/release/tetherscript --ast      examples/hello.tether
+./target/release/tetherscript --bytecode examples/hello.tether
 
 # Serve LSP over stdio for editors
 ./target/release/tetherscript --lsp
@@ -186,7 +186,7 @@ src/
   value.rs       — runtime values, ownership slots, environments
   vm.rs          — bytecode VM
 examples/
-  hello.kl, fib.kl, closures.kl, ownership.kl, use_after_move.kl
+  hello.tether, fib.tether, closures.tether, ownership.tether, use_after_move.tether
 editor/vscode/
   VSCode grammar and LSP client
 docs/
