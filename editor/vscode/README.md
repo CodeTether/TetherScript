@@ -4,7 +4,7 @@ Language support for [TetherScript](https://github.com/TetherScript-Rs/tetherscr
 
 ## What it does
 
-- Syntax highlighting for `.tether` files and legacy `.kl` files
+- Syntax highlighting for `.tether` files and legacy `.tether` files
 - Lex and parse errors reported as red squigglies in real time
 - Bracket matching, auto-close, comment toggling
 
@@ -24,7 +24,7 @@ Language support for [TetherScript](https://github.com/TetherScript-Rs/tetherscr
    npm install
    ```
 
-3. Open `editor/vscode` in VSCode and press `F5` to launch an Extension Development Host. Open a `.tether` or `.kl` file in the new window.
+3. Open `editor/vscode` in VSCode and press `F5` to launch an Extension Development Host. Open a `.tether` or `.tether` file in the new window.
 
    To package and install for daily use:
 

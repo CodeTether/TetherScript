@@ -26,9 +26,9 @@ use crate::vm::VM;
 pub fn run() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
-        eprintln!("usage: tetherscript [--tokens|--ast|--bytecode|--vm|--lsp] [--step-budget <n>] [--grant-fs <root>] [--grant-http <origin>...] <file.kl>");
-        eprintln!("       tetherscript --plugin <plugin.kl> <hook> [json-arg...]");
-        eprintln!("       tetherscript --codetether-manifest <plugin.kl>");
+        eprintln!("usage: tetherscript [--tokens|--ast|--bytecode|--vm|--lsp] [--step-budget <n>] [--grant-fs <root>] [--grant-http <origin>...] <file.tether>");
+        eprintln!("       tetherscript --plugin <plugin.tether> <hook> [json-arg...]");
+        eprintln!("       tetherscript --codetether-manifest <plugin.tether>");
         process::exit(2);
     }
 
@@ -212,7 +212,7 @@ pub fn run() {
 
 fn run_codetether_manifest_cli(args: &[String]) -> i32 {
     if args.len() != 1 {
-        eprintln!("usage: tetherscript --codetether-manifest <plugin.kl>");
+        eprintln!("usage: tetherscript --codetether-manifest <plugin.tether>");
         return 2;
     }
 
@@ -236,7 +236,7 @@ fn run_codetether_manifest_cli(args: &[String]) -> i32 {
 
 fn run_plugin_cli(args: &[String]) -> i32 {
     if args.len() < 2 {
-        eprintln!("usage: tetherscript --plugin <plugin.kl> <hook> [json-arg...]");
+        eprintln!("usage: tetherscript --plugin <plugin.tether> <hook> [json-arg...]");
         return 2;
     }
 

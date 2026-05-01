@@ -1,6 +1,6 @@
 // Minimal HTTP server. Run with:
-//     tetherscript examples/http_hello.kl
-//     tetherscript --vm examples/http_hello.kl
+//     tetherscript examples/http_hello.tether
+//     tetherscript --vm examples/http_hello.tether
 // Then: curl http://127.0.0.1:8787/
 //       curl http://127.0.0.1:8787/hello
 //       curl -X POST -d 'hi' http://127.0.0.1:8787/echo

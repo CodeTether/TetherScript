@@ -7,4 +7,4 @@ services:
       - "8787:8787"
     restart: unless-stopped
     # Swap in any example by overriding the command:
-    #   command: ["/examples/http_hello.kl"]
+    #   command: ["/examples/http_hello.tether"]

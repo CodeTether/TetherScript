@@ -173,7 +173,7 @@ fn plugin() {
     return m
 }
 "#;
-        let manifest = manifest_for_source("example.kl", source).unwrap();
+        let manifest = manifest_for_source("example.tether", source).unwrap();
         assert_eq!(manifest["id"], "tetherscript.example");
         assert_eq!(manifest["name"], "TetherScript Example");
         assert_eq!(manifest["version"], "1.2.3");
