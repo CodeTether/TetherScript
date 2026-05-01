@@ -4,4 +4,4 @@ version = 4
 
 [[package]]
 name = "tetherscript"
-version = "0.0.1-alpha-0.4"
+version = "0.0.1-alpha-0.5"
