@@ -8,6 +8,7 @@
 //! tetherscript run <file.tether>              run with bytecode VM (default)
 //! tetherscript run --interp <file.tether>     run with tree-walking interpreter
 //! tetherscript check <file>                   parse and run ownership analysis
+//! tetherscript render <html> [css] [width]      render HTML/CSS to a text display list
 //! tetherscript inspect --tokens <file>        dump tokens
 //! tetherscript inspect --ast <file>           dump AST
 //! tetherscript inspect --bytecode <file>      dump compiled bytecode
@@ -18,6 +19,7 @@
 //! ```
 
 mod ast;
+mod browser;
 mod bytecode;
 mod capability;
 mod compiler;
@@ -84,6 +86,7 @@ fn main() {
     match first.as_str() {
         "run" => cmd_run(&args[2..]),
         "check" => cmd_check(&args[2..]),
+        "render" => cmd_render(&args[2..]),
         "inspect" => cmd_inspect(&args[2..]),
         "lsp" => cmd_lsp(),
         "repl" => cmd_repl(),
@@ -328,6 +331,36 @@ fn cmd_lsp() {
         eprintln!("tetherscript-lsp: {}", e);
         process::exit(1);
     }
+}
+
+fn cmd_render(args: &[String]) {
+    if args.is_empty() || args[0] == "--help" || args[0] == "-h" {
+        println!("tetherscript render -- Render HTML/CSS to a deterministic text display list");
+        println!();
+        println!("USAGE:");
+        println!("    tetherscript render <html-file> [css-file] [width]");
+        if args.is_empty() {
+            process::exit(2);
+        }
+        return;
+    }
+    let html = read_source(&args[0]);
+    let css = args
+        .get(1)
+        .map(|path| read_source(path))
+        .unwrap_or_default();
+    let width = args
+        .get(2)
+        .map(|raw| {
+            raw.parse::<i64>().unwrap_or_else(|_| {
+                eprintln!("tetherscript render: width must be an integer");
+                process::exit(2);
+            })
+        })
+        .unwrap_or(80);
+    let doc = browser::parse_html(&html);
+    let layout = browser::layout_document(&doc, &css, width);
+    print!("{}", browser::render_text(&layout));
 }
 
 fn cmd_check(args: &[String]) {

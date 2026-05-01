@@ -11,6 +11,7 @@ use std::fmt::Write as _;
 use std::rc::Rc;
 
 use crate::ast::*;
+use crate::browser;
 use crate::http;
 use crate::json;
 use crate::lexer::Lexer;
@@ -1266,6 +1267,22 @@ fn install_pure_builtins(env: &Rc<RefCell<Env>>) {
         pure_native("type_of", Some(1), |args| {
             Ok(Value::Str(Rc::new(args[0].type_name().into())))
         }),
+        false,
+    );
+
+    e.define(
+        "browser_parse_html",
+        pure_native("browser_parse_html", Some(1), browser::html_to_value),
+        false,
+    );
+    e.define(
+        "browser_render",
+        pure_native("browser_render", None, browser::render_to_value),
+        false,
+    );
+    e.define(
+        "browser_layout",
+        pure_native("browser_layout", None, browser::layout_to_runtime_value),
         false,
     );
 

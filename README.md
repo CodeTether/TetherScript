@@ -25,6 +25,9 @@ TetherScript currently includes:
 - Method calls on built-in values.
 - JSON parsing/encoding implemented in-tree.
 - Blocking HTTP client helpers and a blocking HTTP/1.1 server.
+- Experimental browser primitives for parsing small HTML fragments, applying
+  simple CSS rules, computing block layout, and rendering deterministic text
+  display lists.
 - SMTP sending support.
 - Standard tools for filesystem, process, environment, path, time, Base64,
   SHA-256, and URL parsing.
@@ -101,6 +104,7 @@ including:
 
 - `json_parse`, `json_encode`, `json_encode_pretty`
 - `http_get`, `http_head`, `http_post`, `http_request`, `http_serve`
+- `browser_parse_html`, `browser_layout`, `browser_render`
 - `smtp_send`
 - `fs_read`, `fs_write`, `fs_exists`, `fs_list`, `fs_mkdir`, `fs_stat`,
   `fs_remove`, `fs_rename`, `fs_copy`
@@ -168,6 +172,7 @@ diagnostics.
 ```text
 src/
   ast.rs         — AST node definitions
+  browser.rs     — experimental HTML/CSS parser, layout, and text renderer
   bytecode.rs    — bytecode instruction/chunk/function types
   capability.rs  — capability trait/object model
   compiler.rs    — AST to bytecode compiler
@@ -206,6 +211,7 @@ docs/
 - [x] JSON support
 - [x] HTTP client/server support
 - [x] Standard filesystem/process/env/path/time/hash/base64/url tools
+- [x] Experimental browser parser/layout/text renderer
 - [x] Rust embedding/plugin host
 - [ ] Runtime `&mut` exclusivity enforcement
 - [ ] Modules and imports
