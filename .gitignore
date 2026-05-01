@@ -1,6 +1,10 @@
 /target
 /AGENT.md
 /.claude
+/.codetether-agent/
+/leftoff.md
+/prd_*.json
+/us_001/
 
 # vscode extension build artifacts
 editor/vscode/node_modules/

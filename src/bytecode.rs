@@ -51,6 +51,8 @@ pub enum Instr {
     JumpIfFalse(i32),
     JumpIfFalseKeep(i32), // leaves value on stack for short-circuit `&&`
     JumpIfTrueKeep(i32),  // leaves value on stack for short-circuit `||`
+    IterInit,             // stack: iterable -> snapshot list
+    ForNext(u16, i32),    // name_idx, exhausted jump; stack: iterable, index
 
     // Aggregates
     BuildList(u16),

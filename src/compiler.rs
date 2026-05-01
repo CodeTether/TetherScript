@@ -73,6 +73,7 @@ impl Compiler {
             Instr::JumpIfFalse(_) => Instr::JumpIfFalse(offset),
             Instr::JumpIfFalseKeep(_) => Instr::JumpIfFalseKeep(offset),
             Instr::JumpIfTrueKeep(_) => Instr::JumpIfTrueKeep(offset),
+            Instr::ForNext(name, _) => Instr::ForNext(*name, offset),
             other => panic!("patch_jump on non-jump instruction: {:?}", other),
         };
     }
@@ -316,6 +317,26 @@ impl Compiler {
                 let back = loop_start as i32 - (self.chunk.code.len() + 1) as i32;
                 self.emit(Instr::Jump(back));
                 self.patch_jump(jf);
+                self.emit(Instr::Nil);
+            }
+
+            Expr::For { name, iter, body } => {
+                self.compile_expr(iter);
+                self.emit(Instr::IterInit);
+                let zero = self.add_const(Value::Int(0));
+                self.emit(Instr::Const(zero));
+                self.emit(Instr::PushScope);
+                let loop_start = self.chunk.code.len();
+                let name_idx = self.intern_name(name);
+                let exhausted = self.emit(Instr::ForNext(name_idx, 0));
+                self.emit(Instr::PushScope);
+                self.compile_block(body);
+                self.emit(Instr::Pop);
+                self.emit(Instr::PopScope);
+                let back = loop_start as i32 - (self.chunk.code.len() + 1) as i32;
+                self.emit(Instr::Jump(back));
+                self.patch_jump(exhausted);
+                self.emit(Instr::PopScope);
                 self.emit(Instr::Nil);
             }
 

@@ -14,6 +14,7 @@ use std::rc::Rc;
 use crate::bytecode::{Chunk, FnProto, Instr, VmFnObj};
 use crate::interp::{
     apply_binary, apply_unary, call_method, field_value, index_value, install_builtins,
+    iterable_values,
 };
 use crate::value::{Env, NativeFunc, Runtime, Slot, Value};
 
@@ -213,6 +214,37 @@ impl VM {
             Instr::JumpIfTrueKeep(off) => {
                 let truthy = self.stack.last().unwrap().truthy();
                 if truthy {
+                    self.jump(off);
+                }
+            }
+            Instr::IterInit => {
+                let iterable = self.stack.pop().expect("IterInit with empty stack");
+                let items = iterable_values(&iterable)?;
+                self.stack.push(Value::List(Rc::new(RefCell::new(items))));
+            }
+            Instr::ForNext(idx, off) => {
+                let name = self.name(idx);
+                let index = match self.stack.pop().expect("ForNext with empty stack") {
+                    Value::Int(index) if index >= 0 => index,
+                    other => {
+                        return Err(Unwind::Error(format!(
+                            "for loop internal index must be non-negative int, got {}",
+                            other.type_name()
+                        )))
+                    }
+                };
+                let iterable = self.stack.last().expect("ForNext missing iterable").clone();
+                let items = iterable_values(&iterable)?;
+                if let Some(item) = items.get(index as usize).cloned() {
+                    self.frames
+                        .last()
+                        .unwrap()
+                        .env
+                        .borrow_mut()
+                        .define(&name, item, true);
+                    self.stack.push(Value::Int(index + 1));
+                } else {
+                    self.stack.pop();
                     self.jump(off);
                 }
             }

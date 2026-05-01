@@ -324,6 +324,16 @@ impl Interpreter {
                 Ok(Value::Nil)
             }
 
+            Expr::For { name, iter, body } => {
+                let items = iterable_values(&self.eval(iter, env)?)?;
+                for item in items {
+                    let scope = Env::child(env);
+                    scope.borrow_mut().define(name, item, true);
+                    self.exec_block(body, &scope)?;
+                }
+                Ok(Value::Nil)
+            }
+
             Expr::Block(block) => {
                 let scope = Env::child(env);
                 self.exec_block(block, &scope)
@@ -594,6 +604,28 @@ pub(crate) fn field_value(target: &Value, name: &str) -> Result<Value, String> {
             "cannot access field `{}` on {}",
             name,
             target.type_name()
+        )),
+    }
+}
+
+pub(crate) fn iterable_values(value: &Value) -> Result<Vec<Value>, String> {
+    match value {
+        Value::List(items) => Ok(items.borrow().iter().cloned().collect()),
+        Value::Str(text) => Ok(text
+            .chars()
+            .map(|ch| Value::Str(Rc::new(ch.to_string())))
+            .collect()),
+        Value::Map(map) => {
+            let mut keys: Vec<String> = map.borrow().keys().cloned().collect();
+            keys.sort();
+            Ok(keys
+                .into_iter()
+                .map(|key| Value::Str(Rc::new(key)))
+                .collect())
+        }
+        other => Err(format!(
+            "for loop cannot iterate over {}",
+            other.type_name()
         )),
     }
 }
@@ -1368,6 +1400,51 @@ fn main() {
 }
 "#;
         let program = parse(source);
+        let chunk = Compiler::compile_program(&program);
+        let mut vm = VM::new();
+        vm.run(chunk).unwrap();
+    }
+
+    #[test]
+    fn for_loops_work_in_interpreter_and_vm() {
+        let source = r#"
+fn main() {
+    let nums = [1, 2, 3, 4]
+    let mut sum = 0
+    for n in nums {
+        sum = sum + n
+    }
+    assert(sum == 10, "list for loop failed")
+
+    let mut text = ""
+    for ch in "ts" {
+        text = text + ch
+    }
+    assert(text == "ts", "string for loop failed")
+
+    let m = map()
+    m.beta = 2
+    m.alpha = 1
+    let keys = []
+    for key in m {
+        keys.push(key)
+    }
+    assert(keys.join(",") == "alpha,beta", "map key for loop failed")
+
+    let growing = [1, 2]
+    let seen = []
+    for value in growing {
+        seen.push(value)
+        growing.push(99)
+    }
+    assert(seen.join(",") == "1,2", "for loop should snapshot iterable")
+}
+"#;
+        let program = parse(source);
+
+        let mut interp = Interpreter::new();
+        interp.run(&program).unwrap();
+
         let chunk = Compiler::compile_program(&program);
         let mut vm = VM::new();
         vm.run(chunk).unwrap();
