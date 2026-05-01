@@ -63,6 +63,11 @@ pub enum Expr {
         cond: Box<Expr>,
         body: Box<Block>,
     },
+    For {
+        name: String,
+        iter: Box<Expr>,
+        body: Box<Block>,
+    },
     Block(Box<Block>),
 
     // Function literal (anonymous)
