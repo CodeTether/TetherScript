@@ -9,6 +9,7 @@ repository = "https://github.com/CodeTether/TetherScript"
 readme = "README.md"
 keywords = ["scripting", "embedded", "language", "vm", "sandbox"]
 categories = ["compilers", "parser-implementations", "embedded"]
+exclude = ["trd.md"]
 
 [dependencies]
 
