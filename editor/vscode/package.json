@@ -1,7 +1,7 @@
 {
   "name": "tetherscript",
   "displayName": "TetherScript",
-  "description": "Language support for TetherScript (.tether and .tether) — syntax highlighting, diagnostics from lex and parse errors via LSP.",
+  "description": "Language support for TetherScript (.tether) — syntax highlighting, diagnostics from lex and parse errors via LSP.",
   "version": "0.0.4",
   "publisher": "tetherscript-rs",
   "repository": {
@@ -23,7 +23,7 @@
       {
         "id": "tetherscript",
         "aliases": ["TetherScript", "tetherscript"],
-        "extensions": [".tether", ".tether"],
+        "extensions": [".tether"],
         "configuration": "./language-configuration.json"
       }
     ],
