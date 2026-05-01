@@ -341,6 +341,14 @@ fn write_json(value: &Value, out: &mut String, pretty: Option<usize>) -> Result<
             out.push_str(&value.to_string());
         }
         Value::Str(value) => write_json_string(value, out),
+        Value::Bytes(value) => {
+            let encoded = value
+                .borrow()
+                .iter()
+                .map(|b| Value::Int(*b as i64))
+                .collect::<Vec<_>>();
+            write_json_list(&encoded, out, pretty)?;
+        }
         Value::List(values) => write_json_list(&values.borrow(), out, pretty)?,
         Value::Map(values) => write_json_map(&values.borrow(), out, pretty)?,
         Value::Fn(_) | Value::VmFn(_) | Value::Native(_) => {

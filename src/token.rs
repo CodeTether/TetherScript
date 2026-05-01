@@ -8,6 +8,7 @@ pub enum Token {
     Int(i64),
     Float(f64),
     Str(String),
+    Bytes(Vec<u8>),
     Bool(bool),
     Ident(String),
 

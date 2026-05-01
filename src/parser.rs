@@ -227,6 +227,10 @@ impl Parser {
                 self.bump();
                 Ok(Expr::Str(s))
             }
+            Token::Bytes(bytes) => {
+                self.bump();
+                Ok(Expr::Bytes(bytes))
+            }
             Token::Bool(b) => {
                 self.bump();
                 Ok(Expr::Bool(b))
