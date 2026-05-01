@@ -304,6 +304,7 @@ impl Parser {
 
             Token::If => self.parse_if(),
             Token::While => self.parse_while(),
+            Token::For => self.parse_for(),
             Token::Fn => self.parse_fn_expr(),
             Token::Return => self.parse_return(),
             Token::Panic => self.parse_panic(),
@@ -447,6 +448,22 @@ impl Parser {
         let body = Box::new(self.parse_block()?);
         Ok(Expr::While {
             cond: Box::new(cond),
+            body,
+        })
+    }
+
+    fn parse_for(&mut self) -> Result<Expr, ParseError> {
+        self.bump(); // `for`
+        let name = match self.bump().token {
+            Token::Ident(s) => s,
+            other => return Err(self.error(format!("expected loop variable, got {:?}", other))),
+        };
+        self.expect(&Token::In, "`in`")?;
+        let iter = self.parse_expr()?;
+        let body = Box::new(self.parse_block()?);
+        Ok(Expr::For {
+            name,
+            iter: Box::new(iter),
             body,
         })
     }
