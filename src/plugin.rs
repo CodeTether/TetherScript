@@ -12,7 +12,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
-use crate::capability::Authority;
+use crate::capability::{with_audit_capture, Authority, CapabilityAuditEvent};
 use crate::interp::{with_step_budget, Interpreter, Unwind};
 use crate::lexer::Lexer;
 use crate::output;
@@ -26,6 +26,7 @@ pub struct PluginHost {
     grants: Vec<(String, Rc<dyn Authority>)>,
     step_budget: u64,
     output_limit: usize,
+    audit_capabilities: bool,
 }
 
 pub struct LoadedPlugin {
@@ -34,12 +35,14 @@ pub struct LoadedPlugin {
     load_stdout: String,
     step_budget: u64,
     output_limit: usize,
+    audit_capabilities: bool,
 }
 
 #[derive(Debug, Clone)]
 pub struct PluginCall {
     pub value: Value,
     pub stdout: String,
+    pub audit: Vec<CapabilityAuditEvent>,
 }
 
 #[derive(Debug)]
@@ -83,6 +86,7 @@ impl PluginHost {
             grants: Vec::new(),
             step_budget: DEFAULT_PLUGIN_STEP_BUDGET,
             output_limit: DEFAULT_PLUGIN_OUTPUT_LIMIT,
+            audit_capabilities: false,
         }
     }
 
@@ -93,6 +97,11 @@ impl PluginHost {
 
     pub fn with_output_limit(mut self, limit: usize) -> Self {
         self.output_limit = limit;
+        self
+    }
+
+    pub fn with_capability_audit(mut self, enabled: bool) -> Self {
+        self.audit_capabilities = enabled;
         self
     }
 
@@ -163,8 +172,10 @@ impl PluginHost {
             interp.grant(grant_name, authority.clone());
         }
 
-        let (stdout, result) = output::with_capture(self.output_limit, || {
-            with_step_budget(self.step_budget, || interp.run_repl(&program))
+        let (stdout, (_audit, result)) = output::with_capture(self.output_limit, || {
+            self.with_optional_audit(|| {
+                with_step_budget(self.step_budget, || interp.run_repl(&program))
+            })
         });
         match result {
             Ok(_) => Ok(LoadedPlugin {
@@ -173,12 +184,24 @@ impl PluginHost {
                 load_stdout: stdout,
                 step_budget: self.step_budget,
                 output_limit: self.output_limit,
+                audit_capabilities: self.audit_capabilities,
             }),
             Err(message) => Err(PluginError::Load {
                 plugin: name,
                 message,
                 stdout,
             }),
+        }
+    }
+
+    fn with_optional_audit<F, R>(&self, f: F) -> (Vec<CapabilityAuditEvent>, R)
+    where
+        F: FnOnce() -> R,
+    {
+        if self.audit_capabilities {
+            with_audit_capture(f)
+        } else {
+            (Vec::new(), f())
         }
     }
 }
@@ -245,11 +268,24 @@ impl LoadedPlugin {
             }
         };
 
-        let (stdout, result) = output::with_capture(self.output_limit, || {
-            with_step_budget(self.step_budget, || self.interp.call(&callee, args))
+        let (stdout, (audit, result)) = output::with_capture(self.output_limit, || {
+            if self.audit_capabilities {
+                with_audit_capture(|| {
+                    with_step_budget(self.step_budget, || self.interp.call(&callee, args))
+                })
+            } else {
+                (
+                    Vec::new(),
+                    with_step_budget(self.step_budget, || self.interp.call(&callee, args)),
+                )
+            }
         });
         match result {
-            Ok(value) => Ok(PluginCall { value, stdout }),
+            Ok(value) => Ok(PluginCall {
+                value,
+                stdout,
+                audit,
+            }),
             Err(err) => Err(PluginError::Hook {
                 plugin: self.name.clone(),
                 hook: hook.to_string(),
@@ -457,5 +493,29 @@ fn validate() {
         let mut plugin = host.load_source("empty", "let x = 1").unwrap();
         let err = plugin.call("not_here", &[]).unwrap_err();
         assert!(matches!(err, PluginError::MissingHook { .. }));
+    }
+
+    #[test]
+    fn plugin_host_can_audit_capability_calls() {
+        let source = r#"
+fn validate() {
+    return tetherscript.version()
+}
+"#;
+        let mut host = PluginHost::new().with_capability_audit(true);
+        host.grant("tetherscript", TetherScriptAuthority::new());
+        let mut plugin = host.load_source("audited", source).unwrap();
+
+        let call = plugin.call("validate", &[]).unwrap();
+
+        assert_eq!(call.audit.len(), 1);
+        assert_eq!(call.audit[0].kind, "tetherscript");
+        assert_eq!(call.audit[0].method, "version");
+        assert!(call.audit[0].allowed);
+
+        match call.value {
+            Value::Result(result) => assert!(matches!(result.as_ref(), ResultValue::Ok(_))),
+            other => panic!("expected result, got {:?}", other),
+        }
     }
 }
