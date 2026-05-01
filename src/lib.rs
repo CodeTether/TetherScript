@@ -12,6 +12,7 @@ pub mod lexer;
 pub mod output;
 pub mod parser;
 pub mod plugin;
+pub mod provider_cap;
 pub mod smtp;
 pub mod system;
 pub mod token;

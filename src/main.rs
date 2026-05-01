@@ -20,6 +20,7 @@ mod lexer;
 mod lsp;
 mod output;
 mod parser;
+mod provider_cap;
 mod smtp;
 mod system;
 mod token;
@@ -39,7 +40,7 @@ use vm::VM;
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
-        eprintln!("usage: tetherscript [--tokens|--ast|--bytecode|--vm|--lsp] [--step-budget <n>] [--grant-fs <root>] <file.kl>");
+        eprintln!("usage: tetherscript [--tokens|--ast|--bytecode|--vm|--lsp] [--step-budget <n>] [--grant-fs <root>] [--grant-provider <endpoint>] <file.kl>");
         process::exit(2);
     }
 
@@ -55,6 +56,7 @@ fn main() {
     let mut path: Option<String> = None;
     let mut step_budget: Option<u64> = None;
     let mut fs_grant: Option<String> = None;
+    let mut provider_grant: Option<String> = None;
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
@@ -94,6 +96,19 @@ fn main() {
                     process::exit(2);
                 }
                 fs_grant = Some(args[i + 1].clone());
+                i += 2;
+            }
+            "--grant-provider" => {
+                if i + 1 >= args.len() {
+                    eprintln!("tetherscript: --grant-provider requires an http:// endpoint argument");
+                    process::exit(2);
+                }
+                let endpoint = &args[i + 1];
+                if !endpoint.starts_with("http://") {
+                    eprintln!("tetherscript: --grant-provider endpoint must start with http://");
+                    process::exit(2);
+                }
+                provider_grant = Some(endpoint.clone());
                 i += 2;
             }
             other => {
@@ -165,6 +180,9 @@ fn main() {
         if let Some(root) = &fs_grant {
             vm.grant("fs", fs_cap::FsAuthority::new(root));
         }
+        if let Some(endpoint) = &provider_grant {
+            vm.grant("provider", provider_cap::ProviderAuthority::new(endpoint));
+        }
         let result = if let Some(budget) = step_budget {
             interp::with_step_budget(budget, || vm.run(chunk))
         } else {
@@ -180,6 +198,9 @@ fn main() {
     let mut interp = Interpreter::new();
     if let Some(root) = &fs_grant {
         interp.grant("fs", fs_cap::FsAuthority::new(root));
+    }
+    if let Some(endpoint) = &provider_grant {
+        interp.grant("provider", provider_cap::ProviderAuthority::new(endpoint));
     }
     let result = if let Some(budget) = step_budget {
         interp::with_step_budget(budget, || interp.run(&program))
