@@ -5,8 +5,9 @@
 //! # Usage
 //!
 //! ```text
-//! tetherscript run <file.tether>              run with tree-walking interpreter (default)
-//! tetherscript run --vm <file.tether>         run with bytecode VM
+//! tetherscript run <file.tether>              run with bytecode VM (default)
+//! tetherscript run --interp <file.tether>     run with tree-walking interpreter
+//! tetherscript check <file>                   parse and run ownership analysis
 //! tetherscript inspect --tokens <file>        dump tokens
 //! tetherscript inspect --ast <file>           dump AST
 //! tetherscript inspect --bytecode <file>      dump compiled bytecode
@@ -27,13 +28,14 @@ mod json;
 mod lexer;
 mod lsp;
 mod output;
+mod ownership;
 mod parser;
 mod provider_cap;
 mod rpc_cap;
 mod smtp;
 mod system;
-mod token;
 mod tls;
+mod token;
 mod value;
 mod vm;
 
@@ -81,6 +83,7 @@ fn main() {
     // Subcommands
     match first.as_str() {
         "run" => cmd_run(&args[2..]),
+        "check" => cmd_check(&args[2..]),
         "inspect" => cmd_inspect(&args[2..]),
         "lsp" => cmd_lsp(),
         "repl" => cmd_repl(),
@@ -103,7 +106,7 @@ fn main() {
 // ---------------------------------------------------------------------------
 
 fn cmd_run(args: &[String]) {
-    let mut vm_mode = false;
+    let mut vm_mode = true;
     let mut step_budget: Option<u64> = None;
     let mut fs_grant: Option<String> = None;
     let mut provider_grant: Option<String> = None;
@@ -120,6 +123,10 @@ fn cmd_run(args: &[String]) {
             }
             "--vm" => {
                 vm_mode = true;
+                i += 1;
+            }
+            "--interp" | "--tree-walk" => {
+                vm_mode = false;
                 i += 1;
             }
             "--step-budget" => {
@@ -162,7 +169,9 @@ fn cmd_run(args: &[String]) {
             "--grant-provider-key" => {
                 i += 1;
                 if i >= args.len() {
-                    eprintln!("tetherscript run: --grant-provider-key requires an API key argument");
+                    eprintln!(
+                        "tetherscript run: --grant-provider-key requires an API key argument"
+                    );
                     process::exit(2);
                 }
                 provider_key = Some(args[i].clone());
@@ -205,7 +214,15 @@ fn cmd_run(args: &[String]) {
         }
     };
 
-    execute_file(&path, vm_mode, step_budget, &fs_grant, &provider_grant, &provider_key, &rpc_grant);
+    execute_file(
+        &path,
+        vm_mode,
+        step_budget,
+        &fs_grant,
+        &provider_grant,
+        &provider_key,
+        &rpc_grant,
+    );
 }
 
 fn cmd_inspect(args: &[String]) {
@@ -279,7 +296,10 @@ fn cmd_inspect(args: &[String]) {
             let program = match Parser::new(tokens).parse_program() {
                 Ok(p) => p,
                 Err(e) => {
-                    eprintln!("tetherscript: parse error at {}:{}: {}", e.line, e.col, e.msg);
+                    eprintln!(
+                        "tetherscript: parse error at {}:{}: {}",
+                        e.line, e.col, e.msg
+                    );
                     process::exit(1);
                 }
             };
@@ -289,7 +309,10 @@ fn cmd_inspect(args: &[String]) {
             let program = match Parser::new(tokens).parse_program() {
                 Ok(p) => p,
                 Err(e) => {
-                    eprintln!("tetherscript: parse error at {}:{}: {}", e.line, e.col, e.msg);
+                    eprintln!(
+                        "tetherscript: parse error at {}:{}: {}",
+                        e.line, e.col, e.msg
+                    );
                     process::exit(1);
                 }
             };
@@ -304,6 +327,53 @@ fn cmd_lsp() {
     if let Err(e) = lsp::run() {
         eprintln!("tetherscript-lsp: {}", e);
         process::exit(1);
+    }
+}
+
+fn cmd_check(args: &[String]) {
+    if args.len() != 1 || args[0] == "--help" || args[0] == "-h" {
+        println!("tetherscript check -- Parse source and run static ownership analysis");
+        println!();
+        println!("USAGE:");
+        println!("    tetherscript check <file.tether>");
+        if args.len() != 1 {
+            process::exit(2);
+        }
+        return;
+    }
+
+    let src = read_source(&args[0]);
+    let tokens = match Lexer::new(&src).tokenize() {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!(
+                "tetherscript check: lex error at {}:{}: {}",
+                e.line, e.col, e.msg
+            );
+            process::exit(1);
+        }
+    };
+    let program = match Parser::new(tokens).parse_program() {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!(
+                "tetherscript check: parse error at {}:{}: {}",
+                e.line, e.col, e.msg
+            );
+            process::exit(1);
+        }
+    };
+    match ownership::analyze(&program) {
+        Ok(()) => println!("{}: ok", args[0]),
+        Err(diagnostics) => {
+            for diagnostic in diagnostics {
+                eprintln!(
+                    "tetherscript check: ownership error: {}",
+                    diagnostic.message
+                );
+            }
+            process::exit(1);
+        }
     }
 }
 
@@ -364,7 +434,7 @@ fn cmd_repl() {
 
 /// Legacy mode: bare `tetherscript <file>` without subcommand.
 fn cmd_run_legacy(args: &[String]) {
-    let mut vm_mode = false;
+    let mut vm_mode = true;
     let mut step_budget: Option<u64> = None;
     let mut fs_grant: Option<String> = None;
     let mut provider_grant: Option<String> = None;
@@ -377,6 +447,10 @@ fn cmd_run_legacy(args: &[String]) {
         match args[i].as_str() {
             "--vm" => {
                 vm_mode = true;
+                i += 1;
+            }
+            "--interp" | "--tree-walk" => {
+                vm_mode = false;
                 i += 1;
             }
             "--step-budget" => {
@@ -471,7 +545,15 @@ fn cmd_run_legacy(args: &[String]) {
         }
     };
 
-    execute_file(&path, vm_mode, step_budget, &fs_grant, &provider_grant, &provider_key, &rpc_grant);
+    execute_file(
+        &path,
+        vm_mode,
+        step_budget,
+        &fs_grant,
+        &provider_grant,
+        &provider_key,
+        &rpc_grant,
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -510,27 +592,40 @@ fn execute_file(
     let program = match Parser::new(tokens).parse_program() {
         Ok(p) => p,
         Err(e) => {
-            eprintln!("tetherscript: parse error at {}:{}: {}", e.line, e.col, e.msg);
+            eprintln!(
+                "tetherscript: parse error at {}:{}: {}",
+                e.line, e.col, e.msg
+            );
             process::exit(1);
         }
     };
 
+    if let Err(diagnostics) = ownership::analyze(&program) {
+        for diagnostic in diagnostics {
+            eprintln!("tetherscript: ownership error: {}", diagnostic.message);
+        }
+        process::exit(1);
+    }
+
     if vm_mode {
         let chunk = Compiler::compile_program(&program);
         let mut vm = VM::new();
+        vm.set_instruction_budget(step_budget);
         grant_capabilities_vm(&mut vm, fs_grant, provider_grant, provider_key, rpc_grant);
-        let result = if let Some(budget) = step_budget {
-            interp::with_step_budget(budget, || vm.run(chunk))
-        } else {
-            vm.run(chunk)
-        };
+        let result = vm.run(chunk);
         if let Err(e) = result {
             eprintln!("tetherscript: {}", e);
             process::exit(1);
         }
     } else {
         let mut interp = Interpreter::new();
-        grant_capabilities_interp(&mut interp, fs_grant, provider_grant, provider_key, rpc_grant);
+        grant_capabilities_interp(
+            &mut interp,
+            fs_grant,
+            provider_grant,
+            provider_key,
+            rpc_grant,
+        );
         let result = if let Some(budget) = step_budget {
             interp::with_step_budget(budget, || interp.run(&program))
         } else {
@@ -556,8 +651,14 @@ fn grant_capabilities_vm(
     if let Some(endpoint) = provider_grant {
         let auth = provider_cap::ProviderAuthority::new(endpoint);
         let auth = if let Some(key) = provider_key {
-            provider_cap::ProviderAuthority::with_bound_header(auth, "Authorization", &format!("Bearer {}", key))
-        } else { auth };
+            provider_cap::ProviderAuthority::with_bound_header(
+                auth,
+                "Authorization",
+                &format!("Bearer {}", key),
+            )
+        } else {
+            auth
+        };
         vm.grant("provider", auth);
     }
     if let Some(endpoint) = rpc_grant {
@@ -578,8 +679,14 @@ fn grant_capabilities_interp(
     if let Some(endpoint) = provider_grant {
         let auth = provider_cap::ProviderAuthority::new(endpoint);
         let auth = if let Some(key) = provider_key {
-            provider_cap::ProviderAuthority::with_bound_header(auth, "Authorization", &format!("Bearer {}", key))
-        } else { auth };
+            provider_cap::ProviderAuthority::with_bound_header(
+                auth,
+                "Authorization",
+                &format!("Bearer {}", key),
+            )
+        } else {
+            auth
+        };
         interp.grant("provider", auth);
     }
     if let Some(endpoint) = rpc_grant {
@@ -610,7 +717,10 @@ fn print_usage() {
 }
 
 fn print_help() {
-    println!("TetherScript {} -- a scripting language with Rust-style ownership", VERSION);
+    println!(
+        "TetherScript {} -- a scripting language with Rust-style ownership",
+        VERSION
+    );
     println!();
     println!("USAGE:");
     println!("    tetherscript <command> [options]");
@@ -632,7 +742,7 @@ fn print_help() {
     println!();
     println!("EXAMPLES:");
     println!("    tetherscript run hello.tether");
-    println!("    tetherscript run --vm fib.tether");
+    println!("    tetherscript run --interp fib.tether");
     println!("    tetherscript run --grant-fs . policy.tether");
     println!("    tetherscript run --grant-provider http://localhost:11434 chat.tether");
     println!("    tetherscript run --grant-provider https://api.cerebras.ai glm_chat.tether");
@@ -655,17 +765,22 @@ fn print_run_help() {
     println!("    tetherscript run [options] <file.tether>");
     println!();
     println!("OPTIONS:");
-    println!("    --vm                    Use bytecode VM instead of tree-walking interpreter");
+    println!(
+        "    --vm                    Use bytecode VM (default)
+    --interp, --tree-walk    Use tree-walking interpreter for debugging"
+    );
     println!("    --step-budget <n>       Set max execution steps (default: unlimited)");
     println!("    --grant-fs <dir>        Grant filesystem capability scoped to <dir>");
-    println!("    --grant-provider <url>  Grant LLM provider capability (http:// or https://host:port)");
+    println!(
+        "    --grant-provider <url>  Grant LLM provider capability (http:// or https://host:port)"
+    );
     println!("    --grant-provider-key <k> API key for the provider (sent as Bearer token)");
     println!("    --grant-rpc <url>       Grant JSON-RPC capability (http://host:port)");
     println!("    -h, --help              Print this help message");
     println!();
     println!("EXAMPLES:");
     println!("    tetherscript run hello.tether");
-    println!("    tetherscript run --vm --step-budget 100000 fib.tether");
+    println!("    tetherscript run --step-budget 100000 fib.tether");
     println!("    tetherscript run --grant-fs . policy.tether");
     println!("    tetherscript run --grant-provider http://localhost:11434 chat.tether");
     println!("    tetherscript run --grant-rpc http://127.0.0.1:36627 agent.tether");

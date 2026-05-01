@@ -7,6 +7,7 @@
 
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
+use std::fmt::Write as _;
 use std::rc::Rc;
 
 use crate::ast::*;
@@ -200,6 +201,7 @@ impl Interpreter {
             Expr::Int(n) => Ok(Value::Int(*n)),
             Expr::Float(n) => Ok(Value::Float(*n)),
             Expr::Str(s) => Ok(Value::Str(Rc::new(s.clone()))),
+            Expr::Bytes(bytes) => Ok(Value::Bytes(Rc::new(RefCell::new(bytes.clone())))),
             Expr::Bool(b) => Ok(Value::Bool(*b)),
             Expr::Nil => Ok(Value::Nil),
 
@@ -403,6 +405,30 @@ impl Interpreter {
                         m.borrow_mut().insert((**k).clone(), value.clone());
                         Ok(value)
                     }
+                    (Value::Bytes(bytes), Value::Int(idx)) => {
+                        let byte = match value {
+                            Value::Int(n) => u8::try_from(n).map_err(|_| {
+                                Unwind::Error("byte assignment value must be in 0..=255".into())
+                            })?,
+                            ref other => {
+                                return Err(Unwind::Error(format!(
+                                    "byte assignment value must be int, got {}",
+                                    other.type_name()
+                                )))
+                            }
+                        };
+                        let mut bytes = bytes.borrow_mut();
+                        let len = bytes.len() as i64;
+                        let idx = if *idx < 0 { idx + len } else { *idx };
+                        if idx < 0 || idx >= len {
+                            return Err(Unwind::Error(format!(
+                                "index {} out of bounds (len {})",
+                                idx, len
+                            )));
+                        }
+                        bytes[idx as usize] = byte;
+                        Ok(Value::Int(byte as i64))
+                    }
                     _ => Err(Unwind::Error(format!(
                         "cannot index-assign into {} with {}",
                         t.type_name(),
@@ -561,6 +587,7 @@ fn values_eq(a: &Value, b: &Value) -> bool {
         (Int(a), Float(b)) => (*a as f64) == *b,
         (Float(a), Int(b)) => *a == (*b as f64),
         (Bool(a), Bool(b)) => a == b,
+        (Bytes(a), Bytes(b)) => *a.borrow() == *b.borrow(),
         (Str(a), Str(b)) => a == b,
         _ => false,
     }
@@ -589,6 +616,15 @@ pub(crate) fn index_value(target: &Value, index: &Value) -> Result<Value, String
                 (bytes[idx as usize] as char).to_string(),
             )))
         }
+        (Value::Bytes(bytes), Value::Int(i)) => {
+            let bytes = bytes.borrow();
+            let len = bytes.len() as i64;
+            let idx = if *i < 0 { i + len } else { *i };
+            if idx < 0 || idx >= len {
+                return Err(format!("index {} out of bounds (len {})", i, len));
+            }
+            Ok(Value::Int(bytes[idx as usize] as i64))
+        }
         (t, i) => Err(format!(
             "cannot index {} with {}",
             t.type_name(),
@@ -614,6 +650,11 @@ pub(crate) fn iterable_values(value: &Value) -> Result<Vec<Value>, String> {
         Value::Str(text) => Ok(text
             .chars()
             .map(|ch| Value::Str(Rc::new(ch.to_string())))
+            .collect()),
+        Value::Bytes(bytes) => Ok(bytes
+            .borrow()
+            .iter()
+            .map(|b| Value::Int(*b as i64))
             .collect()),
         Value::Map(map) => {
             let mut keys: Vec<String> = map.borrow().keys().cloned().collect();
@@ -654,6 +695,35 @@ pub(crate) fn call_method(target: &Value, name: &str, args: &[Value]) -> Result<
         (Value::List(xs), "contains", [needle]) => {
             Ok(Value::Bool(xs.borrow().iter().any(|value| value == needle)))
         }
+        (Value::Bytes(bytes), "len", []) => Ok(Value::Int(bytes.borrow().len() as i64)),
+        (Value::Bytes(bytes), "push", [Value::Int(byte)]) => {
+            let byte = u8::try_from(*byte)
+                .map_err(|_| "bytes.push: value must be in 0..=255".to_string())?;
+            bytes.borrow_mut().push(byte);
+            Ok(Value::Nil)
+        }
+        (Value::Bytes(bytes), "pop", []) => Ok(bytes
+            .borrow_mut()
+            .pop()
+            .map(|b| Value::Int(b as i64))
+            .unwrap_or(Value::Nil)),
+        (Value::Bytes(bytes), "decode_utf8", []) | (Value::Bytes(bytes), "to_string", []) => {
+            let text = String::from_utf8(bytes.borrow().clone())
+                .map_err(|e| format!("bytes.decode_utf8: {}", e))?;
+            Ok(Value::Str(Rc::new(text)))
+        }
+        (Value::Bytes(bytes), "hex", []) => {
+            let bytes = bytes.borrow();
+            let mut out = String::with_capacity(bytes.len() * 2);
+            for b in bytes.iter() {
+                write!(&mut out, "{:02x}", b).expect("writing to String cannot fail");
+            }
+            Ok(Value::Str(Rc::new(out)))
+        }
+        (Value::Bytes(_), "push", [other]) => Err(format!(
+            "bytes.push: value must be int, got {}",
+            other.type_name()
+        )),
         (Value::Str(s), "len", []) => Ok(Value::Int(s.len() as i64)),
         (Value::Str(s), "upper", []) => Ok(Value::Str(Rc::new(s.to_uppercase()))),
         (Value::Str(s), "lower", []) => Ok(Value::Str(Rc::new(s.to_lowercase()))),
@@ -1183,6 +1253,7 @@ fn install_pure_builtins(env: &Rc<RefCell<Env>>) {
         "len",
         pure_native("len", Some(1), |args| match &args[0] {
             Value::Str(s) => Ok(Value::Int(s.len() as i64)),
+            Value::Bytes(b) => Ok(Value::Int(b.borrow().len() as i64)),
             Value::List(x) => Ok(Value::Int(x.borrow().len() as i64)),
             Value::Map(m) => Ok(Value::Int(m.borrow().len() as i64)),
             v => Err(format!("len: {} has no length", v.type_name())),
@@ -1209,6 +1280,36 @@ fn install_pure_builtins(env: &Rc<RefCell<Env>>) {
     e.define(
         "str",
         pure_native("str", Some(1), |args| Ok(system::value_to_string(&args[0]))),
+        false,
+    );
+    e.define(
+        "bytes",
+        pure_native("bytes", Some(1), |args| match &args[0] {
+            Value::Str(s) => Ok(Value::Bytes(Rc::new(RefCell::new(s.as_bytes().to_vec())))),
+            Value::List(items) => {
+                let mut out = Vec::with_capacity(items.borrow().len());
+                for item in items.borrow().iter() {
+                    match item {
+                        Value::Int(n) => out
+                            .push(u8::try_from(*n).map_err(|_| {
+                                "bytes: list values must be in 0..=255".to_string()
+                            })?),
+                        other => {
+                            return Err(format!(
+                                "bytes: list values must be int, got {}",
+                                other.type_name()
+                            ))
+                        }
+                    }
+                }
+                Ok(Value::Bytes(Rc::new(RefCell::new(out))))
+            }
+            Value::Bytes(b) => Ok(Value::Bytes(Rc::new(RefCell::new(b.borrow().clone())))),
+            other => Err(format!(
+                "bytes: expected str, list, or bytes; got {}",
+                other.type_name()
+            )),
+        }),
         false,
     );
     e.define(
@@ -1400,6 +1501,40 @@ fn main() {
 }
 "#;
         let program = parse(source);
+        let chunk = Compiler::compile_program(&program);
+        let mut vm = VM::new();
+        vm.run(chunk).unwrap();
+    }
+
+    #[test]
+    fn bytes_literals_and_methods_match_interpreter_and_vm() {
+        let source = r#"
+fn make() {
+    let b = b"hi\x21"
+    b[0] = 72
+    b.push(10)
+    assert(b.len() == 4, "bytes len failed")
+    assert(b[0] == 72, "bytes index assignment failed")
+    assert(b[1] == 105, "bytes index failed")
+    assert(b.pop() == 10, "bytes pop failed")
+    assert(b.hex() == "486921", "bytes hex failed")
+    assert(b.decode_utf8() == "Hi!", "bytes decode failed")
+    return b
+}
+
+fn main() {
+    let a = make()
+    let b = make()
+    assert(a.hex() == "486921", "first literal result failed")
+    assert(b.hex() == "486921", "second literal result failed")
+    assert(bytes([111, 107]).decode_utf8() == "ok", "bytes(list) failed")
+}
+"#;
+        let program = parse(source);
+
+        let mut interp = Interpreter::new();
+        interp.run(&program).unwrap();
+
         let chunk = Compiler::compile_program(&program);
         let mut vm = VM::new();
         vm.run(chunk).unwrap();

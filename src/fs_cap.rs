@@ -217,16 +217,22 @@ impl Authority for FsAuthority {
                 }
                 let resolved = self.resolve(p)?;
                 let bytes = fs::read(&resolved).map_err(|e| format!("fs.read: {}", e))?;
-                let s = String::from_utf8(bytes)
-                    .map_err(|_| "fs.read: file is not valid UTF-8".to_string())?;
-                Ok(Value::Str(Rc::new(s)))
+                match String::from_utf8(bytes) {
+                    Ok(s) => Ok(Value::Str(Rc::new(s))),
+                    Err(err) => Ok(Value::Bytes(Rc::new(RefCell::new(err.into_bytes())))),
+                }
             }
-            ("write", [Value::Str(p), Value::Str(content)]) => {
+            ("write", [Value::Str(p), content @ (Value::Str(_) | Value::Bytes(_))]) => {
                 if !self.modes.write {
                     return Err("fs.write: capability lacks write mode".into());
                 }
                 let resolved = self.resolve(p)?;
-                fs::write(&resolved, content.as_bytes()).map_err(|e| format!("fs.write: {}", e))?;
+                let bytes = match content {
+                    Value::Str(content) => content.as_bytes().to_vec(),
+                    Value::Bytes(bytes) => bytes.borrow().clone(),
+                    _ => unreachable!(),
+                };
+                fs::write(&resolved, bytes).map_err(|e| format!("fs.write: {}", e))?;
                 Ok(Value::Nil)
             }
             ("list", [Value::Str(p)]) => {

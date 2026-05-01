@@ -101,6 +101,11 @@ impl<'a> Lexer<'a> {
             return Ok(Some(self.make(Token::Newline, line, col)));
         }
 
+        // Byte string literal: b"..."
+        if c == b'b' && self.peek2() == Some(b'"') {
+            return Ok(Some(self.bytes_string(line, col)?));
+        }
+
         // Identifiers and keywords
         if c.is_ascii_alphabetic() || c == b'_' {
             return Ok(Some(self.ident_or_keyword(line, col)));
@@ -354,6 +359,101 @@ impl<'a> Lexer<'a> {
             }
         }
         Ok(self.make(Token::Str(s), line, col))
+    }
+
+    fn bytes_string(&mut self, line: usize, col: usize) -> Result<Spanned, LexError> {
+        self.bump(); // consume b
+        self.bump(); // consume opening "
+        let mut bytes = Vec::new();
+        loop {
+            match self.peek() {
+                None => {
+                    return Err(LexError {
+                        msg: "unterminated byte string".into(),
+                        line,
+                        col,
+                    })
+                }
+                Some(b'"') => {
+                    self.bump();
+                    break;
+                }
+                Some(b'\\') => {
+                    self.bump();
+                    match self.bump() {
+                        Some(b'n') => bytes.push(b'\n'),
+                        Some(b't') => bytes.push(b'\t'),
+                        Some(b'r') => bytes.push(b'\r'),
+                        Some(b'\\') => bytes.push(b'\\'),
+                        Some(b'"') => bytes.push(b'"'),
+                        Some(b'x') => {
+                            let hi = self.bump().ok_or_else(|| LexError {
+                                msg: "unterminated hex byte escape".into(),
+                                line,
+                                col,
+                            })?;
+                            let lo = self.bump().ok_or_else(|| LexError {
+                                msg: "unterminated hex byte escape".into(),
+                                line,
+                                col,
+                            })?;
+                            let h = hex_val(hi).ok_or_else(|| LexError {
+                                msg: format!(
+                                    "bad hex byte escape: \\x{}{}",
+                                    hi as char, lo as char
+                                ),
+                                line,
+                                col,
+                            })?;
+                            let l = hex_val(lo).ok_or_else(|| LexError {
+                                msg: format!(
+                                    "bad hex byte escape: \\x{}{}",
+                                    hi as char, lo as char
+                                ),
+                                line,
+                                col,
+                            })?;
+                            bytes.push((h << 4) | l);
+                        }
+                        Some(other) => {
+                            return Err(LexError {
+                                msg: format!("bad byte escape: \\{}", other as char),
+                                line: self.line,
+                                col: self.col,
+                            });
+                        }
+                        None => {
+                            return Err(LexError {
+                                msg: "unterminated escape".into(),
+                                line,
+                                col,
+                            })
+                        }
+                    }
+                }
+                Some(c) if c < 0x80 => {
+                    bytes.push(c);
+                    self.bump();
+                }
+                Some(_) => {
+                    return Err(LexError {
+                        msg: "non-ASCII byte string content must use \\xNN escapes".into(),
+                        line: self.line,
+                        col: self.col,
+                    })
+                }
+            }
+        }
+        Ok(self.make(Token::Bytes(bytes), line, col))
+    }
+}
+
+fn hex_val(c: u8) -> Option<u8> {
+    match c {
+        b'0'..=b'9' => Some(c - b'0'),
+        b'a'..=b'f' => Some(c - b'a' + 10),
+        b'A'..=b'F' => Some(c - b'A' + 10),
+        _ => None,
     }
 }
 
