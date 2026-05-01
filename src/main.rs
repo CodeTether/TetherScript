@@ -12,6 +12,7 @@ mod ast;
 mod bytecode;
 mod capability;
 mod compiler;
+mod fs_cap;
 mod http;
 mod interp;
 mod json;
@@ -38,7 +39,7 @@ use vm::VM;
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
-        eprintln!("usage: tetherscript [--tokens|--ast|--bytecode|--vm|--lsp] <file.kl>");
+        eprintln!("usage: tetherscript [--tokens|--ast|--bytecode|--vm|--lsp] [--step-budget <n>] [--grant-fs <root>] <file.kl>");
         process::exit(2);
     }
 
@@ -50,15 +51,70 @@ fn main() {
         return;
     }
 
-    let (mode, path) = match args[1].as_str() {
-        "--tokens" if args.len() >= 3 => ("tokens", &args[2]),
-        "--ast" if args.len() >= 3 => ("ast", &args[2]),
-        "--bytecode" if args.len() >= 3 => ("bytecode", &args[2]),
-        "--vm" if args.len() >= 3 => ("vm", &args[2]),
-        _ => ("run", &args[1]),
+    let mut mode = "run";
+    let mut path: Option<String> = None;
+    let mut step_budget: Option<u64> = None;
+    let mut fs_grant: Option<String> = None;
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--tokens" => {
+                mode = "tokens";
+                i += 1;
+            }
+            "--ast" => {
+                mode = "ast";
+                i += 1;
+            }
+            "--bytecode" => {
+                mode = "bytecode";
+                i += 1;
+            }
+            "--vm" => {
+                mode = "vm";
+                i += 1;
+            }
+            "--step-budget" => {
+                if i + 1 >= args.len() {
+                    eprintln!("tetherscript: --step-budget requires an integer argument");
+                    process::exit(2);
+                }
+                match args[i + 1].parse::<u64>() {
+                    Ok(n) => step_budget = Some(n),
+                    Err(_) => {
+                        eprintln!("tetherscript: --step-budget must be a non-negative integer");
+                        process::exit(2);
+                    }
+                }
+                i += 2;
+            }
+            "--grant-fs" => {
+                if i + 1 >= args.len() {
+                    eprintln!("tetherscript: --grant-fs requires a directory argument");
+                    process::exit(2);
+                }
+                fs_grant = Some(args[i + 1].clone());
+                i += 2;
+            }
+            other => {
+                if path.is_some() {
+                    eprintln!("tetherscript: unexpected argument `{}`", other);
+                    process::exit(2);
+                }
+                path = Some(other.to_string());
+                i += 1;
+            }
+        }
+    }
+    let path = match path {
+        Some(path) => path,
+        None => {
+            eprintln!("tetherscript: missing source file");
+            process::exit(2);
+        }
     };
 
-    let src = match fs::read_to_string(path) {
+    let src = match fs::read_to_string(&path) {
         Ok(s) => s,
         Err(e) => {
             eprintln!("tetherscript: can't read {}: {}", path, e);
@@ -106,7 +162,15 @@ fn main() {
     if mode == "vm" {
         let chunk = Compiler::compile_program(&program);
         let mut vm = VM::new();
-        if let Err(e) = vm.run(chunk) {
+        if let Some(root) = &fs_grant {
+            vm.grant("fs", fs_cap::FsAuthority::new(root));
+        }
+        let result = if let Some(budget) = step_budget {
+            interp::with_step_budget(budget, || vm.run(chunk))
+        } else {
+            vm.run(chunk)
+        };
+        if let Err(e) = result {
             eprintln!("tetherscript: {}", e);
             process::exit(1);
         }
@@ -114,7 +178,15 @@ fn main() {
     }
 
     let mut interp = Interpreter::new();
-    if let Err(e) = interp.run(&program) {
+    if let Some(root) = &fs_grant {
+        interp.grant("fs", fs_cap::FsAuthority::new(root));
+    }
+    let result = if let Some(budget) = step_budget {
+        interp::with_step_budget(budget, || interp.run(&program))
+    } else {
+        interp.run(&program)
+    };
+    if let Err(e) = result {
         eprintln!("tetherscript: {}", e);
         process::exit(1);
     }
