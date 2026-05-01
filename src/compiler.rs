@@ -6,6 +6,7 @@
 //! bracketed by `PushScope`/`PopScope` so nested `if`/`while`/`{}` match the
 //! tree-walker's env nesting exactly.
 
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::ast::*;
@@ -174,6 +175,10 @@ impl Compiler {
             }
             Expr::Str(s) => {
                 let c = self.add_const(Value::Str(Rc::new(s.clone())));
+                self.emit(Instr::Const(c));
+            }
+            Expr::Bytes(bytes) => {
+                let c = self.add_const(Value::Bytes(Rc::new(RefCell::new(bytes.clone()))));
                 self.emit(Instr::Const(c));
             }
             Expr::Bool(b) => {

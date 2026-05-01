@@ -40,16 +40,42 @@ pub struct VM {
     globals: Rc<RefCell<Env>>,
     stack: Vec<Value>,
     frames: Vec<Frame>,
+    instruction_budget: Option<u64>,
 }
 
 impl VM {
     pub fn new() -> Self {
+        Self::builder().build()
+    }
+
+    pub fn builder() -> VmBuilder {
+        VmBuilder::new()
+    }
+
+    pub fn set_instruction_budget(&mut self, budget: Option<u64>) {
+        self.instruction_budget = budget;
+    }
+
+    fn tick_instruction(&mut self) -> Result<(), Unwind> {
+        if let Some(remaining) = self.instruction_budget.as_mut() {
+            if *remaining == 0 {
+                return Err(Unwind::Error(
+                    "VM instruction budget exhausted (possible infinite loop)".into(),
+                ));
+            }
+            *remaining -= 1;
+        }
+        Ok(())
+    }
+
+    fn new_with_budget(instruction_budget: Option<u64>) -> Self {
         let globals = Env::new_global();
         install_builtins(&globals);
         Self {
             globals,
             stack: Vec::with_capacity(256),
             frames: Vec::with_capacity(32),
+            instruction_budget,
         }
     }
 
@@ -107,6 +133,7 @@ impl VM {
                 }
                 (f.proto.chunk.code[f.ip].clone(), code_len)
             };
+            self.tick_instruction()?;
             self.frames.last_mut().unwrap().ip += 1;
             match self.step(instr, code_len) {
                 Ok(()) => {}
@@ -134,7 +161,9 @@ impl VM {
             }
 
             Instr::Const(idx) => {
-                let v = self.frames.last().unwrap().proto.chunk.consts[idx as usize].clone();
+                let v = clone_const_value(
+                    &self.frames.last().unwrap().proto.chunk.consts[idx as usize],
+                );
                 self.stack.push(v);
             }
             Instr::Nil => self.stack.push(Value::Nil),
@@ -279,6 +308,31 @@ impl VM {
                     }
                     (Value::Map(m), Value::Str(k)) => {
                         m.borrow_mut().insert((**k).clone(), v.clone());
+                    }
+                    (Value::Bytes(bytes), Value::Int(idx)) => {
+                        let byte = match v {
+                            Value::Int(n) => u8::try_from(n).map_err(|_| {
+                                Unwind::Error("byte assignment value must be in 0..=255".into())
+                            })?,
+                            ref other => {
+                                return Err(Unwind::Error(format!(
+                                    "byte assignment value must be int, got {}",
+                                    other.type_name()
+                                )))
+                            }
+                        };
+                        let mut bytes = bytes.borrow_mut();
+                        let len = bytes.len() as i64;
+                        let ix = if *idx < 0 { idx + len } else { *idx };
+                        if ix < 0 || ix >= len {
+                            return Err(Unwind::Error(format!(
+                                "index {} out of bounds (len {})",
+                                idx, len
+                            )));
+                        }
+                        bytes[ix as usize] = byte;
+                        self.stack.push(Value::Int(byte as i64));
+                        return Ok(());
                     }
                     _ => {
                         return Err(Unwind::Error(format!(
@@ -494,6 +548,48 @@ impl Default for VM {
     }
 }
 
+pub struct VmBuilder {
+    instruction_budget: Option<u64>,
+    grants: Vec<(String, Rc<dyn crate::capability::Authority>)>,
+}
+
+impl VmBuilder {
+    pub fn new() -> Self {
+        Self {
+            instruction_budget: None,
+            grants: Vec::new(),
+        }
+    }
+
+    pub fn instruction_limit(mut self, limit: u64) -> Self {
+        self.instruction_budget = Some(limit);
+        self
+    }
+
+    pub fn capability(
+        mut self,
+        name: impl Into<String>,
+        authority: Rc<dyn crate::capability::Authority>,
+    ) -> Self {
+        self.grants.push((name.into(), authority));
+        self
+    }
+
+    pub fn build(self) -> VM {
+        let mut vm = VM::new_with_budget(self.instruction_budget);
+        for (name, authority) in self.grants {
+            vm.grant(&name, authority);
+        }
+        vm
+    }
+}
+
+impl Default for VmBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn format_unwind(u: Unwind) -> String {
     match u {
         Unwind::Error(e) | Unwind::Panic(e) | Unwind::TryErr(e) => e,
@@ -506,6 +602,13 @@ fn format_unwind(u: Unwind) -> String {
 /// the interpreter loop until the frame count is back to where we started.
 /// For native callees, `dispatch_call` already pushed the result onto the
 /// stack, so no extra work is needed.
+fn clone_const_value(value: &Value) -> Value {
+    match value {
+        Value::Bytes(bytes) => Value::Bytes(Rc::new(RefCell::new(bytes.borrow().clone()))),
+        other => other.clone(),
+    }
+}
+
 impl Runtime for VM {
     fn invoke(&mut self, callee: &Value, args: &[Value]) -> Result<Value, String> {
         let depth = self.frames.len();

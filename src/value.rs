@@ -34,6 +34,7 @@ pub enum Value {
     Float(f64),
     Bool(bool),
     Str(Rc<String>),
+    Bytes(Rc<RefCell<Vec<u8>>>),
     List(Rc<RefCell<Vec<Value>>>),
     Map(Rc<RefCell<HashMap<String, Value>>>),
     Fn(Rc<FnObj>),
@@ -102,6 +103,7 @@ impl Value {
             Value::Float(_) => "float",
             Value::Bool(_) => "bool",
             Value::Str(_) => "str",
+            Value::Bytes(_) => "bytes",
             Value::List(_) => "list",
             Value::Map(_) => "map",
             Value::Fn(_) | Value::VmFn(_) | Value::Native(_) => "fn",
@@ -117,6 +119,7 @@ impl Value {
             Value::Int(n) => *n != 0,
             Value::Float(f) => *f != 0.0,
             Value::Str(s) => !s.is_empty(),
+            Value::Bytes(b) => !b.borrow().is_empty(),
             Value::List(xs) => !xs.borrow().is_empty(),
             Value::Map(m) => !m.borrow().is_empty(),
             Value::Fn(_) | Value::VmFn(_) | Value::Native(_) => true,
@@ -143,6 +146,7 @@ impl PartialEq for Value {
             (Float(a), Float(b)) => a == b,
             (Bool(a), Bool(b)) => a == b,
             (Str(a), Str(b)) => a == b,
+            (Bytes(a), Bytes(b)) => *a.borrow() == *b.borrow(),
             (List(a), List(b)) => *a.borrow() == *b.borrow(),
             (Map(a), Map(b)) => *a.borrow() == *b.borrow(),
             (Result(a), Result(b)) => a.as_ref() == b.as_ref(),
@@ -179,6 +183,22 @@ impl fmt::Display for Value {
             Value::Float(n) => write!(f, "{}", n),
             Value::Bool(b) => write!(f, "{}", b),
             Value::Str(s) => write!(f, "{}", s),
+            Value::Bytes(bytes) => {
+                let bytes = bytes.borrow();
+                write!(f, "b\"")?;
+                for byte in bytes.iter() {
+                    match *byte {
+                        b'\\' => write!(f, "\\\\")?,
+                        b'\"' => write!(f, "\\\"")?,
+                        b'\n' => write!(f, "\\n")?,
+                        b'\r' => write!(f, "\\r")?,
+                        b'\t' => write!(f, "\\t")?,
+                        0x20..=0x7e => write!(f, "{}", *byte as char)?,
+                        other => write!(f, "\\x{:02x}", other)?,
+                    }
+                }
+                write!(f, "\"")
+            }
             Value::List(xs) => {
                 let xs = xs.borrow();
                 write!(f, "[")?;
