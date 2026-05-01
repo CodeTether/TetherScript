@@ -217,9 +217,9 @@ impl Authority for FsAuthority {
                 }
                 let resolved = self.resolve(p)?;
                 let bytes = fs::read(&resolved).map_err(|e| format!("fs.read: {}", e))?;
-                match String::from_utf8(bytes.clone()) {
+                match String::from_utf8(bytes) {
                     Ok(s) => Ok(Value::Str(Rc::new(s))),
-                    Err(_) => Ok(Value::Bytes(Rc::new(RefCell::new(bytes)))),
+                    Err(err) => Ok(Value::Bytes(Rc::new(RefCell::new(err.into_bytes())))),
                 }
             }
             ("write", [Value::Str(p), content @ (Value::Str(_) | Value::Bytes(_))]) => {

@@ -341,14 +341,7 @@ fn write_json(value: &Value, out: &mut String, pretty: Option<usize>) -> Result<
             out.push_str(&value.to_string());
         }
         Value::Str(value) => write_json_string(value, out),
-        Value::Bytes(value) => {
-            let encoded = value
-                .borrow()
-                .iter()
-                .map(|b| Value::Int(*b as i64))
-                .collect::<Vec<_>>();
-            write_json_list(&encoded, out, pretty)?;
-        }
+        Value::Bytes(value) => write_json_bytes(&value.borrow(), out, pretty)?,
         Value::List(values) => write_json_list(&values.borrow(), out, pretty)?,
         Value::Map(values) => write_json_map(&values.borrow(), out, pretty)?,
         Value::Fn(_) | Value::VmFn(_) | Value::Native(_) => {
@@ -363,6 +356,31 @@ fn write_json(value: &Value, out: &mut String, pretty: Option<usize>) -> Result<
             return Err("json_encode: cannot encode a capability value as JSON".to_string())
         }
     }
+    Ok(())
+}
+
+fn write_json_bytes(bytes: &[u8], out: &mut String, pretty: Option<usize>) -> Result<(), String> {
+    out.push('[');
+    if bytes.is_empty() {
+        out.push(']');
+        return Ok(());
+    }
+    let child_pretty = pretty.map(|indent| indent + 2);
+    for (index, byte) in bytes.iter().enumerate() {
+        if index > 0 {
+            out.push(',');
+        }
+        if let Some(indent) = child_pretty {
+            out.push('\n');
+            push_indent(out, indent);
+        }
+        out.push_str(&byte.to_string());
+    }
+    if let Some(indent) = pretty {
+        out.push('\n');
+        push_indent(out, indent);
+    }
+    out.push(']');
     Ok(())
 }
 
@@ -640,6 +658,13 @@ mod tests {
     fn encode_string_escapes() {
         let v = encode(&Value::Str(Rc::new("hello\nworld".into()))).unwrap();
         assert_eq!(v, Value::Str(Rc::new(r#""hello\nworld""#.into())));
+    }
+
+    #[test]
+    fn encode_bytes() {
+        let bytes = Value::Bytes(Rc::new(RefCell::new(vec![0, 10, 255])));
+        let v = encode(&bytes).unwrap();
+        assert_eq!(v, Value::Str(Rc::new("[0,10,255]".into())));
     }
 
     #[test]

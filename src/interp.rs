@@ -7,6 +7,7 @@
 
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
+use std::fmt::Write as _;
 use std::rc::Rc;
 
 use crate::ast::*;
@@ -712,9 +713,10 @@ pub(crate) fn call_method(target: &Value, name: &str, args: &[Value]) -> Result<
             Ok(Value::Str(Rc::new(text)))
         }
         (Value::Bytes(bytes), "hex", []) => {
-            let mut out = String::new();
-            for b in bytes.borrow().iter() {
-                out.push_str(&format!("{:02x}", b));
+            let bytes = bytes.borrow();
+            let mut out = String::with_capacity(bytes.len() * 2);
+            for b in bytes.iter() {
+                write!(&mut out, "{:02x}", b).expect("writing to String cannot fail");
             }
             Ok(Value::Str(Rc::new(out)))
         }
@@ -1499,6 +1501,40 @@ fn main() {
 }
 "#;
         let program = parse(source);
+        let chunk = Compiler::compile_program(&program);
+        let mut vm = VM::new();
+        vm.run(chunk).unwrap();
+    }
+
+    #[test]
+    fn bytes_literals_and_methods_match_interpreter_and_vm() {
+        let source = r#"
+fn make() {
+    let b = b"hi\x21"
+    b[0] = 72
+    b.push(10)
+    assert(b.len() == 4, "bytes len failed")
+    assert(b[0] == 72, "bytes index assignment failed")
+    assert(b[1] == 105, "bytes index failed")
+    assert(b.pop() == 10, "bytes pop failed")
+    assert(b.hex() == "486921", "bytes hex failed")
+    assert(b.decode_utf8() == "Hi!", "bytes decode failed")
+    return b
+}
+
+fn main() {
+    let a = make()
+    let b = make()
+    assert(a.hex() == "486921", "first literal result failed")
+    assert(b.hex() == "486921", "second literal result failed")
+    assert(bytes([111, 107]).decode_utf8() == "ok", "bytes(list) failed")
+}
+"#;
+        let program = parse(source);
+
+        let mut interp = Interpreter::new();
+        interp.run(&program).unwrap();
+
         let chunk = Compiler::compile_program(&program);
         let mut vm = VM::new();
         vm.run(chunk).unwrap();

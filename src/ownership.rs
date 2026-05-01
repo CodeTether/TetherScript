@@ -272,7 +272,6 @@ impl Analyzer {
     }
 
     fn register_borrow(&mut self, borrower: &str, owner: &str, mutable: bool) {
-        self.check_borrow(owner, mutable);
         if let Some(state) = self.bindings.get_mut(owner) {
             if mutable {
                 state.mutable_borrow = true;

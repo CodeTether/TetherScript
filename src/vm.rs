@@ -161,7 +161,9 @@ impl VM {
             }
 
             Instr::Const(idx) => {
-                let v = self.frames.last().unwrap().proto.chunk.consts[idx as usize].clone();
+                let v = clone_const_value(
+                    &self.frames.last().unwrap().proto.chunk.consts[idx as usize],
+                );
                 self.stack.push(v);
             }
             Instr::Nil => self.stack.push(Value::Nil),
@@ -600,6 +602,13 @@ fn format_unwind(u: Unwind) -> String {
 /// the interpreter loop until the frame count is back to where we started.
 /// For native callees, `dispatch_call` already pushed the result onto the
 /// stack, so no extra work is needed.
+fn clone_const_value(value: &Value) -> Value {
+    match value {
+        Value::Bytes(bytes) => Value::Bytes(Rc::new(RefCell::new(bytes.borrow().clone()))),
+        other => other.clone(),
+    }
+}
+
 impl Runtime for VM {
     fn invoke(&mut self, callee: &Value, args: &[Value]) -> Result<Value, String> {
         let depth = self.frames.len();
