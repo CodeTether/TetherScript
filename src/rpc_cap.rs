@@ -97,8 +97,7 @@ impl RpcAuthority {
     /// Create a new RPC capability scoped to the given HTTP endpoint.
     /// Endpoint must be `http://host[:port]`.
     pub fn new(endpoint: &str) -> Rc<dyn Authority> {
-        let (host, port) = parse_endpoint(endpoint)
-            .unwrap_or_else(|_| ("localhost".into(), 80));
+        let (host, port) = parse_endpoint(endpoint).unwrap_or_else(|_| ("localhost".into(), 80));
         Rc::new(RpcAuthority {
             endpoint: endpoint.trim_end_matches('/').to_string(),
             host,
@@ -134,10 +133,7 @@ impl RpcAuthority {
     }
 
     /// Restrict to specific JSON-RPC methods.
-    pub fn with_methods(
-        auth: Rc<dyn Authority>,
-        methods: &[&str],
-    ) -> Rc<dyn Authority> {
+    pub fn with_methods(auth: Rc<dyn Authority>, methods: &[&str]) -> Rc<dyn Authority> {
         let this = auth
             .as_any()
             .downcast_ref::<RpcAuthority>()
@@ -207,7 +203,10 @@ impl RpcAuthority {
     }
 
     /// Read HTTP response and return (status, headers, body).
-    fn read_response(&self, stream: &mut TcpStream) -> Result<(u16, HashMap<String, String>, Vec<u8>), String> {
+    fn read_response(
+        &self,
+        stream: &mut TcpStream,
+    ) -> Result<(u16, HashMap<String, String>, Vec<u8>), String> {
         let mut reader = BufReader::new(stream);
 
         // Read status line
@@ -242,22 +241,30 @@ impl RpcAuthority {
                 .parse()
                 .map_err(|_| format!("rpc: invalid content-length {}", content_length))?;
             if len > MAX_RESPONSE_BYTES {
-                return Err(format!("rpc: response body exceeds {} bytes", MAX_RESPONSE_BYTES));
+                return Err(format!(
+                    "rpc: response body exceeds {} bytes",
+                    MAX_RESPONSE_BYTES
+                ));
             }
             let mut buf = vec![0; len];
             if len > 0 {
-                reader.read_exact(&mut buf)
+                reader
+                    .read_exact(&mut buf)
                     .map_err(|e| format!("rpc: read body failed: {}", e))?;
             }
             buf
         } else {
             // Read until connection closed
             let mut buf = Vec::new();
-            reader.take((MAX_RESPONSE_BYTES + 1) as u64)
+            reader
+                .take((MAX_RESPONSE_BYTES + 1) as u64)
                 .read_to_end(&mut buf)
                 .map_err(|e| format!("rpc: read body failed: {}", e))?;
             if buf.len() > MAX_RESPONSE_BYTES {
-                return Err(format!("rpc: response body exceeds {} bytes", MAX_RESPONSE_BYTES));
+                return Err(format!(
+                    "rpc: response body exceeds {} bytes",
+                    MAX_RESPONSE_BYTES
+                ));
             }
             buf
         };
@@ -277,8 +284,14 @@ impl RpcAuthority {
         };
 
         let mut request = HashMap::new();
-        request.insert("jsonrpc".to_string(), Value::Str(Rc::new("2.0".to_string())));
-        request.insert("method".to_string(), Value::Str(Rc::new(method.to_string())));
+        request.insert(
+            "jsonrpc".to_string(),
+            Value::Str(Rc::new("2.0".to_string())),
+        );
+        request.insert(
+            "method".to_string(),
+            Value::Str(Rc::new(method.to_string())),
+        );
         request.insert("params".to_string(), params.clone());
         request.insert("id".to_string(), Value::Int(id as i64));
 
@@ -295,12 +308,26 @@ impl RpcAuthority {
             let map = map.borrow();
             if let Some(Value::Map(ref error)) = map.get("error") {
                 let error = error.borrow();
-                let code = error.get("code").and_then(|v| {
-                    if let Value::Int(c) = v { Some(*c) } else { None }
-                }).unwrap_or(-1);
-                let message = error.get("message").and_then(|v| {
-                    if let Value::Str(s) = v { Some(s.as_str()) } else { None }
-                }).unwrap_or("unknown error");
+                let code = error
+                    .get("code")
+                    .and_then(|v| {
+                        if let Value::Int(c) = v {
+                            Some(*c)
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or(-1);
+                let message = error
+                    .get("message")
+                    .and_then(|v| {
+                        if let Value::Str(s) = v {
+                            Some(s.as_str())
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or("unknown error");
                 return Err(format!("rpc: error {}: {}", code, message));
             }
         }
@@ -375,9 +402,15 @@ impl RpcAuthority {
         }
 
         // Check content type
-        let content_type = headers.get("content-type").map(|s| s.as_str()).unwrap_or("");
+        let content_type = headers
+            .get("content-type")
+            .map(|s| s.as_str())
+            .unwrap_or("");
         if !content_type.contains("text/event-stream") {
-            return Err(format!("rpc: expected text/event-stream, got {}", content_type));
+            return Err(format!(
+                "rpc: expected text/event-stream, got {}",
+                content_type
+            ));
         }
 
         // Read SSE events
@@ -572,7 +605,9 @@ impl Authority for RpcAuthority {
             }
             "sse_subscribe" => {
                 if args.len() != 2 {
-                    return Err("rpc.sse_subscribe: expected path (string), handler (function)".into());
+                    return Err(
+                        "rpc.sse_subscribe: expected path (string), handler (function)".into(),
+                    );
                 }
                 let path = string_arg(&args[0], "rpc.sse_subscribe: path")?;
                 let handler = &args[1];
@@ -632,7 +667,8 @@ fn parse_endpoint(endpoint: &str) -> Result<(String, u16), String> {
     let (host, port) = if let Some(idx) = rest.find(':') {
         let host = &rest[..idx];
         let port_str = &rest[idx + 1..];
-        let port = port_str.parse::<u16>()
+        let port = port_str
+            .parse::<u16>()
             .map_err(|_| format!("rpc: invalid port {}", port_str))?;
         (host.to_string(), port)
     } else {
@@ -649,11 +685,18 @@ fn parse_endpoint(endpoint: &str) -> Result<(String, u16), String> {
 fn string_arg(arg: &Value, name: &str) -> Result<String, String> {
     match arg {
         Value::Str(s) => Ok(s.as_str().to_string()),
-        other => Err(format!("{}: expected string, got {}", name, other.type_name())),
+        other => Err(format!(
+            "{}: expected string, got {}",
+            name,
+            other.type_name()
+        )),
     }
 }
 
-fn read_line<R: Read>(reader: &mut BufReader<R>, max_bytes: usize) -> Result<Option<String>, String> {
+fn read_line<R: Read>(
+    reader: &mut BufReader<R>,
+    max_bytes: usize,
+) -> Result<Option<String>, String> {
     let mut line = String::new();
     let mut bytes = 0;
 
@@ -745,14 +788,18 @@ fn sha1(message: &[u8]) -> [u8; 20] {
         // 80 rounds
         for i in 0..80 {
             let (f, k) = match i {
-                0..=19  => ((b & c) | ((!b) & d),             0x5A827999u32),
-                20..=39 => (b ^ c ^ d,                         0x6ED9EBA1u32),
-                40..=59 => ((b & c) | (b & d) | (c & d),       0x8F1BBCDCu32),
-                60..=79 => (b ^ c ^ d,                         0xCA62C1D6u32),
+                0..=19 => ((b & c) | ((!b) & d), 0x5A827999u32),
+                20..=39 => (b ^ c ^ d, 0x6ED9EBA1u32),
+                40..=59 => ((b & c) | (b & d) | (c & d), 0x8F1BBCDCu32),
+                60..=79 => (b ^ c ^ d, 0xCA62C1D6u32),
                 _ => unreachable!(),
             };
-            let temp = a.rotate_left(5).wrapping_add(f)
-                .wrapping_add(e).wrapping_add(k).wrapping_add(w[i]);
+            let temp = a
+                .rotate_left(5)
+                .wrapping_add(f)
+                .wrapping_add(e)
+                .wrapping_add(k)
+                .wrapping_add(w[i]);
             e = d;
             d = c;
             c = b.rotate_left(30);
@@ -827,12 +874,14 @@ fn read_ws_frame<R: Read>(reader: &mut BufReader<R>) -> Result<Option<(u8, Vec<u
     // Read extended payload length
     if payload_len == 126 {
         let mut ext = [0u8; 2];
-        reader.read_exact(&mut ext)
+        reader
+            .read_exact(&mut ext)
             .map_err(|e| format!("rpc: read WebSocket extended length failed: {}", e))?;
         payload_len = u16::from_be_bytes(ext) as usize;
     } else if payload_len == 127 {
         let mut ext = [0u8; 8];
-        reader.read_exact(&mut ext)
+        reader
+            .read_exact(&mut ext)
             .map_err(|e| format!("rpc: read WebSocket extended length failed: {}", e))?;
         payload_len = u64::from_be_bytes(ext) as usize;
     }
@@ -840,14 +889,16 @@ fn read_ws_frame<R: Read>(reader: &mut BufReader<R>) -> Result<Option<(u8, Vec<u
     // Read masking key if present
     let mut mask = [0u8; 4];
     if masked {
-        reader.read_exact(&mut mask)
+        reader
+            .read_exact(&mut mask)
             .map_err(|e| format!("rpc: read WebSocket mask failed: {}", e))?;
     }
 
     // Read payload
     let mut payload = vec![0u8; payload_len];
     if payload_len > 0 {
-        reader.read_exact(&mut payload)
+        reader
+            .read_exact(&mut payload)
             .map_err(|e| format!("rpc: read WebSocket payload failed: {}", e))?;
     }
 
@@ -886,7 +937,8 @@ fn write_ws_frame(stream: &mut TcpStream, opcode: u8, payload: &[u8]) -> Result<
         header.extend_from_slice(&(len as u64).to_be_bytes());
     }
 
-    stream.write_all(&header)
+    stream
+        .write_all(&header)
         .and_then(|_| stream.write_all(payload))
         .and_then(|_| stream.flush())
         .map_err(|e| format!("rpc: write WebSocket frame failed: {}", e))?;

@@ -8,7 +8,7 @@
 //! tetherscript run <file.tether>              run with bytecode VM (default)
 //! tetherscript run --interp <file.tether>     run with tree-walking interpreter
 //! tetherscript check <file>                   parse and run ownership analysis
-//! tetherscript render <html> [css] [width]      render HTML/CSS to a text display list
+//! tetherscript render <html-file> [css-file] [width] render HTML/CSS files to a text display list
 //! tetherscript inspect --tokens <file>        dump tokens
 //! tetherscript inspect --ast <file>           dump AST
 //! tetherscript inspect --bytecode <file>      dump compiled bytecode

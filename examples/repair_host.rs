@@ -38,10 +38,9 @@ fn main() -> Result<(), String> {
     let script_path = &args[3];
 
     // --- 1. Read and parse JSON in Rust ---
-    let raw = fs::read_to_string(in_path)
-        .map_err(|e| format!("read {}: {}", in_path, e))?;
-    let data = json::parse(&Value::Str(Rc::new(raw)))
-        .map_err(|e| format!("parse {}: {}", in_path, e))?;
+    let raw = fs::read_to_string(in_path).map_err(|e| format!("read {}: {}", in_path, e))?;
+    let data =
+        json::parse(&Value::Str(Rc::new(raw))).map_err(|e| format!("parse {}: {}", in_path, e))?;
 
     let messages = match data {
         Value::List(list) => list,
@@ -52,9 +51,7 @@ fn main() -> Result<(), String> {
 
     // --- 2. Load the TetherScript plugin (no capability grants needed) ---
     let host = PluginHost::new();
-    let mut plugin = host
-        .load_file(script_path)
-        .map_err(|e| e.to_string())?;
+    let mut plugin = host.load_file(script_path).map_err(|e| e.to_string())?;
 
     if !plugin.has_hook("repair_msg") {
         return Err(format!(
@@ -80,16 +77,14 @@ fn main() -> Result<(), String> {
 
     // --- 4. Re-encode and write ---
     let result_array = Value::List(Rc::new(RefCell::new(results)));
-    let json_out = json::encode_pretty(&result_array)
-        .map_err(|e| format!("encode: {}", e))?;
+    let json_out = json::encode_pretty(&result_array).map_err(|e| format!("encode: {}", e))?;
 
     let json_str = match json_out {
         Value::Str(s) => s.to_string(),
         other => return Err(format!("json_encode returned {}", other.type_name())),
     };
 
-    fs::write(out_path, &json_str)
-        .map_err(|e| format!("write {}: {}", out_path, e))?;
+    fs::write(out_path, &json_str).map_err(|e| format!("write {}: {}", out_path, e))?;
 
     println!("processed {} messages: {} -> {}", total, in_path, out_path);
 

@@ -106,8 +106,8 @@ impl ProviderAuthority {
     /// Create a new provider capability scoped to the given HTTP endpoint.
     /// Endpoint must be `http://host[:port]`.
     pub fn new(endpoint: &str) -> Rc<dyn Authority> {
-        let (scheme, host, port) = parse_endpoint(endpoint)
-            .unwrap_or_else(|| (Scheme::Http, "localhost".into(), 80));
+        let (scheme, host, port) =
+            parse_endpoint(endpoint).unwrap_or_else(|| (Scheme::Http, "localhost".into(), 80));
         Rc::new(ProviderAuthority {
             endpoint: endpoint.trim_end_matches('/').to_string(),
             scheme,
@@ -147,10 +147,7 @@ impl ProviderAuthority {
     }
 
     /// Restrict to a specific model.
-    pub fn with_model(
-        auth: Rc<dyn Authority>,
-        model: &str,
-    ) -> Rc<dyn Authority> {
+    pub fn with_model(auth: Rc<dyn Authority>, model: &str) -> Rc<dyn Authority> {
         let this = auth
             .as_any()
             .downcast_ref::<ProviderAuthority>()
@@ -171,10 +168,7 @@ impl ProviderAuthority {
     }
 
     /// Set the API path (default: `/v1/chat/completions`).
-    pub fn with_path(
-        auth: Rc<dyn Authority>,
-        path: &str,
-    ) -> Rc<dyn Authority> {
+    pub fn with_path(auth: Rc<dyn Authority>, path: &str) -> Rc<dyn Authority> {
         let this = auth
             .as_any()
             .downcast_ref::<ProviderAuthority>()
@@ -214,10 +208,7 @@ impl ProviderAuthority {
             .ok_or("provider.chat: expected messages argument")?;
 
         let mut body = HashMap::new();
-        body.insert(
-            "messages".to_string(),
-            messages_val.clone(),
-        );
+        body.insert("messages".to_string(), messages_val.clone());
 
         // Extract model from overrides or default
         let mut model = String::new();
@@ -398,11 +389,9 @@ impl ProviderAuthority {
             Scheme::Https => {
                 let connector = TlsConnector::new()
                     .map_err(|e| format!("provider: create TLS connector: {}", e))?;
-                let tls_stream = connector
-                    .connect(&self.host, self.port)
-                    .map_err(|e| {
-                        format!("provider: TLS handshake with {} failed: {}", self.host, e)
-                    })?;
+                let tls_stream = connector.connect(&self.host, self.port).map_err(|e| {
+                    format!("provider: TLS handshake with {} failed: {}", self.host, e)
+                })?;
                 Ok(Box::new(tls_stream))
             }
         }
@@ -457,15 +446,21 @@ impl ProviderAuthority {
         let mut reader = BufReader::new(stream);
 
         // Read status line
-        let status_line = read_line(&mut reader)?
-            .ok_or_else(|| "provider: empty response".to_string())?;
+        let status_line =
+            read_line(&mut reader)?.ok_or_else(|| "provider: empty response".to_string())?;
         let status = parse_status_code(&status_line)?;
         if !(200..300).contains(&status) {
             // Read body for error info
             let mut body = Vec::new();
-            let _ = reader.take((MAX_RESPONSE_BYTES + 1) as u64).read_to_end(&mut body);
+            let _ = reader
+                .take((MAX_RESPONSE_BYTES + 1) as u64)
+                .read_to_end(&mut body);
             let text = String::from_utf8_lossy(&body);
-            return Err(format!("provider: HTTP {} response: {}", status, text.trim()));
+            return Err(format!(
+                "provider: HTTP {} response: {}",
+                status,
+                text.trim()
+            ));
         }
 
         // Read headers
@@ -486,7 +481,8 @@ impl ProviderAuthority {
                         content_length = Some(value.parse().unwrap_or(0));
                     }
                     "transfer-encoding" => {
-                        chunked = value.split(',')
+                        chunked = value
+                            .split(',')
                             .any(|part| part.trim().eq_ignore_ascii_case("chunked"));
                     }
                     _ => {}
@@ -765,9 +761,7 @@ impl Authority for ProviderAuthority {
             if !self.models.is_empty() {
                 new_models = new_models.intersection(&requested).cloned().collect();
                 if new_models.is_empty() {
-                    return Err(
-                        "provider.narrow: no models left after intersection".into()
-                    );
+                    return Err("provider.narrow: no models left after intersection".into());
                 }
             } else {
                 // Parent allows any model; child restricts
@@ -826,9 +820,7 @@ impl Authority for ProviderAuthority {
             // stream(messages, handler, [overrides]) -> accumulated string
             "stream" => {
                 if args.len() < 2 {
-                    return Err(
-                        "provider.stream: expected messages and handler arguments".into()
-                    );
+                    return Err("provider.stream: expected messages and handler arguments".into());
                 }
                 let handler = &args[1];
                 // Build body from messages + optional overrides
@@ -878,10 +870,7 @@ impl Authority for ProviderAuthority {
                             .collect(),
                     ))),
                 );
-                m.insert(
-                    "max_tokens".into(),
-                    Value::Int(self.max_tokens as i64),
-                );
+                m.insert("max_tokens".into(), Value::Int(self.max_tokens as i64));
                 // Don't expose bound header values — only names
                 let header_names: Vec<Value> = self
                     .bound_headers
@@ -1043,9 +1032,9 @@ mod tests {
         let mut params = HashMap::new();
         params.insert(
             "models".to_string(),
-            Value::List(Rc::new(RefCell::new(vec![
-                Value::Str(Rc::new("llama3".into())),
-            ]))),
+            Value::List(Rc::new(RefCell::new(vec![Value::Str(Rc::new(
+                "llama3".into(),
+            ))]))),
         );
         let narrowed = scoped
             .narrow(&Value::Map(Rc::new(RefCell::new(params))))
@@ -1090,11 +1079,8 @@ mod tests {
     #[test]
     fn describe_does_not_expose_bound_headers() {
         let base = ProviderAuthority::new("http://localhost:11434");
-        let with_key = ProviderAuthority::with_bound_header(
-            base,
-            "Authorization",
-            "Bearer secret-key-12345",
-        );
+        let with_key =
+            ProviderAuthority::with_bound_header(base, "Authorization", "Bearer secret-key-12345");
         let mut rt = NoopRuntime;
         let desc = with_key.invoke(&mut rt, "describe", &[]).unwrap();
         match desc {

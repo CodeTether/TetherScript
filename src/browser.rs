@@ -269,7 +269,7 @@ fn layout_styled_node(styled: &StyledNode, x: i64, y: i64, containing_width: i64
                     children.push(child_layout);
                 }
             }
-            let explicit_height = parse_px(styled.styles.get("height"));
+            let explicit_height = parse_px(styled.styles.get("height")).map(|height| height.max(0));
             let content_height = (cursor_y - y) + padding;
             let height = explicit_height.unwrap_or(content_height.max(1));
             LayoutBox {
@@ -543,12 +543,19 @@ impl<'a> HtmlParser<'a> {
 }
 
 fn decode_entities(input: &str) -> String {
-    input
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&#39;", "'")
-        .replace("&amp;", "&")
+    let mut decoded = input.to_string();
+    loop {
+        let next = decoded
+            .replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+            .replace("&#39;", "'");
+        if next == decoded {
+            return decoded;
+        }
+        decoded = next;
+    }
 }
 
 fn is_void_element(tag: &str) -> bool {
@@ -576,6 +583,12 @@ pub fn html_to_value(args: &[Value]) -> Result<Value, String> {
 }
 
 pub fn render_to_value(args: &[Value]) -> Result<Value, String> {
+    if !(1..=3).contains(&args.len()) {
+        return Err(format!(
+            "browser_render: expected 1 to 3 args, got {}",
+            args.len()
+        ));
+    }
     let html = expect_str(args.first(), "browser_render")?;
     let css = match args.get(1) {
         Some(Value::Str(css)) => css.as_str(),
@@ -603,6 +616,12 @@ pub fn render_to_value(args: &[Value]) -> Result<Value, String> {
 }
 
 pub fn layout_to_runtime_value(args: &[Value]) -> Result<Value, String> {
+    if !(1..=3).contains(&args.len()) {
+        return Err(format!(
+            "browser_layout: expected 1 to 3 args, got {}",
+            args.len()
+        ));
+    }
     let html = expect_str(args.first(), "browser_layout")?;
     let css = match args.get(1) {
         Some(Value::Str(css)) => css.as_str(),
@@ -682,5 +701,40 @@ mod tests {
             Value::Str(text) => assert!(text.contains("<h1>")),
             other => panic!("expected str, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn decodes_nested_entities() {
+        let doc = parse_html("<p>&amp;lt;tag&amp;gt;</p>");
+        let Node::Element(element) = &doc.children[0] else {
+            panic!("expected element");
+        };
+        assert_eq!(element.children, vec![Node::Text("<tag>".into())]);
+    }
+
+    #[test]
+    fn clamps_negative_explicit_height() {
+        let doc = parse_html("<section><p>Hello</p></section>");
+        let layout = layout_document(&doc, "section { height: -5px }", 80);
+
+        assert_eq!(layout.children[0].height, 0);
+        assert_eq!(layout.height, 1);
+    }
+
+    #[test]
+    fn browser_variadics_reject_extra_args() {
+        let args = [
+            Value::Str(Rc::new("<h1>Hello</h1>".into())),
+            Value::Str(Rc::new("".into())),
+            Value::Int(80),
+            Value::Int(1),
+        ];
+
+        assert!(render_to_value(&args)
+            .unwrap_err()
+            .contains("expected 1 to 3 args"));
+        assert!(layout_to_runtime_value(&args)
+            .unwrap_err()
+            .contains("expected 1 to 3 args"));
     }
 }
