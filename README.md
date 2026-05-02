@@ -28,6 +28,8 @@ TetherScript currently includes:
 - Experimental browser primitives for parsing small HTML fragments, applying
   simple CSS rules, computing block layout, and rendering deterministic text
   display lists.
+- A dependency-free miniature JavaScript host for those browser primitives, with
+  `document`, `window`, selectors, attributes, and inline `<script>` execution.
 - SMTP sending support.
 - Standard tools for filesystem, process, environment, path, time, Base64,
   SHA-256, and URL parsing.
@@ -104,7 +106,10 @@ including:
 
 - `json_parse`, `json_encode`, `json_encode_pretty`
 - `http_get`, `http_head`, `http_post`, `http_request`, `http_serve`
-- `browser_parse_html`, `browser_layout`, `browser_render`
+- `browser_parse_html`, `browser_parse_css`, `browser_styles`,
+  `browser_query_selector`, `browser_text_content`, `browser_snapshot`,
+  `browser_layout`, `browser_display_list`, `browser_render`
+- `js_eval`, `browser_eval_js`, `browser_run_scripts`
 - `smtp_send`
 - `fs_read`, `fs_write`, `fs_exists`, `fs_list`, `fs_mkdir`, `fs_stat`,
   `fs_remove`, `fs_rename`, `fs_copy`
@@ -162,6 +167,8 @@ diagnostics.
 - Formatter and REPL.
 - More complete LSP features such as completions, hover, go-to-definition, and
   exact spans.
+- Full ECMAScript/Web compatibility. The JavaScript/browser runtime is an
+  in-tree, zero-dependency foundation, not a Test262- or Web Platform Tests-complete engine.
 - Capability audit logs and richer resource budgets.
 - Moving ambient host tools behind explicit capabilities where practical.
 - VM local-slot optimization; variable lookup is still name-based.
@@ -173,6 +180,7 @@ diagnostics.
 src/
   ast.rs         — AST node definitions
   browser.rs     — experimental HTML/CSS parser, layout, and text renderer
+  browser_js.rs  — dependency-free browser JavaScript DOM host bindings
   bytecode.rs    — bytecode instruction/chunk/function types
   capability.rs  — capability trait/object model
   compiler.rs    — AST to bytecode compiler
@@ -212,6 +220,7 @@ docs/
 - [x] HTTP client/server support
 - [x] Standard filesystem/process/env/path/time/hash/base64/url tools
 - [x] Experimental browser parser/layout/text renderer
+- [x] Experimental dependency-free browser JavaScript host bindings
 - [x] Rust embedding/plugin host
 - [ ] Runtime `&mut` exclusivity enforcement
 - [ ] Modules and imports
