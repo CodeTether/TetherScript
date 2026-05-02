@@ -24,6 +24,7 @@ pub enum JsValue {
     Array(Rc<RefCell<Vec<JsValue>>>),
     Object(Rc<RefCell<HashMap<String, JsValue>>>),
     Function(Rc<JsFunction>),
+    BoundFunction(Rc<BoundFunction>),
     Native(Rc<NativeFunction>),
 }
 
@@ -33,6 +34,12 @@ pub struct JsFunction {
     params: Vec<String>,
     body: Vec<Stmt>,
     env: EnvRef,
+}
+
+#[derive(Clone)]
+pub struct BoundFunction {
+    pub function: JsValue,
+    pub this_value: JsValue,
 }
 
 pub struct NativeFunction {
@@ -68,6 +75,7 @@ impl PartialEq for JsValue {
             (JsValue::Array(a), JsValue::Array(b)) => Rc::ptr_eq(a, b),
             (JsValue::Object(a), JsValue::Object(b)) => Rc::ptr_eq(a, b),
             (JsValue::Function(a), JsValue::Function(b)) => Rc::ptr_eq(a, b),
+            (JsValue::BoundFunction(a), JsValue::BoundFunction(b)) => Rc::ptr_eq(a, b),
             (JsValue::Native(a), JsValue::Native(b)) => Rc::ptr_eq(a, b),
             _ => false,
         }
@@ -81,7 +89,7 @@ impl JsValue {
             JsValue::Bool(b) => *b,
             JsValue::Number(n) => *n != 0.0 && !n.is_nan(),
             JsValue::String(s) => !s.is_empty(),
-            JsValue::Array(_) | JsValue::Object(_) | JsValue::Function(_) | JsValue::Native(_) => true,
+            JsValue::Array(_) | JsValue::Object(_) | JsValue::Function(_) | JsValue::BoundFunction(_) | JsValue::Native(_) => true,
         }
     }
 
@@ -97,6 +105,7 @@ impl JsValue {
             JsValue::Array(items) => items.borrow().iter().map(|v| v.display()).collect::<Vec<_>>().join(","),
             JsValue::Object(_) => "[object Object]".into(),
             JsValue::Function(fun) => format!("function {}", fun.name.as_deref().unwrap_or("<anonymous>")),
+            JsValue::BoundFunction(fun) => format!("bound {}", fun.function.display()),
             JsValue::Native(fun) => format!("function {}", fun.name),
         }
     }
@@ -125,7 +134,7 @@ pub fn js_to_tether(value: &JsValue) -> Value {
             let map = obj.borrow().iter().map(|(k, v)| (k.clone(), js_to_tether(v))).collect();
             Value::Map(Rc::new(RefCell::new(map)))
         }
-        JsValue::Function(_) | JsValue::Native(_) => Value::Str(Rc::new(value.display())),
+        JsValue::Function(_) | JsValue::BoundFunction(_) | JsValue::Native(_) => Value::Str(Rc::new(value.display())),
     }
 }
 
@@ -259,7 +268,7 @@ impl Env {
 #[derive(Debug, Clone, PartialEq)]
 enum TokenKind {
     Number(f64), String(String), Ident(String),
-    Let, Const, Var, Function, Return, If, Else, While, For, Break, Continue, True, False, Null,
+    Let, Const, Var, Function, Return, If, Else, While, For, Break, Continue, True, False, Null, This, Typeof,
     Plus, Minus, Star, Slash, Percent, Bang, Eq, EqEq, BangEq, StrictEq, StrictBangEq,
     Lt, Lte, Gt, Gte, AndAnd, OrOr, Dot, Comma, Semi, Colon,
     LParen, RParen, LBrace, RBrace, LBracket, RBracket,
@@ -364,6 +373,7 @@ impl<'a> Lexer<'a> {
             "else" => TokenKind::Else, "while" => TokenKind::While, "for" => TokenKind::For,
             "break" => TokenKind::Break, "continue" => TokenKind::Continue,
             "true" => TokenKind::True, "false" => TokenKind::False, "null" => TokenKind::Null,
+            "this" => TokenKind::This, "typeof" => TokenKind::Typeof,
             _ => TokenKind::Ident(s),
         }
     }
@@ -381,7 +391,7 @@ impl<'a> Lexer<'a> {
 #[derive(Debug, Clone)]
 enum Stmt { Expr(Expr), Var(String, Option<Expr>), Function(String, Vec<String>, Vec<Stmt>), Return(Option<Expr>), Block(Vec<Stmt>), If(Expr, Box<Stmt>, Option<Box<Stmt>>), While(Expr, Box<Stmt>), Break, Continue }
 #[derive(Debug, Clone)]
-enum Expr { Literal(JsValue), Var(String), Array(Vec<Expr>), Object(Vec<(String, Expr)>), Unary(String, Box<Expr>), Binary(Box<Expr>, String, Box<Expr>), Assign(Box<Expr>, Box<Expr>), Call(Box<Expr>, Vec<Expr>), Get(Box<Expr>, String), Index(Box<Expr>, Box<Expr>) }
+enum Expr { Literal(JsValue), Var(String), This, Function(Vec<String>, Vec<Stmt>), Array(Vec<Expr>), Object(Vec<(String, Expr)>), Unary(String, Box<Expr>), Typeof(Box<Expr>), Binary(Box<Expr>, String, Box<Expr>), Assign(Box<Expr>, Box<Expr>), Call(Box<Expr>, Vec<Expr>), Get(Box<Expr>, String), Index(Box<Expr>, Box<Expr>) }
 
 struct Parser { tokens: Vec<Token>, pos: usize }
 
@@ -433,7 +443,7 @@ impl Parser {
     fn comparison(&mut self) -> Result<Expr, String> { let mut e = self.term()?; while self.matches(&[TokenKind::Lt, TokenKind::Lte, TokenKind::Gt, TokenKind::Gte]) { let op = match &self.previous().kind { TokenKind::Lt => "<", TokenKind::Lte => "<=", TokenKind::Gt => ">", _ => ">=" }; e = Expr::Binary(Box::new(e), op.into(), Box::new(self.term()?)); } Ok(e) }
     fn term(&mut self) -> Result<Expr, String> { let mut e = self.factor()?; while self.matches(&[TokenKind::Plus, TokenKind::Minus]) { let op = if self.previous().kind == TokenKind::Plus { "+" } else { "-" }; e = Expr::Binary(Box::new(e), op.into(), Box::new(self.factor()?)); } Ok(e) }
     fn factor(&mut self) -> Result<Expr, String> { let mut e = self.unary()?; while self.matches(&[TokenKind::Star, TokenKind::Slash, TokenKind::Percent]) { let op = match &self.previous().kind { TokenKind::Star => "*", TokenKind::Slash => "/", _ => "%" }; e = Expr::Binary(Box::new(e), op.into(), Box::new(self.unary()?)); } Ok(e) }
-    fn unary(&mut self) -> Result<Expr, String> { if self.matches(&[TokenKind::Bang, TokenKind::Minus, TokenKind::Plus]) { let op = match &self.previous().kind { TokenKind::Bang => "!", TokenKind::Minus => "-", _ => "+" }; Ok(Expr::Unary(op.into(), Box::new(self.unary()?))) } else { self.call() } }
+    fn unary(&mut self) -> Result<Expr, String> { if self.matches(&[TokenKind::Bang, TokenKind::Minus, TokenKind::Plus]) { let op = match &self.previous().kind { TokenKind::Bang => "!", TokenKind::Minus => "-", _ => "+" }; Ok(Expr::Unary(op.into(), Box::new(self.unary()?))) } else if self.matches(&[TokenKind::Typeof]) { Ok(Expr::Typeof(Box::new(self.unary()?))) } else { self.call() } }
 
     fn call(&mut self) -> Result<Expr, String> {
         let mut e = self.primary()?;
@@ -455,6 +465,8 @@ impl Parser {
             TokenKind::False => Ok(Expr::Literal(JsValue::Bool(false))),
             TokenKind::Null => Ok(Expr::Literal(JsValue::Null)),
             TokenKind::Ident(s) => Ok(Expr::Var(s)),
+            TokenKind::This => Ok(Expr::This),
+            TokenKind::Function => { self.consume(&TokenKind::LParen, "Expected '(' after function")?; let params = self.params()?; self.consume(&TokenKind::LBrace, "Expected function body")?; Ok(Expr::Function(params, self.block()?)) }
             TokenKind::LParen => { let e = self.expression()?; self.consume(&TokenKind::RParen, "Expected ')'")?; Ok(e) }
             TokenKind::LBracket => { let mut items = Vec::new(); if !self.check(&TokenKind::RBracket) { loop { items.push(self.expression()?); if !self.matches(&[TokenKind::Comma]) { break; } } } self.consume(&TokenKind::RBracket, "Expected ']'")?; Ok(Expr::Array(items)) }
             TokenKind::LBrace => { let mut props = Vec::new(); if !self.check(&TokenKind::RBrace) { loop { let key = match self.advance().kind.clone() { TokenKind::Ident(s) | TokenKind::String(s) => s, other => return Err(format!("Expected object key, got {:?}", other)), }; self.consume(&TokenKind::Colon, "Expected ':'")?; props.push((key, self.expression()?)); if !self.matches(&[TokenKind::Comma]) { break; } } } self.consume(&TokenKind::RBrace, "Expected '}'")?; Ok(Expr::Object(props)) }
@@ -504,14 +516,47 @@ fn eval_expr(expr: &Expr, env: EnvRef) -> Result<JsValue, String> {
     match expr {
         Expr::Literal(v) => Ok(v.clone()),
         Expr::Var(name) => env.borrow().get(name).ok_or_else(|| format!("ReferenceError: {} is not defined", name)),
+        Expr::This => Ok(env.borrow().get("this").unwrap_or(JsValue::Undefined)),
+        Expr::Function(params, body) => Ok(JsValue::Function(Rc::new(JsFunction { name: None, params: params.clone(), body: body.clone(), env }))),
         Expr::Array(items) => Ok(JsValue::Array(Rc::new(RefCell::new(items.iter().map(|e| eval_expr(e, env.clone())).collect::<Result<Vec<_>, _>>()?)))),
         Expr::Object(props) => { let mut m = HashMap::new(); for (k, e) in props { m.insert(k.clone(), eval_expr(e, env.clone())?); } Ok(JsValue::Object(Rc::new(RefCell::new(m)))) }
         Expr::Unary(op, e) => { let v = eval_expr(e, env)?; match op.as_str() { "!" => Ok(JsValue::Bool(!v.truthy())), "-" => Ok(JsValue::Number(-v.number())), "+" => Ok(JsValue::Number(v.number())), _ => unreachable!() } }
+        Expr::Typeof(e) => Ok(JsValue::String(typeof_expr(e, env))),
         Expr::Binary(a, op, b) => eval_binary(eval_expr(a, env.clone())?, op, || eval_expr(b, env)),
         Expr::Assign(target, rhs) => { let v = eval_expr(rhs, env.clone())?; assign_target(target, v.clone(), env)?; Ok(v) }
-        Expr::Call(callee, args) => { let callee = eval_expr(callee, env.clone())?; let args = args.iter().map(|a| eval_expr(a, env.clone())).collect::<Result<Vec<_>, _>>()?; call_value(callee, &args) }
+        Expr::Call(callee, args) => { let callee = eval_callee(callee, env.clone())?; let args = args.iter().map(|a| eval_expr(a, env.clone())).collect::<Result<Vec<_>, _>>()?; call_value(callee, &args) }
         Expr::Get(obj, prop) => get_property(&eval_expr(obj, env)?, prop),
         Expr::Index(obj, idx) => { let key = eval_expr(idx, env.clone())?.display(); get_property(&eval_expr(obj, env)?, &key) }
+    }
+}
+
+fn eval_callee(expr: &Expr, env: EnvRef) -> Result<JsValue, String> {
+    match expr {
+        Expr::Get(obj, prop) => { let this_value = eval_expr(obj, env)?; Ok(bind_this(get_property(&this_value, prop)?, this_value)) }
+        Expr::Index(obj, idx) => { let this_value = eval_expr(obj, env.clone())?; let key = eval_expr(idx, env)?.display(); Ok(bind_this(get_property(&this_value, &key)?, this_value)) }
+        _ => eval_expr(expr, env),
+    }
+}
+
+fn bind_this(function: JsValue, this_value: JsValue) -> JsValue {
+    match function {
+        JsValue::Function(_) | JsValue::Native(_) | JsValue::BoundFunction(_) => JsValue::BoundFunction(Rc::new(BoundFunction { function, this_value })),
+        other => other,
+    }
+}
+
+fn typeof_expr(expr: &Expr, env: EnvRef) -> String {
+    match expr {
+        Expr::Var(name) if env.borrow().get(name).is_none() => "undefined".into(),
+        _ => match eval_expr(expr, env).unwrap_or(JsValue::Undefined) {
+            JsValue::Undefined => "undefined".into(),
+            JsValue::Null => "object".into(),
+            JsValue::Bool(_) => "boolean".into(),
+            JsValue::Number(_) => "number".into(),
+            JsValue::String(_) => "string".into(),
+            JsValue::Function(_) | JsValue::BoundFunction(_) | JsValue::Native(_) => "function".into(),
+            JsValue::Array(_) | JsValue::Object(_) => "object".into(),
+        },
     }
 }
 
@@ -573,8 +618,21 @@ fn set_property(value: &JsValue, prop: &str, new_value: JsValue) -> Result<(), S
 fn call_value(callee: JsValue, args: &[JsValue]) -> Result<JsValue, String> {
     match callee {
         JsValue::Native(native) => { if let Some(arity) = native.arity { if args.len() != arity { return Err(format!("{}: expected {} args, got {}", native.name, arity, args.len())); } } (native.func)(args) }
+        JsValue::BoundFunction(bound) => call_with_this(bound.function.clone(), bound.this_value.clone(), args),
         JsValue::Function(fun) => { let call_env = Env::new(Some(fun.env.clone())); for (i, p) in fun.params.iter().enumerate() { call_env.borrow_mut().define(p, args.get(i).cloned().unwrap_or(JsValue::Undefined)); } match execute_block(&fun.body, call_env)? { Flow::Return(v) | Flow::Value(v) => Ok(v), Flow::Break | Flow::Continue => Err("break/continue outside loop".into()) } }
         _ => Err(format!("TypeError: {} is not callable", callee.display())),
+    }
+}
+
+pub fn call_function_with_this(callee: JsValue, this_value: JsValue, args: &[JsValue]) -> Result<JsValue, String> {
+    call_with_this(callee, this_value, args)
+}
+
+fn call_with_this(callee: JsValue, this_value: JsValue, args: &[JsValue]) -> Result<JsValue, String> {
+    match callee {
+        JsValue::Function(fun) => { let call_env = Env::new(Some(fun.env.clone())); call_env.borrow_mut().define("this", this_value); for (i, p) in fun.params.iter().enumerate() { call_env.borrow_mut().define(p, args.get(i).cloned().unwrap_or(JsValue::Undefined)); } match execute_block(&fun.body, call_env)? { Flow::Return(v) | Flow::Value(v) => Ok(v), Flow::Break | Flow::Continue => Err("break/continue outside loop".into()) } }
+        JsValue::BoundFunction(bound) => call_with_this(bound.function.clone(), bound.this_value.clone(), args),
+        other => call_value(other, args),
     }
 }
 
