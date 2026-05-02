@@ -8,7 +8,7 @@
 //! `getAttribute`, plus basic element creation and tree mutation APIs.
 
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
 
 use crate::browser::{self, Element, Node};
@@ -16,6 +16,7 @@ use crate::js::{self, JsEngine, JsValue, NativeFunction};
 use crate::value::Value;
 
 const DOM_API_VERSION: &str = "tetherscript-dom-0.3";
+const MAX_TIMER_DRAIN: usize = 10_000;
 
 thread_local! {
     static EVENT_REGISTRY: RefCell<HashMap<String, EventEntry>> = RefCell::new(HashMap::new());
@@ -39,6 +40,19 @@ struct EventEntry {
     handlers: HashMap<String, JsValue>,
 }
 
+#[derive(Clone)]
+struct TimerTask {
+    id: u32,
+    callback: JsValue,
+    args: Vec<JsValue>,
+}
+
+#[derive(Default)]
+struct TimerQueue {
+    next_id: u32,
+    tasks: VecDeque<TimerTask>,
+}
+
 pub struct BrowserJsResult {
     pub document: browser::Document,
     pub value: JsValue,
@@ -48,7 +62,8 @@ pub struct BrowserJsResult {
 pub fn run_html_scripts(html: &str) -> Result<BrowserJsResult, String> {
     let root = html_to_root(html);
     let mut engine = JsEngine::new();
-    install_dom_globals(&mut engine, root.clone());
+    let timers = Rc::new(RefCell::new(TimerQueue::default()));
+    let window = install_dom_globals(&mut engine, root.clone(), timers.clone());
     let scripts = collect_inline_scripts(&root.borrow());
     let mut last = JsValue::Undefined;
     for source in scripts {
@@ -56,14 +71,17 @@ pub fn run_html_scripts(html: &str) -> Result<BrowserJsResult, String> {
             last = engine.eval(&source)?;
         }
     }
+    drain_timers(timers, window)?;
     Ok(BrowserJsResult { document: root_to_document(&root), value: last, console: engine.console_output() })
 }
 
 pub fn eval_with_dom(html: &str, script: &str) -> Result<BrowserJsResult, String> {
     let root = html_to_root(html);
     let mut engine = JsEngine::new();
-    install_dom_globals(&mut engine, root.clone());
+    let timers = Rc::new(RefCell::new(TimerQueue::default()));
+    let window = install_dom_globals(&mut engine, root.clone(), timers.clone());
     let value = engine.eval(script)?;
+    drain_timers(timers, window)?;
     Ok(BrowserJsResult { document: root_to_document(&root), value, console: engine.console_output() })
 }
 
@@ -76,7 +94,7 @@ fn html_to_root(html: &str) -> Rc<RefCell<Node>> {
     })))
 }
 
-fn install_dom_globals(engine: &mut JsEngine, root: Rc<RefCell<Node>>) {
+fn install_dom_globals(engine: &mut JsEngine, root: Rc<RefCell<Node>>, timers: Rc<RefCell<TimerQueue>>) -> JsValue {
     let document = node_object(DomHandle { root: root.clone(), path: Vec::new() });
     engine.set_global("document", document.clone());
     let mut window = HashMap::new();
@@ -85,9 +103,53 @@ fn install_dom_globals(engine: &mut JsEngine, root: Rc<RefCell<Node>>) {
     let navigator = navigator_object();
     window.insert("location".into(), location.clone());
     window.insert("navigator".into(), navigator.clone());
-    engine.set_global("window", JsValue::Object(Rc::new(RefCell::new(window))));
+    install_timer_bindings(&mut window, timers);
+    let window = JsValue::Object(Rc::new(RefCell::new(window)));
+    if let JsValue::Object(obj) = &window {
+        let borrowed = obj.borrow();
+        if let Some(set_timeout) = borrowed.get("setTimeout").cloned() { engine.set_global("setTimeout", set_timeout); }
+        if let Some(clear_timeout) = borrowed.get("clearTimeout").cloned() { engine.set_global("clearTimeout", clear_timeout); }
+    }
+    engine.set_global("window", window.clone());
     engine.set_global("location", location);
     engine.set_global("navigator", navigator);
+    window
+}
+
+fn install_timer_bindings(window: &mut HashMap<String, JsValue>, timers: Rc<RefCell<TimerQueue>>) {
+    let set_queue = timers.clone();
+    window.insert("setTimeout".into(), native("setTimeout", None, move |args| {
+        let callback = args.first().cloned().unwrap_or(JsValue::Undefined);
+        let callback_args = if args.len() > 2 { args[2..].to_vec() } else { Vec::new() };
+        let mut queue = set_queue.borrow_mut();
+        queue.next_id = queue.next_id.saturating_add(1).max(1);
+        let id = queue.next_id;
+        queue.tasks.push_back(TimerTask { id, callback, args: callback_args });
+        Ok(JsValue::Number(id as f64))
+    }));
+
+    let clear_queue = timers;
+    window.insert("clearTimeout".into(), native("clearTimeout", None, move |args| {
+        let id = args.first().map(timer_id).unwrap_or(0);
+        clear_queue.borrow_mut().tasks.retain(|task| task.id != id);
+        Ok(JsValue::Undefined)
+    }));
+}
+
+fn drain_timers(timers: Rc<RefCell<TimerQueue>>, window: JsValue) -> Result<(), String> {
+    let mut drained = 0;
+    loop {
+        let task = { timers.borrow_mut().tasks.pop_front() };
+        let Some(task) = task else { break; };
+        drained += 1;
+        if drained > MAX_TIMER_DRAIN { return Err(format!("setTimeout: exceeded deterministic drain limit of {} callbacks", MAX_TIMER_DRAIN)); }
+        js::call_function_with_this(task.callback, window.clone(), &task.args)?;
+    }
+    Ok(())
+}
+
+fn timer_id(value: &JsValue) -> u32 {
+    match value { JsValue::Number(n) if n.is_finite() && *n > 0.0 => *n as u32, other => other.display().parse().unwrap_or(0) }
 }
 
 fn location_object(href: &str) -> JsValue {
@@ -579,7 +641,7 @@ fn child_element_count(node: &Node) -> usize {
 }
 
 pub fn compatibility_report_to_value(_args: &[Value]) -> Result<Value, String> {
-    let features = ["document", "window", "selectors", "attributes", "textContent", "innerHTML", "createElement", "append", "remove", "events", "this", "typeof", "functionExpressions", "forLoops", "location", "navigator"];
+    let features = ["document", "window", "selectors", "attributes", "textContent", "innerHTML", "createElement", "append", "remove", "events", "this", "typeof", "functionExpressions", "forLoops", "location", "navigator", "setTimeout", "clearTimeout", "deterministicTimers"];
     Ok(Value::List(Rc::new(RefCell::new(features.into_iter().map(|s| Value::Str(Rc::new(s.into()))).collect()))))
 }
 
@@ -657,5 +719,31 @@ mod tests {
             "let items=document.querySelectorAll('li'); let text=''; for (let i=0; i<items.length; i=i+1) { text = text + items[i].textContent; } text;",
         ).unwrap();
         assert_eq!(result.value, JsValue::String("ABC".into()));
+    }
+
+    #[test]
+    fn set_timeout_callbacks_drain_after_script_fifo() {
+        let result = eval_with_dom(
+            "<button id='go'>old</button>",
+            "let order=''; setTimeout(function(){ order=order+'A'; document.getElementById('go').textContent='done'; }, 50); setTimeout(function(){ order=order+'B'; }, 0); order='sync'; order;",
+        ).unwrap();
+        assert_eq!(result.value, JsValue::String("sync".into()));
+        assert_eq!(browser::text_content(&result.document.children[0]), "done");
+
+        let result = eval_with_dom(
+            "<main></main>",
+            "let order=''; setTimeout(function(){ order=order+'A'; }, 10); setTimeout(function(){ order=order+'B'; console.log(order); }, 0); 'sync';",
+        ).unwrap();
+        assert_eq!(result.console, vec!["AB".to_string()]);
+    }
+
+    #[test]
+    fn clear_timeout_cancels_pending_callback_and_timeout_args_work() {
+        let result = eval_with_dom(
+            "<main></main>",
+            "let seen=''; let first=setTimeout(function(){ seen='bad'; }, 0); clearTimeout(first); window.setTimeout(function(a,b){ seen=a+b; console.log(this.navigator.language + ':' + seen); }, 0, 'O', 'K'); 'sync';",
+        ).unwrap();
+        assert_eq!(result.value, JsValue::String("sync".into()));
+        assert_eq!(result.console, vec!["en-US:OK".to_string()]);
     }
 }
