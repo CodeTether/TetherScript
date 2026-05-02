@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.0-alpha.8] - 2026-05-02
+
+### Added
+
+- Dependency-free JavaScript interpreter (js module) with globals, functions, control flow, arrays, and js_eval.
+- Browser JavaScript host bindings (browser_js module) exposing window/document, DOM mutation/querying, events, deterministic timers, and Storage APIs.
+- Expanded browser subsystem with richer CSS selector parsing/cascade, structured snapshot and display-list output helpers.
+- tetherscript js CLI subcommand for running JavaScript.
+- Test coverage for img src attribute in display commands.
+
+### Fixed
+
+- EVENT_REGISTRY thread_local now cleared per evaluation to prevent memory leaks.
+- <img src> DOM attribute carried into LayoutBox.styles so DisplayCommand::Image.src is non-empty.
+
 ## Unreleased
 
 ### Added
