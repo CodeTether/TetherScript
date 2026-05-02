@@ -5,7 +5,9 @@
 //! `std` and the project's own modules. It exposes a small DOM surface:
 //! `document`, `window`, `getElementById`, `querySelector`, `querySelectorAll`,
 //! `textContent`, `innerText`, `innerHTML`, `children`, `setAttribute`, and
-//! `getAttribute`, plus basic element creation and tree mutation APIs.
+//! `getAttribute`, plus basic element creation and tree mutation APIs. Browser
+//! compatibility globals also include `location`, `navigator`, deterministic
+//! timers, and in-memory `localStorage`/`sessionStorage` Storage objects.
 
 use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
@@ -51,6 +53,11 @@ struct TimerTask {
 struct TimerQueue {
     next_id: u32,
     tasks: VecDeque<TimerTask>,
+}
+
+#[derive(Default)]
+struct StorageArea {
+    entries: Vec<(String, String)>,
 }
 
 pub struct BrowserJsResult {
@@ -101,18 +108,27 @@ fn install_dom_globals(engine: &mut JsEngine, root: Rc<RefCell<Node>>, timers: R
     window.insert("document".into(), document);
     let location = location_object("http://localhost/");
     let navigator = navigator_object();
+    let local_storage = storage_object("localStorage");
+    let session_storage = storage_object("sessionStorage");
     window.insert("location".into(), location.clone());
     window.insert("navigator".into(), navigator.clone());
+    window.insert("localStorage".into(), local_storage.clone());
+    window.insert("sessionStorage".into(), session_storage.clone());
     install_timer_bindings(&mut window, timers);
     let window = JsValue::Object(Rc::new(RefCell::new(window)));
     if let JsValue::Object(obj) = &window {
+        obj.borrow_mut().insert("window".into(), window.clone());
+        obj.borrow_mut().insert("self".into(), window.clone());
         let borrowed = obj.borrow();
         if let Some(set_timeout) = borrowed.get("setTimeout").cloned() { engine.set_global("setTimeout", set_timeout); }
         if let Some(clear_timeout) = borrowed.get("clearTimeout").cloned() { engine.set_global("clearTimeout", clear_timeout); }
     }
     engine.set_global("window", window.clone());
+    engine.set_global("self", window.clone());
     engine.set_global("location", location);
     engine.set_global("navigator", navigator);
+    engine.set_global("localStorage", local_storage);
+    engine.set_global("sessionStorage", session_storage);
     window
 }
 
@@ -163,6 +179,90 @@ fn navigator_object() -> JsValue {
     let mut obj = HashMap::new();
     obj.insert("userAgent".into(), JsValue::String("TetherScript/0.1 BrowserCompat".into())); obj.insert("language".into(), JsValue::String("en-US".into())); obj.insert("languages".into(), JsValue::Array(Rc::new(RefCell::new(vec![JsValue::String("en-US".into()), JsValue::String("en".into())])))); obj.insert("platform".into(), JsValue::String(std::env::consts::OS.into())); obj.insert("cookieEnabled".into(), JsValue::Bool(false)); obj.insert("onLine".into(), JsValue::Bool(true));
     JsValue::Object(Rc::new(RefCell::new(obj)))
+}
+
+fn storage_object(label: &'static str) -> JsValue {
+    let area = Rc::new(RefCell::new(StorageArea::default()));
+    let object = Rc::new(RefCell::new(HashMap::new()));
+
+    object.borrow_mut().insert("length".into(), JsValue::Number(0.0));
+
+    {
+        let area = area.clone();
+        object.borrow_mut().insert("getItem".into(), native(&format!("{}.getItem", label), Some(1), move |args| {
+            let key = args.first().unwrap_or(&JsValue::Undefined).display();
+            Ok(area.borrow().get(&key).map(JsValue::String).unwrap_or(JsValue::Null))
+        }));
+    }
+
+    {
+        let area = area.clone();
+        let object = object.clone();
+        let object_for_closure = object.clone();
+        let set_item = native(&format!("{}.setItem", label), Some(2), move |args| {
+            let key = args.first().unwrap_or(&JsValue::Undefined).display();
+            let value = args.get(1).unwrap_or(&JsValue::Undefined).display();
+            area.borrow_mut().set(key, value);
+            sync_storage_length(&object_for_closure, &area);
+            Ok(JsValue::Undefined)
+        });
+        object.borrow_mut().insert("setItem".into(), set_item);
+    }
+
+    {
+        let area = area.clone();
+        let object = object.clone();
+        let object_for_closure = object.clone();
+        let remove_item = native(&format!("{}.removeItem", label), Some(1), move |args| {
+            let key = args.first().unwrap_or(&JsValue::Undefined).display();
+            area.borrow_mut().remove(&key);
+            sync_storage_length(&object_for_closure, &area);
+            Ok(JsValue::Undefined)
+        });
+        object.borrow_mut().insert("removeItem".into(), remove_item);
+    }
+
+    {
+        let area = area.clone();
+        let object = object.clone();
+        let object_for_closure = object.clone();
+        let clear = native(&format!("{}.clear", label), Some(0), move |_| {
+            area.borrow_mut().clear();
+            sync_storage_length(&object_for_closure, &area);
+            Ok(JsValue::Undefined)
+        });
+        object.borrow_mut().insert("clear".into(), clear);
+    }
+
+    {
+        let area = area.clone();
+        object.borrow_mut().insert("key".into(), native(&format!("{}.key", label), Some(1), move |args| {
+            let index = args.first().map(storage_index).unwrap_or(usize::MAX);
+            Ok(area.borrow().key(index).map(JsValue::String).unwrap_or(JsValue::Null))
+        }));
+    }
+
+    JsValue::Object(object)
+}
+
+fn sync_storage_length(object: &Rc<RefCell<HashMap<String, JsValue>>>, area: &Rc<RefCell<StorageArea>>) {
+    object.borrow_mut().insert("length".into(), JsValue::Number(area.borrow().len() as f64));
+}
+
+fn storage_index(value: &JsValue) -> usize {
+    match value {
+        JsValue::Number(n) if n.is_finite() && *n >= 0.0 => *n as usize,
+        other => other.display().parse().unwrap_or(usize::MAX),
+    }
+}
+
+impl StorageArea {
+    fn get(&self, key: &str) -> Option<String> { self.entries.iter().find(|(existing, _)| existing == key).map(|(_, value)| value.clone()) }
+    fn set(&mut self, key: String, value: String) { if let Some((_, existing)) = self.entries.iter_mut().find(|(existing, _)| existing == &key) { *existing = value; } else { self.entries.push((key, value)); } }
+    fn remove(&mut self, key: &str) { self.entries.retain(|(existing, _)| existing != key); }
+    fn clear(&mut self) { self.entries.clear(); }
+    fn key(&self, index: usize) -> Option<String> { self.entries.get(index).map(|(key, _)| key.clone()) }
+    fn len(&self) -> usize { self.entries.len() }
 }
 
 fn node_object(handle: DomHandle) -> JsValue {
@@ -641,7 +741,7 @@ fn child_element_count(node: &Node) -> usize {
 }
 
 pub fn compatibility_report_to_value(_args: &[Value]) -> Result<Value, String> {
-    let features = ["document", "window", "selectors", "attributes", "textContent", "innerHTML", "createElement", "append", "remove", "events", "this", "typeof", "functionExpressions", "forLoops", "location", "navigator", "setTimeout", "clearTimeout", "deterministicTimers"];
+    let features = ["document", "window", "self", "selectors", "attributes", "textContent", "innerHTML", "createElement", "append", "remove", "events", "this", "typeof", "functionExpressions", "forLoops", "location", "navigator", "setTimeout", "clearTimeout", "deterministicTimers", "localStorage", "sessionStorage", "Storage.getItem", "Storage.setItem", "Storage.removeItem", "Storage.clear", "Storage.key", "Storage.length"];
     Ok(Value::List(Rc::new(RefCell::new(features.into_iter().map(|s| Value::Str(Rc::new(s.into()))).collect()))))
 }
 
@@ -713,6 +813,15 @@ mod tests {
     }
 
     #[test]
+    fn window_self_and_storage_globals_are_available() {
+        let result = eval_with_dom(
+            "<main></main>",
+            "window.window === window && self === window && window.localStorage === localStorage && window.sessionStorage === sessionStorage;",
+        ).unwrap();
+        assert_eq!(result.value, JsValue::Bool(true));
+    }
+
+    #[test]
     fn classic_for_loop_supports_node_list_iteration() {
         let result = eval_with_dom(
             "<ul><li>A</li><li>B</li><li>C</li></ul>",
@@ -745,5 +854,39 @@ mod tests {
         ).unwrap();
         assert_eq!(result.value, JsValue::String("sync".into()));
         assert_eq!(result.console, vec!["en-US:OK".to_string()]);
+    }
+
+    #[test]
+    fn local_storage_implements_minimal_storage_api() {
+        let result = eval_with_dom(
+            "<main></main>",
+            "localStorage.setItem('a', 1); localStorage.setItem('b', 'two'); localStorage.setItem('a', 'one'); let before=localStorage.length + ':' + localStorage.key(0) + ':' + localStorage.getItem('a') + ':' + localStorage.getItem('missing'); localStorage.removeItem('b'); let after=localStorage.length + ':' + localStorage.key(1); localStorage.clear(); before + '|' + after + '|' + localStorage.length + ':' + localStorage.getItem('a');",
+        ).unwrap();
+        assert_eq!(result.value, JsValue::String("2:a:one:null|1:null|0:null".into()));
+    }
+
+    #[test]
+    fn session_storage_is_separate_from_local_storage_and_per_eval() {
+        let result = eval_with_dom(
+            "<main></main>",
+            "localStorage.setItem('shared', 'local'); sessionStorage.setItem('shared', 'session'); localStorage.getItem('shared') + ':' + sessionStorage.getItem('shared') + ':' + localStorage.length + ':' + sessionStorage.length;",
+        ).unwrap();
+        assert_eq!(result.value, JsValue::String("local:session:1:1".into()));
+
+        let result = eval_with_dom(
+            "<main></main>",
+            "localStorage.getItem('shared') === null && sessionStorage.length === 0;",
+        ).unwrap();
+        assert_eq!(result.value, JsValue::Bool(true));
+    }
+
+    #[test]
+    fn compatibility_report_lists_storage_apis() {
+        let report = compatibility_report_to_value(&[]).unwrap();
+        let Value::List(items) = report else { panic!("expected list"); };
+        let features = items.borrow().iter().map(|v| match v { Value::Str(s) => s.to_string(), other => other.to_string() }).collect::<Vec<_>>();
+        assert!(features.contains(&"localStorage".to_string()));
+        assert!(features.contains(&"sessionStorage".to_string()));
+        assert!(features.contains(&"Storage.length".to_string()));
     }
 }

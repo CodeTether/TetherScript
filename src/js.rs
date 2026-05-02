@@ -232,6 +232,33 @@ fn install_globals(env: &EnvRef, console_log: Rc<RefCell<Vec<String>>>) {
         arity: Some(1),
         func: Box::new(|args| Ok(JsValue::Bool(args.first().unwrap_or(&JsValue::Undefined).truthy()))),
     })));
+
+    for (name, func) in array_global_functions() {
+        env.borrow_mut().define(name, func);
+    }
+}
+
+fn array_global_functions() -> Vec<(&'static str, JsValue)> {
+    vec![
+        ("push", native_array_global("push", |array, args| array_push(array, args))),
+        ("pop", native_array_global("pop", |array, _| array_pop(array))),
+        ("slice", native_array_global("slice", |array, args| array_slice(array, args))),
+        ("join", native_array_global("join", |array, args| array_join(array, args))),
+        ("forEach", native_array_global("forEach", |array, args| array_for_each(array, args))),
+        ("map", native_array_global("map", |array, args| array_map(array, args))),
+    ]
+}
+
+fn native_array_global(
+    name: &'static str,
+    func: impl Fn(Rc<RefCell<Vec<JsValue>>>, &[JsValue]) -> Result<JsValue, String> + 'static,
+) -> JsValue {
+    JsValue::Native(Rc::new(NativeFunction::new(name, None, move |args| {
+        let Some(JsValue::Array(array)) = args.first() else {
+            return Err(format!("{}: expected array as first arg", name));
+        };
+        func(array.clone(), &args[1..])
+    })))
 }
 
 type EnvRef = Rc<RefCell<Env>>;
@@ -632,10 +659,90 @@ fn get_property(value: &JsValue, prop: &str) -> Result<JsValue, String> {
     match value {
         JsValue::Object(obj) => Ok(obj.borrow().get(prop).cloned().unwrap_or(JsValue::Undefined)),
         JsValue::Array(items) if prop == "length" => Ok(JsValue::Number(items.borrow().len() as f64)),
-        JsValue::Array(items) => prop.parse::<usize>().ok().and_then(|i| items.borrow().get(i).cloned()).ok_or_else(|| format!("Undefined array property {}", prop)).or(Ok(JsValue::Undefined)),
+        JsValue::Array(items) => {
+            if let Ok(index) = prop.parse::<usize>() {
+                return Ok(items.borrow().get(index).cloned().unwrap_or(JsValue::Undefined));
+            }
+            Ok(array_method(prop, items.clone()).unwrap_or(JsValue::Undefined))
+        }
         JsValue::String(s) if prop == "length" => Ok(JsValue::Number(s.chars().count() as f64)),
         _ => Ok(JsValue::Undefined),
     }
+}
+
+fn array_method(prop: &str, array: Rc<RefCell<Vec<JsValue>>>) -> Option<JsValue> {
+    let name = prop.to_string();
+    let method = match prop {
+        "push" => NativeFunction::new(name, None, move |args| array_push(array.clone(), args)),
+        "pop" => NativeFunction::new(name, Some(0), move |_| array_pop(array.clone())),
+        "slice" => NativeFunction::new(name, None, move |args| array_slice(array.clone(), args)),
+        "join" => NativeFunction::new(name, None, move |args| array_join(array.clone(), args)),
+        "forEach" => NativeFunction::new(name, Some(1), move |args| array_for_each(array.clone(), args)),
+        "map" => NativeFunction::new(name, Some(1), move |args| array_map(array.clone(), args)),
+        _ => return None,
+    };
+    Some(JsValue::Native(Rc::new(method)))
+}
+
+fn array_push(array: Rc<RefCell<Vec<JsValue>>>, args: &[JsValue]) -> Result<JsValue, String> {
+    let mut array = array.borrow_mut();
+    array.extend(args.iter().cloned());
+    Ok(JsValue::Number(array.len() as f64))
+}
+
+fn array_pop(array: Rc<RefCell<Vec<JsValue>>>) -> Result<JsValue, String> {
+    Ok(array.borrow_mut().pop().unwrap_or(JsValue::Undefined))
+}
+
+fn array_slice(array: Rc<RefCell<Vec<JsValue>>>, args: &[JsValue]) -> Result<JsValue, String> {
+    let array = array.borrow();
+    let len = array.len();
+    let start = args.first().map(|v| slice_index(v.number(), len, false)).unwrap_or(0);
+    let end = args.get(1).map(|v| slice_index(v.number(), len, true)).unwrap_or(len);
+    let end = end.max(start);
+    Ok(JsValue::Array(Rc::new(RefCell::new(array[start..end].to_vec()))))
+}
+
+fn slice_index(raw: f64, len: usize, default_to_len_on_nan: bool) -> usize {
+    if raw.is_nan() {
+        return if default_to_len_on_nan { len } else { 0 };
+    }
+    let len_i = len as i64;
+    let index = raw.trunc() as i64;
+    let normalized = if index < 0 { (len_i + index).max(0) } else { index.min(len_i) };
+    normalized as usize
+}
+
+fn array_join(array: Rc<RefCell<Vec<JsValue>>>, args: &[JsValue]) -> Result<JsValue, String> {
+    let sep = args.first().map(JsValue::display).unwrap_or_else(|| ",".into());
+    let joined = array
+        .borrow()
+        .iter()
+        .map(|value| match value { JsValue::Undefined | JsValue::Null => String::new(), other => other.display() })
+        .collect::<Vec<_>>()
+        .join(&sep);
+    Ok(JsValue::String(joined))
+}
+
+fn array_for_each(array: Rc<RefCell<Vec<JsValue>>>, args: &[JsValue]) -> Result<JsValue, String> {
+    let callback = args.first().cloned().ok_or_else(|| "forEach: expected callback".to_string())?;
+    let snapshot = array.borrow().clone();
+    let array_value = JsValue::Array(array);
+    for (index, item) in snapshot.into_iter().enumerate() {
+        call_value(callback.clone(), &[item, JsValue::Number(index as f64), array_value.clone()])?;
+    }
+    Ok(JsValue::Undefined)
+}
+
+fn array_map(array: Rc<RefCell<Vec<JsValue>>>, args: &[JsValue]) -> Result<JsValue, String> {
+    let callback = args.first().cloned().ok_or_else(|| "map: expected callback".to_string())?;
+    let snapshot = array.borrow().clone();
+    let array_value = JsValue::Array(array);
+    let mut mapped = Vec::with_capacity(snapshot.len());
+    for (index, item) in snapshot.into_iter().enumerate() {
+        mapped.push(call_value(callback.clone(), &[item, JsValue::Number(index as f64), array_value.clone()])?);
+    }
+    Ok(JsValue::Array(Rc::new(RefCell::new(mapped))))
 }
 
 fn set_property(value: &JsValue, prop: &str, new_value: JsValue) -> Result<(), String> {
@@ -696,5 +803,14 @@ mod tests {
         let mut engine = JsEngine::new();
         engine.eval("console.log('hello', 42);").unwrap();
         assert_eq!(engine.console_output(), vec!["hello 42".to_string()]);
+    }
+
+    #[test]
+    fn array_methods_work_as_properties_and_globals() {
+        let src = "let xs=[1,2]; let pushed=xs.push(3,4); let popped=xs.pop(); let sliced=xs.slice(1).join('|'); let seen=''; xs.forEach(function(v,i){ seen=seen+i+v; }); let mapped=xs.map(function(v,i){ return v+i; }); pushed + ':' + popped + ':' + xs.join('-') + ':' + sliced + ':' + seen + ':' + mapped.join(',') + ':' + push(xs, 9) + ':' + pop(xs);";
+        assert_eq!(
+            eval(src).unwrap(),
+            JsValue::String("4:4:1-2-3:2|3:011223:1,3,5:4:9".into())
+        );
     }
 }
