@@ -12,7 +12,9 @@ use std::rc::Rc;
 
 use crate::ast::*;
 use crate::browser;
+use crate::browser_js;
 use crate::http;
+use crate::js;
 use crate::json;
 use crate::lexer::Lexer;
 use crate::output;
@@ -1220,6 +1222,7 @@ pub(crate) fn install_builtins(env: &Rc<RefCell<Env>>) {
         pure_native("eval", Some(1), |args| eval_source(&args[0])),
         false,
     );
+    e.define("js_eval", pure_native("js_eval", Some(1), js::eval_to_value), false);
 }
 
 /// Subset of built-ins safe to expose to untrusted source running inside
@@ -1238,6 +1241,48 @@ fn install_browser_builtins(env: &Rc<RefCell<Env>>) {
         false,
     );
     e.define(
+        "browser_parse_css",
+        pure_native("browser_parse_css", Some(1), browser::css_to_value),
+        false,
+    );
+    e.define(
+        "browser_styles",
+        pure_native("browser_styles", None, browser::styles_to_value),
+        false,
+    );
+    e.define(
+        "browser_query_selector",
+        pure_native(
+            "browser_query_selector",
+            Some(2),
+            browser::query_selector_to_value,
+        ),
+        false,
+    );
+    e.define(
+        "browser_text_content",
+        pure_native(
+            "browser_text_content",
+            Some(2),
+            browser::text_content_to_value,
+        ),
+        false,
+    );
+    e.define(
+        "browser_snapshot",
+        pure_native("browser_snapshot", None, browser::snapshot_to_value),
+        false,
+    );
+    e.define(
+        "browser_display_list",
+        pure_native(
+            "browser_display_list",
+            None,
+            browser::display_list_to_runtime_value,
+        ),
+        false,
+    );
+    e.define(
         "browser_render",
         pure_native("browser_render", None, browser::render_to_value),
         false,
@@ -1245,6 +1290,21 @@ fn install_browser_builtins(env: &Rc<RefCell<Env>>) {
     e.define(
         "browser_layout",
         pure_native("browser_layout", None, browser::layout_to_runtime_value),
+        false,
+    );
+    e.define(
+        "browser_run_scripts",
+        pure_native("browser_run_scripts", Some(1), browser_js::browser_run_scripts_to_value),
+        false,
+    );
+    e.define(
+        "browser_eval_js",
+        pure_native("browser_eval_js", Some(2), browser_js::browser_eval_js_to_value),
+        false,
+    );
+    e.define(
+        "browser_compatibility_report",
+        pure_native("browser_compatibility_report", Some(0), browser_js::compatibility_report_to_value),
         false,
     );
 }
