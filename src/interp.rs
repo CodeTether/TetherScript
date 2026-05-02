@@ -1302,6 +1302,11 @@ fn install_browser_builtins(env: &Rc<RefCell<Env>>) {
         pure_native("browser_eval_js", Some(2), browser_js::browser_eval_js_to_value),
         false,
     );
+    e.define(
+        "browser_compatibility_report",
+        pure_native("browser_compatibility_report", Some(0), browser_js::compatibility_report_to_value),
+        false,
+    );
 }
 
 fn install_pure_builtins(env: &Rc<RefCell<Env>>) {

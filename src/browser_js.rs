@@ -5,7 +5,7 @@
 //! `std` and the project's own modules. It exposes a small DOM surface:
 //! `document`, `window`, `getElementById`, `querySelector`, `querySelectorAll`,
 //! `textContent`, `innerText`, `innerHTML`, `children`, `setAttribute`, and
-//! `getAttribute`.
+//! `getAttribute`, plus basic element creation and tree mutation APIs.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -14,6 +14,14 @@ use std::rc::Rc;
 use crate::browser::{self, Element, Node};
 use crate::js::{self, JsEngine, JsValue, NativeFunction};
 use crate::value::Value;
+
+const DOM_API_VERSION: &str = "tetherscript-dom-0.2";
+
+#[derive(Clone, Copy)]
+enum InsertPosition {
+    Append,
+    Prepend,
+}
 
 #[derive(Clone)]
 struct DomHandle {
@@ -69,18 +77,42 @@ fn install_dom_globals(engine: &mut JsEngine, root: Rc<RefCell<Node>>) {
 fn node_object(handle: DomHandle) -> JsValue {
     let node = handle.node().unwrap_or(Node::Text(String::new()));
     let mut obj = HashMap::new();
-    obj.insert("nodeType".into(), JsValue::Number(if matches!(node, Node::Text(_)) { 3.0 } else { 1.0 }));
+    obj.insert("nodeType".into(), JsValue::Number(if matches!(node, Node::Text(_)) { 3.0 } else if node_name(&node) == "#document" { 9.0 } else { 1.0 }));
     obj.insert("nodeName".into(), JsValue::String(node_name(&node)));
     obj.insert("tagName".into(), JsValue::String(node_name(&node).to_ascii_uppercase()));
     obj.insert("textContent".into(), JsValue::String(text_content_raw(&node)));
     obj.insert("innerText".into(), JsValue::String(browser::text_content(&node)));
     obj.insert("innerHTML".into(), JsValue::String(inner_html(&node)));
     obj.insert("children".into(), children_array(&handle, &node));
+    obj.insert("childElementCount".into(), JsValue::Number(child_element_count(&node) as f64));
 
     if let Node::Element(el) = &node {
         obj.insert("id".into(), JsValue::String(el.attrs.get("id").cloned().unwrap_or_default()));
         obj.insert("className".into(), JsValue::String(el.attrs.get("class").cloned().unwrap_or_default()));
     }
+
+    install_property_setters(&mut obj, &handle);
+
+    let h = handle.clone();
+    obj.insert("createElement".into(), native("createElement", Some(1), move |args| {
+        let tag = args.first().unwrap_or(&JsValue::Undefined).display().to_ascii_lowercase();
+        let path = h.append_child(Node::Element(Element { tag, attrs: HashMap::new(), children: Vec::new() }), InsertPosition::Append);
+        Ok(node_object(DomHandle { root: h.root.clone(), path }))
+    }));
+
+    let h = handle.clone();
+    obj.insert("createTextNode".into(), native("createTextNode", Some(1), move |args| {
+        let text = args.first().unwrap_or(&JsValue::Undefined).display();
+        let path = h.append_child(Node::Text(text), InsertPosition::Append);
+        Ok(node_object(DomHandle { root: h.root.clone(), path }))
+    }));
+
+    let h = handle.clone();
+    obj.insert("appendChild".into(), native("appendChild", Some(1), move |args| {
+        let child = js_value_to_node(args.first().unwrap_or(&JsValue::Undefined));
+        let path = h.append_child(child, InsertPosition::Append);
+        Ok(node_object(DomHandle { root: h.root.clone(), path }))
+    }));
 
     let h = handle.clone();
     obj.insert("getAttribute".into(), native("getAttribute", Some(1), move |args| {
@@ -98,6 +130,37 @@ fn node_object(handle: DomHandle) -> JsValue {
         h.with_node_mut(|node| {
             if let Node::Element(el) = node { el.attrs.insert(name, value); }
         });
+        Ok(JsValue::Undefined)
+    }));
+
+    let h = handle.clone();
+    obj.insert("removeAttribute".into(), native("removeAttribute", Some(1), move |args| {
+        let name = args.first().unwrap_or(&JsValue::Undefined).display();
+        h.with_node_mut(|node| { if let Node::Element(el) = node { el.attrs.remove(&name); } });
+        Ok(JsValue::Undefined)
+    }));
+
+    let h = handle.clone();
+    obj.insert("hasAttribute".into(), native("hasAttribute", Some(1), move |args| {
+        let name = args.first().unwrap_or(&JsValue::Undefined).display();
+        Ok(JsValue::Bool(matches!(h.node(), Some(Node::Element(el)) if el.attrs.contains_key(&name))))
+    }));
+
+    let h = handle.clone();
+    obj.insert("remove".into(), native("remove", Some(0), move |_| {
+        h.remove_self();
+        Ok(JsValue::Undefined)
+    }));
+
+    let h = handle.clone();
+    obj.insert("prepend".into(), native("prepend", None, move |args| {
+        for arg in args.iter().rev() { h.append_child(js_value_to_node(arg), InsertPosition::Prepend); }
+        Ok(JsValue::Undefined)
+    }));
+
+    let h = handle.clone();
+    obj.insert("append".into(), native("append", None, move |args| {
+        for arg in args { h.append_child(js_value_to_node(arg), InsertPosition::Append); }
         Ok(JsValue::Undefined)
     }));
 
@@ -120,6 +183,8 @@ fn node_object(handle: DomHandle) -> JsValue {
         Ok(JsValue::Array(Rc::new(RefCell::new(nodes))))
     }));
 
+    obj.insert("__domApiVersion".into(), JsValue::String(DOM_API_VERSION.into()));
+
     JsValue::Object(Rc::new(RefCell::new(obj)))
 }
 
@@ -128,6 +193,77 @@ impl DomHandle {
 
     fn with_node_mut(&self, f: impl FnOnce(&mut Node)) {
         if let Some(node) = get_node_mut(&mut self.root.borrow_mut(), &self.path) { f(node); }
+    }
+
+    fn append_child(&self, child: Node, position: InsertPosition) -> Vec<usize> {
+        let mut root = self.root.borrow_mut();
+        let parent = get_node_mut(&mut root, &self.path);
+        let Some(Node::Element(el)) = parent else { return self.path.clone(); };
+        let index = match position {
+            InsertPosition::Append => { el.children.push(child); el.children.len() - 1 }
+            InsertPosition::Prepend => { el.children.insert(0, child); 0 }
+        };
+        let mut path = self.path.clone();
+        path.push(index);
+        path
+    }
+
+    fn remove_self(&self) -> bool {
+        let Some((&index, parent_path)) = self.path.split_last() else { return false; };
+        let mut root = self.root.borrow_mut();
+        let Some(Node::Element(parent)) = get_node_mut(&mut root, parent_path) else { return false; };
+        if index < parent.children.len() { parent.children.remove(index); true } else { false }
+    }
+}
+
+fn install_property_setters(obj: &mut HashMap<String, JsValue>, handle: &DomHandle) {
+    for prop in ["textContent", "innerText"] {
+        let h = handle.clone();
+        obj.insert(format!("__set:{}", prop), native(&format!("set_{}", prop), Some(1), move |args| {
+            let text = args.first().unwrap_or(&JsValue::Undefined).display();
+            h.with_node_mut(|node| match node {
+                Node::Text(existing) => *existing = text,
+                Node::Element(el) => el.children = vec![Node::Text(text)],
+            });
+            Ok(JsValue::Undefined)
+        }));
+    }
+
+    let h = handle.clone();
+    obj.insert("__set:id".into(), native("set_id", Some(1), move |args| {
+        let value = args.first().unwrap_or(&JsValue::Undefined).display();
+        h.with_node_mut(|node| { if let Node::Element(el) = node { el.attrs.insert("id".into(), value); } });
+        Ok(JsValue::Undefined)
+    }));
+
+    let h = handle.clone();
+    obj.insert("__set:className".into(), native("set_className", Some(1), move |args| {
+        let value = args.first().unwrap_or(&JsValue::Undefined).display();
+        h.with_node_mut(|node| { if let Node::Element(el) = node { el.attrs.insert("class".into(), value); } });
+        Ok(JsValue::Undefined)
+    }));
+}
+
+fn js_value_to_node(value: &JsValue) -> Node {
+    match value {
+        JsValue::Object(obj) => {
+            let obj = obj.borrow();
+            if let Some(JsValue::String(tag)) = obj.get("nodeName") {
+                if tag != "#text" && tag != "#document" {
+                    let mut attrs = HashMap::new();
+                    if let Some(JsValue::String(id)) = obj.get("id") { if !id.is_empty() { attrs.insert("id".into(), id.clone()); } }
+                    if let Some(JsValue::String(class_name)) = obj.get("className") { if !class_name.is_empty() { attrs.insert("class".into(), class_name.clone()); } }
+                    let text = obj.get("textContent").map(JsValue::display).unwrap_or_default();
+                    return Node::Element(Element {
+                        tag: tag.to_ascii_lowercase(),
+                        attrs,
+                        children: if text.is_empty() { Vec::new() } else { vec![Node::Text(text)] },
+                    });
+                }
+            }
+            Node::Text(value.display())
+        }
+        _ => Node::Text(value.display()),
     }
 }
 
@@ -305,6 +441,18 @@ fn node_value(node: &Node) -> Value {
     Value::Map(Rc::new(RefCell::new(map)))
 }
 
+fn child_element_count(node: &Node) -> usize {
+    match node {
+        Node::Element(el) => el.children.iter().filter(|child| matches!(child, Node::Element(_))).count(),
+        Node::Text(_) => 0,
+    }
+}
+
+pub fn compatibility_report_to_value(_args: &[Value]) -> Result<Value, String> {
+    let features = ["document", "window", "selectors", "attributes", "textContent", "innerHTML", "createElement", "append", "remove"];
+    Ok(Value::List(Rc::new(RefCell::new(features.into_iter().map(|s| Value::Str(Rc::new(s.into()))).collect()))))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -325,5 +473,17 @@ mod tests {
             Node::Element(el) => assert_eq!(el.attrs.get("data-ok"), Some(&"yes".to_string())),
             Node::Text(_) => panic!("expected element"),
         }
+    }
+
+    #[test]
+    fn dom_property_assignment_and_mutation_apis_update_document() {
+        let result = eval_with_dom(
+            "<main id='app'><p>old</p></main>",
+            "let app=document.getElementById('app'); let p=document.querySelector('p'); p.textContent='new'; let span=document.createElement('span'); span.textContent='!'; app.appendChild(span); document.getElementById('app').children.length;",
+        ).unwrap();
+        assert_eq!(result.value, JsValue::Number(2.0));
+        let text = result.document.children.iter().map(browser::text_content).collect::<Vec<_>>().join(" ");
+        assert!(text.contains("new"));
+        assert!(text.contains("!"));
     }
 }

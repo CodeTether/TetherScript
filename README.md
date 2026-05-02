@@ -28,8 +28,9 @@ TetherScript currently includes:
 - Experimental browser primitives for parsing small HTML fragments, applying
   simple CSS rules, computing block layout, and rendering deterministic text
   display lists.
-- A dependency-free miniature JavaScript host for those browser primitives, with
-  `document`, `window`, selectors, attributes, and inline `<script>` execution.
+- A dependency-free JavaScript host for those browser primitives, with `document`,
+  `window`, selectors, attributes, inline `<script>` execution, text/attribute
+  mutation, and basic DOM tree mutation APIs.
 - SMTP sending support.
 - Standard tools for filesystem, process, environment, path, time, Base64,
   SHA-256, and URL parsing.
@@ -109,7 +110,8 @@ including:
 - `browser_parse_html`, `browser_parse_css`, `browser_styles`,
   `browser_query_selector`, `browser_text_content`, `browser_snapshot`,
   `browser_layout`, `browser_display_list`, `browser_render`
-- `js_eval`, `browser_eval_js`, `browser_run_scripts`
+- `js_eval`, `browser_eval_js`, `browser_run_scripts`,
+  `browser_compatibility_report`
 - `smtp_send`
 - `fs_read`, `fs_write`, `fs_exists`, `fs_list`, `fs_mkdir`, `fs_stat`,
   `fs_remove`, `fs_rename`, `fs_copy`
@@ -167,8 +169,9 @@ diagnostics.
 - Formatter and REPL.
 - More complete LSP features such as completions, hover, go-to-definition, and
   exact spans.
-- Full ECMAScript/Web compatibility. The JavaScript/browser runtime is an
-  in-tree, zero-dependency foundation, not a Test262- or Web Platform Tests-complete engine.
+- Complete Test262 and Web Platform Tests coverage. The JavaScript/browser
+  runtime is an in-tree, zero-dependency compatibility track and currently
+  implements a practical DOM/JS subset rather than every web standard.
 - Capability audit logs and richer resource budgets.
 - Moving ambient host tools behind explicit capabilities where practical.
 - VM local-slot optimization; variable lookup is still name-based.

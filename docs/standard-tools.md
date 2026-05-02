@@ -39,7 +39,7 @@ TetherScript's trusted CLI/runtime should include these scripting primitives. Ho
 - URL: `url_parse(url)`.
 - Process execution: `process_run(command[, args[, stdin[, timeout_ms]]])`.
 - HTTP: `http_get(url)`, `http_head(url)`, `http_post(url, body)`, `http_request(method, url[, body[, headers]])`, `http_serve(port, handler)`.
-- Browser runtime: `browser_parse_html(html)`, `browser_parse_css(css)`, `browser_styles(html[, css])`, `browser_query_selector(html, selector)`, `browser_text_content(html, selector)`, `browser_snapshot(html[, css[, width]])`, `browser_layout(html[, css[, width]])`, `browser_display_list(html[, css[, width]])`, `browser_render(html[, css[, width]])`.
+- Browser runtime: `browser_parse_html(html)`, `browser_parse_css(css)`, `browser_styles(html[, css])`, `browser_query_selector(html, selector)`, `browser_text_content(html, selector)`, `browser_snapshot(html[, css[, width]])`, `browser_layout(html[, css[, width]])`, `browser_display_list(html[, css[, width]])`, `browser_render(html[, css[, width]])`, `js_eval(source)`, `browser_eval_js(html, script)`, `browser_run_scripts(html)`, `browser_compatibility_report()`.
 - SMTP: `smtp_send(host, port, from, to, subject, body)`.
 
 ## Safety Defaults

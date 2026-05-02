@@ -556,7 +556,15 @@ fn get_property(value: &JsValue, prop: &str) -> Result<JsValue, String> {
 
 fn set_property(value: &JsValue, prop: &str, new_value: JsValue) -> Result<(), String> {
     match value {
-        JsValue::Object(obj) => { obj.borrow_mut().insert(prop.into(), new_value); Ok(()) }
+        JsValue::Object(obj) => {
+            let setter_key = format!("__set:{}", prop);
+            let setter = obj.borrow().get(&setter_key).cloned();
+            if let Some(setter) = setter {
+                call_value(setter, std::slice::from_ref(&new_value))?;
+            }
+            obj.borrow_mut().insert(prop.into(), new_value);
+            Ok(())
+        }
         JsValue::Array(items) => { let idx: usize = prop.parse().map_err(|_| format!("Invalid array index {}", prop))?; let mut items = items.borrow_mut(); if idx >= items.len() { items.resize(idx + 1, JsValue::Undefined); } items[idx] = new_value; Ok(()) }
         _ => Err("Cannot set property on primitive".into()),
     }
