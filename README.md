@@ -30,7 +30,8 @@ TetherScript currently includes:
   display lists.
 - A dependency-free JavaScript host for those browser primitives, with `document`,
   `window`, selectors, attributes, inline `<script>` execution, text/attribute
-  mutation, and basic DOM tree mutation APIs.
+  mutation, basic DOM tree mutation APIs, synchronous DOM events,
+  `location`/`navigator` globals, `this`, `typeof`, and function expressions.
 - SMTP sending support.
 - Standard tools for filesystem, process, environment, path, time, Base64,
   SHA-256, and URL parsing.

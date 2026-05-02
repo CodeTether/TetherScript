@@ -15,7 +15,11 @@ use crate::browser::{self, Element, Node};
 use crate::js::{self, JsEngine, JsValue, NativeFunction};
 use crate::value::Value;
 
-const DOM_API_VERSION: &str = "tetherscript-dom-0.2";
+const DOM_API_VERSION: &str = "tetherscript-dom-0.3";
+
+thread_local! {
+    static EVENT_REGISTRY: RefCell<HashMap<String, EventEntry>> = RefCell::new(HashMap::new());
+}
 
 #[derive(Clone, Copy)]
 enum InsertPosition {
@@ -27,6 +31,12 @@ enum InsertPosition {
 struct DomHandle {
     root: Rc<RefCell<Node>>,
     path: Vec<usize>,
+}
+
+#[derive(Clone, Default)]
+struct EventEntry {
+    listeners: HashMap<String, Vec<JsValue>>,
+    handlers: HashMap<String, JsValue>,
 }
 
 pub struct BrowserJsResult {
@@ -71,7 +81,26 @@ fn install_dom_globals(engine: &mut JsEngine, root: Rc<RefCell<Node>>) {
     engine.set_global("document", document.clone());
     let mut window = HashMap::new();
     window.insert("document".into(), document);
+    let location = location_object("http://localhost/");
+    let navigator = navigator_object();
+    window.insert("location".into(), location.clone());
+    window.insert("navigator".into(), navigator.clone());
     engine.set_global("window", JsValue::Object(Rc::new(RefCell::new(window))));
+    engine.set_global("location", location);
+    engine.set_global("navigator", navigator);
+}
+
+fn location_object(href: &str) -> JsValue {
+    let mut obj = parse_location(href);
+    obj.insert("assign".into(), native("location.assign", Some(1), |_| Ok(JsValue::Undefined)));
+    obj.insert("replace".into(), native("location.replace", Some(1), |_| Ok(JsValue::Undefined)));
+    JsValue::Object(Rc::new(RefCell::new(obj)))
+}
+
+fn navigator_object() -> JsValue {
+    let mut obj = HashMap::new();
+    obj.insert("userAgent".into(), JsValue::String("TetherScript/0.1 BrowserCompat".into())); obj.insert("language".into(), JsValue::String("en-US".into())); obj.insert("languages".into(), JsValue::Array(Rc::new(RefCell::new(vec![JsValue::String("en-US".into()), JsValue::String("en".into())])))); obj.insert("platform".into(), JsValue::String(std::env::consts::OS.into())); obj.insert("cookieEnabled".into(), JsValue::Bool(false)); obj.insert("onLine".into(), JsValue::Bool(true));
+    JsValue::Object(Rc::new(RefCell::new(obj)))
 }
 
 fn node_object(handle: DomHandle) -> JsValue {
@@ -176,12 +205,37 @@ fn node_object(handle: DomHandle) -> JsValue {
         Ok(find_by_selector(&h.root, &selector).map(|path| node_object(DomHandle { root: h.root.clone(), path })).unwrap_or(JsValue::Null))
     }));
 
-    let h = handle;
+    let h = handle.clone();
     obj.insert("querySelectorAll".into(), native("querySelectorAll", Some(1), move |args| {
         let selector = args.first().unwrap_or(&JsValue::Undefined).display();
         let nodes = all_by_selector(&h.root, &selector).into_iter().map(|path| node_object(DomHandle { root: h.root.clone(), path })).collect();
         Ok(JsValue::Array(Rc::new(RefCell::new(nodes))))
     }));
+
+    let h = handle.clone();
+    obj.insert("addEventListener".into(), native("addEventListener", Some(2), move |args| {
+        let event_type = args.first().unwrap_or(&JsValue::Undefined).display();
+        let listener = args.get(1).cloned().unwrap_or(JsValue::Undefined);
+        h.add_event_listener(&event_type, listener);
+        Ok(JsValue::Undefined)
+    }));
+
+    let h = handle.clone();
+    obj.insert("removeEventListener".into(), native("removeEventListener", Some(2), move |args| {
+        let event_type = args.first().unwrap_or(&JsValue::Undefined).display();
+        let listener = args.get(1).cloned().unwrap_or(JsValue::Undefined);
+        h.remove_event_listener(&event_type, &listener);
+        Ok(JsValue::Undefined)
+    }));
+
+    let h = handle.clone();
+    obj.insert("dispatchEvent".into(), native("dispatchEvent", Some(1), move |args| {
+        let event = args.first().cloned().unwrap_or(JsValue::Undefined);
+        h.dispatch_event(event)
+    }));
+
+    let h = handle.clone();
+    obj.insert("click".into(), native("click", Some(0), move |_| h.dispatch_event(JsValue::String("click".into()))));
 
     obj.insert("__domApiVersion".into(), JsValue::String(DOM_API_VERSION.into()));
 
@@ -214,6 +268,40 @@ impl DomHandle {
         let Some(Node::Element(parent)) = get_node_mut(&mut root, parent_path) else { return false; };
         if index < parent.children.len() { parent.children.remove(index); true } else { false }
     }
+
+    fn event_key(&self) -> String { format!("{:p}:{:?}", Rc::as_ptr(&self.root), self.path) }
+
+    fn add_event_listener(&self, event_type: &str, listener: JsValue) {
+        EVENT_REGISTRY.with(|registry| {
+            registry.borrow_mut().entry(self.event_key()).or_default().listeners.entry(event_type.into()).or_default().push(listener);
+        });
+    }
+
+    fn remove_event_listener(&self, event_type: &str, listener: &JsValue) {
+        EVENT_REGISTRY.with(|registry| if let Some(entry) = registry.borrow_mut().get_mut(&self.event_key()) { if let Some(list) = entry.listeners.get_mut(event_type) { list.retain(|item| item != listener); } });
+    }
+
+    fn set_handler(&self, name: &str, handler: JsValue) {
+        EVENT_REGISTRY.with(|registry| { registry.borrow_mut().entry(self.event_key()).or_default().handlers.insert(name.into(), handler); });
+    }
+
+    fn dispatch_event(&self, event: JsValue) -> Result<JsValue, String> {
+        let event_type = event_type(&event).unwrap_or_else(|| "event".into());
+        let target = node_object(self.clone());
+        let event = normalize_event(event, &event_type, target.clone(), target.clone());
+        let listeners = self.listeners(&event_type);
+        for listener in listeners { call_dom_listener(listener, target.clone(), event.clone())?; }
+        if let Some(handler) = self.handler(&format!("on{}", event_type)) { call_dom_listener(handler, target, event)?; }
+        Ok(JsValue::Bool(true))
+    }
+
+    fn listeners(&self, event_type: &str) -> Vec<JsValue> {
+        EVENT_REGISTRY.with(|registry| registry.borrow().get(&self.event_key()).and_then(|entry| entry.listeners.get(event_type).cloned()).unwrap_or_default())
+    }
+
+    fn handler(&self, name: &str) -> Option<JsValue> {
+        EVENT_REGISTRY.with(|registry| registry.borrow().get(&self.event_key()).and_then(|entry| entry.handlers.get(name).cloned()))
+    }
 }
 
 fn install_property_setters(obj: &mut HashMap<String, JsValue>, handle: &DomHandle) {
@@ -225,9 +313,16 @@ fn install_property_setters(obj: &mut HashMap<String, JsValue>, handle: &DomHand
                 Node::Text(existing) => *existing = text,
                 Node::Element(el) => el.children = vec![Node::Text(text)],
             });
-            Ok(JsValue::Undefined)
+        Ok(JsValue::Undefined)
+    }));
+
+    for prop in ["onclick", "oninput", "onchange", "onsubmit"] {
+        let h = handle.clone();
+        obj.insert(format!("__set:{}", prop), native(&format!("set_{}", prop), Some(1), move |args| {
+            h.set_handler(prop, args.first().cloned().unwrap_or(JsValue::Undefined)); Ok(JsValue::Undefined)
         }));
     }
+}
 
     let h = handle.clone();
     obj.insert("__set:id".into(), native("set_id", Some(1), move |args| {
@@ -281,6 +376,41 @@ fn get_node_mut<'a>(node: &'a mut Node, path: &[usize]) -> Option<&'a mut Node> 
         Node::Element(el) => el.children.get_mut(path[0]).and_then(|child| get_node_mut(child, &path[1..])),
         Node::Text(_) => None,
     }
+}
+
+fn call_dom_listener(listener: JsValue, this_value: JsValue, event: JsValue) -> Result<(), String> {
+    js::call_function_with_this(listener, this_value, std::slice::from_ref(&event))?;
+    Ok(())
+}
+
+fn event_type(event: &JsValue) -> Option<String> {
+    match event { JsValue::Object(obj) => obj.borrow().get("type").map(JsValue::display), JsValue::String(s) => Some(s.clone()), _ => None }
+}
+
+fn normalize_event(event: JsValue, event_type: &str, target: JsValue, current_target: JsValue) -> JsValue {
+    let mut map = match event { JsValue::Object(obj) => obj.borrow().clone(), _ => HashMap::new() };
+    map.insert("type".into(), JsValue::String(event_type.into()));
+    map.insert("target".into(), target);
+    map.insert("currentTarget".into(), current_target);
+    map.entry("defaultPrevented".into()).or_insert(JsValue::Bool(false));
+    let event_ref = Rc::new(RefCell::new(map));
+    let event_for_prevent = event_ref.clone();
+    event_ref.borrow_mut().insert("preventDefault".into(), native("preventDefault", Some(0), move |_| { event_for_prevent.borrow_mut().insert("defaultPrevented".into(), JsValue::Bool(true)); Ok(JsValue::Undefined) }));
+    JsValue::Object(event_ref)
+}
+
+fn parse_location(href: &str) -> HashMap<String, JsValue> {
+    let mut protocol = "http:".to_string(); let mut host = "localhost".to_string(); let mut pathname = "/".to_string(); let mut search = String::new(); let mut hash = String::new();
+    if let Some((p, rest)) = href.split_once("://") {
+        protocol = format!("{}:", p);
+        let (before_hash, h) = rest.split_once('#').map_or((rest, ""), |(a, b)| (a, b)); hash = if h.is_empty() { String::new() } else { format!("#{}", h) };
+        let (before_query, q) = before_hash.split_once('?').map_or((before_hash, ""), |(a, b)| (a, b)); search = if q.is_empty() { String::new() } else { format!("?{}", q) };
+        if let Some((parsed_host, path)) = before_query.split_once('/') { host = parsed_host.into(); pathname = format!("/{}", path); } else { host = before_query.into(); pathname = "/".into(); }
+    }
+    let origin = format!("{}//{}", protocol, host);
+    let mut obj = HashMap::new();
+    for (k, v) in [("href", href.to_string()), ("protocol", protocol), ("host", host.clone()), ("hostname", host), ("pathname", pathname), ("search", search), ("hash", hash), ("origin", origin)] { obj.insert(k.into(), JsValue::String(v)); }
+    obj
 }
 
 fn native(name: &str, arity: Option<usize>, func: impl Fn(&[JsValue]) -> Result<JsValue, String> + 'static) -> JsValue {
@@ -449,7 +579,7 @@ fn child_element_count(node: &Node) -> usize {
 }
 
 pub fn compatibility_report_to_value(_args: &[Value]) -> Result<Value, String> {
-    let features = ["document", "window", "selectors", "attributes", "textContent", "innerHTML", "createElement", "append", "remove"];
+    let features = ["document", "window", "selectors", "attributes", "textContent", "innerHTML", "createElement", "append", "remove", "events", "this", "typeof", "functionExpressions", "location", "navigator"];
     Ok(Value::List(Rc::new(RefCell::new(features.into_iter().map(|s| Value::Str(Rc::new(s.into()))).collect()))))
 }
 
@@ -485,5 +615,38 @@ mod tests {
         let text = result.document.children.iter().map(browser::text_content).collect::<Vec<_>>().join(" ");
         assert!(text.contains("new"));
         assert!(text.contains("!"));
+    }
+
+    #[test]
+    fn event_listeners_property_handlers_this_and_event_target_work() {
+        let result = eval_with_dom(
+            "<button id='go'>old</button>",
+            "let btn=document.getElementById('go'); let seen=''; btn.addEventListener('click', function(e){ seen=e.type + ':' + e.target.id + ':' + this.id; this.textContent='clicked'; }); btn.click(); seen + ':' + document.getElementById('go').textContent;",
+        ).unwrap();
+        assert_eq!(result.value, JsValue::String("click:go:go:clicked".into()));
+
+        let result = eval_with_dom(
+            "<button id='go'>old</button>",
+            "let btn=document.getElementById('go'); btn.onclick=function(e){ this.setAttribute('data-clicked', e.type); }; btn.dispatchEvent({type:'click'}); document.getElementById('go').getAttribute('data-clicked');",
+        ).unwrap();
+        assert_eq!(result.value, JsValue::String("click".into()));
+    }
+
+    #[test]
+    fn remove_event_listener_and_typeof_work() {
+        let result = eval_with_dom(
+            "<button>ok</button>",
+            "let count=0; function inc(){ count=count+1; } let b=document.querySelector('button'); b.addEventListener('click', inc); b.removeEventListener('click', inc); b.click(); count + ':' + typeof missingName + ':' + typeof document;",
+        ).unwrap();
+        assert_eq!(result.value, JsValue::String("0:undefined:object".into()));
+    }
+
+    #[test]
+    fn location_and_navigator_globals_are_available() {
+        let result = eval_with_dom(
+            "<main></main>",
+            "navigator.userAgent.length > 0 && location.pathname == '/' && window.location.origin == 'http://localhost' && window.navigator.language == 'en-US';",
+        ).unwrap();
+        assert_eq!(result.value, JsValue::Bool(true));
     }
 }
