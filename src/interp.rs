@@ -51,7 +51,8 @@ impl Interpreter {
         Self { globals }
     }
 
-    /// Interpreter with a restricted built-in set: no `http_serve`, no `eval`.
+    /// Interpreter with a restricted built-in set: no `http_serve`, no `eval`,
+    /// and no potentially expensive browser parsing/layout/rendering natives.
     /// Used to run untrusted source passed to `eval(...)` from a hosted REPL.
     pub fn new_sandboxed() -> Self {
         let globals = Env::new_global();
@@ -954,6 +955,7 @@ impl<'a> Runtime for InterpRuntime<'a> {
 
 pub(crate) fn install_builtins(env: &Rc<RefCell<Env>>) {
     install_pure_builtins(env);
+    install_browser_builtins(env);
     let mut e = env.borrow_mut();
 
     e.define(
@@ -1227,6 +1229,26 @@ fn install_sandbox_builtins(env: &Rc<RefCell<Env>>) {
     install_pure_builtins(env);
 }
 
+fn install_browser_builtins(env: &Rc<RefCell<Env>>) {
+    let mut e = env.borrow_mut();
+
+    e.define(
+        "browser_parse_html",
+        pure_native("browser_parse_html", Some(1), browser::html_to_value),
+        false,
+    );
+    e.define(
+        "browser_render",
+        pure_native("browser_render", None, browser::render_to_value),
+        false,
+    );
+    e.define(
+        "browser_layout",
+        pure_native("browser_layout", None, browser::layout_to_runtime_value),
+        false,
+    );
+}
+
 fn install_pure_builtins(env: &Rc<RefCell<Env>>) {
     let mut e = env.borrow_mut();
 
@@ -1267,22 +1289,6 @@ fn install_pure_builtins(env: &Rc<RefCell<Env>>) {
         pure_native("type_of", Some(1), |args| {
             Ok(Value::Str(Rc::new(args[0].type_name().into())))
         }),
-        false,
-    );
-
-    e.define(
-        "browser_parse_html",
-        pure_native("browser_parse_html", Some(1), browser::html_to_value),
-        false,
-    );
-    e.define(
-        "browser_render",
-        pure_native("browser_render", None, browser::render_to_value),
-        false,
-    );
-    e.define(
-        "browser_layout",
-        pure_native("browser_layout", None, browser::layout_to_runtime_value),
         false,
     );
 
