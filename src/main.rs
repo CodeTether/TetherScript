@@ -20,12 +20,14 @@
 
 mod ast;
 mod browser;
+mod browser_js;
 mod bytecode;
 mod capability;
 mod compiler;
 mod fs_cap;
 mod http;
 mod interp;
+mod js;
 mod json;
 mod lexer;
 mod lsp;
@@ -87,6 +89,7 @@ fn main() {
         "run" => cmd_run(&args[2..]),
         "check" => cmd_check(&args[2..]),
         "render" => cmd_render(&args[2..]),
+        "js" => cmd_js(&args[2..]),
         "inspect" => cmd_inspect(&args[2..]),
         "lsp" => cmd_lsp(),
         "repl" => cmd_repl(),
@@ -361,6 +364,35 @@ fn cmd_render(args: &[String]) {
     let doc = browser::parse_html(&html);
     let layout = browser::layout_document(&doc, &css, width);
     print!("{}", browser::render_text(&layout));
+}
+
+fn cmd_js(args: &[String]) {
+    if args.is_empty() || args[0] == "--help" || args[0] == "-h" {
+        println!("tetherscript js -- Run a JavaScript file with the built-in no-dependency JS engine");
+        println!();
+        println!("USAGE:");
+        println!("    tetherscript js <file.js>");
+        if args.is_empty() {
+            process::exit(2);
+        }
+        return;
+    }
+    let src = read_source(&args[0]);
+    let mut engine = js::JsEngine::new();
+    match engine.eval(&src) {
+        Ok(value) => {
+            for line in engine.console_output() {
+                println!("{}", line);
+            }
+            if !matches!(value, js::JsValue::Undefined) {
+                println!("{}", value.display());
+            }
+        }
+        Err(e) => {
+            eprintln!("tetherscript js: {}", e);
+            process::exit(1);
+        }
+    }
 }
 
 fn cmd_check(args: &[String]) {
@@ -737,6 +769,8 @@ fn print_usage() {
     eprintln!("Commands:");
     eprintln!("  run <file>           Run a TetherScript program");
     eprintln!("  inspect <file>       Inspect source (tokens, AST, bytecode)");
+    eprintln!("  render <html>        Render HTML/CSS display list");
+    eprintln!("  js <file.js>         Run JavaScript with the built-in engine");
     eprintln!("  repl                 Interactive REPL");
     eprintln!("  lsp                  Start LSP server over stdio");
     eprintln!();
@@ -762,6 +796,8 @@ fn print_help() {
     println!("COMMANDS:");
     println!("    run <file>        Run a TetherScript program");
     println!("    inspect <file>    Inspect frontend output (tokens, AST, bytecode)");
+    println!("    render <html>     Render HTML/CSS to a display list");
+    println!("    js <file.js>      Run JavaScript with the built-in engine");
     println!("    repl              Start an interactive read-eval-print loop");
     println!("    lsp               Start the LSP server over stdio");
     println!();
@@ -784,6 +820,8 @@ fn print_help() {
     println!("    tetherscript inspect --tokens hello.tether");
     println!("    tetherscript inspect --ast hello.tether");
     println!("    tetherscript inspect --bytecode hello.tether");
+    println!("    tetherscript render examples/browser.html examples/browser.css");
+    println!("    tetherscript js app.js");
     println!("    tetherscript repl");
     println!("    tetherscript lsp");
     println!();

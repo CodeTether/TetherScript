@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+### Added
+
+- Expanded experimental browser runtime built-ins with CSS rule introspection, computed styles, query selection, text extraction, page snapshots, framework-root/resource discovery, and structured display-list output.
+
 ## [0.1.0-alpha.6] - 2026-05-01
 
 ### Added

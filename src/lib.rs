@@ -2,12 +2,14 @@
 
 pub mod ast;
 pub mod browser;
+pub mod browser_js;
 pub mod bytecode;
 pub mod capability;
 pub mod compiler;
 pub mod fs_cap;
 pub mod http;
 pub mod interp;
+pub mod js;
 pub mod json;
 pub mod lexer;
 pub mod output;
