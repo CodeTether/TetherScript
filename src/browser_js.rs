@@ -579,7 +579,7 @@ fn child_element_count(node: &Node) -> usize {
 }
 
 pub fn compatibility_report_to_value(_args: &[Value]) -> Result<Value, String> {
-    let features = ["document", "window", "selectors", "attributes", "textContent", "innerHTML", "createElement", "append", "remove", "events", "this", "typeof", "functionExpressions", "location", "navigator"];
+    let features = ["document", "window", "selectors", "attributes", "textContent", "innerHTML", "createElement", "append", "remove", "events", "this", "typeof", "functionExpressions", "forLoops", "location", "navigator"];
     Ok(Value::List(Rc::new(RefCell::new(features.into_iter().map(|s| Value::Str(Rc::new(s.into()))).collect()))))
 }
 
@@ -648,5 +648,14 @@ mod tests {
             "navigator.userAgent.length > 0 && location.pathname == '/' && window.location.origin == 'http://localhost' && window.navigator.language == 'en-US';",
         ).unwrap();
         assert_eq!(result.value, JsValue::Bool(true));
+    }
+
+    #[test]
+    fn classic_for_loop_supports_node_list_iteration() {
+        let result = eval_with_dom(
+            "<ul><li>A</li><li>B</li><li>C</li></ul>",
+            "let items=document.querySelectorAll('li'); let text=''; for (let i=0; i<items.length; i=i+1) { text = text + items[i].textContent; } text;",
+        ).unwrap();
+        assert_eq!(result.value, JsValue::String("ABC".into()));
     }
 }

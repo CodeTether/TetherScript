@@ -389,7 +389,7 @@ impl<'a> Lexer<'a> {
 }
 
 #[derive(Debug, Clone)]
-enum Stmt { Expr(Expr), Var(String, Option<Expr>), Function(String, Vec<String>, Vec<Stmt>), Return(Option<Expr>), Block(Vec<Stmt>), If(Expr, Box<Stmt>, Option<Box<Stmt>>), While(Expr, Box<Stmt>), Break, Continue }
+enum Stmt { Expr(Expr), Var(String, Option<Expr>), Function(String, Vec<String>, Vec<Stmt>), Return(Option<Expr>), Block(Vec<Stmt>), If(Expr, Box<Stmt>, Option<Box<Stmt>>), While(Expr, Box<Stmt>), For(Option<Box<Stmt>>, Option<Expr>, Option<Expr>, Box<Stmt>), Break, Continue }
 #[derive(Debug, Clone)]
 enum Expr { Literal(JsValue), Var(String), This, Function(Vec<String>, Vec<Stmt>), Array(Vec<Expr>), Object(Vec<(String, Expr)>), Unary(String, Box<Expr>), Typeof(Box<Expr>), Binary(Box<Expr>, String, Box<Expr>), Assign(Box<Expr>, Box<Expr>), Call(Box<Expr>, Vec<Expr>), Get(Box<Expr>, String), Index(Box<Expr>, Box<Expr>) }
 
@@ -405,6 +405,7 @@ impl Parser {
         if self.matches(&[TokenKind::Return]) { let expr = if self.check(&TokenKind::Semi) || self.check(&TokenKind::RBrace) { None } else { Some(self.expression()?) }; self.consume_optional_semi(); return Ok(Stmt::Return(expr)); }
         if self.matches(&[TokenKind::If]) { return self.if_stmt(); }
         if self.matches(&[TokenKind::While]) { return self.while_stmt(); }
+        if self.matches(&[TokenKind::For]) { return self.for_stmt(); }
         if self.matches(&[TokenKind::LBrace]) { return Ok(Stmt::Block(self.block()?)); }
         if self.matches(&[TokenKind::Break]) { self.consume_optional_semi(); return Ok(Stmt::Break); }
         if self.matches(&[TokenKind::Continue]) { self.consume_optional_semi(); return Ok(Stmt::Continue); }
@@ -434,6 +435,27 @@ impl Parser {
     fn block(&mut self) -> Result<Vec<Stmt>, String> { let mut out = Vec::new(); while !self.check(&TokenKind::RBrace) && !self.is_eof() { out.push(self.statement()?); } self.consume(&TokenKind::RBrace, "Expected '}'")?; Ok(out) }
     fn if_stmt(&mut self) -> Result<Stmt, String> { self.consume(&TokenKind::LParen, "Expected '('")?; let cond = self.expression()?; self.consume(&TokenKind::RParen, "Expected ')'")?; let then = Box::new(self.statement()?); let els = if self.matches(&[TokenKind::Else]) { Some(Box::new(self.statement()?)) } else { None }; Ok(Stmt::If(cond, then, els)) }
     fn while_stmt(&mut self) -> Result<Stmt, String> { self.consume(&TokenKind::LParen, "Expected '('")?; let cond = self.expression()?; self.consume(&TokenKind::RParen, "Expected ')'")?; Ok(Stmt::While(cond, Box::new(self.statement()?))) }
+
+    fn for_stmt(&mut self) -> Result<Stmt, String> {
+        self.consume(&TokenKind::LParen, "Expected '(' after for")?;
+        let init = if self.matches(&[TokenKind::Semi]) {
+            None
+        } else if self.matches(&[TokenKind::Let, TokenKind::Const, TokenKind::Var]) {
+            let name = self.consume_ident("Expected variable name")?;
+            let value = if self.matches(&[TokenKind::Eq]) { Some(self.expression()?) } else { None };
+            self.consume(&TokenKind::Semi, "Expected ';' after for initializer")?;
+            Some(Box::new(Stmt::Var(name, value)))
+        } else {
+            let expr = self.expression()?;
+            self.consume(&TokenKind::Semi, "Expected ';' after for initializer")?;
+            Some(Box::new(Stmt::Expr(expr)))
+        };
+        let condition = if self.check(&TokenKind::Semi) { None } else { Some(self.expression()?) };
+        self.consume(&TokenKind::Semi, "Expected ';' after for condition")?;
+        let increment = if self.check(&TokenKind::RParen) { None } else { Some(self.expression()?) };
+        self.consume(&TokenKind::RParen, "Expected ')' after for clauses")?;
+        Ok(Stmt::For(init, condition, increment, Box::new(self.statement()?)))
+    }
 
     fn expression(&mut self) -> Result<Expr, String> { self.assignment() }
     fn assignment(&mut self) -> Result<Expr, String> { let expr = self.or()?; if self.matches(&[TokenKind::Eq]) { Ok(Expr::Assign(Box::new(expr), Box::new(self.assignment()?))) } else { Ok(expr) } }
@@ -507,9 +529,26 @@ fn execute(stmt: &Stmt, env: EnvRef) -> Result<Flow, String> {
         Stmt::Block(stmts) => execute_block(stmts, Env::new(Some(env))),
         Stmt::If(c, t, e) => if eval_expr(c, env.clone())?.truthy() { execute(t, env) } else if let Some(e) = e { execute(e, env) } else { Ok(Flow::Value(JsValue::Undefined)) },
         Stmt::While(c, body) => { let mut last = JsValue::Undefined; while eval_expr(c, env.clone())?.truthy() { match execute(body, env.clone())? { Flow::Value(v) => last = v, Flow::Break => break, Flow::Continue => continue, other => return Ok(other) } } Ok(Flow::Value(last)) }
+        Stmt::For(init, condition, increment, body) => execute_for(init.as_deref(), condition.as_ref(), increment.as_ref(), body, env),
         Stmt::Break => Ok(Flow::Break),
         Stmt::Continue => Ok(Flow::Continue),
     }
+}
+
+fn execute_for(init: Option<&Stmt>, condition: Option<&Expr>, increment: Option<&Expr>, body: &Stmt, env: EnvRef) -> Result<Flow, String> {
+    let loop_env = Env::new(Some(env));
+    if let Some(init) = init { execute(init, loop_env.clone())?; }
+    let mut last = JsValue::Undefined;
+    while condition.map(|c| eval_expr(c, loop_env.clone())).transpose()?.unwrap_or(JsValue::Bool(true)).truthy() {
+        match execute(body, loop_env.clone())? {
+            Flow::Value(v) => last = v,
+            Flow::Break => break,
+            Flow::Continue => {},
+            other => return Ok(other),
+        }
+        if let Some(increment) = increment { eval_expr(increment, loop_env.clone())?; }
+    }
+    Ok(Flow::Value(last))
 }
 
 fn eval_expr(expr: &Expr, env: EnvRef) -> Result<JsValue, String> {
