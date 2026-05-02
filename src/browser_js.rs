@@ -30,6 +30,9 @@ enum InsertPosition {
     Prepend,
 }
 
+// NOTE(riley): Index-path-based handles can shift when siblings are prepended/removed.
+// A future iteration should give each node a stable ID or store Rc<RefCell<Node>> per node
+// so that existing handles remain valid after mutations.
 #[derive(Clone)]
 struct DomHandle {
     root: Rc<RefCell<Node>>,
@@ -67,6 +70,7 @@ pub struct BrowserJsResult {
 }
 
 pub fn run_html_scripts(html: &str) -> Result<BrowserJsResult, String> {
+    EVENT_REGISTRY.with(|r| r.borrow_mut().clear());
     let root = html_to_root(html);
     let mut engine = JsEngine::new();
     let timers = Rc::new(RefCell::new(TimerQueue::default()));
@@ -83,6 +87,7 @@ pub fn run_html_scripts(html: &str) -> Result<BrowserJsResult, String> {
 }
 
 pub fn eval_with_dom(html: &str, script: &str) -> Result<BrowserJsResult, String> {
+    EVENT_REGISTRY.with(|r| r.borrow_mut().clear());
     let root = html_to_root(html);
     let mut engine = JsEngine::new();
     let timers = Rc::new(RefCell::new(TimerQueue::default()));

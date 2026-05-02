@@ -386,6 +386,13 @@ fn style_node(
                 styles.insert(name, value);
             }
         }
+        // Carry relevant DOM attributes into styles so the layout/display pipeline can
+        // reference them (e.g. <img src="..."> produces a non-empty DisplayCommand::Image.src).
+        if element.tag.eq_ignore_ascii_case("img") {
+            if let Some(src) = element.attrs.get("src") {
+                styles.entry("src".into()).or_insert_with(|| src.clone());
+            }
+        }
     }
     let children = match node {
         Node::Element(element) => {
@@ -1503,6 +1510,18 @@ mod tests {
             .iter()
             .any(|cmd| matches!(cmd, DisplayCommand::Rect { color, .. } if color == "red")));
         assert!(commands.iter().any(|cmd| matches!(cmd, DisplayCommand::Text { text, color, .. } if text == "Hello" && color == "blue")));
+    }
+
+    #[test]
+    fn img_src_attribute_carried_into_display_command() {
+        let doc = parse_html(r#"<img src="photo.png">"#);
+        let layout = layout_document(&doc, "", 80);
+        let commands = build_display_list(&layout);
+        let image_cmd = commands.iter().find(|cmd| matches!(cmd, DisplayCommand::Image { .. }));
+        assert!(image_cmd.is_some(), "expected an Image display command for <img>");
+        if let Some(DisplayCommand::Image { src, .. }) = image_cmd {
+            assert_eq!(src, "photo.png", "img src should come from DOM attribute, not styles");
+        }
     }
 
     #[test]
