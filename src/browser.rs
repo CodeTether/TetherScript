@@ -250,8 +250,9 @@ pub fn layout_document(document: &Document, css: &str, width: i64) -> LayoutBox 
     };
     let mut cursor_y = 0;
     for child in styled {
-        let layout = layout_styled_node(&child, 0, cursor_y, root.width);
-        cursor_y += layout.height;
+        let margin_top = parse_px(child.styles.get("margin-top")).unwrap_or(0);
+        let layout = layout_styled_node(&child, 0, cursor_y + margin_top, root.width);
+        cursor_y += margin_top + layout.height;
         root.children.push(layout);
     }
     root.height = cursor_y.max(1);
