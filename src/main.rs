@@ -368,7 +368,9 @@ fn cmd_render(args: &[String]) {
 
 fn cmd_js(args: &[String]) {
     if args.is_empty() || args[0] == "--help" || args[0] == "-h" {
-        println!("tetherscript js -- Run a JavaScript file with the built-in no-dependency JS engine");
+        println!(
+            "tetherscript js -- Run a JavaScript file with the built-in no-dependency JS engine"
+        );
         println!();
         println!("USAGE:");
         println!("    tetherscript js <file.js>");
