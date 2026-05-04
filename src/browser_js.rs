@@ -119,6 +119,7 @@ fn install_dom_globals(engine: &mut JsEngine, root: Rc<RefCell<Node>>, timers: R
     window.insert("navigator".into(), navigator.clone());
     window.insert("localStorage".into(), local_storage.clone());
     window.insert("sessionStorage".into(), session_storage.clone());
+    install_fetch_bindings(&mut window);
     install_timer_bindings(&mut window, timers);
     let window = JsValue::Object(Rc::new(RefCell::new(window)));
     if let JsValue::Object(obj) = &window {
@@ -127,6 +128,9 @@ fn install_dom_globals(engine: &mut JsEngine, root: Rc<RefCell<Node>>, timers: R
         let borrowed = obj.borrow();
         if let Some(set_timeout) = borrowed.get("setTimeout").cloned() { engine.set_global("setTimeout", set_timeout); }
         if let Some(clear_timeout) = borrowed.get("clearTimeout").cloned() { engine.set_global("clearTimeout", clear_timeout); }
+        if let Some(fetch) = borrowed.get("fetch").cloned() { engine.set_global("fetch", fetch); }
+        if let Some(headers) = borrowed.get("Headers").cloned() { engine.set_global("Headers", headers); }
+        if let Some(response) = borrowed.get("Response").cloned() { engine.set_global("Response", response); }
     }
     engine.set_global("window", window.clone());
     engine.set_global("self", window.clone());
@@ -134,8 +138,82 @@ fn install_dom_globals(engine: &mut JsEngine, root: Rc<RefCell<Node>>, timers: R
     engine.set_global("navigator", navigator);
     engine.set_global("localStorage", local_storage);
     engine.set_global("sessionStorage", session_storage);
+    if let JsValue::Object(obj) = &window {
+        for name in ["fetch", "Headers", "Response"] { if let Some(value) = obj.borrow().get(name).cloned() { engine.set_global(name, value); } }
+    }
     window
 }
+
+fn install_fetch_bindings(window: &mut HashMap<String, JsValue>) {
+    let headers_ctor = native("Headers", None, |args| Ok(headers_object(args.first())));
+    let response_ctor = native("Response", None, |args| {
+        let body = args.first().map(JsValue::display).unwrap_or_default();
+        let init = args.get(1);
+        let status = object_number(init, "status").unwrap_or(200.0) as u16;
+        let status_text = object_string(init, "statusText").unwrap_or_else(|| default_status_text(status).into());
+        let headers = object_prop(init, "headers").unwrap_or_else(|| headers_object(None));
+        Ok(response_object(body, status, status_text, headers, String::new()))
+    });
+    let fetch = native("fetch", None, |args| {
+        let url = args.first().map(JsValue::display).unwrap_or_default();
+        let mut body = format!("fetch stub: {}", url);
+        let mut status = 200;
+        if let Some(init) = args.get(1) {
+            if let Some(method) = object_string(Some(init), "method") { body = format!("fetch stub: {} {}", method.to_ascii_uppercase(), url); }
+            if let Some(mock_body) = object_string(Some(init), "body") { body = mock_body; }
+            if let Some(mock_status) = object_number(Some(init), "status") { status = mock_status as u16; }
+        }
+        let mut headers = vec![("content-type".into(), "text/plain;charset=utf-8".into())];
+        if let Some(init_headers) = args.get(1).and_then(|init| object_prop(Some(init), "headers")) { headers.extend(headers_entries(&init_headers)); }
+        Ok(response_object(body, status, default_status_text(status).into(), headers_from_entries(headers), url))
+    });
+
+    window.insert("Headers".into(), headers_ctor.clone());
+    window.insert("Response".into(), response_ctor.clone());
+    window.insert("fetch".into(), fetch.clone());
+}
+
+fn response_object(body: String, status: u16, status_text: String, headers: JsValue, url: String) -> JsValue {
+    let ok = (200..=299).contains(&status);
+    let mut obj = HashMap::new();
+    obj.insert("body".into(), JsValue::String(body.clone()));
+    obj.insert("status".into(), JsValue::Number(status as f64));
+    obj.insert("statusText".into(), JsValue::String(status_text));
+    obj.insert("ok".into(), JsValue::Bool(ok));
+    obj.insert("url".into(), JsValue::String(url));
+    obj.insert("headers".into(), headers);
+    let text_body = body.clone();
+    obj.insert("text".into(), native("Response.text", Some(0), move |_| Ok(JsValue::String(text_body.clone()))));
+    obj.insert("json".into(), native("Response.json", Some(0), move |_| Ok(json_stub_value(&body))));
+    JsValue::Object(Rc::new(RefCell::new(obj)))
+}
+
+fn headers_object(init: Option<&JsValue>) -> JsValue { headers_from_entries(init.into_iter().flat_map(headers_entries).collect()) }
+
+fn headers_from_entries(entries: Vec<(String, String)>) -> JsValue {
+    let entries = Rc::new(RefCell::new(normalize_header_entries(entries)));
+    let mut obj = HashMap::new();
+    obj.insert("get".into(), header_method(entries.clone(), "Headers.get", |entries, name, _| entries.iter().find(|(k, _)| k == &name).map(|(_, v)| JsValue::String(v.clone())).unwrap_or(JsValue::Null)));
+    obj.insert("has".into(), header_method(entries.clone(), "Headers.has", |entries, name, _| JsValue::Bool(entries.iter().any(|(k, _)| k == &name))));
+    obj.insert("set".into(), header_method(entries.clone(), "Headers.set", |entries, name, value| { set_header(entries, name, value); JsValue::Undefined }));
+    obj.insert("append".into(), header_method(entries.clone(), "Headers.append", |entries, name, value| { append_header(entries, name, value); JsValue::Undefined }));
+    JsValue::Object(Rc::new(RefCell::new(obj)))
+}
+
+fn header_method(entries: Rc<RefCell<Vec<(String, String)>>>, name: &'static str, f: fn(&mut Vec<(String, String)>, String, String) -> JsValue) -> JsValue {
+    native(name, None, move |args| { let key = args.first().map(JsValue::display).unwrap_or_default().to_ascii_lowercase(); let value = args.get(1).map(JsValue::display).unwrap_or_default(); Ok(f(&mut entries.borrow_mut(), key, value)) })
+}
+
+fn normalize_header_entries(entries: Vec<(String, String)>) -> Vec<(String, String)> { let mut out = Vec::new(); for (k, v) in entries { append_header(&mut out, k.to_ascii_lowercase(), v); } out }
+fn set_header(entries: &mut Vec<(String, String)>, name: String, value: String) { entries.retain(|(k, _)| k != &name); entries.push((name, value)); }
+fn append_header(entries: &mut Vec<(String, String)>, name: String, value: String) { if let Some((_, existing)) = entries.iter_mut().find(|(k, _)| k == &name) { if !existing.is_empty() { existing.push_str(", "); } existing.push_str(&value); } else { entries.push((name, value)); } }
+
+fn headers_entries(value: &JsValue) -> Vec<(String, String)> { match value { JsValue::Object(obj) => obj.borrow().iter().filter(|(_, v)| !matches!(v, JsValue::Native(_) | JsValue::Function(_) | JsValue::BoundFunction(_))).map(|(k, v)| (k.to_ascii_lowercase(), v.display())).collect(), _ => Vec::new() } }
+fn object_prop(value: Option<&JsValue>, prop: &str) -> Option<JsValue> { match value { Some(JsValue::Object(obj)) => obj.borrow().get(prop).cloned(), _ => None } }
+fn object_string(value: Option<&JsValue>, prop: &str) -> Option<String> { object_prop(value, prop).map(|v| v.display()) }
+fn object_number(value: Option<&JsValue>, prop: &str) -> Option<f64> { match object_prop(value, prop) { Some(JsValue::Number(n)) => Some(n), Some(v) => v.display().parse().ok(), None => None } }
+fn default_status_text(status: u16) -> &'static str { match status { 200 => "OK", 201 => "Created", 204 => "No Content", 400 => "Bad Request", 404 => "Not Found", 500 => "Internal Server Error", _ => "" } }
+fn json_stub_value(body: &str) -> JsValue { let trimmed = body.trim(); if trimmed == "null" { JsValue::Null } else if trimmed == "true" { JsValue::Bool(true) } else if trimmed == "false" { JsValue::Bool(false) } else if let Ok(n) = trimmed.parse::<f64>() { JsValue::Number(n) } else { JsValue::String(trimmed.trim_matches('"').into()) } }
 
 fn install_timer_bindings(window: &mut HashMap<String, JsValue>, timers: Rc<RefCell<TimerQueue>>) {
     let set_queue = timers.clone();
@@ -815,7 +893,7 @@ fn child_element_count(node: &Node) -> usize {
 }
 
 pub fn compatibility_report_to_value(_args: &[Value]) -> Result<Value, String> {
-    let features = ["document", "window", "self", "selectors", "attributes", "textContent", "innerHTML", "createElement", "append", "remove", "events", "this", "typeof", "functionExpressions", "forLoops", "location", "navigator", "setTimeout", "clearTimeout", "deterministicTimers", "localStorage", "sessionStorage", "Storage.getItem", "Storage.setItem", "Storage.removeItem", "Storage.clear", "Storage.key", "Storage.length"];
+    let features = ["document", "window", "self", "selectors", "attributes", "textContent", "innerHTML", "createElement", "append", "remove", "events", "this", "typeof", "functionExpressions", "forLoops", "location", "navigator", "setTimeout", "clearTimeout", "deterministicTimers", "localStorage", "sessionStorage", "Storage.getItem", "Storage.setItem", "Storage.removeItem", "Storage.clear", "Storage.key", "Storage.length", "fetch", "Headers", "Response", "Response.text", "Response.json"];
     Ok(Value::List(Rc::new(RefCell::new(features.into_iter().map(|s| Value::Str(Rc::new(s.into()))).collect()))))
 }
 
@@ -989,5 +1067,35 @@ mod tests {
         assert!(features.contains(&"localStorage".to_string()));
         assert!(features.contains(&"sessionStorage".to_string()));
         assert!(features.contains(&"Storage.length".to_string()));
+    }
+
+    #[test]
+    fn fetch_returns_response_like_object_with_helpers() {
+        let result = eval_with_dom(
+            "<main></main>",
+            "let r=fetch('/api', {method:'post', body:'123', headers:{'X-Test':'yes'}}); r.ok + ':' + r.status + ':' + r.statusText + ':' + r.url + ':' + r.text() + ':' + r.json() + ':' + r.headers.get('x-test') + ':' + r.headers.get('CONTENT-TYPE');",
+        ).unwrap();
+        assert_eq!(result.value, JsValue::String("true:200:OK:/api:123:123:yes:text/plain;charset=utf-8".into()));
+    }
+
+    #[test]
+    fn response_constructor_and_headers_normalize_names() {
+        let result = eval_with_dom(
+            "<main></main>",
+            "let h=Headers({'Content-Type':'application/json','x-id':'a'}); h.append('X-ID','b'); let r=Response('{\\\"ok\\\":true}', {status:404, headers:h}); r.ok + ':' + r.status + ':' + r.statusText + ':' + r.headers.has('content-type') + ':' + r.headers.get('CONTENT-TYPE') + ':' + r.headers.get('x-id') + ':' + r.text();",
+        ).unwrap();
+        assert_eq!(result.value, JsValue::String("false:404:Not Found:true:application/json:a, b:{\"ok\":true}".into()));
+    }
+
+    #[test]
+    fn compatibility_report_lists_fetch_response_apis() {
+        let report = compatibility_report_to_value(&[]).unwrap();
+        let Value::List(items) = report else { panic!("expected list"); };
+        let features = items.borrow().iter().map(|v| match v { Value::Str(s) => s.to_string(), other => other.to_string() }).collect::<Vec<_>>();
+        assert!(features.contains(&"fetch".to_string()));
+        assert!(features.contains(&"Headers".to_string()));
+        assert!(features.contains(&"Response".to_string()));
+        assert!(features.contains(&"Response.text".to_string()));
+        assert!(features.contains(&"Response.json".to_string()));
     }
 }
