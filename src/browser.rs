@@ -1039,10 +1039,18 @@ impl<'a> HtmlParser<'a> {
             Vec::new()
         } else if is_raw_text_element(&tag) {
             let text = self.consume_raw_text(&tag, false);
-            if text.is_empty() { Vec::new() } else { vec![Node::Text(text)] }
+            if text.is_empty() {
+                Vec::new()
+            } else {
+                vec![Node::Text(text)]
+            }
         } else if is_rcdata_element(&tag) {
             let text = decode_entities(&self.consume_raw_text(&tag, true));
-            if text.is_empty() { Vec::new() } else { vec![Node::Text(text)] }
+            if text.is_empty() {
+                Vec::new()
+            } else {
+                vec![Node::Text(text)]
+            }
         } else {
             self.parse_nodes(Some(&tag))
         };
@@ -1128,7 +1136,9 @@ impl<'a> HtmlParser<'a> {
     fn find_matching_end_tag(&self, tag: &str, case_insensitive: bool) -> Option<usize> {
         let needle = format!("</{}", tag);
         if !case_insensitive {
-            return self.src[self.pos..].find(&needle).map(|offset| self.pos + offset);
+            return self.src[self.pos..]
+                .find(&needle)
+                .map(|offset| self.pos + offset);
         }
         self.src[self.pos..]
             .to_ascii_lowercase()
@@ -1471,24 +1481,44 @@ mod tests {
         assert_eq!(element.children, vec![Node::Text("<tag>".into())]);
     }
 
-
     #[test]
     fn script_and_style_parse_as_raw_text() {
-        let doc = parse_html(r#"<script>if (a < b) { document.write("&lt;p&gt;"); }</script><style>.x::before { content: "<"; }</style>"#);
-        let Node::Element(script) = &doc.children[0] else { panic!("expected script"); };
-        assert_eq!(script.children, vec![Node::Text(r#"if (a < b) { document.write("&lt;p&gt;"); }"#.into())]);
-        let Node::Element(style) = &doc.children[1] else { panic!("expected style"); };
-        assert_eq!(style.children, vec![Node::Text(r#".x::before { content: "<"; }"#.into())]);
+        let doc = parse_html(
+            r#"<script>if (a < b) { document.write("&lt;p&gt;"); }</script><style>.x::before { content: "<"; }</style>"#,
+        );
+        let Node::Element(script) = &doc.children[0] else {
+            panic!("expected script");
+        };
+        assert_eq!(
+            script.children,
+            vec![Node::Text(
+                r#"if (a < b) { document.write("&lt;p&gt;"); }"#.into()
+            )]
+        );
+        let Node::Element(style) = &doc.children[1] else {
+            panic!("expected style");
+        };
+        assert_eq!(
+            style.children,
+            vec![Node::Text(r#".x::before { content: "<"; }"#.into())]
+        );
     }
 
     #[test]
     fn title_and_textarea_parse_as_rcdata() {
-        let doc = parse_html("<title>A &amp; B < C</title><textarea>One &lt; two</textarea><p>after</p>");
-        let Node::Element(title) = &doc.children[0] else { panic!("expected title"); };
+        let doc =
+            parse_html("<title>A &amp; B < C</title><textarea>One &lt; two</textarea><p>after</p>");
+        let Node::Element(title) = &doc.children[0] else {
+            panic!("expected title");
+        };
         assert_eq!(title.children, vec![Node::Text("A & B < C".into())]);
-        let Node::Element(textarea) = &doc.children[1] else { panic!("expected textarea"); };
+        let Node::Element(textarea) = &doc.children[1] else {
+            panic!("expected textarea");
+        };
         assert_eq!(textarea.children, vec![Node::Text("One < two".into())]);
-        let Node::Element(p) = &doc.children[2] else { panic!("expected p"); };
+        let Node::Element(p) = &doc.children[2] else {
+            panic!("expected p");
+        };
         assert_eq!(p.children, vec![Node::Text("after".into())]);
     }
 
@@ -1583,10 +1613,18 @@ mod tests {
         let doc = parse_html(r#"<img src="photo.png">"#);
         let layout = layout_document(&doc, "", 80);
         let commands = build_display_list(&layout);
-        let image_cmd = commands.iter().find(|cmd| matches!(cmd, DisplayCommand::Image { .. }));
-        assert!(image_cmd.is_some(), "expected an Image display command for <img>");
+        let image_cmd = commands
+            .iter()
+            .find(|cmd| matches!(cmd, DisplayCommand::Image { .. }));
+        assert!(
+            image_cmd.is_some(),
+            "expected an Image display command for <img>"
+        );
         if let Some(DisplayCommand::Image { src, .. }) = image_cmd {
-            assert_eq!(src, "photo.png", "img src should come from DOM attribute, not styles");
+            assert_eq!(
+                src, "photo.png",
+                "img src should come from DOM attribute, not styles"
+            );
         }
     }
 
