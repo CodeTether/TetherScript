@@ -1036,6 +1036,12 @@ impl<'a> HtmlParser<'a> {
         }
         let children = if self_closing || is_void_element(&tag) {
             Vec::new()
+        } else if is_raw_text_element(&tag) {
+            let text = self.consume_raw_text(&tag, false);
+            if text.is_empty() { Vec::new() } else { vec![Node::Text(text)] }
+        } else if is_rcdata_element(&tag) {
+            let text = decode_entities(&self.consume_raw_text(&tag, true));
+            if text.is_empty() { Vec::new() } else { vec![Node::Text(text)] }
         } else {
             self.parse_nodes(Some(&tag))
         };
@@ -1097,6 +1103,36 @@ impl<'a> HtmlParser<'a> {
         } else {
             self.pos = self.src.len();
         }
+    }
+
+    fn consume_raw_text(&mut self, tag: &str, case_insensitive_end_tag: bool) -> String {
+        let start = self.pos;
+        let Some(end_start) = self.find_matching_end_tag(tag, case_insensitive_end_tag) else {
+            self.pos = self.src.len();
+            return self.src[start..].to_string();
+        };
+        let text = self.src[start..end_start].to_string();
+        self.pos = end_start;
+        self.consume_char();
+        self.consume_char();
+        self.consume_whitespace();
+        self.consume_while(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == ':');
+        self.consume_until('>');
+        if self.starts_with(">") {
+            self.consume_char();
+        }
+        text
+    }
+
+    fn find_matching_end_tag(&self, tag: &str, case_insensitive: bool) -> Option<usize> {
+        let needle = format!("</{}", tag);
+        if !case_insensitive {
+            return self.src[self.pos..].find(&needle).map(|offset| self.pos + offset);
+        }
+        self.src[self.pos..]
+            .to_ascii_lowercase()
+            .find(&needle)
+            .map(|offset| self.pos + offset)
     }
 
     fn peek_closing_tag(&self) -> String {
@@ -1165,6 +1201,14 @@ fn decode_entities(input: &str) -> String {
         }
         decoded = next;
     }
+}
+
+fn is_raw_text_element(tag: &str) -> bool {
+    matches!(tag, "script" | "style")
+}
+
+fn is_rcdata_element(tag: &str) -> bool {
+    matches!(tag, "title" | "textarea")
 }
 
 fn is_void_element(tag: &str) -> bool {
@@ -1424,6 +1468,27 @@ mod tests {
             panic!("expected element");
         };
         assert_eq!(element.children, vec![Node::Text("<tag>".into())]);
+    }
+
+
+    #[test]
+    fn script_and_style_parse_as_raw_text() {
+        let doc = parse_html(r#"<script>if (a < b) { document.write("&lt;p&gt;"); }</script><style>.x::before { content: "<"; }</style>"#);
+        let Node::Element(script) = &doc.children[0] else { panic!("expected script"); };
+        assert_eq!(script.children, vec![Node::Text(r#"if (a < b) { document.write("&lt;p&gt;"); }"#.into())]);
+        let Node::Element(style) = &doc.children[1] else { panic!("expected style"); };
+        assert_eq!(style.children, vec![Node::Text(r#".x::before { content: "<"; }"#.into())]);
+    }
+
+    #[test]
+    fn title_and_textarea_parse_as_rcdata() {
+        let doc = parse_html("<title>A &amp; B < C</title><textarea>One &lt; two</textarea><p>after</p>");
+        let Node::Element(title) = &doc.children[0] else { panic!("expected title"); };
+        assert_eq!(title.children, vec![Node::Text("A & B < C".into())]);
+        let Node::Element(textarea) = &doc.children[1] else { panic!("expected textarea"); };
+        assert_eq!(textarea.children, vec![Node::Text("One < two".into())]);
+        let Node::Element(p) = &doc.children[2] else { panic!("expected p"); };
+        assert_eq!(p.children, vec![Node::Text("after".into())]);
     }
 
     #[test]
