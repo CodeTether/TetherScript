@@ -281,10 +281,13 @@ fn node_object(handle: DomHandle) -> JsValue {
     obj.insert("innerHTML".into(), JsValue::String(inner_html(&node)));
     obj.insert("children".into(), children_array(&handle, &node));
     obj.insert("childElementCount".into(), JsValue::Number(child_element_count(&node) as f64));
+    obj.insert("parentNode".into(), handle.parent().map(shallow_node_object).unwrap_or(JsValue::Null));
 
     if let Node::Element(el) = &node {
         obj.insert("id".into(), JsValue::String(el.attrs.get("id").cloned().unwrap_or_default()));
         obj.insert("className".into(), JsValue::String(el.attrs.get("class").cloned().unwrap_or_default()));
+        obj.insert("value".into(), JsValue::String(el.attrs.get("value").cloned().unwrap_or_default()));
+        obj.insert("checked".into(), JsValue::Bool(el.attrs.contains_key("checked")));
     }
 
     install_property_setters(&mut obj, &handle);
@@ -416,6 +419,21 @@ impl DomHandle {
         if let Some(node) = get_node_mut(&mut self.root.borrow_mut(), &self.path) { f(node); }
     }
 
+    fn parent(&self) -> Option<DomHandle> {
+        let (_, parent_path) = self.path.split_last()?;
+        Some(DomHandle { root: self.root.clone(), path: parent_path.to_vec() })
+    }
+
+    fn bubble_path(&self) -> Vec<DomHandle> {
+        let mut path = self.path.clone();
+        let mut out = Vec::new();
+        loop {
+            out.push(DomHandle { root: self.root.clone(), path: path.clone() });
+            if path.pop().is_none() { break; }
+        }
+        out
+    }
+
     fn append_child(&self, child: Node, position: InsertPosition) -> Vec<usize> {
         let mut root = self.root.borrow_mut();
         let parent = get_node_mut(&mut root, &self.path);
@@ -455,11 +473,16 @@ impl DomHandle {
     fn dispatch_event(&self, event: JsValue) -> Result<JsValue, String> {
         let event_type = event_type(&event).unwrap_or_else(|| "event".into());
         let target = node_object(self.clone());
-        let event = normalize_event(event, &event_type, target.clone(), target.clone());
-        let listeners = self.listeners(&event_type);
-        for listener in listeners { call_dom_listener(listener, target.clone(), event.clone())?; }
-        if let Some(handler) = self.handler(&format!("on{}", event_type)) { call_dom_listener(handler, target, event)?; }
-        Ok(JsValue::Bool(true))
+        let event = normalize_event(event, &event_type, target, node_object(self.clone()));
+        for current in self.bubble_path() {
+            let current_target = node_object(current.clone());
+            set_event_current_target(&event, current_target.clone());
+            for listener in current.listeners(&event_type) { call_dom_listener(listener, current_target.clone(), event.clone())?; }
+            if let Some(handler) = current.handler(&format!("on{}", event_type)) {
+                if call_dom_listener(handler, current_target, event.clone())? == JsValue::Bool(false) { set_event_default_prevented(&event); }
+            }
+        }
+        Ok(JsValue::Bool(!event_default_prevented(&event)))
     }
 
     fn listeners(&self, event_type: &str) -> Vec<JsValue> {
@@ -504,6 +527,41 @@ fn install_property_setters(obj: &mut HashMap<String, JsValue>, handle: &DomHand
         h.with_node_mut(|node| { if let Node::Element(el) = node { el.attrs.insert("class".into(), value); } });
         Ok(JsValue::Undefined)
     }));
+
+    let h = handle.clone();
+    obj.insert("__set:value".into(), native("set_value", Some(1), move |args| {
+        let value = args.first().unwrap_or(&JsValue::Undefined).display();
+        h.with_node_mut(|node| { if let Node::Element(el) = node { el.attrs.insert("value".into(), value); } });
+        Ok(JsValue::Undefined)
+    }));
+
+    let h = handle.clone();
+    obj.insert("__set:checked".into(), native("set_checked", Some(1), move |args| {
+        let checked = args.first().is_some_and(JsValue::truthy);
+        h.with_node_mut(|node| {
+            if let Node::Element(el) = node {
+                if checked { el.attrs.insert("checked".into(), "checked".into()); } else { el.attrs.remove("checked"); }
+            }
+        });
+        Ok(JsValue::Undefined)
+    }));
+}
+
+fn shallow_node_object(handle: DomHandle) -> JsValue {
+    let node = handle.node().unwrap_or(Node::Text(String::new()));
+    let mut obj = HashMap::new();
+    obj.insert("nodeType".into(), JsValue::Number(if matches!(node, Node::Text(_)) { 3.0 } else if node_name(&node) == "#document" { 9.0 } else { 1.0 }));
+    obj.insert("nodeName".into(), JsValue::String(node_name(&node)));
+    obj.insert("tagName".into(), JsValue::String(node_name(&node).to_ascii_uppercase()));
+    obj.insert("textContent".into(), JsValue::String(text_content_raw(&node)));
+    if let Node::Element(el) = &node {
+        obj.insert("id".into(), JsValue::String(el.attrs.get("id").cloned().unwrap_or_default()));
+        obj.insert("className".into(), JsValue::String(el.attrs.get("class").cloned().unwrap_or_default()));
+        obj.insert("value".into(), JsValue::String(el.attrs.get("value").cloned().unwrap_or_default()));
+        obj.insert("checked".into(), JsValue::Bool(el.attrs.contains_key("checked")));
+    }
+    install_property_setters(&mut obj, &handle);
+    JsValue::Object(Rc::new(RefCell::new(obj)))
 }
 
 fn js_value_to_node(value: &JsValue) -> Node {
@@ -545,9 +603,8 @@ fn get_node_mut<'a>(node: &'a mut Node, path: &[usize]) -> Option<&'a mut Node> 
     }
 }
 
-fn call_dom_listener(listener: JsValue, this_value: JsValue, event: JsValue) -> Result<(), String> {
-    js::call_function_with_this(listener, this_value, std::slice::from_ref(&event))?;
-    Ok(())
+fn call_dom_listener(listener: JsValue, this_value: JsValue, event: JsValue) -> Result<JsValue, String> {
+    js::call_function_with_this(listener, this_value, std::slice::from_ref(&event))
 }
 
 fn event_type(event: &JsValue) -> Option<String> {
@@ -564,6 +621,18 @@ fn normalize_event(event: JsValue, event_type: &str, target: JsValue, current_ta
     let event_for_prevent = event_ref.clone();
     event_ref.borrow_mut().insert("preventDefault".into(), native("preventDefault", Some(0), move |_| { event_for_prevent.borrow_mut().insert("defaultPrevented".into(), JsValue::Bool(true)); Ok(JsValue::Undefined) }));
     JsValue::Object(event_ref)
+}
+
+fn set_event_current_target(event: &JsValue, current_target: JsValue) {
+    if let JsValue::Object(obj) = event { obj.borrow_mut().insert("currentTarget".into(), current_target); }
+}
+
+fn set_event_default_prevented(event: &JsValue) {
+    if let JsValue::Object(obj) = event { obj.borrow_mut().insert("defaultPrevented".into(), JsValue::Bool(true)); }
+}
+
+fn event_default_prevented(event: &JsValue) -> bool {
+    matches!(event, JsValue::Object(obj) if obj.borrow().get("defaultPrevented").is_some_and(JsValue::truthy))
 }
 
 fn parse_location(href: &str) -> HashMap<String, JsValue> {
@@ -797,6 +866,33 @@ mod tests {
             "let btn=document.getElementById('go'); btn.onclick=function(e){ this.setAttribute('data-clicked', e.type); }; btn.dispatchEvent({type:'click'}); document.getElementById('go').getAttribute('data-clicked');",
         ).unwrap();
         assert_eq!(result.value, JsValue::String("click".into()));
+    }
+
+    #[test]
+    fn events_bubble_with_current_target_and_default_prevention() {
+        let result = eval_with_dom(
+            "<form id='form'><button id='go'>Send</button></form>",
+            "let form=document.getElementById('form'); let btn=document.getElementById('go'); let seen=''; form.addEventListener('click', function(e){ seen=seen+'form:'+e.target.id+':'+e.currentTarget.id+':'+e.defaultPrevented+';'; }); btn.addEventListener('click', function(e){ seen=seen+'btn:'+e.target.id+':'+e.currentTarget.id+';'; e.preventDefault(); }); let ok=btn.dispatchEvent({type:'click'}); seen + ok;",
+        ).unwrap();
+        assert_eq!(result.value, JsValue::String("btn:go:go;form:go:form:true;false".into()));
+    }
+
+    #[test]
+    fn inline_handler_false_prevents_default_and_parent_node_links_parent() {
+        let result = eval_with_dom(
+            "<div id='outer'><button id='go'>Send</button></div>",
+            "let btn=document.getElementById('go'); btn.onclick=function(e){ return false; }; let ok=btn.dispatchEvent({type:'click'}); ok + ':' + btn.parentNode.id;",
+        ).unwrap();
+        assert_eq!(result.value, JsValue::String("false:outer".into()));
+    }
+
+    #[test]
+    fn form_value_and_checked_properties_reflect_and_update_attributes() {
+        let result = eval_with_dom(
+            "<input id='name' value='Riley'><input id='agree' checked>",
+            "let name=document.getElementById('name'); let agree=document.getElementById('agree'); let before=name.value+':'+agree.checked; name.value='Casey'; agree.checked=false; before + '|' + name.value + ':' + name.getAttribute('value') + ':' + agree.checked + ':' + agree.hasAttribute('checked');",
+        ).unwrap();
+        assert_eq!(result.value, JsValue::String("Riley:true|Casey:Casey:false:false".into()));
     }
 
     #[test]
