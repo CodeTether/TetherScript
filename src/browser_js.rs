@@ -113,10 +113,20 @@ fn install_dom_globals(engine: &mut JsEngine, root: Rc<RefCell<Node>>, timers: R
     window.insert("document".into(), document);
     let location = location_object("http://localhost/");
     let navigator = navigator_object();
+    let url_ctor = native("URL", None, |args| {
+        let input = args.first().unwrap_or(&JsValue::Undefined).display();
+        let base = args.get(1).map(JsValue::display).unwrap_or_else(|| "http://localhost/".into());
+        Ok(url_object(&resolve_url(&input, &base)))
+    });
+    let search_params_ctor = native("URLSearchParams", None, |args| {
+        Ok(url_search_params_object(&args.first().map(JsValue::display).unwrap_or_default()))
+    });
     let local_storage = storage_object("localStorage");
     let session_storage = storage_object("sessionStorage");
     window.insert("location".into(), location.clone());
     window.insert("navigator".into(), navigator.clone());
+    window.insert("URL".into(), url_ctor.clone());
+    window.insert("URLSearchParams".into(), search_params_ctor.clone());
     window.insert("localStorage".into(), local_storage.clone());
     window.insert("sessionStorage".into(), session_storage.clone());
     install_fetch_bindings(&mut window);
@@ -136,6 +146,8 @@ fn install_dom_globals(engine: &mut JsEngine, root: Rc<RefCell<Node>>, timers: R
     engine.set_global("self", window.clone());
     engine.set_global("location", location);
     engine.set_global("navigator", navigator);
+    engine.set_global("URL", url_ctor);
+    engine.set_global("URLSearchParams", search_params_ctor);
     engine.set_global("localStorage", local_storage);
     engine.set_global("sessionStorage", session_storage);
     if let JsValue::Object(obj) = &window {
@@ -252,10 +264,59 @@ fn timer_id(value: &JsValue) -> u32 {
 }
 
 fn location_object(href: &str) -> JsValue {
-    let mut obj = parse_location(href);
-    obj.insert("assign".into(), native("location.assign", Some(1), |_| Ok(JsValue::Undefined)));
-    obj.insert("replace".into(), native("location.replace", Some(1), |_| Ok(JsValue::Undefined)));
-    JsValue::Object(Rc::new(RefCell::new(obj)))
+    let object = Rc::new(RefCell::new(parse_location(&normalize_url(href))));
+    {
+        let object = object.clone();
+        let object_for_closure = object.clone();
+        object.borrow_mut().insert("assign".into(), native("location.assign", Some(1), move |args| {
+            let current = object_for_closure.borrow().get("href").map(JsValue::display).unwrap_or_else(|| "http://localhost/".into());
+            let next = resolve_url(&args.first().unwrap_or(&JsValue::Undefined).display(), &current);
+            update_url_like_object(&object_for_closure, &next);
+            Ok(JsValue::Undefined)
+        }));
+    }
+    {
+        let object = object.clone();
+        let object_for_closure = object.clone();
+        object.borrow_mut().insert("replace".into(), native("location.replace", Some(1), move |args| {
+            let current = object_for_closure.borrow().get("href").map(JsValue::display).unwrap_or_else(|| "http://localhost/".into());
+            let next = resolve_url(&args.first().unwrap_or(&JsValue::Undefined).display(), &current);
+            update_url_like_object(&object_for_closure, &next);
+            Ok(JsValue::Undefined)
+        }));
+    }
+    JsValue::Object(object)
+}
+
+fn url_object(href: &str) -> JsValue {
+    let object = Rc::new(RefCell::new(parse_location(&normalize_url(href))));
+    let search = object.borrow().get("search").map(JsValue::display).unwrap_or_default();
+    object.borrow_mut().insert("searchParams".into(), url_search_params_object(&search));
+    {
+        let object = object.clone();
+        let object_for_closure = object.clone();
+        object.borrow_mut().insert("toString".into(), native("URL.toString", Some(0), move |_| Ok(JsValue::String(object_for_closure.borrow().get("href").map(JsValue::display).unwrap_or_default()))));
+    }
+    object.borrow_mut().insert("__set:href".into(), {
+        let object = object.clone();
+        native("set_URL_href", Some(1), move |args| {
+            update_url_like_object(&object, &normalize_url(&args.first().unwrap_or(&JsValue::Undefined).display()));
+            Ok(JsValue::Undefined)
+        })
+    });
+    JsValue::Object(object)
+}
+
+fn update_url_like_object(object: &Rc<RefCell<HashMap<String, JsValue>>>, href: &str) {
+    let methods = {
+        let obj = object.borrow();
+        ["assign", "replace", "toString", "__set:href"].into_iter().filter_map(|k| obj.get(k).cloned().map(|v| (k.to_string(), v))).collect::<Vec<_>>()
+    };
+    let mut parsed = parse_location(&normalize_url(href));
+    let search = parsed.get("search").map(JsValue::display).unwrap_or_default();
+    parsed.insert("searchParams".into(), url_search_params_object(&search));
+    for (k, v) in methods { parsed.insert(k, v); }
+    *object.borrow_mut() = parsed;
 }
 
 fn navigator_object() -> JsValue {
@@ -713,6 +774,99 @@ fn event_default_prevented(event: &JsValue) -> bool {
     matches!(event, JsValue::Object(obj) if obj.borrow().get("defaultPrevented").is_some_and(JsValue::truthy))
 }
 
+fn normalize_url(href: &str) -> String {
+    if href.contains("://") { href.to_string() } else { resolve_url(href, "http://localhost/") }
+}
+
+fn resolve_url(input: &str, base: &str) -> String {
+    if input.contains("://") { return input.to_string(); }
+    let base = normalize_url(base);
+    let base_parts = parse_location(&base);
+    let origin = base_parts.get("origin").map(JsValue::display).unwrap_or_else(|| "http://localhost".into());
+    if input.starts_with("//") {
+        let protocol = base_parts.get("protocol").map(JsValue::display).unwrap_or_else(|| "http:".into());
+        return format!("{}{}", protocol, input);
+    }
+    if input.starts_with('#') {
+        let no_hash = base.split('#').next().unwrap_or(&base);
+        return format!("{}{}", no_hash, input);
+    }
+    if input.starts_with('?') {
+        let no_query = base.split('?').next().unwrap_or(&base).split('#').next().unwrap_or(&base);
+        return format!("{}{}", no_query, input);
+    }
+    if input.starts_with('/') { return format!("{}{}", origin, input); }
+    let path = base_parts.get("pathname").map(JsValue::display).unwrap_or_else(|| "/".into());
+    let dir = path.rsplit_once('/').map(|(d, _)| format!("{}/", d)).unwrap_or_else(|| "/".into());
+    format!("{}{}{}", origin, dir, input)
+}
+
+fn url_search_params_object(init: &str) -> JsValue {
+    let entries = Rc::new(RefCell::new(parse_search_params(init)));
+    let object = Rc::new(RefCell::new(HashMap::new()));
+    {
+        let entries = entries.clone();
+        object.borrow_mut().insert("get".into(), native("URLSearchParams.get", Some(1), move |args| {
+            let key = args.first().unwrap_or(&JsValue::Undefined).display();
+            Ok(entries.borrow().iter().find(|(k, _)| k == &key).map(|(_, v)| JsValue::String(v.clone())).unwrap_or(JsValue::Null))
+        }));
+    }
+    {
+        let entries = entries.clone();
+        object.borrow_mut().insert("set".into(), native("URLSearchParams.set", Some(2), move |args| {
+            let key = args.first().unwrap_or(&JsValue::Undefined).display();
+            let value = args.get(1).unwrap_or(&JsValue::Undefined).display();
+            let mut entries = entries.borrow_mut();
+            entries.retain(|(k, _)| k != &key);
+            entries.push((key, value));
+            Ok(JsValue::Undefined)
+        }));
+    }
+    {
+        let entries = entries.clone();
+        object.borrow_mut().insert("append".into(), native("URLSearchParams.append", Some(2), move |args| {
+            entries.borrow_mut().push((args.first().unwrap_or(&JsValue::Undefined).display(), args.get(1).unwrap_or(&JsValue::Undefined).display()));
+            Ok(JsValue::Undefined)
+        }));
+    }
+    {
+        let entries = entries.clone();
+        object.borrow_mut().insert("has".into(), native("URLSearchParams.has", Some(1), move |args| {
+            let key = args.first().unwrap_or(&JsValue::Undefined).display();
+            Ok(JsValue::Bool(entries.borrow().iter().any(|(k, _)| k == &key)))
+        }));
+    }
+    {
+        let entries = entries.clone();
+        object.borrow_mut().insert("delete".into(), native("URLSearchParams.delete", Some(1), move |args| {
+            let key = args.first().unwrap_or(&JsValue::Undefined).display();
+            entries.borrow_mut().retain(|(k, _)| k != &key);
+            Ok(JsValue::Undefined)
+        }));
+    }
+    {
+        let entries = entries.clone();
+        object.borrow_mut().insert("toString".into(), native("URLSearchParams.toString", Some(0), move |_| Ok(JsValue::String(serialize_search_params(&entries.borrow())))));
+    }
+    JsValue::Object(object)
+}
+
+fn parse_search_params(init: &str) -> Vec<(String, String)> {
+    let query = init.strip_prefix('?').unwrap_or(init);
+    if query.is_empty() { return Vec::new(); }
+    query.split('&').filter(|part| !part.is_empty()).map(|part| {
+        let (key, value) = part.split_once('=').unwrap_or((part, ""));
+        (decode_query_component(key), decode_query_component(value))
+    }).collect()
+}
+
+fn serialize_search_params(entries: &[(String, String)]) -> String {
+    entries.iter().map(|(k, v)| format!("{}={}", encode_query_component(k), encode_query_component(v))).collect::<Vec<_>>().join("&")
+}
+
+fn decode_query_component(input: &str) -> String { input.replace('+', " ") }
+fn encode_query_component(input: &str) -> String { input.replace(' ', "+") }
+
 fn parse_location(href: &str) -> HashMap<String, JsValue> {
     let mut protocol = "http:".to_string(); let mut host = "localhost".to_string(); let mut pathname = "/".to_string(); let mut search = String::new(); let mut hash = String::new();
     if let Some((p, rest)) = href.split_once("://") {
@@ -893,7 +1047,7 @@ fn child_element_count(node: &Node) -> usize {
 }
 
 pub fn compatibility_report_to_value(_args: &[Value]) -> Result<Value, String> {
-    let features = ["document", "window", "self", "selectors", "attributes", "textContent", "innerHTML", "createElement", "append", "remove", "events", "this", "typeof", "functionExpressions", "forLoops", "location", "navigator", "setTimeout", "clearTimeout", "deterministicTimers", "localStorage", "sessionStorage", "Storage.getItem", "Storage.setItem", "Storage.removeItem", "Storage.clear", "Storage.key", "Storage.length", "fetch", "Headers", "Response", "Response.text", "Response.json"];
+    let features = ["document", "window", "self", "selectors", "attributes", "textContent", "innerHTML", "createElement", "append", "remove", "events", "this", "typeof", "functionExpressions", "forLoops", "location", "URL", "URLSearchParams", "navigator", "setTimeout", "clearTimeout", "deterministicTimers", "localStorage", "sessionStorage", "Storage.getItem", "Storage.setItem", "Storage.removeItem", "Storage.clear", "Storage.key", "Storage.length", "fetch", "Headers", "Response", "Response.text", "Response.json"];
     Ok(Value::List(Rc::new(RefCell::new(features.into_iter().map(|s| Value::Str(Rc::new(s.into()))).collect()))))
 }
 
@@ -989,6 +1143,24 @@ mod tests {
             "navigator.userAgent.length > 0 && location.pathname == '/' && window.location.origin == 'http://localhost' && window.navigator.language == 'en-US';",
         ).unwrap();
         assert_eq!(result.value, JsValue::Bool(true));
+    }
+
+    #[test]
+    fn url_and_url_search_params_are_available() {
+        let result = eval_with_dom(
+            "<main></main>",
+            "let u=URL('/docs/page?x=1#top', 'https://example.com/root/index.html'); let p=URLSearchParams('a=1&b=two+words'); p.set('a','2'); p.append('c','3'); u.origin + '|' + u.pathname + '|' + u.searchParams.get('x') + '|' + p.get('b') + '|' + p.has('c') + '|' + p.toString();",
+        ).unwrap();
+        assert_eq!(result.value, JsValue::String("https://example.com|/docs/page|1|two words|true|b=two+words&a=2&c=3".into()));
+    }
+
+    #[test]
+    fn location_assign_and_replace_update_location_fields() {
+        let result = eval_with_dom(
+            "<main></main>",
+            "location.assign('/next?ok=1#frag'); let first=location.href + '|' + location.pathname + '|' + location.search + '|' + location.hash; location.replace('child'); first + '>' + location.href;",
+        ).unwrap();
+        assert_eq!(result.value, JsValue::String("http://localhost/next?ok=1#frag|/next|?ok=1|#frag>http://localhost/child".into()));
     }
 
     #[test]
