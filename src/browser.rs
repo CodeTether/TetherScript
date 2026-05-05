@@ -158,6 +158,13 @@ pub fn query_selector(document: &Document, selector: &str) -> Vec<Node> {
     out
 }
 
+pub fn element_matches(element: &Element, ancestors: &[Element], selector: &str) -> bool {
+    let Some(selector) = parse_selector(selector) else {
+        return false;
+    };
+    selector_matches(&selector, element, ancestors)
+}
+
 pub fn text_content(node: &Node) -> String {
     let mut out = String::new();
     collect_text(node, &mut out);

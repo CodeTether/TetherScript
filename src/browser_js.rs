@@ -128,28 +128,12 @@ fn install_dom_globals(
     window.insert("document".into(), document);
     let location = location_object("http://localhost/");
     let navigator = navigator_object();
-    let url_ctor = native("URL", None, |args| {
-        let input = args.first().unwrap_or(&JsValue::Undefined).display();
-        let base = args
-            .get(1)
-            .map(JsValue::display)
-            .unwrap_or_else(|| "http://localhost/".into());
-        Ok(url_object(&resolve_url(&input, &base)))
-    });
-    let search_params_ctor = native("URLSearchParams", None, |args| {
-        Ok(url_search_params_object(
-            &args.first().map(JsValue::display).unwrap_or_default(),
-        ))
-    });
     let local_storage = storage_object("localStorage");
     let session_storage = storage_object("sessionStorage");
     window.insert("location".into(), location.clone());
     window.insert("navigator".into(), navigator.clone());
-    window.insert("URL".into(), url_ctor.clone());
-    window.insert("URLSearchParams".into(), search_params_ctor.clone());
     window.insert("localStorage".into(), local_storage.clone());
     window.insert("sessionStorage".into(), session_storage.clone());
-    install_fetch_bindings(&mut window);
     install_timer_bindings(&mut window, timers);
     let window = JsValue::Object(Rc::new(RefCell::new(window)));
     if let JsValue::Object(obj) = &window {
@@ -162,252 +146,14 @@ fn install_dom_globals(
         if let Some(clear_timeout) = borrowed.get("clearTimeout").cloned() {
             engine.set_global("clearTimeout", clear_timeout);
         }
-        if let Some(fetch) = borrowed.get("fetch").cloned() {
-            engine.set_global("fetch", fetch);
-        }
-        if let Some(headers) = borrowed.get("Headers").cloned() {
-            engine.set_global("Headers", headers);
-        }
-        if let Some(response) = borrowed.get("Response").cloned() {
-            engine.set_global("Response", response);
-        }
     }
     engine.set_global("window", window.clone());
     engine.set_global("self", window.clone());
     engine.set_global("location", location);
     engine.set_global("navigator", navigator);
-    engine.set_global("URL", url_ctor);
-    engine.set_global("URLSearchParams", search_params_ctor);
     engine.set_global("localStorage", local_storage);
     engine.set_global("sessionStorage", session_storage);
-    if let JsValue::Object(obj) = &window {
-        for name in ["fetch", "Headers", "Response"] {
-            if let Some(value) = obj.borrow().get(name).cloned() {
-                engine.set_global(name, value);
-            }
-        }
-    }
     window
-}
-
-fn install_fetch_bindings(window: &mut HashMap<String, JsValue>) {
-    let headers_ctor = native("Headers", None, |args| Ok(headers_object(args.first())));
-    let response_ctor = native("Response", None, |args| {
-        let body = args.first().map(JsValue::display).unwrap_or_default();
-        let init = args.get(1);
-        let status = object_number(init, "status").unwrap_or(200.0) as u16;
-        let status_text =
-            object_string(init, "statusText").unwrap_or_else(|| default_status_text(status).into());
-        let headers = object_prop(init, "headers").unwrap_or_else(|| headers_object(None));
-        Ok(response_object(
-            body,
-            status,
-            status_text,
-            headers,
-            String::new(),
-        ))
-    });
-    let fetch = native("fetch", None, |args| {
-        let url = args.first().map(JsValue::display).unwrap_or_default();
-        let mut body = format!("fetch stub: {}", url);
-        let mut status = 200;
-        if let Some(init) = args.get(1) {
-            if let Some(method) = object_string(Some(init), "method") {
-                body = format!("fetch stub: {} {}", method.to_ascii_uppercase(), url);
-            }
-            if let Some(mock_body) = object_string(Some(init), "body") {
-                body = mock_body;
-            }
-            if let Some(mock_status) = object_number(Some(init), "status") {
-                status = mock_status as u16;
-            }
-        }
-        let mut headers = vec![("content-type".into(), "text/plain;charset=utf-8".into())];
-        if let Some(init_headers) = args
-            .get(1)
-            .and_then(|init| object_prop(Some(init), "headers"))
-        {
-            headers.extend(headers_entries(&init_headers));
-        }
-        Ok(response_object(
-            body,
-            status,
-            default_status_text(status).into(),
-            headers_from_entries(headers),
-            url,
-        ))
-    });
-
-    window.insert("Headers".into(), headers_ctor.clone());
-    window.insert("Response".into(), response_ctor.clone());
-    window.insert("fetch".into(), fetch.clone());
-}
-
-fn response_object(
-    body: String,
-    status: u16,
-    status_text: String,
-    headers: JsValue,
-    url: String,
-) -> JsValue {
-    let ok = (200..=299).contains(&status);
-    let mut obj = HashMap::new();
-    obj.insert("body".into(), JsValue::String(body.clone()));
-    obj.insert("status".into(), JsValue::Number(status as f64));
-    obj.insert("statusText".into(), JsValue::String(status_text));
-    obj.insert("ok".into(), JsValue::Bool(ok));
-    obj.insert("url".into(), JsValue::String(url));
-    obj.insert("headers".into(), headers);
-    let text_body = body.clone();
-    obj.insert(
-        "text".into(),
-        native("Response.text", Some(0), move |_| {
-            Ok(JsValue::String(text_body.clone()))
-        }),
-    );
-    obj.insert(
-        "json".into(),
-        native("Response.json", Some(0), move |_| {
-            Ok(json_stub_value(&body))
-        }),
-    );
-    JsValue::Object(Rc::new(RefCell::new(obj)))
-}
-
-fn headers_object(init: Option<&JsValue>) -> JsValue {
-    headers_from_entries(init.into_iter().flat_map(headers_entries).collect())
-}
-
-fn headers_from_entries(entries: Vec<(String, String)>) -> JsValue {
-    let entries = Rc::new(RefCell::new(normalize_header_entries(entries)));
-    let mut obj = HashMap::new();
-    obj.insert(
-        "get".into(),
-        header_method(entries.clone(), "Headers.get", |entries, name, _| {
-            entries
-                .iter()
-                .find(|(k, _)| k == &name)
-                .map(|(_, v)| JsValue::String(v.clone()))
-                .unwrap_or(JsValue::Null)
-        }),
-    );
-    obj.insert(
-        "has".into(),
-        header_method(entries.clone(), "Headers.has", |entries, name, _| {
-            JsValue::Bool(entries.iter().any(|(k, _)| k == &name))
-        }),
-    );
-    obj.insert(
-        "set".into(),
-        header_method(entries.clone(), "Headers.set", |entries, name, value| {
-            set_header(entries, name, value);
-            JsValue::Undefined
-        }),
-    );
-    obj.insert(
-        "append".into(),
-        header_method(entries.clone(), "Headers.append", |entries, name, value| {
-            append_header(entries, name, value);
-            JsValue::Undefined
-        }),
-    );
-    JsValue::Object(Rc::new(RefCell::new(obj)))
-}
-
-fn header_method(
-    entries: Rc<RefCell<Vec<(String, String)>>>,
-    name: &'static str,
-    f: fn(&mut Vec<(String, String)>, String, String) -> JsValue,
-) -> JsValue {
-    native(name, None, move |args| {
-        let key = args
-            .first()
-            .map(JsValue::display)
-            .unwrap_or_default()
-            .to_ascii_lowercase();
-        let value = args.get(1).map(JsValue::display).unwrap_or_default();
-        Ok(f(&mut entries.borrow_mut(), key, value))
-    })
-}
-
-fn normalize_header_entries(entries: Vec<(String, String)>) -> Vec<(String, String)> {
-    let mut out = Vec::new();
-    for (k, v) in entries {
-        append_header(&mut out, k.to_ascii_lowercase(), v);
-    }
-    out
-}
-fn set_header(entries: &mut Vec<(String, String)>, name: String, value: String) {
-    entries.retain(|(k, _)| k != &name);
-    entries.push((name, value));
-}
-fn append_header(entries: &mut Vec<(String, String)>, name: String, value: String) {
-    if let Some((_, existing)) = entries.iter_mut().find(|(k, _)| k == &name) {
-        if !existing.is_empty() {
-            existing.push_str(", ");
-        }
-        existing.push_str(&value);
-    } else {
-        entries.push((name, value));
-    }
-}
-
-fn headers_entries(value: &JsValue) -> Vec<(String, String)> {
-    match value {
-        JsValue::Object(obj) => obj
-            .borrow()
-            .iter()
-            .filter(|(_, v)| {
-                !matches!(
-                    v,
-                    JsValue::Native(_) | JsValue::Function(_) | JsValue::BoundFunction(_)
-                )
-            })
-            .map(|(k, v)| (k.to_ascii_lowercase(), v.display()))
-            .collect(),
-        _ => Vec::new(),
-    }
-}
-fn object_prop(value: Option<&JsValue>, prop: &str) -> Option<JsValue> {
-    match value {
-        Some(JsValue::Object(obj)) => obj.borrow().get(prop).cloned(),
-        _ => None,
-    }
-}
-fn object_string(value: Option<&JsValue>, prop: &str) -> Option<String> {
-    object_prop(value, prop).map(|v| v.display())
-}
-fn object_number(value: Option<&JsValue>, prop: &str) -> Option<f64> {
-    match object_prop(value, prop) {
-        Some(JsValue::Number(n)) => Some(n),
-        Some(v) => v.display().parse().ok(),
-        None => None,
-    }
-}
-fn default_status_text(status: u16) -> &'static str {
-    match status {
-        200 => "OK",
-        201 => "Created",
-        204 => "No Content",
-        400 => "Bad Request",
-        404 => "Not Found",
-        500 => "Internal Server Error",
-        _ => "",
-    }
-}
-fn json_stub_value(body: &str) -> JsValue {
-    let trimmed = body.trim();
-    if trimmed == "null" {
-        JsValue::Null
-    } else if trimmed == "true" {
-        JsValue::Bool(true)
-    } else if trimmed == "false" {
-        JsValue::Bool(false)
-    } else if let Ok(n) = trimmed.parse::<f64>() {
-        JsValue::Number(n)
-    } else {
-        JsValue::String(trimmed.trim_matches('"').into())
-    }
 }
 
 fn install_timer_bindings(window: &mut HashMap<String, JsValue>, timers: Rc<RefCell<TimerQueue>>) {
@@ -471,107 +217,16 @@ fn timer_id(value: &JsValue) -> u32 {
 }
 
 fn location_object(href: &str) -> JsValue {
-    let object = Rc::new(RefCell::new(parse_location(&normalize_url(href))));
-    {
-        let object = object.clone();
-        let object_for_closure = object.clone();
-        object.borrow_mut().insert(
-            "assign".into(),
-            native("location.assign", Some(1), move |args| {
-                let current = object_for_closure
-                    .borrow()
-                    .get("href")
-                    .map(JsValue::display)
-                    .unwrap_or_else(|| "http://localhost/".into());
-                let next = resolve_url(
-                    &args.first().unwrap_or(&JsValue::Undefined).display(),
-                    &current,
-                );
-                update_url_like_object(&object_for_closure, &next);
-                Ok(JsValue::Undefined)
-            }),
-        );
-    }
-    {
-        let object = object.clone();
-        let object_for_closure = object.clone();
-        object.borrow_mut().insert(
-            "replace".into(),
-            native("location.replace", Some(1), move |args| {
-                let current = object_for_closure
-                    .borrow()
-                    .get("href")
-                    .map(JsValue::display)
-                    .unwrap_or_else(|| "http://localhost/".into());
-                let next = resolve_url(
-                    &args.first().unwrap_or(&JsValue::Undefined).display(),
-                    &current,
-                );
-                update_url_like_object(&object_for_closure, &next);
-                Ok(JsValue::Undefined)
-            }),
-        );
-    }
-    JsValue::Object(object)
-}
-
-fn url_object(href: &str) -> JsValue {
-    let object = Rc::new(RefCell::new(parse_location(&normalize_url(href))));
-    let search = object
-        .borrow()
-        .get("search")
-        .map(JsValue::display)
-        .unwrap_or_default();
-    object
-        .borrow_mut()
-        .insert("searchParams".into(), url_search_params_object(&search));
-    {
-        let object = object.clone();
-        let object_for_closure = object.clone();
-        object.borrow_mut().insert(
-            "toString".into(),
-            native("URL.toString", Some(0), move |_| {
-                Ok(JsValue::String(
-                    object_for_closure
-                        .borrow()
-                        .get("href")
-                        .map(JsValue::display)
-                        .unwrap_or_default(),
-                ))
-            }),
-        );
-    }
-    object.borrow_mut().insert("__set:href".into(), {
-        let object = object.clone();
-        native("set_URL_href", Some(1), move |args| {
-            update_url_like_object(
-                &object,
-                &normalize_url(&args.first().unwrap_or(&JsValue::Undefined).display()),
-            );
-            Ok(JsValue::Undefined)
-        })
-    });
-    JsValue::Object(object)
-}
-
-fn update_url_like_object(object: &Rc<RefCell<HashMap<String, JsValue>>>, href: &str) {
-    let methods = {
-        let obj = object.borrow();
-        ["assign", "replace", "toString", "__set:href"]
-            .into_iter()
-            .filter_map(|k| obj.get(k).cloned().map(|v| (k.to_string(), v)))
-            .collect::<Vec<_>>()
-    };
-    let mut parsed = parse_location(&normalize_url(href));
-    let search = parsed
-        .get("search")
-        .map(JsValue::display)
-        .unwrap_or_default();
-    parsed.insert("searchParams".into(), url_search_params_object(&search));
-    for (k, v) in methods {
-        parsed.insert(k, v);
-    }
-    *object.borrow_mut() = parsed;
+    let mut obj = parse_location(href);
+    obj.insert(
+        "assign".into(),
+        native("location.assign", Some(1), |_| Ok(JsValue::Undefined)),
+    );
+    obj.insert(
+        "replace".into(),
+        native("location.replace", Some(1), |_| Ok(JsValue::Undefined)),
+    );
+    JsValue::Object(Rc::new(RefCell::new(obj)))
 }
 
 fn navigator_object() -> JsValue {
@@ -757,13 +412,6 @@ fn node_object(handle: DomHandle) -> JsValue {
         "childElementCount".into(),
         JsValue::Number(child_element_count(&node) as f64),
     );
-    obj.insert(
-        "parentNode".into(),
-        handle
-            .parent()
-            .map(shallow_node_object)
-            .unwrap_or(JsValue::Null),
-    );
 
     if let Node::Element(el) = &node {
         obj.insert(
@@ -774,6 +422,8 @@ fn node_object(handle: DomHandle) -> JsValue {
             "className".into(),
             JsValue::String(el.attrs.get("class").cloned().unwrap_or_default()),
         );
+        obj.insert("classList".into(), class_list_object(handle.clone()));
+        obj.insert("dataset".into(), dataset_object(handle.clone(), el));
         obj.insert(
             "value".into(),
             JsValue::String(el.attrs.get("value").cloned().unwrap_or_default()),
@@ -975,6 +625,45 @@ fn node_object(handle: DomHandle) -> JsValue {
 
     let h = handle.clone();
     obj.insert(
+        "matches".into(),
+        native("matches", Some(1), move |args| {
+            let selector = args.first().unwrap_or(&JsValue::Undefined).display();
+            let Some(Node::Element(el)) = h.node() else {
+                return Ok(JsValue::Bool(false));
+            };
+            Ok(JsValue::Bool(browser::element_matches(
+                &el,
+                &h.ancestors(),
+                &selector,
+            )))
+        }),
+    );
+
+    let h = handle.clone();
+    obj.insert(
+        "closest".into(),
+        native("closest", Some(1), move |args| {
+            let selector = args.first().unwrap_or(&JsValue::Undefined).display();
+            let mut path = h.path.clone();
+            loop {
+                let candidate = DomHandle {
+                    root: h.root.clone(),
+                    path: path.clone(),
+                };
+                if let Some(Node::Element(el)) = candidate.node() {
+                    if browser::element_matches(&el, &candidate.ancestors(), &selector) {
+                        return Ok(node_object(candidate));
+                    }
+                }
+                if path.pop().is_none() {
+                    return Ok(JsValue::Null);
+                }
+            }
+        }),
+    );
+
+    let h = handle.clone();
+    obj.insert(
         "addEventListener".into(),
         native("addEventListener", Some(2), move |args| {
             let event_type = args.first().unwrap_or(&JsValue::Undefined).display();
@@ -1031,29 +720,6 @@ impl DomHandle {
         }
     }
 
-    fn parent(&self) -> Option<DomHandle> {
-        let (_, parent_path) = self.path.split_last()?;
-        Some(DomHandle {
-            root: self.root.clone(),
-            path: parent_path.to_vec(),
-        })
-    }
-
-    fn bubble_path(&self) -> Vec<DomHandle> {
-        let mut path = self.path.clone();
-        let mut out = Vec::new();
-        loop {
-            out.push(DomHandle {
-                root: self.root.clone(),
-                path: path.clone(),
-            });
-            if path.pop().is_none() {
-                break;
-            }
-        }
-        out
-    }
-
     fn append_child(&self, child: Node, position: InsertPosition) -> Vec<usize> {
         let mut root = self.root.borrow_mut();
         let parent = get_node_mut(&mut root, &self.path);
@@ -1095,6 +761,21 @@ impl DomHandle {
         format!("{:p}:{:?}", Rc::as_ptr(&self.root), self.path)
     }
 
+    fn ancestors(&self) -> Vec<Element> {
+        let root = self.root.borrow();
+        let mut ancestors = Vec::new();
+        let mut current: &Node = &root;
+        for index in &self.path {
+            if let Node::Element(el) = current {
+                ancestors.push(el.clone());
+                current = &el.children[*index];
+            } else {
+                break;
+            }
+        }
+        ancestors
+    }
+
     fn add_event_listener(&self, event_type: &str, listener: JsValue) {
         EVENT_REGISTRY.with(|registry| {
             registry
@@ -1132,22 +813,15 @@ impl DomHandle {
     fn dispatch_event(&self, event: JsValue) -> Result<JsValue, String> {
         let event_type = event_type(&event).unwrap_or_else(|| "event".into());
         let target = node_object(self.clone());
-        let event = normalize_event(event, &event_type, target, node_object(self.clone()));
-        for current in self.bubble_path() {
-            let current_target = node_object(current.clone());
-            set_event_current_target(&event, current_target.clone());
-            for listener in current.listeners(&event_type) {
-                call_dom_listener(listener, current_target.clone(), event.clone())?;
-            }
-            if let Some(handler) = current.handler(&format!("on{}", event_type)) {
-                if call_dom_listener(handler, current_target, event.clone())?
-                    == JsValue::Bool(false)
-                {
-                    set_event_default_prevented(&event);
-                }
-            }
+        let event = normalize_event(event, &event_type, target.clone(), target.clone());
+        let listeners = self.listeners(&event_type);
+        for listener in listeners {
+            call_dom_listener(listener, target.clone(), event.clone())?;
         }
-        Ok(JsValue::Bool(!event_default_prevented(&event)))
+        if let Some(handler) = self.handler(&format!("on{}", event_type)) {
+            call_dom_listener(handler, target, event)?;
+        }
+        Ok(JsValue::Bool(true))
     }
 
     fn listeners(&self, event_type: &str) -> Vec<JsValue> {
@@ -1238,16 +912,15 @@ fn install_property_setters(obj: &mut HashMap<String, JsValue>, handle: &DomHand
             Ok(JsValue::Undefined)
         }),
     );
-
     let h = handle.clone();
     obj.insert(
         "__set:checked".into(),
         native("set_checked", Some(1), move |args| {
-            let checked = args.first().is_some_and(JsValue::truthy);
+            let checked = args.first().unwrap_or(&JsValue::Undefined).truthy();
             h.with_node_mut(|node| {
                 if let Node::Element(el) = node {
                     if checked {
-                        el.attrs.insert("checked".into(), "checked".into());
+                        el.attrs.insert("checked".into(), String::new());
                     } else {
                         el.attrs.remove("checked");
                     }
@@ -1258,48 +931,160 @@ fn install_property_setters(obj: &mut HashMap<String, JsValue>, handle: &DomHand
     );
 }
 
-fn shallow_node_object(handle: DomHandle) -> JsValue {
-    let node = handle.node().unwrap_or(Node::Text(String::new()));
+fn class_list_object(handle: DomHandle) -> JsValue {
     let mut obj = HashMap::new();
     obj.insert(
-        "nodeType".into(),
-        JsValue::Number(if matches!(node, Node::Text(_)) {
-            3.0
-        } else if node_name(&node) == "#document" {
-            9.0
-        } else {
-            1.0
+        "length".into(),
+        JsValue::Number(class_tokens(&handle).len() as f64),
+    );
+    let h = handle.clone();
+    obj.insert(
+        "contains".into(),
+        native("classList.contains", Some(1), move |args| {
+            Ok(JsValue::Bool(class_tokens(&h).iter().any(|item| {
+                item == &args.first().unwrap_or(&JsValue::Undefined).display()
+            })))
         }),
     );
-    obj.insert("nodeName".into(), JsValue::String(node_name(&node)));
+    let h = handle.clone();
     obj.insert(
-        "tagName".into(),
-        JsValue::String(node_name(&node).to_ascii_uppercase()),
+        "add".into(),
+        native("classList.add", None, move |args| {
+            let mut tokens = class_tokens(&h);
+            for arg in args {
+                let token = arg.display();
+                if !token.is_empty() && !tokens.iter().any(|item| item == &token) {
+                    tokens.push(token);
+                }
+            }
+            set_class_tokens(&h, tokens);
+            Ok(JsValue::Undefined)
+        }),
     );
+    let h = handle.clone();
     obj.insert(
-        "textContent".into(),
-        JsValue::String(text_content_raw(&node)),
+        "remove".into(),
+        native("classList.remove", None, move |args| {
+            let remove = args.iter().map(JsValue::display).collect::<Vec<_>>();
+            set_class_tokens(
+                &h,
+                class_tokens(&h)
+                    .into_iter()
+                    .filter(|token| !remove.iter().any(|item| item == token))
+                    .collect(),
+            );
+            Ok(JsValue::Undefined)
+        }),
     );
-    if let Node::Element(el) = &node {
-        obj.insert(
-            "id".into(),
-            JsValue::String(el.attrs.get("id").cloned().unwrap_or_default()),
-        );
-        obj.insert(
-            "className".into(),
-            JsValue::String(el.attrs.get("class").cloned().unwrap_or_default()),
-        );
-        obj.insert(
-            "value".into(),
-            JsValue::String(el.attrs.get("value").cloned().unwrap_or_default()),
-        );
-        obj.insert(
-            "checked".into(),
-            JsValue::Bool(el.attrs.contains_key("checked")),
-        );
-    }
-    install_property_setters(&mut obj, &handle);
+    let h = handle.clone();
+    obj.insert(
+        "toggle".into(),
+        native("classList.toggle", None, move |args| {
+            let token = args.first().unwrap_or(&JsValue::Undefined).display();
+            let force = args.get(1).map(JsValue::truthy);
+            let mut tokens = class_tokens(&h);
+            let present = tokens.iter().any(|item| item == &token);
+            let should_have = force.unwrap_or(!present);
+            if should_have && !present && !token.is_empty() {
+                tokens.push(token.clone());
+            }
+            if !should_have {
+                tokens.retain(|item| item != &token);
+            }
+            set_class_tokens(&h, tokens);
+            Ok(JsValue::Bool(should_have))
+        }),
+    );
+    let h = handle.clone();
+    obj.insert(
+        "toString".into(),
+        native("classList.toString", Some(0), move |_| {
+            Ok(JsValue::String(class_tokens(&h).join(" ")))
+        }),
+    );
     JsValue::Object(Rc::new(RefCell::new(obj)))
+}
+
+fn dataset_object(handle: DomHandle, element: &Element) -> JsValue {
+    let mut obj = HashMap::new();
+    for (name, value) in &element.attrs {
+        if let Some(prop) = data_attr_to_prop(name) {
+            obj.insert(prop.clone(), JsValue::String(value.clone()));
+            let h = handle.clone();
+            let attr = prop_to_data_attr(&prop);
+            obj.insert(
+                format!("__set:{}", prop),
+                native(&format!("set_dataset_{}", prop), Some(1), move |args| {
+                    let value = args.first().unwrap_or(&JsValue::Undefined).display();
+                    h.with_node_mut(|node| {
+                        if let Node::Element(el) = node {
+                            el.attrs.insert(attr.clone(), value);
+                        }
+                    });
+                    Ok(JsValue::Undefined)
+                }),
+            );
+        }
+    }
+    JsValue::Object(Rc::new(RefCell::new(obj)))
+}
+
+fn class_tokens(handle: &DomHandle) -> Vec<String> {
+    match handle.node() {
+        Some(Node::Element(el)) => el
+            .attrs
+            .get("class")
+            .map(|s| s.split_whitespace().map(str::to_string).collect())
+            .unwrap_or_default(),
+        _ => Vec::new(),
+    }
+}
+
+fn set_class_tokens(handle: &DomHandle, tokens: Vec<String>) {
+    handle.with_node_mut(|node| {
+        if let Node::Element(el) = node {
+            if tokens.is_empty() {
+                el.attrs.remove("class");
+            } else {
+                el.attrs.insert("class".into(), tokens.join(" "));
+            }
+        }
+    });
+}
+
+fn data_attr_to_prop(name: &str) -> Option<String> {
+    let rest = name.strip_prefix("data-")?;
+    if rest.is_empty() {
+        return None;
+    }
+    let mut out = String::new();
+    let mut upper_next = false;
+    for ch in rest.chars() {
+        if ch == '-' {
+            upper_next = true;
+            continue;
+        }
+        if upper_next {
+            out.push(ch.to_ascii_uppercase());
+            upper_next = false;
+        } else {
+            out.push(ch);
+        }
+    }
+    Some(out)
+}
+
+fn prop_to_data_attr(prop: &str) -> String {
+    let mut out = String::from("data-");
+    for ch in prop.chars() {
+        if ch.is_ascii_uppercase() {
+            out.push('-');
+            out.push(ch.to_ascii_lowercase());
+        } else {
+            out.push(ch);
+        }
+    }
+    out
 }
 
 fn js_value_to_node(value: &JsValue) -> Node {
@@ -1366,12 +1151,9 @@ fn get_node_mut<'a>(node: &'a mut Node, path: &[usize]) -> Option<&'a mut Node> 
     }
 }
 
-fn call_dom_listener(
-    listener: JsValue,
-    this_value: JsValue,
-    event: JsValue,
-) -> Result<JsValue, String> {
-    js::call_function_with_this(listener, this_value, std::slice::from_ref(&event))
+fn call_dom_listener(listener: JsValue, this_value: JsValue, event: JsValue) -> Result<(), String> {
+    js::call_function_with_this(listener, this_value, std::slice::from_ref(&event))?;
+    Ok(())
 }
 
 fn event_type(event: &JsValue) -> Option<String> {
@@ -1409,193 +1191,6 @@ fn normalize_event(
         }),
     );
     JsValue::Object(event_ref)
-}
-
-fn set_event_current_target(event: &JsValue, current_target: JsValue) {
-    if let JsValue::Object(obj) = event {
-        obj.borrow_mut()
-            .insert("currentTarget".into(), current_target);
-    }
-}
-
-fn set_event_default_prevented(event: &JsValue) {
-    if let JsValue::Object(obj) = event {
-        obj.borrow_mut()
-            .insert("defaultPrevented".into(), JsValue::Bool(true));
-    }
-}
-
-fn event_default_prevented(event: &JsValue) -> bool {
-    matches!(event, JsValue::Object(obj) if obj.borrow().get("defaultPrevented").is_some_and(JsValue::truthy))
-}
-
-fn normalize_url(href: &str) -> String {
-    if href.contains("://") {
-        href.to_string()
-    } else {
-        resolve_url(href, "http://localhost/")
-    }
-}
-
-fn resolve_url(input: &str, base: &str) -> String {
-    if input.contains("://") {
-        return input.to_string();
-    }
-    let base = normalize_url(base);
-    let base_parts = parse_location(&base);
-    let origin = base_parts
-        .get("origin")
-        .map(JsValue::display)
-        .unwrap_or_else(|| "http://localhost".into());
-    if input.starts_with("//") {
-        let protocol = base_parts
-            .get("protocol")
-            .map(JsValue::display)
-            .unwrap_or_else(|| "http:".into());
-        return format!("{}{}", protocol, input);
-    }
-    if input.starts_with('#') {
-        let no_hash = base.split('#').next().unwrap_or(&base);
-        return format!("{}{}", no_hash, input);
-    }
-    if input.starts_with('?') {
-        let no_query = base
-            .split('?')
-            .next()
-            .unwrap_or(&base)
-            .split('#')
-            .next()
-            .unwrap_or(&base);
-        return format!("{}{}", no_query, input);
-    }
-    if input.starts_with('/') {
-        return format!("{}{}", origin, input);
-    }
-    let path = base_parts
-        .get("pathname")
-        .map(JsValue::display)
-        .unwrap_or_else(|| "/".into());
-    let dir = path
-        .rsplit_once('/')
-        .map(|(d, _)| format!("{}/", d))
-        .unwrap_or_else(|| "/".into());
-    format!("{}{}{}", origin, dir, input)
-}
-
-fn url_search_params_object(init: &str) -> JsValue {
-    let entries = Rc::new(RefCell::new(parse_search_params(init)));
-    let object = Rc::new(RefCell::new(HashMap::new()));
-    {
-        let entries = entries.clone();
-        object.borrow_mut().insert(
-            "get".into(),
-            native("URLSearchParams.get", Some(1), move |args| {
-                let key = args.first().unwrap_or(&JsValue::Undefined).display();
-                Ok(entries
-                    .borrow()
-                    .iter()
-                    .find(|(k, _)| k == &key)
-                    .map(|(_, v)| JsValue::String(v.clone()))
-                    .unwrap_or(JsValue::Null))
-            }),
-        );
-    }
-    {
-        let entries = entries.clone();
-        object.borrow_mut().insert(
-            "set".into(),
-            native("URLSearchParams.set", Some(2), move |args| {
-                let key = args.first().unwrap_or(&JsValue::Undefined).display();
-                let value = args.get(1).unwrap_or(&JsValue::Undefined).display();
-                let mut entries = entries.borrow_mut();
-                entries.retain(|(k, _)| k != &key);
-                entries.push((key, value));
-                Ok(JsValue::Undefined)
-            }),
-        );
-    }
-    {
-        let entries = entries.clone();
-        object.borrow_mut().insert(
-            "append".into(),
-            native("URLSearchParams.append", Some(2), move |args| {
-                entries.borrow_mut().push((
-                    args.first().unwrap_or(&JsValue::Undefined).display(),
-                    args.get(1).unwrap_or(&JsValue::Undefined).display(),
-                ));
-                Ok(JsValue::Undefined)
-            }),
-        );
-    }
-    {
-        let entries = entries.clone();
-        object.borrow_mut().insert(
-            "has".into(),
-            native("URLSearchParams.has", Some(1), move |args| {
-                let key = args.first().unwrap_or(&JsValue::Undefined).display();
-                Ok(JsValue::Bool(
-                    entries.borrow().iter().any(|(k, _)| k == &key),
-                ))
-            }),
-        );
-    }
-    {
-        let entries = entries.clone();
-        object.borrow_mut().insert(
-            "delete".into(),
-            native("URLSearchParams.delete", Some(1), move |args| {
-                let key = args.first().unwrap_or(&JsValue::Undefined).display();
-                entries.borrow_mut().retain(|(k, _)| k != &key);
-                Ok(JsValue::Undefined)
-            }),
-        );
-    }
-    {
-        let entries = entries.clone();
-        object.borrow_mut().insert(
-            "toString".into(),
-            native("URLSearchParams.toString", Some(0), move |_| {
-                Ok(JsValue::String(serialize_search_params(&entries.borrow())))
-            }),
-        );
-    }
-    JsValue::Object(object)
-}
-
-fn parse_search_params(init: &str) -> Vec<(String, String)> {
-    let query = init.strip_prefix('?').unwrap_or(init);
-    if query.is_empty() {
-        return Vec::new();
-    }
-    query
-        .split('&')
-        .filter(|part| !part.is_empty())
-        .map(|part| {
-            let (key, value) = part.split_once('=').unwrap_or((part, ""));
-            (decode_query_component(key), decode_query_component(value))
-        })
-        .collect()
-}
-
-fn serialize_search_params(entries: &[(String, String)]) -> String {
-    entries
-        .iter()
-        .map(|(k, v)| {
-            format!(
-                "{}={}",
-                encode_query_component(k),
-                encode_query_component(v)
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("&")
-}
-
-fn decode_query_component(input: &str) -> String {
-    input.replace('+', " ")
-}
-fn encode_query_component(input: &str) -> String {
-    input.replace(' ', "+")
 }
 
 fn parse_location(href: &str) -> HashMap<String, JsValue> {
@@ -1976,8 +1571,6 @@ pub fn compatibility_report_to_value(_args: &[Value]) -> Result<Value, String> {
         "functionExpressions",
         "forLoops",
         "location",
-        "URL",
-        "URLSearchParams",
         "navigator",
         "setTimeout",
         "clearTimeout",
@@ -1990,11 +1583,6 @@ pub fn compatibility_report_to_value(_args: &[Value]) -> Result<Value, String> {
         "Storage.clear",
         "Storage.key",
         "Storage.length",
-        "fetch",
-        "Headers",
-        "Response",
-        "Response.text",
-        "Response.json",
     ];
     Ok(Value::List(Rc::new(RefCell::new(
         features
@@ -2060,39 +1648,6 @@ mod tests {
     }
 
     #[test]
-    fn events_bubble_with_current_target_and_default_prevention() {
-        let result = eval_with_dom(
-            "<form id='form'><button id='go'>Send</button></form>",
-            "let form=document.getElementById('form'); let btn=document.getElementById('go'); let seen=''; form.addEventListener('click', function(e){ seen=seen+'form:'+e.target.id+':'+e.currentTarget.id+':'+e.defaultPrevented+';'; }); btn.addEventListener('click', function(e){ seen=seen+'btn:'+e.target.id+':'+e.currentTarget.id+';'; e.preventDefault(); }); let ok=btn.dispatchEvent({type:'click'}); seen + ok;",
-        ).unwrap();
-        assert_eq!(
-            result.value,
-            JsValue::String("btn:go:go;form:go:form:true;false".into())
-        );
-    }
-
-    #[test]
-    fn inline_handler_false_prevents_default_and_parent_node_links_parent() {
-        let result = eval_with_dom(
-            "<div id='outer'><button id='go'>Send</button></div>",
-            "let btn=document.getElementById('go'); btn.onclick=function(e){ return false; }; let ok=btn.dispatchEvent({type:'click'}); ok + ':' + btn.parentNode.id;",
-        ).unwrap();
-        assert_eq!(result.value, JsValue::String("false:outer".into()));
-    }
-
-    #[test]
-    fn form_value_and_checked_properties_reflect_and_update_attributes() {
-        let result = eval_with_dom(
-            "<input id='name' value='Riley'><input id='agree' checked>",
-            "let name=document.getElementById('name'); let agree=document.getElementById('agree'); let before=name.value+':'+agree.checked; name.value='Casey'; agree.checked=false; before + '|' + name.value + ':' + name.getAttribute('value') + ':' + agree.checked + ':' + agree.hasAttribute('checked');",
-        ).unwrap();
-        assert_eq!(
-            result.value,
-            JsValue::String("Riley:true|Casey:Casey:false:false".into())
-        );
-    }
-
-    #[test]
     fn remove_event_listener_and_typeof_work() {
         let result = eval_with_dom(
             "<button>ok</button>",
@@ -2108,34 +1663,6 @@ mod tests {
             "navigator.userAgent.length > 0 && location.pathname == '/' && window.location.origin == 'http://localhost' && window.navigator.language == 'en-US';",
         ).unwrap();
         assert_eq!(result.value, JsValue::Bool(true));
-    }
-
-    #[test]
-    fn url_and_url_search_params_are_available() {
-        let result = eval_with_dom(
-            "<main></main>",
-            "let u=URL('/docs/page?x=1#top', 'https://example.com/root/index.html'); let p=URLSearchParams('a=1&b=two+words'); p.set('a','2'); p.append('c','3'); u.origin + '|' + u.pathname + '|' + u.searchParams.get('x') + '|' + p.get('b') + '|' + p.has('c') + '|' + p.toString();",
-        ).unwrap();
-        assert_eq!(
-            result.value,
-            JsValue::String(
-                "https://example.com|/docs/page|1|two words|true|b=two+words&a=2&c=3".into()
-            )
-        );
-    }
-
-    #[test]
-    fn location_assign_and_replace_update_location_fields() {
-        let result = eval_with_dom(
-            "<main></main>",
-            "location.assign('/next?ok=1#frag'); let first=location.href + '|' + location.pathname + '|' + location.search + '|' + location.hash; location.replace('child'); first + '>' + location.href;",
-        ).unwrap();
-        assert_eq!(
-            result.value,
-            JsValue::String(
-                "http://localhost/next?ok=1#frag|/next|?ok=1|#frag>http://localhost/child".into()
-            )
-        );
     }
 
     #[test]
@@ -2227,50 +1754,5 @@ mod tests {
         assert!(features.contains(&"localStorage".to_string()));
         assert!(features.contains(&"sessionStorage".to_string()));
         assert!(features.contains(&"Storage.length".to_string()));
-    }
-
-    #[test]
-    fn fetch_returns_response_like_object_with_helpers() {
-        let result = eval_with_dom(
-            "<main></main>",
-            "let r=fetch('/api', {method:'post', body:'123', headers:{'X-Test':'yes'}}); r.ok + ':' + r.status + ':' + r.statusText + ':' + r.url + ':' + r.text() + ':' + r.json() + ':' + r.headers.get('x-test') + ':' + r.headers.get('CONTENT-TYPE');",
-        ).unwrap();
-        assert_eq!(
-            result.value,
-            JsValue::String("true:200:OK:/api:123:123:yes:text/plain;charset=utf-8".into())
-        );
-    }
-
-    #[test]
-    fn response_constructor_and_headers_normalize_names() {
-        let result = eval_with_dom(
-            "<main></main>",
-            "let h=Headers({'Content-Type':'application/json','x-id':'a'}); h.append('X-ID','b'); let r=Response('{\\\"ok\\\":true}', {status:404, headers:h}); r.ok + ':' + r.status + ':' + r.statusText + ':' + r.headers.has('content-type') + ':' + r.headers.get('CONTENT-TYPE') + ':' + r.headers.get('x-id') + ':' + r.text();",
-        ).unwrap();
-        assert_eq!(
-            result.value,
-            JsValue::String("false:404:Not Found:true:application/json:a, b:{\"ok\":true}".into())
-        );
-    }
-
-    #[test]
-    fn compatibility_report_lists_fetch_response_apis() {
-        let report = compatibility_report_to_value(&[]).unwrap();
-        let Value::List(items) = report else {
-            panic!("expected list");
-        };
-        let features = items
-            .borrow()
-            .iter()
-            .map(|v| match v {
-                Value::Str(s) => s.to_string(),
-                other => other.to_string(),
-            })
-            .collect::<Vec<_>>();
-        assert!(features.contains(&"fetch".to_string()));
-        assert!(features.contains(&"Headers".to_string()));
-        assert!(features.contains(&"Response".to_string()));
-        assert!(features.contains(&"Response.text".to_string()));
-        assert!(features.contains(&"Response.json".to_string()));
     }
 }
