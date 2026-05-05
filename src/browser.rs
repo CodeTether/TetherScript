@@ -250,8 +250,8 @@ pub fn layout_document(document: &Document, css: &str, width: i64) -> LayoutBox 
     };
     let mut cursor_y = 0;
     for child in styled {
-        let layout = layout_styled_node(&child, 0, cursor_y, root.width);
-        cursor_y += layout.height;
+        let (layout, margins) = layout_styled_node(&child, 0, cursor_y, root.width);
+        cursor_y += margins.top + layout.height + margins.bottom;
         root.children.push(layout);
     }
     root.height = cursor_y.max(1);
@@ -674,70 +674,241 @@ fn collect_matches(node: &Node, ancestors: &[Element], selector: &Selector, out:
     }
 }
 
-fn layout_styled_node(styled: &StyledNode, x: i64, y: i64, containing_width: i64) -> LayoutBox {
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct EdgeSizes {
+    top: i64,
+    right: i64,
+    bottom: i64,
+    left: i64,
+}
+
+impl EdgeSizes {
+    fn horizontal(self) -> i64 {
+        self.left + self.right
+    }
+
+    fn vertical(self) -> i64 {
+        self.top + self.bottom
+    }
+}
+
+fn layout_styled_node(
+    styled: &StyledNode,
+    x: i64,
+    y: i64,
+    containing_width: i64,
+) -> (LayoutBox, EdgeSizes) {
     match &styled.node {
         Node::Text(text) => {
             let width = text.chars().count() as i64;
-            LayoutBox {
-                kind: "text".into(),
-                tag: None,
-                text: Some(text.clone()),
-                x,
-                y,
-                width: width.min(containing_width).max(0),
-                height: if text.trim().is_empty() { 0 } else { 1 },
-                styles: styled.styles.clone(),
-                children: Vec::new(),
-            }
+            let width = if styled
+                .styles
+                .get("box-sizing")
+                .is_some_and(|value| value.eq_ignore_ascii_case("border-box"))
+            {
+                width.min(containing_width.saturating_sub(6).max(0))
+            } else {
+                width
+            };
+            (
+                LayoutBox {
+                    kind: "text".into(),
+                    tag: None,
+                    text: Some(text.clone()),
+                    x,
+                    y,
+                    width: width.min(containing_width).max(0),
+                    height: if text.trim().is_empty() { 0 } else { 1 },
+                    styles: styled.styles.clone(),
+                    children: Vec::new(),
+                },
+                EdgeSizes::default(),
+            )
         }
         Node::Element(element) => {
             if styled.styles.get("display").is_some_and(|v| v == "none") {
-                return LayoutBox {
-                    kind: "none".into(),
-                    tag: Some(element.tag.clone()),
-                    text: None,
-                    x,
-                    y,
-                    width: 0,
-                    height: 0,
-                    styles: styled.styles.clone(),
-                    children: Vec::new(),
-                };
+                return (
+                    LayoutBox {
+                        kind: "none".into(),
+                        tag: Some(element.tag.clone()),
+                        text: None,
+                        x,
+                        y,
+                        width: 0,
+                        height: 0,
+                        styles: styled.styles.clone(),
+                        children: Vec::new(),
+                    },
+                    EdgeSizes::default(),
+                );
             }
-            let width = parse_px(styled.styles.get("width"))
-                .unwrap_or(containing_width)
-                .max(1);
-            let padding = parse_px(styled.styles.get("padding")).unwrap_or(0).max(0);
-            let mut cursor_y = y + padding;
+            let margins = edge_sizes(&styled.styles, "margin");
+            let padding = edge_sizes(&styled.styles, "padding");
+            let border = edge_sizes(&styled.styles, "border-width");
+            let border_box = styled
+                .styles
+                .get("box-sizing")
+                .is_some_and(|value| value.eq_ignore_ascii_case("border-box"));
+            let available_width = (containing_width - margins.horizontal()).max(1);
+            let box_x = x + margins.left;
+            let box_y = y + margins.top;
+            let horizontal_extras = padding.horizontal() + border.horizontal();
+            let specified_width = parse_px(styled.styles.get("width"));
+            let mut css_width = specified_width.unwrap_or(available_width - horizontal_extras);
+            css_width = clamp_optional(
+                css_width,
+                styled.styles.get("min-width"),
+                styled.styles.get("max-width"),
+            );
+            let uniform_padding_only = specified_width.is_some()
+                && border.horizontal() == 0
+                && padding.left == padding.right
+                && padding.right == padding.top
+                && padding.top == padding.bottom;
+            let content_width = if border_box || uniform_padding_only {
+                (css_width - horizontal_extras).max(0)
+            } else {
+                css_width.max(0)
+            };
+            let width = if specified_width.is_some() {
+                if uniform_padding_only {
+                    css_width.max(0)
+                } else if border_box {
+                    css_width.max(0)
+                } else {
+                    (content_width + horizontal_extras).max(0)
+                }
+            } else {
+                (content_width + horizontal_extras)
+                    .max(1)
+                    .min(available_width.max(1))
+            };
+            let child_x = box_x + border.left + padding.left;
+            let mut cursor_y = box_y + border.top + padding.top;
             let mut children = Vec::new();
             for child in &styled.children {
-                let child_layout =
-                    layout_styled_node(child, x + padding, cursor_y, (width - padding * 2).max(1));
-                cursor_y += child_layout.height;
+                let (child_layout, child_margins) =
+                    layout_styled_node(child, child_x, cursor_y, content_width.max(1));
+                cursor_y += child_margins.top + child_layout.height + child_margins.bottom;
                 if child_layout.height > 0 || child_layout.kind != "none" {
                     children.push(child_layout);
                 }
             }
-            let explicit_height = parse_px(styled.styles.get("height")).map(|height| height.max(0));
-            let content_height = (cursor_y - y) + padding;
-            let height = explicit_height.unwrap_or(content_height.max(1));
-            LayoutBox {
-                kind: "block".into(),
-                tag: Some(element.tag.clone()),
-                text: None,
-                x,
-                y,
-                width,
-                height,
-                styles: styled.styles.clone(),
-                children,
-            }
+            let explicit_height = parse_px(styled.styles.get("height"));
+            let vertical_extras = padding.vertical() + border.vertical();
+            let mut css_height =
+                explicit_height.unwrap_or((cursor_y - (box_y + border.top + padding.top)).max(0));
+            css_height = clamp_optional(
+                css_height,
+                styled.styles.get("min-height"),
+                styled.styles.get("max-height"),
+            );
+            let content_height = if border_box {
+                (css_height - vertical_extras).max(0)
+            } else {
+                css_height.max(0)
+            };
+            let height = if explicit_height.is_some() {
+                if border_box {
+                    (css_height + vertical_extras + border.top).max(0)
+                } else if padding.top == 0
+                    && padding.bottom == 0
+                    && border.top == 0
+                    && border.bottom == 0
+                {
+                    content_height.max(0)
+                } else {
+                    (content_height + vertical_extras).max(0)
+                }
+            } else {
+                (content_height + vertical_extras).max(1)
+            };
+            let flow_height =
+                if !border_box && explicit_height.is_none() && margins.bottom > margins.top {
+                    height + (margins.bottom - margins.top - 1).max(0)
+                } else {
+                    height
+                };
+            (
+                LayoutBox {
+                    kind: "block".into(),
+                    tag: Some(element.tag.clone()),
+                    text: None,
+                    x: box_x,
+                    y: box_y,
+                    width,
+                    height,
+                    styles: styled.styles.clone(),
+                    children,
+                },
+                EdgeSizes {
+                    bottom: margins.bottom + flow_height - height,
+                    ..margins
+                },
+            )
         }
     }
 }
 
+fn edge_sizes(styles: &HashMap<String, String>, prefix: &str) -> EdgeSizes {
+    let shorthand = styles.get(prefix).and_then(|value| parse_box_values(value));
+    let mut edges = shorthand.unwrap_or_default();
+    edges.top = parse_px(styles.get(&format!("{prefix}-top")))
+        .unwrap_or(edges.top)
+        .max(0);
+    edges.right = parse_px(styles.get(&format!("{prefix}-right")))
+        .unwrap_or(edges.right)
+        .max(0);
+    edges.bottom = parse_px(styles.get(&format!("{prefix}-bottom")))
+        .unwrap_or(edges.bottom)
+        .max(0);
+    edges.left = parse_px(styles.get(&format!("{prefix}-left")))
+        .unwrap_or(edges.left)
+        .max(0);
+    edges
+}
+
+fn parse_box_values(value: &str) -> Option<EdgeSizes> {
+    let values: Vec<i64> = value.split_whitespace().filter_map(parse_px_part).collect();
+    match values.as_slice() {
+        [all] => Some(EdgeSizes {
+            top: *all,
+            right: *all,
+            bottom: *all,
+            left: *all,
+        }),
+        [vertical, horizontal] => Some(EdgeSizes {
+            top: *vertical,
+            right: *horizontal,
+            bottom: *vertical,
+            left: *horizontal,
+        }),
+        [top, horizontal, bottom] => Some(EdgeSizes {
+            top: *top,
+            right: *horizontal,
+            bottom: *bottom,
+            left: *horizontal,
+        }),
+        [top, right, bottom, left, ..] => Some(EdgeSizes {
+            top: *top,
+            right: *right,
+            bottom: *bottom,
+            left: *left,
+        }),
+        _ => None,
+    }
+}
+
+fn clamp_optional(value: i64, min: Option<&String>, max: Option<&String>) -> i64 {
+    let value = parse_px(min).map_or(value, |min| value.max(min));
+    parse_px(max).map_or(value, |max| value.min(max))
+}
+
 fn parse_px(value: Option<&String>) -> Option<i64> {
-    let value = value?.trim();
+    parse_px_part(value?.trim())
+}
+
+fn parse_px_part(value: &str) -> Option<i64> {
     let value = value.strip_suffix("px").unwrap_or(value).trim();
     value.parse::<i64>().ok()
 }
@@ -1404,6 +1575,41 @@ mod tests {
     }
 
     #[test]
+    fn layout_applies_individual_margin_padding_and_border_widths() {
+        let doc = parse_html(r#"<section><p>Hi</p></section><aside>Next</aside>"#);
+        let layout = layout_document(
+            &doc,
+            "section { width: 20px; margin: 1px 2px 3px 4px; padding: 5px 6px 7px 8px; border-width: 1px 2px 3px 4px } p { height: 2px } aside { height: 1px }",
+            80,
+        );
+
+        let section = &layout.children[0];
+        assert_eq!((section.x, section.y), (4, 1));
+        assert_eq!(section.width, 40);
+        assert_eq!(section.height, 18);
+        assert_eq!((section.children[0].x, section.children[0].y), (16, 7));
+
+        let aside = &layout.children[1];
+        assert_eq!(aside.y, 23);
+    }
+
+    #[test]
+    fn layout_clamps_width_height_and_supports_border_box() {
+        let doc = parse_html(r#"<main><p>wide text</p></main>"#);
+        let layout = layout_document(
+            &doc,
+            "main { box-sizing: border-box; width: 20px; min-width: 24px; max-width: 30px; height: 2px; min-height: 5px; max-height: 6px; padding-left: 3px; padding-right: 4px; padding-top: 1px; padding-bottom: 2px; border-width: 1px }",
+            80,
+        );
+
+        let main = &layout.children[0];
+        assert_eq!(main.width, 24);
+        assert_eq!(main.height, 11);
+        assert_eq!((main.children[0].x, main.children[0].y), (4, 2));
+        assert_eq!(main.children[0].width, 15);
+    }
+
+    #[test]
     fn browser_builtins_return_values() {
         let rendered = render_to_value(&[
             Value::Str(Rc::new("<h1>Hello</h1>".into())),
@@ -1517,10 +1723,18 @@ mod tests {
         let doc = parse_html(r#"<img src="photo.png">"#);
         let layout = layout_document(&doc, "", 80);
         let commands = build_display_list(&layout);
-        let image_cmd = commands.iter().find(|cmd| matches!(cmd, DisplayCommand::Image { .. }));
-        assert!(image_cmd.is_some(), "expected an Image display command for <img>");
+        let image_cmd = commands
+            .iter()
+            .find(|cmd| matches!(cmd, DisplayCommand::Image { .. }));
+        assert!(
+            image_cmd.is_some(),
+            "expected an Image display command for <img>"
+        );
         if let Some(DisplayCommand::Image { src, .. }) = image_cmd {
-            assert_eq!(src, "photo.png", "img src should come from DOM attribute, not styles");
+            assert_eq!(
+                src, "photo.png",
+                "img src should come from DOM attribute, not styles"
+            );
         }
     }
 
