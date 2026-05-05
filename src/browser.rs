@@ -41,7 +41,21 @@ pub struct CssRule {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Selector {
-    pub parts: Vec<SimpleSelector>,
+    pub parts: Vec<SelectorPart>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Combinator {
+    Descendant,
+    Child,
+    AdjacentSibling,
+    GeneralSibling,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SelectorPart {
+    pub combinator: Option<Combinator>,
+    pub simple: SimpleSelector,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -50,6 +64,7 @@ pub struct SimpleSelector {
     pub id: Option<String>,
     pub classes: Vec<String>,
     pub attrs: Vec<AttributeSelector>,
+    pub not: Vec<SimpleSelector>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -152,8 +167,8 @@ pub fn query_selector(document: &Document, selector: &str) -> Vec<Node> {
         return Vec::new();
     };
     let mut out = Vec::new();
-    for child in &document.children {
-        collect_matches(child, &[], &selector, &mut out);
+    for (index, child) in document.children.iter().enumerate() {
+        collect_matches(child, &[], &document.children, index, &selector, &mut out);
     }
     out
 }
@@ -162,7 +177,16 @@ pub fn element_matches(element: &Element, ancestors: &[Element], selector: &str)
     let Some(selector) = parse_selector(selector) else {
         return false;
     };
-    selector_matches(&selector, element, ancestors)
+    let frames: Vec<ElementFrame> = ancestors
+        .iter()
+        .cloned()
+        .map(|element| ElementFrame {
+            element,
+            siblings: Vec::new(),
+            index: 0,
+        })
+        .collect();
+    selector_matches(&selector, element, &frames, &[], 0)
 }
 
 pub fn text_content(node: &Node) -> String {
@@ -237,7 +261,10 @@ pub fn style_document(document: &Document, rules: &[CssRule]) -> Vec<StyledNode>
     document
         .children
         .iter()
-        .map(|node| style_node(node, &[], &HashMap::new(), rules))
+        .enumerate()
+        .map(|(index, node)| {
+            style_node(node, &[], &document.children, index, &HashMap::new(), rules)
+        })
         .collect()
 }
 
@@ -368,9 +395,18 @@ pub fn display_list_to_value(commands: &[DisplayCommand]) -> Value {
     Value::List(Rc::new(RefCell::new(values)))
 }
 
+#[derive(Clone)]
+struct ElementFrame {
+    element: Element,
+    siblings: Vec<Node>,
+    index: usize,
+}
+
 fn style_node(
     node: &Node,
-    ancestors: &[Element],
+    ancestors: &[ElementFrame],
+    siblings: &[Node],
+    index: usize,
     inherited: &HashMap<String, String>,
     rules: &[CssRule],
 ) -> StyledNode {
@@ -378,7 +414,7 @@ fn style_node(
     let mut winning: HashMap<String, (u32, usize)> = HashMap::new();
     if let Node::Element(element) = node {
         for rule in rules {
-            if selector_matches(&rule.selector, element, ancestors) {
+            if selector_matches(&rule.selector, element, ancestors, siblings, index) {
                 for (name, value) in &rule.declarations {
                     let key = (rule.specificity, rule.order);
                     if winning.get(name).is_none_or(|existing| key >= *existing) {
@@ -404,11 +440,25 @@ fn style_node(
     let children = match node {
         Node::Element(element) => {
             let mut next_ancestors = ancestors.to_vec();
-            next_ancestors.push(element.clone());
+            next_ancestors.push(ElementFrame {
+                element: element.clone(),
+                siblings: siblings.to_vec(),
+                index,
+            });
             element
                 .children
                 .iter()
-                .map(|child| style_node(child, &next_ancestors, &styles, rules))
+                .enumerate()
+                .map(|(child_index, child)| {
+                    style_node(
+                        child,
+                        &next_ancestors,
+                        &element.children,
+                        child_index,
+                        &styles,
+                        rules,
+                    )
+                })
                 .collect()
         }
         Node::Text(_) => Vec::new(),
@@ -480,15 +530,60 @@ pub fn css_rules_to_value(rules: &[CssRule]) -> Value {
 
 fn parse_selector(source: &str) -> Option<Selector> {
     let mut parts = Vec::new();
-    for raw in source.split_whitespace() {
-        let raw = raw.trim();
-        if raw.is_empty() || raw.contains('>') || raw.contains('+') || raw.contains('~') {
-            return None;
+    let mut current = String::new();
+    let mut pending_combinator = None;
+    let mut in_attr = false;
+    let mut in_not = 0usize;
+
+    for ch in source.chars().chain(std::iter::once(' ')) {
+        if ch == '[' && in_not == 0 {
+            in_attr = true;
+            current.push(ch);
+            continue;
         }
-        let part = parse_simple_selector(raw)?;
-        parts.push(part);
+        if ch == ']' && in_not == 0 {
+            in_attr = false;
+            current.push(ch);
+            continue;
+        }
+        if ch == '(' && current.ends_with(":not") && !in_attr {
+            in_not += 1;
+            current.push(ch);
+            continue;
+        }
+        if ch == ')' && in_not > 0 && !in_attr {
+            in_not -= 1;
+            current.push(ch);
+            continue;
+        }
+        if !in_attr && in_not == 0 && matches!(ch, '>' | '+' | '~' | ' ' | '\t' | '\n' | '\r') {
+            if !current.trim().is_empty() {
+                parts.push(SelectorPart {
+                    combinator: if parts.is_empty() {
+                        None
+                    } else {
+                        pending_combinator.take().or(Some(Combinator::Descendant))
+                    },
+                    simple: parse_simple_selector(current.trim())?,
+                });
+                current.clear();
+            }
+            if matches!(ch, '>' | '+' | '~') {
+                if parts.is_empty() || pending_combinator.is_some() {
+                    return None;
+                }
+                pending_combinator = Some(match ch {
+                    '>' => Combinator::Child,
+                    '+' => Combinator::AdjacentSibling,
+                    '~' => Combinator::GeneralSibling,
+                    _ => unreachable!(),
+                });
+            }
+            continue;
+        }
+        current.push(ch);
     }
-    if parts.is_empty() {
+    if parts.is_empty() || pending_combinator.is_some() || in_attr || in_not != 0 {
         None
     } else {
         Some(Selector { parts })
@@ -502,15 +597,16 @@ fn parse_simple_selector(raw: &str) -> Option<SimpleSelector> {
             id: None,
             classes: Vec::new(),
             attrs: Vec::new(),
+            not: Vec::new(),
         });
     }
     let mut tag = None;
     let mut id = None;
     let mut classes = Vec::new();
     let mut attrs = Vec::new();
+    let mut not = Vec::new();
     let mut current = String::new();
     let mut mode = 't';
-
     let chars: Vec<char> = raw.chars().collect();
     let mut index = 0;
     while index <= chars.len() {
@@ -518,6 +614,30 @@ fn parse_simple_selector(raw: &str) -> Option<SimpleSelector> {
         if ch == '#' || ch == '.' {
             flush_simple_selector_piece(&mut tag, &mut id, &mut classes, mode, &mut current);
             mode = ch;
+            index += 1;
+            continue;
+        }
+        if raw[index..].starts_with(":not(") {
+            flush_simple_selector_piece(&mut tag, &mut id, &mut classes, mode, &mut current);
+            index += 5;
+            let start = index;
+            while let Some(not_ch) = chars.get(index).copied() {
+                if not_ch == ')' {
+                    break;
+                }
+                if matches!(not_ch, '>' | '+' | '~' | ' ' | '\t' | '\n' | '\r' | '(') {
+                    return None;
+                }
+                index += 1;
+            }
+            if chars.get(index) != Some(&')') || index == start {
+                return None;
+            }
+            let inner = &raw[start..index];
+            if inner.starts_with(":not(") {
+                return None;
+            }
+            not.push(parse_simple_selector(inner)?);
             index += 1;
             continue;
         }
@@ -547,19 +667,19 @@ fn parse_simple_selector(raw: &str) -> Option<SimpleSelector> {
             index += 1;
             continue;
         }
-        if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' || ch == ':' {
+        if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
             current.push(ch);
         } else {
             return None;
         }
         index += 1;
     }
-
     Some(SimpleSelector {
         tag,
         id,
         classes,
         attrs,
+        not,
     })
 }
 
@@ -604,46 +724,137 @@ fn parse_attribute_selector(raw: &str) -> Option<AttributeSelector> {
     })
 }
 
+fn simple_specificity(simple: &SimpleSelector) -> u32 {
+    let ids = u32::from(simple.id.is_some());
+    let classes = simple.classes.len() as u32;
+    let tags = u32::from(simple.tag.is_some());
+    let attrs = simple.attrs.len() as u32;
+    let not = simple.not.iter().map(simple_specificity).max().unwrap_or(0);
+    ids * 100 + (classes + attrs) * 10 + tags + not
+}
+
 fn selector_specificity(selector: &Selector) -> u32 {
     selector
         .parts
         .iter()
-        .map(|part| {
-            let ids = u32::from(part.id.is_some());
-            let classes = part.classes.len() as u32;
-            let tags = u32::from(part.tag.is_some());
-            let attrs = part.attrs.len() as u32;
-            ids * 100 + (classes + attrs) * 10 + tags
-        })
+        .map(|part| simple_specificity(&part.simple))
         .sum()
 }
 
-fn selector_matches(selector: &Selector, element: &Element, ancestors: &[Element]) -> bool {
+fn selector_matches(
+    selector: &Selector,
+    element: &Element,
+    ancestors: &[ElementFrame],
+    siblings: &[Node],
+    index: usize,
+) -> bool {
     let Some(last) = selector.parts.last() else {
         return false;
     };
-    if !simple_selector_matches(last, element) {
+    if !simple_selector_matches(&last.simple, element) {
         return false;
     }
-    if selector.parts.len() == 1 {
+    selector_matches_at(
+        selector,
+        selector.parts.len() - 1,
+        ancestors,
+        siblings,
+        index,
+    )
+}
+
+fn selector_matches_at(
+    selector: &Selector,
+    part_index: usize,
+    ancestors: &[ElementFrame],
+    siblings: &[Node],
+    index: usize,
+) -> bool {
+    if part_index == 0 {
         return true;
     }
-
-    let mut ancestor_pos = ancestors.len();
-    for part in selector.parts[..selector.parts.len() - 1].iter().rev() {
-        let mut found = false;
-        while ancestor_pos > 0 {
-            ancestor_pos -= 1;
-            if simple_selector_matches(part, &ancestors[ancestor_pos]) {
-                found = true;
-                break;
-            }
+    let previous = &selector.parts[part_index - 1].simple;
+    match selector.parts[part_index]
+        .combinator
+        .unwrap_or(Combinator::Descendant)
+    {
+        Combinator::Descendant => (0..ancestors.len()).rev().any(|ancestor_index| {
+            let frame = &ancestors[ancestor_index];
+            simple_selector_matches(previous, &frame.element)
+                && selector_matches_at(
+                    selector,
+                    part_index - 1,
+                    &ancestors[..ancestor_index],
+                    &frame.siblings,
+                    frame.index,
+                )
+        }),
+        Combinator::Child => ancestors.last().is_some_and(|frame| {
+            simple_selector_matches(previous, &frame.element)
+                && selector_matches_at(
+                    selector,
+                    part_index - 1,
+                    &ancestors[..ancestors.len() - 1],
+                    &frame.siblings,
+                    frame.index,
+                )
+        }),
+        Combinator::AdjacentSibling => {
+            previous_element_sibling(siblings, index).is_some_and(|(sibling, sibling_index)| {
+                simple_selector_matches(previous, sibling)
+                    && selector_matches_at(
+                        selector,
+                        part_index - 1,
+                        ancestors,
+                        siblings,
+                        sibling_index,
+                    )
+            })
         }
-        if !found {
-            return false;
+        Combinator::GeneralSibling => {
+            previous_element_siblings(siblings, index).any(|(sibling, sibling_index)| {
+                simple_selector_matches(previous, sibling)
+                    && selector_matches_at(
+                        selector,
+                        part_index - 1,
+                        ancestors,
+                        siblings,
+                        sibling_index,
+                    )
+            })
         }
     }
-    true
+}
+
+fn previous_element_sibling(siblings: &[Node], index: usize) -> Option<(&Element, usize)> {
+    siblings[..index]
+        .iter()
+        .enumerate()
+        .rev()
+        .find_map(|(sibling_index, node)| {
+            if let Node::Element(element) = node {
+                Some((element, sibling_index))
+            } else {
+                None
+            }
+        })
+}
+
+fn previous_element_siblings(
+    siblings: &[Node],
+    index: usize,
+) -> impl Iterator<Item = (&Element, usize)> {
+    siblings[..index]
+        .iter()
+        .enumerate()
+        .rev()
+        .filter_map(|(sibling_index, node)| {
+            if let Node::Element(element) = node {
+                Some((element, sibling_index))
+            } else {
+                None
+            }
+        })
 }
 
 fn simple_selector_matches(selector: &SimpleSelector, element: &Element) -> bool {
@@ -665,18 +876,39 @@ fn simple_selector_matches(selector: &SimpleSelector, element: &Element) -> bool
     }) && selector.attrs.iter().all(|attr| match &attr.value {
         Some(value) => element.attrs.get(&attr.name) == Some(value),
         None => element.attrs.contains_key(&attr.name),
-    })
+    }) && selector
+        .not
+        .iter()
+        .all(|negated| !simple_selector_matches(negated, element))
 }
 
-fn collect_matches(node: &Node, ancestors: &[Element], selector: &Selector, out: &mut Vec<Node>) {
+fn collect_matches(
+    node: &Node,
+    ancestors: &[ElementFrame],
+    siblings: &[Node],
+    index: usize,
+    selector: &Selector,
+    out: &mut Vec<Node>,
+) {
     if let Node::Element(element) = node {
-        if selector_matches(selector, element, ancestors) {
+        if selector_matches(selector, element, ancestors, siblings, index) {
             out.push(node.clone());
         }
         let mut next_ancestors = ancestors.to_vec();
-        next_ancestors.push(element.clone());
-        for child in &element.children {
-            collect_matches(child, &next_ancestors, selector, out);
+        next_ancestors.push(ElementFrame {
+            element: element.clone(),
+            siblings: siblings.to_vec(),
+            index,
+        });
+        for (child_index, child) in element.children.iter().enumerate() {
+            collect_matches(
+                child,
+                &next_ancestors,
+                &element.children,
+                child_index,
+                selector,
+                out,
+            );
         }
     }
 }
