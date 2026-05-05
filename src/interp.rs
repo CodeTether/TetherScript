@@ -953,6 +953,112 @@ impl<'a> Runtime for InterpRuntime<'a> {
     }
 }
 
+fn browser_assert(
+    rt: &mut dyn Runtime,
+    args: &[Value],
+    method: &str,
+    message: &str,
+) -> Result<Value, String> {
+    let browser = args
+        .get(0)
+        .ok_or_else(|| format!("{}: missing browser", method))?;
+    let arg = args.get(1).cloned().unwrap_or(Value::Nil);
+    let call_args = if matches!(arg, Value::Nil) {
+        Vec::new()
+    } else {
+        vec![arg]
+    };
+    match invoke_browser_result(rt, browser, method, &call_args)? {
+        crate::value::ResultValue::Ok(_) => Ok(Value::Result(Rc::new(
+            crate::value::ResultValue::Ok(Value::Bool(true)),
+        ))),
+        crate::value::ResultValue::Err(e) => Ok(Value::Result(Rc::new(
+            crate::value::ResultValue::Err(format!("{}: {}", message, e)),
+        ))),
+    }
+}
+
+fn browser_assert_empty(
+    rt: &mut dyn Runtime,
+    args: &[Value],
+    method: &str,
+    message: &str,
+) -> Result<Value, String> {
+    let browser = args
+        .get(0)
+        .ok_or_else(|| format!("{}: missing browser", method))?;
+    match invoke_browser_result(rt, browser, method, &[])? {
+        crate::value::ResultValue::Ok(Value::List(xs)) if xs.borrow().is_empty() => Ok(
+            Value::Result(Rc::new(crate::value::ResultValue::Ok(Value::Bool(true)))),
+        ),
+        crate::value::ResultValue::Ok(Value::Nil) => Ok(Value::Result(Rc::new(
+            crate::value::ResultValue::Ok(Value::Bool(true)),
+        ))),
+        crate::value::ResultValue::Ok(v) => Ok(Value::Result(Rc::new(
+            crate::value::ResultValue::Err(format!("{}: {}", message, v)),
+        ))),
+        crate::value::ResultValue::Err(e) => {
+            Ok(Value::Result(Rc::new(crate::value::ResultValue::Err(e))))
+        }
+    }
+}
+
+fn browser_assert_bool(
+    rt: &mut dyn Runtime,
+    args: &[Value],
+    method: &str,
+    message: &str,
+) -> Result<Value, String> {
+    let browser = args
+        .get(0)
+        .ok_or_else(|| format!("{}: missing browser", method))?;
+    let arg = args
+        .get(1)
+        .cloned()
+        .ok_or_else(|| format!("{}: missing selector", method))?;
+    match invoke_browser_result(rt, browser, method, &[arg])? {
+        crate::value::ResultValue::Ok(Value::Bool(true)) => Ok(Value::Result(Rc::new(
+            crate::value::ResultValue::Ok(Value::Bool(true)),
+        ))),
+        crate::value::ResultValue::Ok(v) => Ok(Value::Result(Rc::new(
+            crate::value::ResultValue::Err(format!("{}: {}", message, v)),
+        ))),
+        crate::value::ResultValue::Err(e) => {
+            Ok(Value::Result(Rc::new(crate::value::ResultValue::Err(e))))
+        }
+    }
+}
+
+fn browser_assert_snapshot_flag(
+    rt: &mut dyn Runtime,
+    args: &[Value],
+    _flag: &str,
+    message: &str,
+) -> Result<Value, String> {
+    browser_assert_bool(rt, args, "is_enabled", message)
+}
+
+fn invoke_browser_result(
+    rt: &mut dyn Runtime,
+    browser: &Value,
+    method: &str,
+    args: &[Value],
+) -> Result<crate::value::ResultValue, String> {
+    let cap = match browser {
+        Value::Capability(c) => c,
+        other => {
+            return Err(format!(
+                "browser assertion expected capability, got {}",
+                other.type_name()
+            ))
+        }
+    };
+    match cap.invoke(rt, method, args) {
+        Ok(v) => Ok(crate::value::ResultValue::Ok(v)),
+        Err(e) => Ok(crate::value::ResultValue::Err(e)),
+    }
+}
+
 // ---------- built-ins ----------
 
 pub(crate) fn install_builtins(env: &Rc<RefCell<Env>>) {
@@ -964,6 +1070,75 @@ pub(crate) fn install_builtins(env: &Rc<RefCell<Env>>) {
         "http_serve",
         runtime_native("http_serve", Some(2), |rt, args| {
             http::serve(rt, &args[0], &args[1])
+        }),
+        false,
+    );
+
+    e.define(
+        "assert_selector",
+        runtime_native("assert_selector", Some(2), |rt, args| {
+            browser_assert(rt, args, "wait_for_selector", "selector not found")
+        }),
+        false,
+    );
+    e.define(
+        "assert_text",
+        runtime_native("assert_text", Some(2), |rt, args| {
+            browser_assert(rt, args, "wait_for_text", "text not found")
+        }),
+        false,
+    );
+    e.define(
+        "assert_no_console_errors",
+        runtime_native("assert_no_console_errors", Some(1), |rt, args| {
+            browser_assert_empty(rt, args, "console_errors", "console errors present")
+        }),
+        false,
+    );
+    e.define(
+        "assert_no_failed_requests",
+        runtime_native("assert_no_failed_requests", Some(1), |rt, args| {
+            browser_assert_empty(rt, args, "failed_requests", "failed requests present")
+        }),
+        false,
+    );
+    e.define(
+        "assert_visible",
+        runtime_native("assert_visible", Some(2), |rt, args| {
+            browser_assert_bool(rt, args, "is_visible", "element is not visible")
+        }),
+        false,
+    );
+    e.define(
+        "assert_enabled",
+        runtime_native("assert_enabled", Some(2), |rt, args| {
+            browser_assert_snapshot_flag(rt, args, "enabled", "element is not enabled")
+        }),
+        false,
+    );
+    e.define(
+        "assert_route",
+        runtime_native("assert_route", Some(2), |rt, args| {
+            browser_assert(rt, args, "wait_for_url", "route not reached")
+        }),
+        false,
+    );
+    e.define(
+        "assert_screenshot_matches",
+        runtime_native("assert_screenshot_matches", Some(2), |rt, args| {
+            browser_assert(rt, args, "assert_screenshot_matches", "screenshot mismatch")
+        }),
+        false,
+    );
+    e.define(
+        "assert_react_component",
+        runtime_native("assert_react_component", Some(2), |rt, args| {
+            browser_assert(
+                rt,
+                args,
+                "react.component_tree",
+                "react component not found",
+            )
         }),
         false,
     );

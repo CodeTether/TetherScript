@@ -20,6 +20,7 @@
 
 mod ast;
 mod browser;
+mod browser_cap;
 mod browser_js;
 mod bytecode;
 mod capability;
@@ -118,6 +119,9 @@ fn cmd_run(args: &[String]) {
     let mut provider_grant: Option<String> = None;
     let mut provider_key: Option<String> = None;
     let mut rpc_grant: Option<String> = None;
+    let mut browser_grant: Option<String> = None;
+    let mut browser_origins: Vec<String> = Vec::new();
+    let mut browser_scopes: Vec<String> = Vec::new();
     let mut path: Option<String> = None;
 
     let mut i = 0;
@@ -196,6 +200,43 @@ fn cmd_run(args: &[String]) {
                 rpc_grant = Some(args[i].clone());
                 i += 1;
             }
+            "--grant-browser" => {
+                i += 1;
+                if i >= args.len() {
+                    eprintln!(
+                        "tetherscript run: --grant-browser requires a browser bridge endpoint"
+                    );
+                    process::exit(2);
+                }
+                if !args[i].starts_with("http://") && !args[i].starts_with("https://") {
+                    eprintln!("tetherscript run: --grant-browser endpoint must start with http:// or https://");
+                    process::exit(2);
+                }
+                browser_grant = Some(args[i].clone());
+                i += 1;
+            }
+            "--browser-origin" => {
+                i += 1;
+                if i >= args.len() {
+                    eprintln!("tetherscript run: --browser-origin requires an origin");
+                    process::exit(2);
+                }
+                browser_origins.push(args[i].clone());
+                i += 1;
+            }
+            "--browser-scope" => {
+                i += 1;
+                if i >= args.len() {
+                    eprintln!("tetherscript run: --browser-scope requires a scope name or 'all'");
+                    process::exit(2);
+                }
+                if args[i] == "all" {
+                    browser_scopes.extend(browser_cap::BrowserAuthority::all_scopes());
+                } else {
+                    browser_scopes.push(args[i].clone());
+                }
+                i += 1;
+            }
             other => {
                 if other.starts_with('-') {
                     eprintln!("tetherscript run: unknown option '{}'", other);
@@ -228,6 +269,9 @@ fn cmd_run(args: &[String]) {
         &provider_grant,
         &provider_key,
         &rpc_grant,
+        &browser_grant,
+        &browser_origins,
+        &browser_scopes,
     );
 }
 
@@ -507,6 +551,9 @@ fn cmd_run_legacy(args: &[String]) {
     let mut provider_grant: Option<String> = None;
     let mut provider_key: Option<String> = None;
     let mut rpc_grant: Option<String> = None;
+    let mut browser_grant: Option<String> = None;
+    let mut browser_origins: Vec<String> = Vec::new();
+    let mut browser_scopes: Vec<String> = Vec::new();
     let mut path: Option<String> = None;
 
     let mut i = 0;
@@ -579,6 +626,37 @@ fn cmd_run_legacy(args: &[String]) {
                 rpc_grant = Some(args[i].clone());
                 i += 1;
             }
+            "--grant-browser" => {
+                i += 1;
+                if i >= args.len() {
+                    eprintln!("tetherscript: --grant-browser requires a browser bridge endpoint");
+                    process::exit(2);
+                }
+                browser_grant = Some(args[i].clone());
+                i += 1;
+            }
+            "--browser-origin" => {
+                i += 1;
+                if i >= args.len() {
+                    eprintln!("tetherscript: --browser-origin requires an origin");
+                    process::exit(2);
+                }
+                browser_origins.push(args[i].clone());
+                i += 1;
+            }
+            "--browser-scope" => {
+                i += 1;
+                if i >= args.len() {
+                    eprintln!("tetherscript: --browser-scope requires a scope name or 'all'");
+                    process::exit(2);
+                }
+                if args[i] == "all" {
+                    browser_scopes.extend(browser_cap::BrowserAuthority::all_scopes());
+                } else {
+                    browser_scopes.push(args[i].clone());
+                }
+                i += 1;
+            }
             "--help" | "-h" => {
                 print_help();
                 return;
@@ -620,6 +698,9 @@ fn cmd_run_legacy(args: &[String]) {
         &provider_grant,
         &provider_key,
         &rpc_grant,
+        &browser_grant,
+        &browser_origins,
+        &browser_scopes,
     );
 }
 
@@ -645,6 +726,9 @@ fn execute_file(
     provider_grant: &Option<String>,
     provider_key: &Option<String>,
     rpc_grant: &Option<String>,
+    browser_grant: &Option<String>,
+    browser_origins: &[String],
+    browser_scopes: &[String],
 ) {
     let src = read_source(path);
 
@@ -678,7 +762,16 @@ fn execute_file(
         let chunk = Compiler::compile_program(&program);
         let mut vm = VM::new();
         vm.set_instruction_budget(step_budget);
-        grant_capabilities_vm(&mut vm, fs_grant, provider_grant, provider_key, rpc_grant);
+        grant_capabilities_vm(
+            &mut vm,
+            fs_grant,
+            provider_grant,
+            provider_key,
+            rpc_grant,
+            browser_grant,
+            browser_origins,
+            browser_scopes,
+        );
         let result = vm.run(chunk);
         if let Err(e) = result {
             eprintln!("tetherscript: {}", e);
@@ -692,6 +785,9 @@ fn execute_file(
             provider_grant,
             provider_key,
             rpc_grant,
+            browser_grant,
+            browser_origins,
+            browser_scopes,
         );
         let result = if let Some(budget) = step_budget {
             interp::with_step_budget(budget, || interp.run(&program))
@@ -711,6 +807,9 @@ fn grant_capabilities_vm(
     provider_grant: &Option<String>,
     provider_key: &Option<String>,
     rpc_grant: &Option<String>,
+    browser_grant: &Option<String>,
+    browser_origins: &[String],
+    browser_scopes: &[String],
 ) {
     if let Some(root) = fs_grant {
         vm.grant("fs", fs_cap::FsAuthority::new(root));
@@ -731,6 +830,24 @@ fn grant_capabilities_vm(
     if let Some(endpoint) = rpc_grant {
         vm.grant("rpc", rpc_cap::RpcAuthority::new(endpoint));
     }
+    if let Some(endpoint) = browser_grant {
+        let scopes = if browser_scopes.is_empty() {
+            vec![
+                "browser.navigate".into(),
+                "browser.interact".into(),
+                "browser.inspect.dom".into(),
+                "browser.inspect.console".into(),
+                "browser.inspect.network".into(),
+                "browser.screenshot".into(),
+            ]
+        } else {
+            browser_scopes.to_vec()
+        };
+        vm.grant(
+            "browser",
+            browser_cap::BrowserAuthority::new(endpoint, browser_origins.to_vec(), scopes),
+        );
+    }
 }
 
 fn grant_capabilities_interp(
@@ -739,6 +856,9 @@ fn grant_capabilities_interp(
     provider_grant: &Option<String>,
     provider_key: &Option<String>,
     rpc_grant: &Option<String>,
+    browser_grant: &Option<String>,
+    browser_origins: &[String],
+    browser_scopes: &[String],
 ) {
     if let Some(root) = fs_grant {
         interp.grant("fs", fs_cap::FsAuthority::new(root));
@@ -758,6 +878,24 @@ fn grant_capabilities_interp(
     }
     if let Some(endpoint) = rpc_grant {
         interp.grant("rpc", rpc_cap::RpcAuthority::new(endpoint));
+    }
+    if let Some(endpoint) = browser_grant {
+        let scopes = if browser_scopes.is_empty() {
+            vec![
+                "browser.navigate".into(),
+                "browser.interact".into(),
+                "browser.inspect.dom".into(),
+                "browser.inspect.console".into(),
+                "browser.inspect.network".into(),
+                "browser.screenshot".into(),
+            ]
+        } else {
+            browser_scopes.to_vec()
+        };
+        interp.grant(
+            "browser",
+            browser_cap::BrowserAuthority::new(endpoint, browser_origins.to_vec(), scopes),
+        );
     }
 }
 
