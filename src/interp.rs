@@ -1222,7 +1222,11 @@ pub(crate) fn install_builtins(env: &Rc<RefCell<Env>>) {
         pure_native("eval", Some(1), |args| eval_source(&args[0])),
         false,
     );
-    e.define("js_eval", pure_native("js_eval", Some(1), js::eval_to_value), false);
+    e.define(
+        "js_eval",
+        pure_native("js_eval", Some(1), js::eval_to_value),
+        false,
+    );
 }
 
 /// Subset of built-ins safe to expose to untrusted source running inside
@@ -1294,17 +1298,29 @@ fn install_browser_builtins(env: &Rc<RefCell<Env>>) {
     );
     e.define(
         "browser_run_scripts",
-        pure_native("browser_run_scripts", Some(1), browser_js::browser_run_scripts_to_value),
+        pure_native(
+            "browser_run_scripts",
+            Some(1),
+            browser_js::browser_run_scripts_to_value,
+        ),
         false,
     );
     e.define(
         "browser_eval_js",
-        pure_native("browser_eval_js", Some(2), browser_js::browser_eval_js_to_value),
+        pure_native(
+            "browser_eval_js",
+            Some(2),
+            browser_js::browser_eval_js_to_value,
+        ),
         false,
     );
     e.define(
         "browser_compatibility_report",
-        pure_native("browser_compatibility_report", Some(0), browser_js::compatibility_report_to_value),
+        pure_native(
+            "browser_compatibility_report",
+            Some(0),
+            browser_js::compatibility_report_to_value,
+        ),
         false,
     );
 }
