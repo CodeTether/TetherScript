@@ -22,6 +22,7 @@ const MAX_TIMER_DRAIN: usize = 10_000;
 
 thread_local! {
     static EVENT_REGISTRY: RefCell<HashMap<String, EventEntry>> = RefCell::new(HashMap::new());
+    static LAYOUT_CSS: RefCell<String> = RefCell::new(String::new());
 }
 
 #[derive(Clone, Copy)]
@@ -67,6 +68,8 @@ pub struct BrowserJsResult {
     pub document: browser::Document,
     pub value: JsValue,
     pub console: Vec<String>,
+    pub css: String,
+    pub viewport_width: i64,
 }
 
 pub fn run_html_scripts(html: &str) -> Result<BrowserJsResult, String> {
@@ -74,7 +77,9 @@ pub fn run_html_scripts(html: &str) -> Result<BrowserJsResult, String> {
     let root = html_to_root(html);
     let mut engine = JsEngine::new();
     let timers = Rc::new(RefCell::new(TimerQueue::default()));
-    let window = install_dom_globals(&mut engine, root.clone(), timers.clone());
+    // Extract embedded CSS for layout computation
+    let css = browser::extract_embedded_css(&root_to_document(&root));
+    let window = install_dom_globals(&mut engine, root.clone(), timers.clone(), css.clone());
     let scripts = collect_inline_scripts(&root.borrow());
     let mut last = JsValue::Undefined;
     for source in scripts {
@@ -82,11 +87,15 @@ pub fn run_html_scripts(html: &str) -> Result<BrowserJsResult, String> {
             last = engine.eval(&source)?;
         }
     }
+    dispatch_document_lifecycle(&root, "DOMContentLoaded")?;
+    dispatch_window_lifecycle(&window, "load")?;
     drain_timers(timers, window)?;
     Ok(BrowserJsResult {
         document: root_to_document(&root),
         value: last,
         console: engine.console_output(),
+        css,
+        viewport_width: 80,
     })
 }
 
@@ -95,13 +104,18 @@ pub fn eval_with_dom(html: &str, script: &str) -> Result<BrowserJsResult, String
     let root = html_to_root(html);
     let mut engine = JsEngine::new();
     let timers = Rc::new(RefCell::new(TimerQueue::default()));
-    let window = install_dom_globals(&mut engine, root.clone(), timers.clone());
+    let css = browser::extract_embedded_css(&root_to_document(&root));
+    let window = install_dom_globals(&mut engine, root.clone(), timers.clone(), css.clone());
     let value = engine.eval(script)?;
+    dispatch_document_lifecycle(&root, "DOMContentLoaded")?;
+    dispatch_window_lifecycle(&window, "load")?;
     drain_timers(timers, window)?;
     Ok(BrowserJsResult {
         document: root_to_document(&root),
         value,
         console: engine.console_output(),
+        css,
+        viewport_width: 80,
     })
 }
 
@@ -118,7 +132,11 @@ fn install_dom_globals(
     engine: &mut JsEngine,
     root: Rc<RefCell<Node>>,
     timers: Rc<RefCell<TimerQueue>>,
+    css: String,
 ) -> JsValue {
+    // Store CSS in thread-local for layout computations
+    LAYOUT_CSS.with(|c| *c.borrow_mut() = css.clone());
+
     let document = node_object(DomHandle {
         root: root.clone(),
         path: Vec::new(),
@@ -126,15 +144,49 @@ fn install_dom_globals(
     engine.set_global("document", document.clone());
     let mut window = HashMap::new();
     window.insert("document".into(), document);
-    let location = location_object("http://localhost/");
+    let location_map = Rc::new(RefCell::new(parse_location("http://localhost/")));
+    install_location_methods(&location_map);
+    let location = JsValue::Object(location_map.clone());
     let navigator = navigator_object();
     let local_storage = storage_object("localStorage");
     let session_storage = storage_object("sessionStorage");
+    let history = history_object(location_map);
     window.insert("location".into(), location.clone());
+    window.insert("history".into(), history.clone());
     window.insert("navigator".into(), navigator.clone());
     window.insert("localStorage".into(), local_storage.clone());
     window.insert("sessionStorage".into(), session_storage.clone());
     install_timer_bindings(&mut window, timers);
+    let style_root = root.clone();
+    window.insert(
+        "getComputedStyle".into(),
+        native("getComputedStyle", Some(1), move |args| {
+            let path = dom_path_from_value(args.first().unwrap_or(&JsValue::Undefined));
+            Ok(computed_style_object(&DomHandle {
+                root: style_root.clone(),
+                path,
+            }))
+        }),
+    );
+    let rect_root = root.clone();
+    window.insert(
+        "getBoundingClientRect".into(),
+        native("getBoundingClientRect", Some(1), move |args| {
+            let path = dom_path_from_value(args.first().unwrap_or(&JsValue::Undefined));
+            Ok(rect_object(&element_rect(&DomHandle {
+                root: rect_root.clone(),
+                path,
+            })))
+        }),
+    );
+    let a11y_root = root.clone();
+    window.insert(
+        "getAccessibilityTree".into(),
+        native("getAccessibilityTree", Some(0), move |_| {
+            Ok(accessibility_tree_object(&root_to_document(&a11y_root)))
+        }),
+    );
+    install_window_event_bindings(&mut window);
     let window = JsValue::Object(Rc::new(RefCell::new(window)));
     if let JsValue::Object(obj) = &window {
         obj.borrow_mut().insert("window".into(), window.clone());
@@ -147,9 +199,21 @@ fn install_dom_globals(
             engine.set_global("clearTimeout", clear_timeout);
         }
     }
+    if let JsValue::Object(obj) = &window {
+        for name in [
+            "getComputedStyle",
+            "getBoundingClientRect",
+            "getAccessibilityTree",
+        ] {
+            if let Some(value) = obj.borrow().get(name).cloned() {
+                engine.set_global(name, value);
+            }
+        }
+    }
     engine.set_global("window", window.clone());
     engine.set_global("self", window.clone());
     engine.set_global("location", location);
+    engine.set_global("history", history);
     engine.set_global("navigator", navigator);
     engine.set_global("localStorage", local_storage);
     engine.set_global("sessionStorage", session_storage);
@@ -216,17 +280,236 @@ fn timer_id(value: &JsValue) -> u32 {
     }
 }
 
-fn location_object(href: &str) -> JsValue {
-    let mut obj = parse_location(href);
-    obj.insert(
+fn install_window_event_bindings(window: &mut HashMap<String, JsValue>) {
+    window.insert(
+        "addEventListener".into(),
+        native("window.addEventListener", Some(2), move |args| {
+            let event_type = args.first().unwrap_or(&JsValue::Undefined).display();
+            let listener = args.get(1).cloned().unwrap_or(JsValue::Undefined);
+            EVENT_REGISTRY.with(|registry| {
+                registry
+                    .borrow_mut()
+                    .entry("window".into())
+                    .or_default()
+                    .listeners
+                    .entry(event_type)
+                    .or_default()
+                    .push(listener);
+            });
+            Ok(JsValue::Undefined)
+        }),
+    );
+    window.insert(
+        "removeEventListener".into(),
+        native("window.removeEventListener", Some(2), move |args| {
+            let event_type = args.first().unwrap_or(&JsValue::Undefined).display();
+            let listener = args.get(1).cloned().unwrap_or(JsValue::Undefined);
+            EVENT_REGISTRY.with(|registry| {
+                if let Some(entry) = registry.borrow_mut().get_mut("window") {
+                    if let Some(list) = entry.listeners.get_mut(&event_type) {
+                        list.retain(|item| item != &listener);
+                    }
+                }
+            });
+            Ok(JsValue::Undefined)
+        }),
+    );
+    window.insert(
+        "dispatchEvent".into(),
+        native("window.dispatchEvent", Some(1), move |args| {
+            let event_type = event_type(args.first().unwrap_or(&JsValue::Undefined))
+                .unwrap_or_else(|| "event".into());
+            dispatch_window_event(&event_type)?;
+            Ok(JsValue::Bool(true))
+        }),
+    );
+    for prop in ["onload", "onpopstate"] {
+        window.insert(prop.into(), JsValue::Null);
+        window.insert(
+            format!("__set:{}", prop),
+            native(&format!("set_window_{}", prop), Some(1), move |args| {
+                let handler = args.first().cloned().unwrap_or(JsValue::Undefined);
+                EVENT_REGISTRY.with(|registry| {
+                    registry
+                        .borrow_mut()
+                        .entry("window".into())
+                        .or_default()
+                        .handlers
+                        .insert(prop.into(), handler);
+                });
+                Ok(JsValue::Undefined)
+            }),
+        );
+    }
+}
+
+fn dispatch_window_lifecycle(window: &JsValue, event_type: &str) -> Result<(), String> {
+    dispatch_window_event_with_this(event_type, window.clone())
+}
+
+fn dispatch_window_event(event_type: &str) -> Result<(), String> {
+    dispatch_window_event_with_this(event_type, JsValue::Undefined)
+}
+
+fn dispatch_window_event_with_this(event_type: &str, this_value: JsValue) -> Result<(), String> {
+    let event = normalize_event(
+        JsValue::String(event_type.into()),
+        event_type,
+        this_value.clone(),
+        this_value.clone(),
+    );
+    let (listeners, handler) = EVENT_REGISTRY.with(|registry| {
+        registry
+            .borrow()
+            .get("window")
+            .map(|entry| {
+                (
+                    entry.listeners.get(event_type).cloned().unwrap_or_default(),
+                    entry.handlers.get(&format!("on{}", event_type)).cloned(),
+                )
+            })
+            .unwrap_or_default()
+    });
+    for listener in listeners {
+        call_dom_listener(listener, this_value.clone(), event.clone())?;
+    }
+    if let Some(handler) = handler {
+        call_dom_listener(handler, this_value, event)?;
+    }
+    Ok(())
+}
+
+fn dispatch_document_lifecycle(root: &Rc<RefCell<Node>>, event_type: &str) -> Result<(), String> {
+    DomHandle {
+        root: root.clone(),
+        path: Vec::new(),
+    }
+    .dispatch_event(JsValue::String(event_type.into()))?;
+    Ok(())
+}
+
+fn install_location_methods(obj: &Rc<RefCell<HashMap<String, JsValue>>>) {
+    let assign_obj = obj.clone();
+    obj.borrow_mut().insert(
         "assign".into(),
-        native("location.assign", Some(1), |_| Ok(JsValue::Undefined)),
+        native("location.assign", Some(1), move |args| {
+            let href = args.first().unwrap_or(&JsValue::Undefined).display();
+            set_location_href(&assign_obj, &href);
+            Ok(JsValue::Undefined)
+        }),
     );
-    obj.insert(
+    let replace_obj = obj.clone();
+    obj.borrow_mut().insert(
         "replace".into(),
-        native("location.replace", Some(1), |_| Ok(JsValue::Undefined)),
+        native("location.replace", Some(1), move |args| {
+            let href = args.first().unwrap_or(&JsValue::Undefined).display();
+            set_location_href(&replace_obj, &href);
+            Ok(JsValue::Undefined)
+        }),
     );
-    JsValue::Object(Rc::new(RefCell::new(obj)))
+}
+
+fn history_object(location: Rc<RefCell<HashMap<String, JsValue>>>) -> JsValue {
+    let stack = Rc::new(RefCell::new(vec![location_href(&location)]));
+    let object = Rc::new(RefCell::new(HashMap::new()));
+    object
+        .borrow_mut()
+        .insert("length".into(), JsValue::Number(1.0));
+
+    let push_location = location.clone();
+    let push_stack = stack.clone();
+    let push_object = object.clone();
+    object.borrow_mut().insert(
+        "pushState".into(),
+        native("history.pushState", Some(3), move |args| {
+            let url = args.get(2).map(JsValue::display).unwrap_or_default();
+            if !url.is_empty() {
+                set_location_href(&push_location, &url);
+                push_stack.borrow_mut().push(location_href(&push_location));
+                push_object.borrow_mut().insert(
+                    "length".into(),
+                    JsValue::Number(push_stack.borrow().len() as f64),
+                );
+            }
+            Ok(JsValue::Undefined)
+        }),
+    );
+
+    let replace_location = location.clone();
+    let replace_stack = stack.clone();
+    object.borrow_mut().insert(
+        "replaceState".into(),
+        native("history.replaceState", Some(3), move |args| {
+            let url = args.get(2).map(JsValue::display).unwrap_or_default();
+            if !url.is_empty() {
+                set_location_href(&replace_location, &url);
+                if let Some(last) = replace_stack.borrow_mut().last_mut() {
+                    *last = location_href(&replace_location);
+                }
+            }
+            Ok(JsValue::Undefined)
+        }),
+    );
+
+    let back_location = location.clone();
+    let back_stack = stack.clone();
+    object.borrow_mut().insert(
+        "back".into(),
+        native("history.back", Some(0), move |_| {
+            if back_stack.borrow().len() > 1 {
+                back_stack.borrow_mut().pop();
+                if let Some(href) = back_stack.borrow().last().cloned() {
+                    set_location_href(&back_location, &href);
+                }
+                dispatch_window_event("popstate")?;
+            }
+            Ok(JsValue::Undefined)
+        }),
+    );
+
+    JsValue::Object(object)
+}
+
+fn location_href(location: &Rc<RefCell<HashMap<String, JsValue>>>) -> String {
+    location
+        .borrow()
+        .get("href")
+        .map(JsValue::display)
+        .unwrap_or_else(|| "http://localhost/".into())
+}
+
+fn set_location_href(location: &Rc<RefCell<HashMap<String, JsValue>>>, href: &str) {
+    let mut parsed = parse_location(href);
+    install_location_methods_on_map(&mut parsed, location.clone());
+    *location.borrow_mut() = parsed;
+}
+
+fn install_location_methods_on_map(
+    map: &mut HashMap<String, JsValue>,
+    target: Rc<RefCell<HashMap<String, JsValue>>>,
+) {
+    let assign_target = target.clone();
+    map.insert(
+        "assign".into(),
+        native("location.assign", Some(1), move |args| {
+            set_location_href(
+                &assign_target,
+                &args.first().unwrap_or(&JsValue::Undefined).display(),
+            );
+            Ok(JsValue::Undefined)
+        }),
+    );
+    let replace_target = target;
+    map.insert(
+        "replace".into(),
+        native("location.replace", Some(1), move |args| {
+            set_location_href(
+                &replace_target,
+                &args.first().unwrap_or(&JsValue::Undefined).display(),
+            );
+            Ok(JsValue::Undefined)
+        }),
+    );
 }
 
 fn navigator_object() -> JsValue {
@@ -394,6 +677,7 @@ fn node_object(handle: DomHandle) -> JsValue {
         }),
     );
     obj.insert("nodeName".into(), JsValue::String(node_name(&node)));
+    obj.insert("__domPath".into(), JsValue::String(path_key(&handle.path)));
     obj.insert(
         "tagName".into(),
         JsValue::String(node_name(&node).to_ascii_uppercase()),
@@ -432,6 +716,26 @@ fn node_object(handle: DomHandle) -> JsValue {
             "checked".into(),
             JsValue::Bool(el.attrs.contains_key("checked")),
         );
+
+        let (offset_width, offset_height) = element_offset_size(&handle);
+        obj.insert("offsetWidth".into(), JsValue::Number(offset_width as f64));
+        obj.insert("offsetHeight".into(), JsValue::Number(offset_height as f64));
+
+        if el.tag == "form" {
+            obj.insert(
+                "action".into(),
+                JsValue::String(el.attrs.get("action").cloned().unwrap_or_default()),
+            );
+            obj.insert(
+                "method".into(),
+                JsValue::String(
+                    el.attrs
+                        .get("method")
+                        .map(|m| m.to_ascii_lowercase())
+                        .unwrap_or_else(|| "get".into()),
+                ),
+            );
+        }
     }
 
     install_property_setters(&mut obj, &handle);
@@ -695,6 +999,50 @@ fn node_object(handle: DomHandle) -> JsValue {
 
     let h = handle.clone();
     obj.insert(
+        "getBoundingClientRect".into(),
+        native("getBoundingClientRect", Some(0), move |_| {
+            Ok(rect_object(&element_rect(&h)))
+        }),
+    );
+
+    let h = handle.clone();
+    obj.insert(
+        "getComputedStyle".into(),
+        native("getComputedStyle", Some(0), move |_| {
+            Ok(computed_style_object(&h))
+        }),
+    );
+
+    let h = handle.clone();
+    obj.insert(
+        "getAccessibilityTree".into(),
+        native("getAccessibilityTree", Some(0), move |_| {
+            Ok(accessibility_tree_object(&root_to_document(&h.root)))
+        }),
+    );
+
+    let h = handle.clone();
+    obj.insert(
+        "collectFormData".into(),
+        native("collectFormData", Some(0), move |_| {
+            Ok(form_data_object(&h))
+        }),
+    );
+
+    let h = handle.clone();
+    obj.insert(
+        "requestSubmit".into(),
+        native("requestSubmit", Some(0), move |_| submit_form(&h, true)),
+    );
+
+    let h = handle.clone();
+    obj.insert(
+        "submit".into(),
+        native("submit", Some(0), move |_| submit_form(&h, true)),
+    );
+
+    let h = handle.clone();
+    obj.insert(
         "click".into(),
         native("click", Some(0), move |_| {
             h.dispatch_event(JsValue::String("click".into()))
@@ -819,9 +1167,16 @@ impl DomHandle {
             call_dom_listener(listener, target.clone(), event.clone())?;
         }
         if let Some(handler) = self.handler(&format!("on{}", event_type)) {
-            call_dom_listener(handler, target, event)?;
+            call_dom_listener(handler, target, event.clone())?;
         }
-        Ok(JsValue::Bool(true))
+        let default_prevented = match &event {
+            JsValue::Object(obj) => obj
+                .borrow()
+                .get("defaultPrevented")
+                .is_some_and(JsValue::truthy),
+            _ => false,
+        };
+        Ok(JsValue::Bool(!default_prevented))
     }
 
     fn listeners(&self, event_type: &str) -> Vec<JsValue> {
@@ -1222,6 +1577,22 @@ fn parse_location(href: &str) -> HashMap<String, JsValue> {
             host = before_query.into();
             pathname = "/".into();
         }
+    } else if href.starts_with('/') {
+        let (before_hash, h) = href.split_once('#').map_or((href, ""), |(a, b)| (a, b));
+        hash = if h.is_empty() {
+            String::new()
+        } else {
+            format!("#{}", h)
+        };
+        let (before_query, q) = before_hash
+            .split_once('?')
+            .map_or((before_hash, ""), |(a, b)| (a, b));
+        search = if q.is_empty() {
+            String::new()
+        } else {
+            format!("?{}", q)
+        };
+        pathname = before_query.to_string();
     }
     let origin = format!("{}//{}", protocol, host);
     let mut obj = HashMap::new();
@@ -1257,6 +1628,263 @@ fn root_to_document(root: &Rc<RefCell<Node>>) -> browser::Document {
             children: vec![node.clone()],
         },
     }
+}
+
+fn path_key(path: &[usize]) -> String {
+    path.iter()
+        .map(|idx| idx.to_string())
+        .collect::<Vec<_>>()
+        .join(".")
+}
+
+fn dom_path_from_value(value: &JsValue) -> Vec<usize> {
+    let JsValue::Object(obj) = value else {
+        return Vec::new();
+    };
+    let Some(JsValue::String(path)) = obj.borrow().get("__domPath").cloned() else {
+        return Vec::new();
+    };
+    if path.is_empty() {
+        return Vec::new();
+    }
+    path.split('.')
+        .filter_map(|part| part.parse::<usize>().ok())
+        .collect()
+}
+
+fn layout_for_handle(handle: &DomHandle) -> browser::LayoutBox {
+    let document = root_to_document(&handle.root);
+    let css = LAYOUT_CSS.with(|c| c.borrow().clone());
+    browser::layout_document(&document, &css, 80)
+}
+
+fn element_rect(handle: &DomHandle) -> (i64, i64, i64, i64) {
+    let layout = layout_for_handle(handle);
+    browser::find_layout_box_at_path(&layout, &handle.path)
+        .map(|b| (b.x, b.y, b.width, b.height))
+        .unwrap_or((0, 0, 0, 0))
+}
+
+fn element_offset_size(handle: &DomHandle) -> (i64, i64) {
+    let (_, _, width, height) = element_rect(handle);
+    (width, height)
+}
+
+fn rect_object(rect: &(i64, i64, i64, i64)) -> JsValue {
+    let (x, y, width, height) = *rect;
+    let mut obj = HashMap::new();
+    for (key, value) in [
+        ("x", x),
+        ("y", y),
+        ("width", width),
+        ("height", height),
+        ("left", x),
+        ("top", y),
+        ("right", x + width),
+        ("bottom", y + height),
+    ] {
+        obj.insert(key.into(), JsValue::Number(value as f64));
+    }
+    JsValue::Object(Rc::new(RefCell::new(obj)))
+}
+
+fn computed_style_object(handle: &DomHandle) -> JsValue {
+    let mut styles = HashMap::new();
+    if let Some(styled) = styled_node_at_path(handle) {
+        styles.extend(styled.styles);
+    }
+    if let Some(Node::Element(el)) = handle.node() {
+        if let Some(inline) = el.attrs.get("style") {
+            styles.extend(browser::parse_inline_style(inline));
+        }
+    }
+
+    let (x, y, width, height) = element_rect(handle);
+    styles
+        .entry("display".into())
+        .or_insert_with(|| "block".into());
+    styles
+        .entry("width".into())
+        .or_insert_with(|| format!("{}px", width));
+    styles
+        .entry("height".into())
+        .or_insert_with(|| format!("{}px", height));
+    styles.insert("left".into(), format!("{}px", x));
+    styles.insert("top".into(), format!("{}px", y));
+
+    let object = Rc::new(RefCell::new(
+        styles
+            .into_iter()
+            .map(|(k, v)| (k, JsValue::String(v)))
+            .collect::<HashMap<_, _>>(),
+    ));
+    let object_for_get = object.clone();
+    object.borrow_mut().insert(
+        "getPropertyValue".into(),
+        native(
+            "CSSStyleDeclaration.getPropertyValue",
+            Some(1),
+            move |args| {
+                let name = args.first().unwrap_or(&JsValue::Undefined).display();
+                Ok(object_for_get
+                    .borrow()
+                    .get(&name)
+                    .cloned()
+                    .unwrap_or_else(|| JsValue::String(String::new())))
+            },
+        ),
+    );
+    JsValue::Object(object)
+}
+
+fn styled_node_at_path(handle: &DomHandle) -> Option<browser::StyledNode> {
+    let document = root_to_document(&handle.root);
+    let css = LAYOUT_CSS.with(|c| c.borrow().clone());
+    let styled = browser::computed_styles(&document, &css);
+    let (first, rest) = handle.path.split_first()?;
+    let mut current = styled.get(*first)?.clone();
+    for index in rest {
+        current = current.children.get(*index)?.clone();
+    }
+    Some(current)
+}
+
+fn accessibility_tree_object(document: &browser::Document) -> JsValue {
+    let nodes = browser::build_accessibility_tree(document)
+        .into_iter()
+        .map(a11y_node_object)
+        .collect::<Vec<_>>();
+    JsValue::Array(Rc::new(RefCell::new(nodes)))
+}
+
+fn a11y_node_object(node: browser::A11yNode) -> JsValue {
+    let mut obj = HashMap::new();
+    obj.insert("role".into(), JsValue::String(node.role));
+    obj.insert(
+        "name".into(),
+        node.name.map(JsValue::String).unwrap_or(JsValue::Null),
+    );
+    obj.insert("tag".into(), JsValue::String(node.tag));
+    obj.insert("focusable".into(), JsValue::Bool(node.focusable));
+    obj.insert("disabled".into(), JsValue::Bool(node.disabled));
+    obj.insert(
+        "children".into(),
+        JsValue::Array(Rc::new(RefCell::new(
+            node.children.into_iter().map(a11y_node_object).collect(),
+        ))),
+    );
+    JsValue::Object(Rc::new(RefCell::new(obj)))
+}
+
+fn form_data_object(handle: &DomHandle) -> JsValue {
+    let entries = collect_form_entries(handle);
+    let object = Rc::new(RefCell::new(HashMap::new()));
+    for (name, value) in &entries {
+        object
+            .borrow_mut()
+            .insert(name.clone(), JsValue::String(value.clone()));
+    }
+    object.borrow_mut().insert(
+        "entries".into(),
+        JsValue::Array(Rc::new(RefCell::new(
+            entries
+                .iter()
+                .map(|(name, value)| {
+                    JsValue::Array(Rc::new(RefCell::new(vec![
+                        JsValue::String(name.clone()),
+                        JsValue::String(value.clone()),
+                    ])))
+                })
+                .collect(),
+        ))),
+    );
+    let entries_for_get = entries.clone();
+    object.borrow_mut().insert(
+        "get".into(),
+        native("FormData.get", Some(1), move |args| {
+            let name = args.first().unwrap_or(&JsValue::Undefined).display();
+            Ok(entries_for_get
+                .iter()
+                .find(|(n, _)| n == &name)
+                .map(|(_, v)| JsValue::String(v.clone()))
+                .unwrap_or(JsValue::Null))
+        }),
+    );
+    JsValue::Object(object)
+}
+
+fn collect_form_entries(handle: &DomHandle) -> Vec<(String, String)> {
+    let mut entries = Vec::new();
+    if let Some(node) = handle.node() {
+        collect_form_entries_from_node(&node, &mut entries);
+    }
+    entries
+}
+
+fn collect_form_entries_from_node(node: &Node, entries: &mut Vec<(String, String)>) {
+    let Node::Element(el) = node else {
+        return;
+    };
+    if matches!(el.tag.as_str(), "input" | "textarea" | "select")
+        && !el.attrs.contains_key("disabled")
+    {
+        if let Some(name) = el.attrs.get("name") {
+            let input_type = el
+                .attrs
+                .get("type")
+                .map(|ty| ty.to_ascii_lowercase())
+                .unwrap_or_else(|| "text".into());
+            let include = !matches!(input_type.as_str(), "submit" | "button" | "reset")
+                && (!matches!(input_type.as_str(), "checkbox" | "radio")
+                    || el.attrs.contains_key("checked"));
+            if include {
+                let value = if el.tag == "textarea" {
+                    browser::text_content(node)
+                } else {
+                    el.attrs.get("value").cloned().unwrap_or_else(|| {
+                        if input_type == "checkbox" {
+                            "on".into()
+                        } else {
+                            String::new()
+                        }
+                    })
+                };
+                entries.push((name.clone(), value));
+            }
+        }
+    }
+    for child in &el.children {
+        collect_form_entries_from_node(child, entries);
+    }
+}
+
+fn submit_form(handle: &DomHandle, dispatch_submit: bool) -> Result<JsValue, String> {
+    if dispatch_submit {
+        if !handle
+            .dispatch_event(JsValue::String("submit".into()))?
+            .truthy()
+        {
+            return Ok(JsValue::Bool(false));
+        }
+    }
+    let mut obj = HashMap::new();
+    if let Some(Node::Element(el)) = handle.node() {
+        obj.insert(
+            "action".into(),
+            JsValue::String(el.attrs.get("action").cloned().unwrap_or_default()),
+        );
+        obj.insert(
+            "method".into(),
+            JsValue::String(
+                el.attrs
+                    .get("method")
+                    .map(|m| m.to_ascii_lowercase())
+                    .unwrap_or_else(|| "get".into()),
+            ),
+        );
+    }
+    obj.insert("data".into(), form_data_object(handle));
+    Ok(JsValue::Object(Rc::new(RefCell::new(obj))))
 }
 
 fn collect_inline_scripts(node: &Node) -> Vec<String> {
@@ -1583,6 +2211,22 @@ pub fn compatibility_report_to_value(_args: &[Value]) -> Result<Value, String> {
         "Storage.clear",
         "Storage.key",
         "Storage.length",
+        "getComputedStyle",
+        "getBoundingClientRect",
+        "offsetWidth",
+        "offsetHeight",
+        "accessibilityTree",
+        "ariaRoles",
+        "focusableElements",
+        "formData",
+        "formSubmit",
+        "submitEvents",
+        "DOMContentLoaded",
+        "loadEvent",
+        "history.pushState",
+        "history.replaceState",
+        "history.back",
+        "popstate",
     ];
     Ok(Value::List(Rc::new(RefCell::new(
         features
@@ -1735,6 +2379,70 @@ mod tests {
         )
         .unwrap();
         assert_eq!(result.value, JsValue::Bool(true));
+    }
+
+    #[test]
+    fn computed_styles_geometry_and_offsets_are_exposed() {
+        let result = eval_with_dom(
+            "<style>#box { width: 12px; height: 4px; color: red; }</style><main><div id='box' style='margin-top: 2px'>Hi</div></main>",
+            "let box=document.getElementById('box'); let style=getComputedStyle(box); let rect=box.getBoundingClientRect(); style.color + ':' + style.getPropertyValue('margin-top') + ':' + rect.width + ':' + rect.height + ':' + box.offsetWidth + ':' + box.offsetHeight;",
+        )
+        .unwrap();
+        assert_eq!(result.value, JsValue::String("red:2px:12:4:12:4".into()));
+    }
+
+    #[test]
+    fn accessibility_tree_exposes_roles_names_and_focusability() {
+        let result = eval_with_dom(
+            "<main><button aria-label='Save'></button><a href='/x'>Read</a><img alt='Logo'></main>",
+            "let tree=getAccessibilityTree(); let main=tree[0]; let button=main.children[0]; let link=main.children[1]; let img=main.children[2]; main.role + ':' + button.role + ':' + button.name + ':' + button.focusable + ':' + link.role + ':' + img.name;",
+        )
+        .unwrap();
+        assert_eq!(
+            result.value,
+            JsValue::String("main:button:Save:true:link:Logo".into())
+        );
+    }
+
+    #[test]
+    fn forms_collect_values_and_submit_events_can_cancel() {
+        let result = eval_with_dom(
+            "<form id='f' action='/save' method='post'><input name='q' value='rust'><input type='checkbox' name='ok' checked><input type='checkbox' name='skip'><textarea name='body'>Hi</textarea></form>",
+            "let form=document.getElementById('f'); let data=form.collectFormData(); let submitted=form.requestSubmit(); form.method + ':' + submitted.action + ':' + submitted.method + ':' + data.get('q') + ':' + data.get('ok') + ':' + data.get('skip') + ':' + submitted.data.get('body');",
+        )
+        .unwrap();
+        assert_eq!(
+            result.value,
+            JsValue::String("post:/save:post:rust:on:null:Hi".into())
+        );
+
+        let result = eval_with_dom(
+            "<form id='f'><input name='q' value='rust'></form>",
+            "let form=document.getElementById('f'); let seen=''; form.addEventListener('submit', function(e){ seen=e.type; e.preventDefault(); }); let submitted=form.requestSubmit(); seen + ':' + submitted;",
+        )
+        .unwrap();
+        assert_eq!(result.value, JsValue::String("submit:false".into()));
+    }
+
+    #[test]
+    fn navigation_lifecycle_history_and_location_are_available() {
+        let result = eval_with_dom(
+            "<main></main>",
+            "let events=''; document.addEventListener('DOMContentLoaded', function(e){ events=events+'D'; }); window.onload=function(){ events=events+'L'; console.log(events); }; events;",
+        )
+        .unwrap();
+        assert_eq!(result.value, JsValue::String(String::new()));
+        assert_eq!(result.console, vec!["DL".to_string()]);
+
+        let result = eval_with_dom(
+            "<main></main>",
+            "let pops=0; window.addEventListener('popstate', function(){ pops=pops+1; }); history.pushState({page:1}, '', '/first?x=1#top'); let first=location.pathname + location.search + location.hash + ':' + history.length; history.pushState({}, '', '/second'); history.back(); first + '|' + location.pathname + ':' + pops;",
+        )
+        .unwrap();
+        assert_eq!(
+            result.value,
+            JsValue::String("/first?x=1#top:2|/first:1".into())
+        );
     }
 
     #[test]
