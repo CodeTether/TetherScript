@@ -1813,6 +1813,271 @@ pub fn layout_to_runtime_value(args: &[Value]) -> Result<Value, String> {
     Ok(layout_to_value(&layout_document(&doc, css, width)))
 }
 
+/// ARIA landmark / role derived from the element's `role` attribute or implicit role.
+#[derive(Debug, Clone, PartialEq)]
+pub struct A11yNode {
+    pub role: String,
+    pub name: Option<String>,
+    pub tag: String,
+    pub focusable: bool,
+    pub disabled: bool,
+    pub children: Vec<A11yNode>,
+}
+
+/// Map of implicit ARIA roles for HTML elements (WHATWG spec).
+fn implicit_role(tag: &str) -> Option<&'static str> {
+    Some(match tag {
+        "a" => "link",
+        "article" => "article",
+        "aside" => "complementary",
+        "body" => "document",
+        "button" => "button",
+        "datalist" => "listbox",
+        "dd" => "definition",
+        "details" => "group",
+        "dialog" => "dialog",
+        "dt" => "term",
+        "fieldset" => "group",
+        "figure" => "figure",
+        "footer" => "contentinfo",
+        "form" => "form",
+        "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => "heading",
+        "header" => "banner",
+        "hr" => "separator",
+        "img" => "img",
+        "input" => "textbox",
+        "li" => "listitem",
+        "link" => "link",
+        "main" => "main",
+        "menu" => "menu",
+        "meter" => "meter",
+        "nav" => "navigation",
+        "ol" | "ul" => "list",
+        "option" => "option",
+        "output" => "status",
+        "progress" => "progressbar",
+        "section" => "region",
+        "select" => "combobox",
+        "summary" => "button",
+        "table" => "table",
+        "tbody" | "thead" | "tfoot" => "rowgroup",
+        "td" => "cell",
+        "textarea" => "textbox",
+        "th" => "columnheader",
+        "tr" => "row",
+        _ => return None,
+    })
+}
+
+/// Compute the ARIA role for an element: explicit `role` attr wins, then implicit.
+fn element_role(element: &Element) -> String {
+    if let Some(role) = element.attrs.get("role") {
+        if !role.is_empty() {
+            return role.to_ascii_lowercase();
+        }
+    }
+    implicit_role(&element.tag).unwrap_or("generic").to_string()
+}
+
+/// Compute the accessible name for an element.
+fn accessible_name(element: &Element) -> Option<String> {
+    // aria-label wins
+    if let Some(label) = element.attrs.get("aria-label") {
+        if !label.is_empty() {
+            return Some(label.clone());
+        }
+    }
+    // aria-labelledby (we'd need to resolve IDs — return as-is for now)
+    if let Some(labelledby) = element.attrs.get("aria-labelledby") {
+        if !labelledby.is_empty() {
+            return Some(format!("#{}", labelledby));
+        }
+    }
+    // title attribute
+    if let Some(title) = element.attrs.get("title") {
+        if !title.is_empty() {
+            return Some(title.clone());
+        }
+    }
+    // alt attribute (images)
+    if let Some(alt) = element.attrs.get("alt") {
+        if !alt.is_empty() {
+            return Some(alt.clone());
+        }
+    }
+    // placeholder for inputs
+    if let Some(placeholder) = element.attrs.get("placeholder") {
+        if !placeholder.is_empty() {
+            return Some(placeholder.clone());
+        }
+    }
+    // label via for attribute — skip for now (requires ID resolution)
+    None
+}
+
+/// Is the element keyboard-focusable?
+fn is_focusable(element: &Element) -> bool {
+    if element.attrs.get("role").is_some() {
+        return true;
+    }
+    if let Some(tabindex) = element.attrs.get("tabindex") {
+        if let Ok(idx) = tabindex.parse::<i32>() {
+            return idx >= 0;
+        }
+    }
+    matches!(
+        element.tag.as_str(),
+        "a" | "button" | "input" | "select" | "textarea" | "summary" | "details"
+    ) && !element.attrs.contains_key("disabled")
+}
+
+/// Recursively build the accessibility tree from a DOM node.
+fn build_a11y_node(node: &Node) -> Option<A11yNode> {
+    match node {
+        Node::Text(text) => {
+            let trimmed = text.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(A11yNode {
+                    role: "text".into(),
+                    name: Some(trimmed.to_string()),
+                    tag: "#text".into(),
+                    focusable: false,
+                    disabled: false,
+                    children: Vec::new(),
+                })
+            }
+        }
+        Node::Element(element) => {
+            // Skip elements with aria-hidden="true" or display:none via hidden attr
+            if element
+                .attrs
+                .get("aria-hidden")
+                .is_some_and(|v| v == "true")
+            {
+                return None;
+            }
+            let role = element_role(element);
+            // For presentational role, skip generating a11y node but still process children
+            if role == "presentation" || role == "none" {
+                let mut children = Vec::new();
+                for child in &element.children {
+                    if let Some(a11y) = build_a11y_node(child) {
+                        children.push(a11y);
+                    }
+                }
+                // Return first child directly or merge
+                if children.len() == 1 {
+                    return Some(children.into_iter().next().unwrap());
+                }
+                // Merge all children into a generic container
+                return Some(A11yNode {
+                    role: "generic".into(),
+                    name: None,
+                    tag: element.tag.clone(),
+                    focusable: false,
+                    disabled: false,
+                    children,
+                });
+            }
+
+            let mut children = Vec::new();
+            for child in &element.children {
+                if let Some(a11y) = build_a11y_node(child) {
+                    children.push(a11y);
+                }
+            }
+
+            Some(A11yNode {
+                role,
+                name: accessible_name(element),
+                tag: element.tag.clone(),
+                focusable: is_focusable(element),
+                disabled: element.attrs.contains_key("disabled"),
+                children,
+            })
+        }
+    }
+}
+
+/// Build a full accessibility tree from a document.
+pub fn build_accessibility_tree(document: &Document) -> Vec<A11yNode> {
+    document
+        .children
+        .iter()
+        .filter_map(|node| build_a11y_node(node))
+        .collect()
+}
+
+/// Convert an accessibility tree to a Value for the runtime.
+pub fn a11y_tree_to_value(nodes: &[A11yNode]) -> Value {
+    Value::List(Rc::new(RefCell::new(
+        nodes.iter().map(a11y_node_to_value).collect(),
+    )))
+}
+
+fn a11y_node_to_value(node: &A11yNode) -> Value {
+    let mut map = HashMap::new();
+    map.insert("role".into(), Value::Str(Rc::new(node.role.clone())));
+    map.insert(
+        "name".into(),
+        match &node.name {
+            Some(n) => Value::Str(Rc::new(n.clone())),
+            None => Value::Nil,
+        },
+    );
+    map.insert("tag".into(), Value::Str(Rc::new(node.tag.clone())));
+    map.insert("focusable".into(), Value::Bool(node.focusable));
+    map.insert("disabled".into(), Value::Bool(node.disabled));
+    map.insert(
+        "children".into(),
+        Value::List(Rc::new(RefCell::new(
+            node.children.iter().map(a11y_node_to_value).collect(),
+        ))),
+    );
+    Value::Map(Rc::new(RefCell::new(map)))
+}
+
+/// Find the layout box that corresponds to a given element at a path.
+/// The path is a sequence of child indices to traverse from the layout root.
+pub fn find_layout_box_at_path<'a>(layout: &'a LayoutBox, path: &[usize]) -> Option<&'a LayoutBox> {
+    if path.is_empty() {
+        return Some(layout);
+    }
+    let mut current = layout;
+    for &idx in path {
+        current = current.children.get(idx)?;
+    }
+    Some(current)
+}
+
+/// Collect all focusable elements from a document, returning (path, element) pairs.
+pub fn collect_focusable(document: &Document) -> Vec<(Vec<usize>, Element)> {
+    let mut results = Vec::new();
+    for (i, child) in document.children.iter().enumerate() {
+        collect_focusable_recursive(child, &[i], &mut results);
+    }
+    results
+}
+
+fn collect_focusable_recursive(
+    node: &Node,
+    path: &[usize],
+    results: &mut Vec<(Vec<usize>, Element)>,
+) {
+    if let Node::Element(el) = node {
+        if is_focusable(el) {
+            results.push((path.to_vec(), el.clone()));
+        }
+        for (i, child) in el.children.iter().enumerate() {
+            let mut child_path = path.to_vec();
+            child_path.push(i);
+            collect_focusable_recursive(child, &child_path, results);
+        }
+    }
+}
+
 fn optional_width(value: Option<&Value>, name: &str) -> Result<i64, String> {
     match value {
         Some(Value::Int(width)) => Ok(*width),
