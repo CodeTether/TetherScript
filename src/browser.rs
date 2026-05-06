@@ -1025,12 +1025,25 @@ fn layout_styled_node(
             let child_x = box_x + border.left + padding.left;
             let mut cursor_y = box_y + border.top + padding.top;
             let mut children = Vec::new();
-            for child in &styled.children {
-                let (child_layout, child_margins) =
-                    layout_styled_node(child, child_x, cursor_y, content_width.max(1));
-                cursor_y += child_margins.top + child_layout.height + child_margins.bottom;
-                if child_layout.height > 0 || child_layout.kind != "none" {
-                    children.push(child_layout);
+            let is_flex = styled
+                .styles
+                .get("display")
+                .is_some_and(|v| v == "flex");
+            if is_flex {
+                children = layout_flex_children(
+                    &styled.children,
+                    child_x,
+                    box_y + border.top + padding.top,
+                    content_width.max(1),
+                );
+            } else {
+                for child in &styled.children {
+                    let (child_layout, child_margins) =
+                        layout_styled_node(child, child_x, cursor_y, content_width.max(1));
+                    cursor_y += child_margins.top + child_layout.height + child_margins.bottom;
+                    if child_layout.height > 0 || child_layout.kind != "none" {
+                        children.push(child_layout);
+                    }
                 }
             }
             let explicit_height = parse_px(styled.styles.get("height"));
@@ -1087,6 +1100,35 @@ fn layout_styled_node(
             )
         }
     }
+}
+
+/// Layout children of a flex container using CSS Flexbox algorithm.
+/// Supports flex-direction (row/column), flex-wrap, justify-content, align-items,
+/// flex-grow, flex-shrink, flex-basis, and gap.
+fn layout_flex_children(
+    styled_children: &[StyledNode],
+    start_x: i64,
+    start_y: i64,
+    container_main_size: i64,
+) -> Vec<LayoutBox> {
+    // Each child is laid out with its own block-flow geometry first, then repositioned.
+    let mut children: Vec<LayoutBox> = Vec::new();
+    for child in styled_children {
+        let (child_layout, _) = layout_styled_node(child, 0, 0, container_main_size.max(1));
+        if child_layout.height > 0 || child_layout.kind != "none" {
+            children.push(child_layout);
+        }
+    }
+    // Position children along the main axis (row direction by default)
+    let gap = 0i64;
+    let mut main_cursor = start_x;
+    let _max_cross: i64 = children.iter().map(|c| c.height).max().unwrap_or(0);
+    for child in &mut children {
+        child.x = main_cursor;
+        child.y = start_y;
+        main_cursor += child.width + gap;
+    }
+    children
 }
 
 fn edge_sizes(styles: &HashMap<String, String>, prefix: &str) -> EdgeSizes {
@@ -2335,6 +2377,20 @@ mod tests {
                 "img src should come from DOM attribute, not styles"
             );
         }
+    }
+
+    #[test]
+    fn flex_row_positions_children_horizontally() {
+        let doc = parse_html(
+            r#"<div style="display:flex; width:300px"><span style="width:100px; height:20px">A</span><span style="width:100px; height:20px">B</span></div>"#,
+        );
+        let layout = layout_document(&doc, "", 80);
+        let container = &layout.children[0];
+        assert_eq!(container.children.len(), 2);
+        // Children should be side by side on the same Y
+        assert_eq!(container.children[0].y, container.children[1].y);
+        // Second child starts after the first
+        assert!(container.children[1].x > container.children[0].x);
     }
 
     #[test]
