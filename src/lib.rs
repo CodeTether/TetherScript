@@ -2,6 +2,7 @@
 
 pub mod ast;
 pub mod browser;
+pub mod browser_loop;
 pub mod browser_cap;
 pub mod browser_dom;
 pub mod browser_events;
