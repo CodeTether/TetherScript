@@ -211,7 +211,12 @@ mod tests {
         let log = Rc::new(RefCell::new(Vec::new()));
         let mut loop_ = BrowserLoop::new();
 
-        for (delay, name) in [(2, "timer-2a"), (1, "timer-1"), (2, "timer-2b"), (0, "timer-0")] {
+        for (delay, name) in [
+            (2, "timer-2a"),
+            (1, "timer-1"),
+            (2, "timer-2b"),
+            (0, "timer-0"),
+        ] {
             let log_for_timer = Rc::clone(&log);
             loop_.set_timeout(delay, move |_| record(&log_for_timer, name));
         }
