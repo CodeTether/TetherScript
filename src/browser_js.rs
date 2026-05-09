@@ -6578,8 +6578,9 @@ fn install_web_api_bindings(window: &mut HashMap<String, JsValue>) {
     window.insert(
         "URLSearchParams".into(),
         native("URLSearchParams", None, move |args| {
-            let input = args.first().unwrap_or(&JsValue::Undefined).display();
-            Ok(url_search_params_object(parse_search_params(&input)))
+            Ok(url_search_params_object(url_search_params_entries(
+                args.first().unwrap_or(&JsValue::Undefined),
+            )))
         }),
     );
     window.insert(
@@ -7249,11 +7250,76 @@ fn parse_search_params(input: &str) -> Vec<(String, String)> {
         .collect()
 }
 
+fn url_search_params_entries(value: &JsValue) -> Vec<(String, String)> {
+    match value {
+        JsValue::Array(items) => search_params_from_pairs(&items.borrow()),
+        JsValue::Object(obj) => search_params_from_object(value, obj),
+        JsValue::String(input) => parse_search_params(input),
+        other => parse_search_params(&other.display()),
+    }
+}
+
+fn search_params_from_pairs(items: &[JsValue]) -> Vec<(String, String)> {
+    items
+        .iter()
+        .filter_map(|item| match item {
+            JsValue::Array(pair) => {
+                let pair = pair.borrow();
+                Some((pair.first()?.display(), pair.get(1)?.display()))
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+fn search_params_from_object(
+    value: &JsValue,
+    obj: &Rc<RefCell<HashMap<String, JsValue>>>,
+) -> Vec<(String, String)> {
+    let (is_params, entries_fn) = {
+        let obj = obj.borrow();
+        (
+            obj.get("__urlSearchParamsBrand").is_some(),
+            obj.get("entries").cloned(),
+        )
+    };
+    if is_params {
+        if let Some(entries_fn) = entries_fn {
+            if let Ok(rows) = js::call_function_with_this(entries_fn, value.clone(), &[]) {
+                return url_search_params_entries(&rows);
+            }
+        }
+    }
+    let mut entries = obj
+        .borrow()
+        .iter()
+        .filter_map(|(name, value)| {
+            if name.starts_with("__")
+                || matches!(
+                    value,
+                    JsValue::Native(_) | JsValue::Function(_) | JsValue::BoundFunction(_)
+                )
+            {
+                None
+            } else {
+                Some((name.clone(), value.display()))
+            }
+        })
+        .collect::<Vec<_>>();
+    entries.sort_by(|(left, _), (right, _)| left.cmp(right));
+    entries
+}
+
 fn url_search_params_object(entries: Vec<(String, String)>) -> JsValue {
     let entries = Rc::new(RefCell::new(entries));
     let object = Rc::new(RefCell::new(HashMap::new()));
     let this_value = JsValue::Object(object.clone());
     let mut obj = object.borrow_mut();
+    obj.insert("__urlSearchParamsBrand".into(), JsValue::Bool(true));
+    obj.insert(
+        "size".into(),
+        JsValue::Number(entries.borrow().len() as f64),
+    );
     let get_entries = entries.clone();
     obj.insert(
         "get".into(),
@@ -7293,6 +7359,7 @@ fn url_search_params_object(entries: Vec<(String, String)>) -> JsValue {
         }),
     );
     let set_entries = entries.clone();
+    let set_object = object.clone();
     obj.insert(
         "set".into(),
         native("URLSearchParams.set", Some(2), move |args| {
@@ -7321,26 +7388,33 @@ fn url_search_params_object(entries: Vec<(String, String)>) -> JsValue {
             } else {
                 entries.push((key, value));
             }
+            set_search_params_size(&set_object, entries.len());
             Ok(JsValue::Undefined)
         }),
     );
     let append_entries = entries.clone();
+    let append_object = object.clone();
     obj.insert(
         "append".into(),
         native("URLSearchParams.append", Some(2), move |args| {
-            append_entries.borrow_mut().push((
+            let mut entries = append_entries.borrow_mut();
+            entries.push((
                 args.first().unwrap_or(&JsValue::Undefined).display(),
                 args.get(1).unwrap_or(&JsValue::Undefined).display(),
             ));
+            set_search_params_size(&append_object, entries.len());
             Ok(JsValue::Undefined)
         }),
     );
     let delete_entries = entries.clone();
+    let delete_object = object.clone();
     obj.insert(
         "delete".into(),
         native("URLSearchParams.delete", Some(1), move |args| {
             let key = args.first().unwrap_or(&JsValue::Undefined).display();
-            delete_entries.borrow_mut().retain(|(name, _)| name != &key);
+            let mut entries = delete_entries.borrow_mut();
+            entries.retain(|(name, _)| name != &key);
+            set_search_params_size(&delete_object, entries.len());
             Ok(JsValue::Undefined)
         }),
     );
@@ -7402,12 +7476,13 @@ fn url_search_params_object(entries: Vec<(String, String)>) -> JsValue {
         }),
     );
     let sort_entries = entries.clone();
+    let sort_object = object.clone();
     obj.insert(
         "sort".into(),
         native("URLSearchParams.sort", Some(0), move |_| {
-            sort_entries
-                .borrow_mut()
-                .sort_by(|(left, _), (right, _)| left.cmp(right));
+            let mut entries = sort_entries.borrow_mut();
+            entries.sort_by(|(left, _), (right, _)| left.cmp(right));
+            set_search_params_size(&sort_object, entries.len());
             Ok(JsValue::Undefined)
         }),
     );
@@ -7420,8 +7495,23 @@ fn url_search_params_object(entries: Vec<(String, String)>) -> JsValue {
             )))
         }),
     );
+    let json_entries = entries.clone();
+    obj.insert(
+        "toJSON".into(),
+        native("URLSearchParams.toJSON", Some(0), move |_| {
+            Ok(JsValue::String(search_params_string(
+                &json_entries.borrow(),
+            )))
+        }),
+    );
     drop(obj);
     this_value
+}
+
+fn set_search_params_size(object: &Rc<RefCell<HashMap<String, JsValue>>>, len: usize) {
+    object
+        .borrow_mut()
+        .insert("size".into(), JsValue::Number(len as f64));
 }
 
 fn search_params_entries_array(entries: &[(String, String)]) -> JsValue {
