@@ -33,6 +33,8 @@ mod cssom_host;
 mod custom_host;
 #[path = "browser_js_dom.rs"]
 mod dom_compat_host;
+#[path = "browser_js_event_path.rs"]
+mod event_path_host;
 #[path = "browser_js_fullscreen.rs"]
 mod fullscreen_host;
 #[path = "browser_js_lifecycle.rs"]
@@ -2907,6 +2909,7 @@ impl DomHandle {
         let target = node_object(self.clone());
         let event = normalize_event(event, &event_type, target.clone(), target.clone());
         let path = self.event_path();
+        event_path_host::install(&event, &path);
 
         for ancestor in path.iter().take(path.len().saturating_sub(1)) {
             set_event_position(&event, node_object(ancestor.clone()), 1);
@@ -3605,21 +3608,21 @@ fn normalize_event(
     target: JsValue,
     current_target: JsValue,
 ) -> JsValue {
-    let mut map = match event {
-        JsValue::Object(obj) => obj.borrow().clone(),
-        _ => HashMap::new(),
+    let event_ref = match event {
+        JsValue::Object(obj) => obj,
+        _ => Rc::new(RefCell::new(HashMap::new())),
     };
-    map.insert("type".into(), JsValue::String(event_type.into()));
-    map.insert("target".into(), target);
-    map.insert("currentTarget".into(), current_target);
-    map.entry("bubbles".into()).or_insert(JsValue::Bool(true));
-    map.entry("cancelable".into())
-        .or_insert(JsValue::Bool(true));
-    map.entry("eventPhase".into())
-        .or_insert(JsValue::Number(0.0));
-    map.entry("defaultPrevented".into())
-        .or_insert(JsValue::Bool(false));
-    let event_ref = Rc::new(RefCell::new(map));
+    {
+        let mut map = event_ref.borrow_mut();
+        map.insert("type".into(), JsValue::String(event_type.into()));
+        map.insert("target".into(), target);
+        map.insert("currentTarget".into(), current_target);
+        map.entry("bubbles".into()).or_insert(JsValue::Bool(true));
+        map.entry("cancelable".into()).or_insert(JsValue::Bool(true));
+        map.entry("eventPhase".into()).or_insert(JsValue::Number(0.0));
+        map.entry("defaultPrevented".into())
+            .or_insert(JsValue::Bool(false));
+    }
     let event_for_prevent = event_ref.clone();
     event_ref.borrow_mut().insert(
         "preventDefault".into(),
