@@ -29,5 +29,6 @@ fn install_control(obj: &Rc<RefCell<HashMap<String, JsValue>>>, handle: &DomHand
         select::install(obj, handle);
     } else {
         value_setter::install(obj, handle);
+        input_compat::install(obj, handle);
     }
 }

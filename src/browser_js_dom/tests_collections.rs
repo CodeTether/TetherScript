@@ -1,6 +1,9 @@
 use crate::browser_js::eval_with_dom;
 use crate::js::JsValue;
 
+#[path = "tests_html_collection_named.rs"]
+mod tests_html_collection_named;
+
 #[test]
 fn query_selector_all_exposes_item_and_for_each() {
     let result = eval_with_dom(
