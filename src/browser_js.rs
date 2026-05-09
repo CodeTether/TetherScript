@@ -10,7 +10,7 @@
 //! timers, and in-memory `localStorage`/`sessionStorage` Storage objects.
 
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet};
 use std::rc::{Rc, Weak};
 
 use crate::browser::{self, Element, Node};
@@ -50,10 +50,13 @@ mod realtime_model;
 pub(crate) use realtime_model::{BrowserJsRealtimeEvent, BrowserJsRealtimeEventKind};
 #[path = "browser_js_selection/mod.rs"]
 mod selection_host;
+#[path = "browser_js_timers.rs"]
+mod timers_host;
 #[path = "browser_js_viewport/mod.rs"]
 mod viewport_host;
 #[path = "browser_js_window/mod.rs"]
 mod window_host;
+use timers_host::TimerQueue;
 
 const DOM_API_VERSION: &str = "tetherscript-dom-0.3";
 const MAX_TIMER_DRAIN: usize = 10_000;
@@ -106,16 +109,6 @@ struct ScheduledCallback {
     callback: JsValue,
     args: Vec<JsValue>,
     this_value: JsValue,
-}
-
-#[derive(Default)]
-struct TimerQueue {
-    next_id: u32,
-    timers: VecDeque<ScheduledCallback>,
-    interval_ids: HashSet<u32>,
-    microtasks: VecDeque<ScheduledCallback>,
-    animation_frames: VecDeque<ScheduledCallback>,
-    idle_callbacks: VecDeque<ScheduledCallback>,
 }
 
 #[derive(Default)]
@@ -890,12 +883,15 @@ fn install_timer_bindings(window: &mut HashMap<String, JsValue>, timers: Rc<RefC
             let mut queue = set_queue.borrow_mut();
             queue.next_id = queue.next_id.saturating_add(1).max(1);
             let id = queue.next_id;
-            queue.timers.push_back(ScheduledCallback {
-                id,
-                callback,
-                args: callback_args,
-                this_value: JsValue::Undefined,
-            });
+            queue.schedule_timeout(
+                timer_delay(args.get(1)),
+                ScheduledCallback {
+                    id,
+                    callback,
+                    args: callback_args,
+                    this_value: JsValue::Undefined,
+                },
+            );
             Ok(JsValue::Number(id as f64))
         }),
     );
@@ -905,9 +901,7 @@ fn install_timer_bindings(window: &mut HashMap<String, JsValue>, timers: Rc<RefC
         "clearTimeout".into(),
         native("clearTimeout", None, move |args| {
             let id = args.first().map(timer_id).unwrap_or(0);
-            let mut queue = clear_queue.borrow_mut();
-            queue.interval_ids.remove(&id);
-            queue.timers.retain(|task| task.id != id);
+            clear_queue.borrow_mut().cancel_timer(id);
             Ok(JsValue::Undefined)
         }),
     );
@@ -926,12 +920,15 @@ fn install_timer_bindings(window: &mut HashMap<String, JsValue>, timers: Rc<RefC
             queue.next_id = queue.next_id.saturating_add(1).max(1);
             let id = queue.next_id;
             queue.interval_ids.insert(id);
-            queue.timers.push_back(ScheduledCallback {
-                id,
-                callback,
-                args: callback_args,
-                this_value: JsValue::Undefined,
-            });
+            queue.schedule_timeout(
+                timer_delay(args.get(1)),
+                ScheduledCallback {
+                    id,
+                    callback,
+                    args: callback_args,
+                    this_value: JsValue::Undefined,
+                },
+            );
             Ok(JsValue::Number(id as f64))
         }),
     );
@@ -941,9 +938,7 @@ fn install_timer_bindings(window: &mut HashMap<String, JsValue>, timers: Rc<RefC
         "clearInterval".into(),
         native("clearInterval", None, move |args| {
             let id = args.first().map(timer_id).unwrap_or(0);
-            let mut queue = clear_interval_queue.borrow_mut();
-            queue.interval_ids.remove(&id);
-            queue.timers.retain(|task| task.id != id);
+            clear_interval_queue.borrow_mut().cancel_timer(id);
             Ok(JsValue::Undefined)
         }),
     );
@@ -1019,7 +1014,7 @@ fn drain_timers(timers: Rc<RefCell<TimerQueue>>, window: JsValue) -> Result<(), 
             drain_microtasks(timers.clone(), window.clone())?;
         }
 
-        let task = { timers.borrow_mut().timers.pop_front() };
+        let task = { timers.borrow_mut().pop_timer() };
         let Some(task) = task else {
             if performance_host::drain_idle_callbacks(timers.clone(), window.clone(), &mut drained)?
             {
@@ -1027,6 +1022,7 @@ fn drain_timers(timers: Rc<RefCell<TimerQueue>>, window: JsValue) -> Result<(), 
             }
             break;
         };
+        let (task, delay_ms) = task;
         drained += 1;
         let is_interval = { timers.borrow().interval_ids.contains(&task.id) };
         if drained > MAX_TIMER_DRAIN {
@@ -1043,7 +1039,7 @@ fn drain_timers(timers: Rc<RefCell<TimerQueue>>, window: JsValue) -> Result<(), 
         js::call_function_with_this(task.callback.clone(), window.clone(), &task.args)?;
         drain_microtasks(timers.clone(), window.clone())?;
         if is_interval && timers.borrow().interval_ids.contains(&task.id) {
-            timers.borrow_mut().timers.push_back(task);
+            timers.borrow_mut().reschedule_interval(task, delay_ms);
         }
     }
     Ok(())
@@ -1085,6 +1081,21 @@ fn timer_id(value: &JsValue) -> u32 {
     match value {
         JsValue::Number(n) if n.is_finite() && *n > 0.0 => *n as u32,
         other => other.display().parse().unwrap_or(0),
+    }
+}
+
+fn timer_delay(value: Option<&JsValue>) -> u64 {
+    let delay = match value {
+        Some(JsValue::Number(n)) => *n,
+        Some(JsValue::String(s)) => s.trim().parse().unwrap_or(0.0),
+        Some(JsValue::Bool(true)) => 1.0,
+        Some(JsValue::Bool(false) | JsValue::Null | JsValue::Undefined) | None => 0.0,
+        Some(_) => 0.0,
+    };
+    if delay.is_finite() && delay > 0.0 {
+        delay.trunc() as u64
+    } else {
+        0
     }
 }
 
@@ -7921,7 +7932,7 @@ mod tests {
     }
 
     #[test]
-    fn set_timeout_callbacks_drain_after_script_fifo() {
+    fn set_timeout_callbacks_drain_after_script_by_deadline_then_registration() {
         let result = eval_with_dom(
             "<button id='go'>old</button>",
             "let order=''; setTimeout(function(){ order=order+'A'; document.getElementById('go').textContent='done'; }, 50); setTimeout(function(){ order=order+'B'; }, 0); order='sync'; order;",
@@ -7931,9 +7942,9 @@ mod tests {
 
         let result = eval_with_dom(
             "<main></main>",
-            "let order=''; setTimeout(function(){ order=order+'A'; }, 10); setTimeout(function(){ order=order+'B'; console.log(order); }, 0); 'sync';",
+            "let order=''; setTimeout(function(){ order=order+'A'; }, 10); setTimeout(function(){ order=order+'B'; }, 0); setTimeout(function(){ order=order+'C'; console.log(order); }, 10); 'sync';",
         ).unwrap();
-        assert_eq!(result.console, vec!["AB".to_string()]);
+        assert_eq!(result.console, vec!["BAC".to_string()]);
     }
 
     #[test]
@@ -7961,6 +7972,16 @@ mod tests {
                 "true:OK:3".to_string()
             ]
         );
+    }
+
+    #[test]
+    fn set_interval_reschedules_by_delay_between_timeout_deadlines() {
+        let result = eval_with_dom(
+            "<main></main>",
+            "let order=''; let count=0; let id=setInterval(function(){ count=count+1; order=order+'I'; if (count === 2) { clearInterval(id); } }, 10); setTimeout(function(){ order=order+'T'; }, 15); setTimeout(function(){ console.log(order); }, 25); 'sync';",
+        ).unwrap();
+        assert_eq!(result.value, JsValue::String("sync".into()));
+        assert_eq!(result.console, vec!["ITI".to_string()]);
     }
 
     #[test]
