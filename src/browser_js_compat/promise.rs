@@ -14,6 +14,8 @@ mod finally;
 mod handler;
 #[path = "promise/object.rs"]
 mod object;
+#[path = "promise/reaction.rs"]
+mod reaction;
 #[path = "promise/state.rs"]
 mod state;
 #[path = "promise/then.rs"]
