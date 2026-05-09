@@ -10,7 +10,7 @@
 //! timers, and in-memory `localStorage`/`sessionStorage` Storage objects.
 
 use std::cell::RefCell;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::rc::{Rc, Weak};
 
 use crate::browser::{self, Element, Node};
@@ -106,6 +106,7 @@ struct ScheduledCallback {
 struct TimerQueue {
     next_id: u32,
     timers: VecDeque<ScheduledCallback>,
+    interval_ids: HashSet<u32>,
     microtasks: VecDeque<ScheduledCallback>,
     animation_frames: VecDeque<ScheduledCallback>,
     idle_callbacks: VecDeque<ScheduledCallback>,
@@ -733,6 +734,12 @@ fn install_dom_globals(
         if let Some(clear_timeout) = borrowed.get("clearTimeout").cloned() {
             engine.set_global("clearTimeout", clear_timeout);
         }
+        if let Some(set_interval) = borrowed.get("setInterval").cloned() {
+            engine.set_global("setInterval", set_interval);
+        }
+        if let Some(clear_interval) = borrowed.get("clearInterval").cloned() {
+            engine.set_global("clearInterval", clear_interval);
+        }
         if let Some(queue_microtask) = borrowed.get("queueMicrotask").cloned() {
             engine.set_global("queueMicrotask", queue_microtask);
         }
@@ -871,7 +878,45 @@ fn install_timer_bindings(window: &mut HashMap<String, JsValue>, timers: Rc<RefC
         "clearTimeout".into(),
         native("clearTimeout", None, move |args| {
             let id = args.first().map(timer_id).unwrap_or(0);
-            clear_queue.borrow_mut().timers.retain(|task| task.id != id);
+            let mut queue = clear_queue.borrow_mut();
+            queue.interval_ids.remove(&id);
+            queue.timers.retain(|task| task.id != id);
+            Ok(JsValue::Undefined)
+        }),
+    );
+
+    let interval_queue = timers.clone();
+    window.insert(
+        "setInterval".into(),
+        native("setInterval", None, move |args| {
+            let callback = args.first().cloned().unwrap_or(JsValue::Undefined);
+            let callback_args = if args.len() > 2 {
+                args[2..].to_vec()
+            } else {
+                Vec::new()
+            };
+            let mut queue = interval_queue.borrow_mut();
+            queue.next_id = queue.next_id.saturating_add(1).max(1);
+            let id = queue.next_id;
+            queue.interval_ids.insert(id);
+            queue.timers.push_back(ScheduledCallback {
+                id,
+                callback,
+                args: callback_args,
+                this_value: JsValue::Undefined,
+            });
+            Ok(JsValue::Number(id as f64))
+        }),
+    );
+
+    let clear_interval_queue = timers.clone();
+    window.insert(
+        "clearInterval".into(),
+        native("clearInterval", None, move |args| {
+            let id = args.first().map(timer_id).unwrap_or(0);
+            let mut queue = clear_interval_queue.borrow_mut();
+            queue.interval_ids.remove(&id);
+            queue.timers.retain(|task| task.id != id);
             Ok(JsValue::Undefined)
         }),
     );
@@ -956,14 +1001,23 @@ fn drain_timers(timers: Rc<RefCell<TimerQueue>>, window: JsValue) -> Result<(), 
             break;
         };
         drained += 1;
+        let is_interval = { timers.borrow().interval_ids.contains(&task.id) };
         if drained > MAX_TIMER_DRAIN {
+            let timer_name = if is_interval {
+                "setInterval"
+            } else {
+                "setTimeout"
+            };
             return Err(format!(
-                "setTimeout: exceeded deterministic drain limit of {} callbacks",
-                MAX_TIMER_DRAIN
+                "{}: exceeded deterministic drain limit of {} callbacks",
+                timer_name, MAX_TIMER_DRAIN
             ));
         }
-        js::call_function_with_this(task.callback, window.clone(), &task.args)?;
+        js::call_function_with_this(task.callback.clone(), window.clone(), &task.args)?;
         drain_microtasks(timers.clone(), window.clone())?;
+        if is_interval && timers.borrow().interval_ids.contains(&task.id) {
+            timers.borrow_mut().timers.push_back(task);
+        }
     }
     Ok(())
 }
@@ -1732,6 +1786,7 @@ fn node_object(handle: DomHandle) -> JsValue {
         );
         obj.insert("classList".into(), class_list_object(handle.clone()));
         obj.insert("dataset".into(), dataset_object(handle.clone(), el));
+        selection_host::editable_props::install(&mut obj, &handle, el, self_object.clone());
         if !el.tag.starts_with('#') {
             fullscreen_host::install_element(&mut obj, &handle, self_object.clone());
             obj.insert(
@@ -3935,7 +3990,7 @@ fn element_offset_size(handle: &DomHandle) -> (i64, i64) {
 fn rect_object(rect: &(i64, i64, i64, i64)) -> JsValue {
     let (x, y, width, height) = *rect;
     let mut obj = HashMap::new();
-    for (key, value) in [
+    let fields = [
         ("x", x),
         ("y", y),
         ("width", width),
@@ -3944,10 +3999,24 @@ fn rect_object(rect: &(i64, i64, i64, i64)) -> JsValue {
         ("top", y),
         ("right", x + width),
         ("bottom", y + height),
-    ] {
+    ];
+    for (key, value) in fields {
         obj.insert(key.into(), JsValue::Number(value as f64));
     }
+    obj.insert(
+        "toJSON".into(),
+        native("DOMRect.toJSON", Some(0), move |_| Ok(rect_json(fields))),
+    );
     JsValue::Object(Rc::new(RefCell::new(obj)))
+}
+
+fn rect_json(fields: [(&'static str, i64); 8]) -> JsValue {
+    JsValue::Object(Rc::new(RefCell::new(
+        fields
+            .into_iter()
+            .map(|(key, value)| (key.into(), JsValue::Number(value as f64)))
+            .collect(),
+    )))
 }
 
 fn computed_style_object(handle: &DomHandle) -> JsValue {
@@ -7656,6 +7725,8 @@ pub fn compatibility_report_to_value(_args: &[Value]) -> Result<Value, String> {
         "navigator",
         "setTimeout",
         "clearTimeout",
+        "setInterval",
+        "clearInterval",
         "queueMicrotask",
         "requestAnimationFrame",
         "cancelAnimationFrame",
@@ -7827,6 +7898,42 @@ mod tests {
         ).unwrap();
         assert_eq!(result.value, JsValue::String("sync".into()));
         assert_eq!(result.console, vec!["en-US:OK".to_string()]);
+    }
+
+    #[test]
+    fn set_interval_repeats_until_cleared_with_window_this_and_args() {
+        let result = eval_with_dom(
+            "<main></main>",
+            "let count=0; let id=setInterval(function(a,b){ count=count+1; console.log((this === window) + ':' + a + b + ':' + count); if (count === 3) { clearInterval(id); } }, 0, 'O', 'K'); 'sync';",
+        ).unwrap();
+        assert_eq!(result.value, JsValue::String("sync".into()));
+        assert_eq!(
+            result.console,
+            vec![
+                "true:OK:1".to_string(),
+                "true:OK:2".to_string(),
+                "true:OK:3".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn clear_interval_cancels_pending_interval() {
+        let result = eval_with_dom(
+            "<main></main>",
+            "let seen='ok'; let id=setInterval(function(){ seen='bad'; }, 0); clearInterval(id); setTimeout(function(){ console.log(seen); }, 0); 'sync';",
+        ).unwrap();
+        assert_eq!(result.value, JsValue::String("sync".into()));
+        assert_eq!(result.console, vec!["ok".to_string()]);
+    }
+
+    #[test]
+    fn uncleared_interval_hits_deterministic_drain_limit() {
+        let error = match eval_with_dom("<main></main>", "setInterval(function(){}, 0); 'sync';") {
+            Ok(_) => panic!("expected uncleared interval to hit drain limit"),
+            Err(error) => error,
+        };
+        assert!(error.contains("setInterval: exceeded deterministic drain limit"));
     }
 
     #[test]
