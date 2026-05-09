@@ -1,6 +1,8 @@
 mod build;
 mod collect;
 mod decl_object;
+mod escape;
+mod global;
 mod index;
 mod list_object;
 mod model;
@@ -9,10 +11,14 @@ mod parse_decl;
 mod parse_rule;
 mod rule_object;
 mod rules;
+mod sheet_constructor;
 mod sheet_object;
 mod state;
+mod support_props;
+mod supports;
 mod sync;
 
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::browser::Document;
@@ -28,6 +34,11 @@ pub(super) fn install_document(document: &JsValue, model: &Document, css: String
     }
 }
 
+pub(super) fn install_window(window: &mut HashMap<String, JsValue>) {
+    window.insert("CSS".into(), global::object());
+    window.insert("CSSStyleSheet".into(), sheet_constructor::constructor());
+}
+
 fn layout_update(source: &str) {
     super::LAYOUT_CSS.with(|css| *css.borrow_mut() = source.to_string());
 }
@@ -39,3 +50,9 @@ fn native(
 ) -> JsValue {
     super::native(name, arity, func)
 }
+
+#[cfg(test)]
+mod tests_global;
+
+#[cfg(test)]
+mod tests_sheet;
