@@ -66,6 +66,8 @@ thread_local! {
     static LAYOUT_CSS: RefCell<String> = const { RefCell::new(String::new()) };
     static MUTATION_OBSERVERS: RefCell<HashMap<u64, MutationObserverState>> = RefCell::new(HashMap::new());
     static NEXT_MUTATION_OBSERVER_ID: RefCell<u64> = const { RefCell::new(1) };
+    static OBJECT_URLS: RefCell<HashSet<String>> = RefCell::new(HashSet::new());
+    static NEXT_OBJECT_URL_ID: RefCell<u64> = const { RefCell::new(1) };
 }
 
 #[derive(Clone, Copy)]
@@ -559,6 +561,8 @@ fn reset_browser_js_state() {
     dom_compat_host::form_validation::reset();
     MUTATION_OBSERVERS.with(|observers| observers.borrow_mut().clear());
     NEXT_MUTATION_OBSERVER_ID.with(|id| *id.borrow_mut() = 1);
+    OBJECT_URLS.with(|urls| urls.borrow_mut().clear());
+    NEXT_OBJECT_URL_ID.with(|id| *id.borrow_mut() = 1);
 }
 
 fn seed_browser_js_state(state: &BrowserJsState) {
@@ -6639,6 +6643,21 @@ fn url_constructor() -> JsValue {
                     .map(|href| url_object(&href))
                     .unwrap_or(JsValue::Null))
             }),
+        )
+        .with_property(
+            "createObjectURL",
+            native("URL.createObjectURL", Some(1), move |args| {
+                Ok(create_object_url(
+                    args.first().unwrap_or(&JsValue::Undefined),
+                ))
+            }),
+        )
+        .with_property(
+            "revokeObjectURL",
+            native("URL.revokeObjectURL", Some(1), move |args| {
+                revoke_object_url(&args[0]);
+                Ok(JsValue::Undefined)
+            }),
         ),
     ))
 }
@@ -6782,6 +6801,42 @@ fn url_object(href: &str) -> JsValue {
         }),
     );
     JsValue::Object(object)
+}
+
+fn create_object_url(value: &JsValue) -> JsValue {
+    let kind = object_url_kind(value);
+    let id = NEXT_OBJECT_URL_ID.with(|next| {
+        let mut next = next.borrow_mut();
+        let id = *next;
+        *next += 1;
+        id
+    });
+    let url = format!("blob:tetherscript://{kind}/{id}");
+    OBJECT_URLS.with(|urls| {
+        urls.borrow_mut().insert(url.clone());
+    });
+    JsValue::String(url)
+}
+
+fn object_url_kind(value: &JsValue) -> &'static str {
+    let JsValue::Object(object) = value else {
+        return "object";
+    };
+    let object = object.borrow();
+    if object.contains_key("name") && object.contains_key("lastModified") {
+        "file"
+    } else if object.contains_key("__blobBytes") {
+        "blob"
+    } else {
+        "object"
+    }
+}
+
+fn revoke_object_url(value: &JsValue) {
+    let url = value.display();
+    OBJECT_URLS.with(|urls| {
+        urls.borrow_mut().remove(&url);
+    });
 }
 
 fn request_object(request: &FetchRequest) -> JsValue {
