@@ -2934,11 +2934,12 @@ impl DomHandle {
             set_event_position(&event, node_object(ancestor.clone()), 1);
             for listener in ancestor.listeners(&event_type, Some(true)) {
                 call_registered_listener(ancestor, &event_type, listener, event.clone())?;
-                if event_flag(&event, "__immediatePropagationStopped")
-                    || event_flag(&event, "__propagationStopped")
-                {
+                if event_flag(&event, "__immediatePropagationStopped") {
                     return Ok(JsValue::Bool(!event_flag(&event, "defaultPrevented")));
                 }
+            }
+            if event_flag(&event, "__propagationStopped") {
+                return Ok(JsValue::Bool(!event_flag(&event, "defaultPrevented")));
             }
         }
 
@@ -2967,17 +2968,15 @@ impl DomHandle {
                 set_event_position(&event, node_object(ancestor.clone()), 3);
                 for listener in ancestor.listeners(&event_type, Some(false)) {
                     call_registered_listener(ancestor, &event_type, listener, event.clone())?;
-                    if event_flag(&event, "__immediatePropagationStopped")
-                        || event_flag(&event, "__propagationStopped")
-                    {
+                    if event_flag(&event, "__immediatePropagationStopped") {
                         return Ok(JsValue::Bool(!event_flag(&event, "defaultPrevented")));
                     }
                 }
                 if let Some(handler) = ancestor.handler(&format!("on{}", event_type)) {
                     call_dom_listener(handler, node_object(ancestor.clone()), event.clone())?;
-                    if event_flag(&event, "__propagationStopped") {
-                        return Ok(JsValue::Bool(!event_flag(&event, "defaultPrevented")));
-                    }
+                }
+                if event_flag(&event, "__propagationStopped") {
+                    return Ok(JsValue::Bool(!event_flag(&event, "defaultPrevented")));
                 }
             }
         }
