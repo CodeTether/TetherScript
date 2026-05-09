@@ -34,3 +34,19 @@ fn request_clone_uses_current_headers_and_unused_body() {
 
     assert_eq!(result.value, JsValue::String("2|3|false|payload".into()));
 }
+
+#[test]
+fn request_blob_returns_body_blob_and_leaves_clone_unused() {
+    let result = eval_with_dom(
+        "<main></main>",
+        "let r=new Request('/api',{headers:{'Content-Type':'text/plain'},body:'Hi'});let c=r.clone();let out='';\
+         r.blob().then(function(b){let t='';let a='';b.text().then(function(v){t=v;});b.arrayBuffer().then(function(v){a=v.length+':'+v[0]+':'+v[1];});out=b.size+':'+b.type+':'+t+':'+a;});\
+         out+'|'+r.bodyUsed+'|'+c.bodyUsed;",
+    )
+    .unwrap();
+
+    assert_eq!(
+        result.value,
+        JsValue::String("2:text/plain:Hi:2:72:105|true|false".into())
+    );
+}

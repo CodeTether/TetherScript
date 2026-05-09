@@ -2,8 +2,12 @@ use super::*;
 
 #[path = "fields/clipboard.rs"]
 mod clipboard;
+#[path = "fields/constructors.rs"]
+pub(super) mod constructors;
 #[path = "fields/keyboard.rs"]
 mod keyboard;
+#[path = "fields/lifecycle.rs"]
+mod lifecycle;
 #[path = "fields/misc.rs"]
 mod misc;
 #[path = "fields/mouse.rs"]
@@ -22,23 +26,5 @@ pub(super) fn insert(
     event_class: class::EventClass,
     init: Option<&JsValue>,
 ) {
-    match event_class {
-        class::EventClass::Custom => misc::custom(map, init),
-        class::EventClass::Mouse => mouse::insert(map, init),
-        class::EventClass::Keyboard => keyboard::insert(map, init),
-        class::EventClass::Input => text::input(map, init),
-        class::EventClass::Submit => misc::submit(map, init),
-        class::EventClass::Focus => misc::focus(map, init),
-        class::EventClass::Storage => storage::insert(map, init),
-        class::EventClass::Clipboard => clipboard::insert(map, init),
-        class::EventClass::Pointer => {
-            mouse::insert(map, init);
-            pointer::insert(map, init);
-        }
-        class::EventClass::Wheel => {
-            mouse::insert(map, init);
-            wheel::insert(map, init);
-        }
-        class::EventClass::Event => {}
-    }
+    event_class.insert_fields(map, init);
 }

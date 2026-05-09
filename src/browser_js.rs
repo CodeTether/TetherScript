@@ -4928,6 +4928,20 @@ fn response_object(fields: ResponseFields) -> JsValue {
         }),
     );
 
+    let blob_body = fields.body.clone();
+    let blob_object = object.clone();
+    let blob_headers = headers.clone();
+    object.borrow_mut().insert(
+        "blob".into(),
+        native("Response.blob", Some(0), move |_| {
+            mark_response_body_used(&blob_object);
+            let mime_type = body_mime_type(&headers_from_value(&blob_headers));
+            Ok(fulfilled_thenable(blob_from_text_body(
+                &blob_body, mime_type,
+            )))
+        }),
+    );
+
     let clone_headers = headers;
     object.borrow_mut().insert(
         "clone".into(),
@@ -4953,12 +4967,54 @@ fn fulfilled_thenable(value: JsValue) -> JsValue {
 }
 
 fn byte_array_from_text(text: &str) -> JsValue {
+    byte_array_from_bytes(text.as_bytes())
+}
+
+fn byte_array_from_bytes(bytes: &[u8]) -> JsValue {
     JsValue::Array(Rc::new(RefCell::new(
-        text.as_bytes()
+        bytes
             .iter()
             .map(|byte| JsValue::Number(*byte as f64))
             .collect(),
     )))
+}
+
+fn blob_from_text_body(text: &str, mime_type: String) -> JsValue {
+    let data = text.as_bytes().to_vec();
+    let object = Rc::new(RefCell::new(HashMap::new()));
+    {
+        let mut obj = object.borrow_mut();
+        obj.insert("size".into(), JsValue::Number(data.len() as f64));
+        obj.insert("type".into(), JsValue::String(mime_type.clone()));
+        obj.insert("__blobBytes".into(), byte_array_from_bytes(&data));
+        obj.insert("__blobType".into(), JsValue::String(mime_type));
+    }
+
+    let text_body = text.to_string();
+    object.borrow_mut().insert(
+        "text".into(),
+        native("Blob.text", Some(0), move |_| {
+            Ok(fulfilled_thenable(JsValue::String(text_body.clone())))
+        }),
+    );
+
+    let buffer_data = data;
+    object.borrow_mut().insert(
+        "arrayBuffer".into(),
+        native("Blob.arrayBuffer", Some(0), move |_| {
+            Ok(fulfilled_thenable(byte_array_from_bytes(&buffer_data)))
+        }),
+    );
+
+    JsValue::Object(object)
+}
+
+fn body_mime_type(headers: &[(String, String)]) -> String {
+    headers
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case("content-type"))
+        .map(|(_, value)| value.clone())
+        .unwrap_or_default()
 }
 
 fn mark_response_body_used(object: &Rc<RefCell<HashMap<String, JsValue>>>) {
@@ -6788,6 +6844,20 @@ fn request_object(request: &FetchRequest) -> JsValue {
         native("Request.arrayBuffer", Some(0), move |_| {
             mark_request_body_used(&buffer_object);
             Ok(fulfilled_thenable(byte_array_from_text(&buffer_body)))
+        }),
+    );
+
+    let blob_body = request.body.clone().unwrap_or_default();
+    let blob_object = object.clone();
+    let blob_headers = headers.clone();
+    object.borrow_mut().insert(
+        "blob".into(),
+        native("Request.blob", Some(0), move |_| {
+            mark_request_body_used(&blob_object);
+            let mime_type = body_mime_type(&headers_from_value(&blob_headers));
+            Ok(fulfilled_thenable(blob_from_text_body(
+                &blob_body, mime_type,
+            )))
         }),
     );
 
