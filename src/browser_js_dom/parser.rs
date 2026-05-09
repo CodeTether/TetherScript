@@ -12,15 +12,28 @@ fn parser_object() -> JsValue {
     obj.insert(
         "parseFromString".into(),
         native("DOMParser.parseFromString", Some(2), move |args| {
-            let html = args.first().unwrap_or(&JsValue::Undefined).display();
+            let markup = args.first().unwrap_or(&JsValue::Undefined).display();
             let mime = args.get(1).unwrap_or(&JsValue::Undefined).display();
-            let source = if mime == "text/html" {
-                html
+            let document = if is_html_mime(&mime) {
+                construct::document_from_html(&markup)
+            } else if is_xml_mime(&mime) {
+                construct::document_from_markup(&markup)
             } else {
-                String::new()
+                construct::document_from_html("")
             };
-            Ok(construct::document_from_html(&source))
+            Ok(document)
         }),
     );
     JsValue::Object(Rc::new(RefCell::new(obj)))
+}
+
+fn is_html_mime(mime: &str) -> bool {
+    mime.trim().eq_ignore_ascii_case("text/html")
+}
+
+fn is_xml_mime(mime: &str) -> bool {
+    matches!(
+        mime.trim().to_ascii_lowercase().as_str(),
+        "image/svg+xml" | "application/xml" | "text/xml"
+    )
 }
