@@ -2589,6 +2589,32 @@ fn refresh_node_properties(obj: &Rc<RefCell<HashMap<String, JsValue>>>, handle: 
             JsValue::Number(child_element_count(&node) as f64),
         );
         obj.insert(
+            "isConnected".into(),
+            JsValue::Bool(handle_is_connected(handle)),
+        );
+        obj.insert(
+            "parentNode".into(),
+            optional_node_ref_object(handle.parent()),
+        );
+        obj.insert(
+            "parentElement".into(),
+            optional_node_ref_object(handle.parent()),
+        );
+        obj.insert(
+            "previousSibling".into(),
+            optional_node_ref_object(handle.previous_sibling()),
+        );
+        obj.insert(
+            "nextSibling".into(),
+            optional_node_ref_object(handle.next_sibling()),
+        );
+        if node_name(&node) != "#document" {
+            obj.insert(
+                "ownerDocument".into(),
+                document_reference_object(handle.root.clone()),
+            );
+        }
+        obj.insert(
             "textContent".into(),
             JsValue::String(text_content_raw(&node)),
         );
@@ -2598,6 +2624,11 @@ fn refresh_node_properties(obj: &Rc<RefCell<HashMap<String, JsValue>>>, handle: 
         );
         obj.insert("innerHTML".into(), JsValue::String(inner_html(&node)));
     }
+}
+
+fn handle_is_connected(handle: &DomHandle) -> bool {
+    handle.node().is_some()
+        && matches!(&*handle.root.borrow(), Node::Element(el) if el.tag == "#document")
 }
 
 fn refresh_value_node_properties(value: &JsValue) {
