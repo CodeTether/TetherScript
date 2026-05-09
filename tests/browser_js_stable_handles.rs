@@ -24,3 +24,17 @@ fn shifted_element_handle_methods_use_current_node() {
 
     assert_eq!(value, JsValue::String("1:yes:ok".into()));
 }
+
+#[test]
+fn shifted_element_keeps_existing_event_registrations() {
+    let value = eval(
+        "let a=document.getElementById('a');let b=document.getElementById('b');\
+         b.addEventListener('click',function(){this.setAttribute('data-listener','yes');});\
+         b.onclick=function(){this.setAttribute('data-handler','yes');};\
+         a.remove();b.click();let fresh=document.getElementById('b');\
+         fresh.getAttribute('data-listener')+':'\
+         +fresh.getAttribute('data-handler');",
+    );
+
+    assert_eq!(value, JsValue::String("yes:yes".into()));
+}
