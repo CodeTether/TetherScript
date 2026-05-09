@@ -2,6 +2,8 @@ use super::*;
 
 #[path = "promise/aggregate.rs"]
 mod aggregate;
+#[path = "promise/api.rs"]
+pub(super) mod api;
 #[path = "promise/catch.rs"]
 mod catch;
 #[path = "promise/constructor.rs"]
@@ -16,6 +18,8 @@ mod handler;
 mod object;
 #[path = "promise/reaction.rs"]
 mod reaction;
+#[path = "promise/scheduler.rs"]
+mod scheduler;
 #[path = "promise/state.rs"]
 mod state;
 #[path = "promise/then.rs"]
@@ -28,6 +32,9 @@ mod tests_all_race;
 #[path = "promise_tests_constructor.rs"]
 mod tests_constructor;
 #[cfg(test)]
+#[path = "promise_tests_microtasks.rs"]
+mod tests_microtasks;
+#[cfg(test)]
 #[path = "promise_tests_pending_aggregate.rs"]
 mod tests_pending_aggregate;
 #[cfg(test)]
@@ -38,17 +45,10 @@ mod tests_pending_finally;
 mod tests_settled;
 
 pub(super) fn install(window: &mut HashMap<String, JsValue>) {
+    scheduler::install(window.get("queueMicrotask").cloned());
     window.insert("Promise".into(), constructor::value());
 }
 
-pub(super) fn fulfilled(value: JsValue) -> JsValue {
-    object::from_state(state::PromiseState::Fulfilled(value))
-}
-
-pub(super) fn resolved(value: JsValue) -> JsValue {
-    object::from_state(state::settle(value))
-}
-
-pub(super) fn rejected(reason: JsValue) -> JsValue {
-    object::from_state(state::PromiseState::Rejected(reason))
+pub(in crate::browser_js) fn reset() {
+    scheduler::reset();
 }

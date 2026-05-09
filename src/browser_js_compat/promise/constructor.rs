@@ -24,5 +24,5 @@ fn resolve(args: &[JsValue]) -> Result<JsValue, String> {
 
 fn reject(args: &[JsValue]) -> Result<JsValue, String> {
     let reason = args.first().cloned().unwrap_or(JsValue::Undefined);
-    Ok(rejected(reason))
+    Ok(api::rejected(reason))
 }

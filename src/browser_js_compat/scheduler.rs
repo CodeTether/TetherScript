@@ -19,12 +19,12 @@ fn post_task() -> JsValue {
     native("scheduler.postTask", None, |args| {
         let callback = args.first().cloned().unwrap_or(JsValue::Undefined);
         if matches!(callback, JsValue::Undefined | JsValue::Null) {
-            return Ok(promise::resolved(JsValue::Undefined));
+            return Ok(promise::api::resolved(JsValue::Undefined));
         }
         Ok(
             match js::call_function_with_this(callback, JsValue::Undefined, &[]) {
-                Ok(value) => promise::resolved(value),
-                Err(error) => promise::rejected(JsValue::String(error)),
+                Ok(value) => promise::api::resolved(value),
+                Err(error) => promise::api::rejected(JsValue::String(error)),
             },
         )
     })
@@ -32,6 +32,6 @@ fn post_task() -> JsValue {
 
 fn yield_task() -> JsValue {
     native("scheduler.yield", None, |_| {
-        Ok(promise::resolved(JsValue::Undefined))
+        Ok(promise::api::resolved(JsValue::Undefined))
     })
 }

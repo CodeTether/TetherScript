@@ -11,14 +11,10 @@ pub(super) fn method(
 ) -> JsValue {
     native("Promise.finally", None, move |args| {
         let callback = args.first().cloned().unwrap_or(JsValue::Undefined);
-        let current = state.borrow().clone();
-        if matches!(current, state::PromiseState::Pending) {
-            return Ok(reaction::push_finally(reactions.clone(), callback));
+        match state.borrow().clone() {
+            state::PromiseState::Pending => Ok(reaction::push_finally(reactions.clone(), callback)),
+            current => Ok(reaction::settled_finally(callback, current)),
         }
-        if !handler::present(&callback) {
-            return Ok(object::from_state(current));
-        }
-        adopt::from_action(action::after_callback(callback, current))
     })
 }
 

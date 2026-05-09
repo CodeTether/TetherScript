@@ -40,7 +40,7 @@ fn handle(handler: JsValue, reason: JsValue) -> Result<JsValue, String> {
         return Ok(from_reason(reason));
     }
     match js::call_function_with_this(handler, JsValue::Undefined, &[reason]) {
-        Ok(value) => Ok(promise::fulfilled(value)),
+        Ok(value) => Ok(promise::api::fulfilled(value)),
         Err(error) => Ok(from_reason(JsValue::String(error))),
     }
 }

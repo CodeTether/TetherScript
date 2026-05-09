@@ -23,7 +23,7 @@ fn install_methods(object: &mut HashMap<String, JsValue>, data: Vec<u8>) {
     object.insert(
         "text".into(),
         native("ClipboardItem.Blob.text", Some(0), move |_| {
-            Ok(promise::fulfilled(JsValue::String(
+            Ok(promise::api::fulfilled(JsValue::String(
                 String::from_utf8_lossy(&text_data).into(),
             )))
         }),
@@ -32,13 +32,15 @@ fn install_methods(object: &mut HashMap<String, JsValue>, data: Vec<u8>) {
     object.insert(
         "arrayBuffer".into(),
         native("ClipboardItem.Blob.arrayBuffer", Some(0), move |_| {
-            Ok(promise::fulfilled(bytes::byte_array(buffer_data.clone())))
+            Ok(promise::api::fulfilled(bytes::byte_array(
+                buffer_data.clone(),
+            )))
         }),
     );
     object.insert(
         "bytes".into(),
         native("ClipboardItem.Blob.bytes", Some(0), move |_| {
-            Ok(promise::fulfilled(bytes::byte_array(data.clone())))
+            Ok(promise::api::fulfilled(bytes::byte_array(data.clone())))
         }),
     );
 }

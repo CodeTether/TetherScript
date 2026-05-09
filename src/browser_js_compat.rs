@@ -29,7 +29,7 @@ mod installer;
 #[path = "browser_js_compat/notification.rs"]
 mod notification;
 #[path = "browser_js_compat/promise.rs"]
-mod promise;
+pub(super) mod promise;
 #[path = "browser_js_compat/structured.rs"]
 mod structured;
 #[path = "browser_js_compat/text.rs"]

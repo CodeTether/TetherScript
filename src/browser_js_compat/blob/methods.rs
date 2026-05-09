@@ -9,7 +9,7 @@ pub(super) fn install(
     object.borrow_mut().insert(
         "text".into(),
         native("Blob.text", Some(0), move |_| {
-            Ok(promise::fulfilled(JsValue::String(
+            Ok(promise::api::fulfilled(JsValue::String(
                 String::from_utf8_lossy(&text_data).into(),
             )))
         }),
@@ -18,14 +18,18 @@ pub(super) fn install(
     object.borrow_mut().insert(
         "arrayBuffer".into(),
         native("Blob.arrayBuffer", Some(0), move |_| {
-            Ok(promise::fulfilled(bytes::byte_array(buffer_data.clone())))
+            Ok(promise::api::fulfilled(bytes::byte_array(
+                buffer_data.clone(),
+            )))
         }),
     );
     let bytes_data = data.clone();
     object.borrow_mut().insert(
         "bytes".into(),
         native("Blob.bytes", Some(0), move |_| {
-            Ok(promise::fulfilled(bytes::byte_array(bytes_data.clone())))
+            Ok(promise::api::fulfilled(bytes::byte_array(
+                bytes_data.clone(),
+            )))
         }),
     );
     object.borrow_mut().insert(
