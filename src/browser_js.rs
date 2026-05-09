@@ -816,6 +816,7 @@ fn install_dom_globals(
             "CSS",
             "CSSStyleSheet",
             "performance",
+            "scheduler",
             "requestIdleCallback",
             "cancelIdleCallback",
             "PerformanceObserver",
