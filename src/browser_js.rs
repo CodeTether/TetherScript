@@ -812,6 +812,7 @@ fn install_dom_globals(
             "FileReader",
             "structuredClone",
             "crypto",
+            "trustedTypes",
             "CSS",
             "CSSStyleSheet",
             "performance",
