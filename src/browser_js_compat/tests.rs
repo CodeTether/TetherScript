@@ -13,6 +13,7 @@ compat_test!(tests_blob_file_bytes, "tests_blob_file_bytes.rs");
 compat_test!(tests_body_array_buffer, "tests_body_array_buffer.rs");
 compat_test!(tests_clipboard_item, "tests_clipboard_item.rs");
 compat_test!(tests_crypto, "tests_crypto.rs");
+compat_test!(crypto_subtle, "tests_crypto_subtle.rs");
 compat_test!(tests_dom_exception, "tests_dom_exception.rs");
 compat_test!(tests_file_reader_abort, "tests_file_reader_abort.rs");
 compat_test!(tests_file_reader, "tests_file_reader.rs");
