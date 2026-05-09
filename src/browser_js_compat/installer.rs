@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "trusted_types.rs"]
+mod trusted_types;
+
 pub(super) fn install(window: &mut HashMap<String, JsValue>) {
     base64::install(window);
     typed_array::install(window);
@@ -17,4 +20,5 @@ pub(super) fn install(window: &mut HashMap<String, JsValue>) {
     notification::install(window);
     promise::install(window);
     url_pattern::install(window);
+    trusted_types::install(window);
 }
