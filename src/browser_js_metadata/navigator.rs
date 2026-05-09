@@ -21,6 +21,8 @@ mod identity;
 mod installer;
 #[path = "navigator/locks.rs"]
 mod locks;
+#[path = "navigator/media_capabilities.rs"]
+mod media_capabilities;
 #[path = "navigator/media_session.rs"]
 mod media_session;
 #[path = "navigator/permissions.rs"]
