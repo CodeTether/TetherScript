@@ -2055,8 +2055,11 @@ fn node_object(handle: DomHandle) -> JsValue {
         "appendChild".into(),
         native("appendChild", Some(1), move |args| {
             let h = current_dom_handle(&object_ref, &h);
-            let child = js_value_to_node(args.first().unwrap_or(&JsValue::Undefined));
+            let child_value = args.first().unwrap_or(&JsValue::Undefined);
+            let moving = dom_handle_from_value(child_value);
+            let child = js_value_to_node(child_value);
             let path = h.append_child(child, InsertPosition::Append)?;
+            reattach_inserted_dom_handles(moving.as_ref(), &h.root, &path);
             if let Some(object) = object_ref.borrow().as_ref() {
                 refresh_node_properties(object, &h);
             }
@@ -2073,9 +2076,12 @@ fn node_object(handle: DomHandle) -> JsValue {
         "insertBefore".into(),
         native("insertBefore", Some(2), move |args| {
             let h = current_dom_handle(&object_ref, &h);
-            let child = js_value_to_node(args.first().unwrap_or(&JsValue::Undefined));
+            let child_value = args.first().unwrap_or(&JsValue::Undefined);
+            let moving = dom_handle_from_value(child_value);
+            let child = js_value_to_node(child_value);
             let reference = args.get(1).and_then(dom_handle_from_value);
             let path = h.insert_child_before(child, reference.as_ref())?;
+            reattach_inserted_dom_handles(moving.as_ref(), &h.root, &path);
             if let Some(object) = object_ref.borrow().as_ref() {
                 refresh_node_properties(object, &h);
             }
@@ -2302,7 +2308,9 @@ fn node_object(handle: DomHandle) -> JsValue {
         native("prepend", None, move |args| {
             let h = current_dom_handle(&object_ref, &h);
             for arg in args.iter().rev() {
-                h.append_child(js_value_to_node(arg), InsertPosition::Prepend)?;
+                let moving = dom_handle_from_value(arg);
+                let path = h.append_child(js_value_to_node(arg), InsertPosition::Prepend)?;
+                reattach_inserted_dom_handles(moving.as_ref(), &h.root, &path);
             }
             Ok(JsValue::Undefined)
         }),
@@ -2315,7 +2323,9 @@ fn node_object(handle: DomHandle) -> JsValue {
         native("append", None, move |args| {
             let h = current_dom_handle(&object_ref, &h);
             for arg in args {
-                h.append_child(js_value_to_node(arg), InsertPosition::Append)?;
+                let moving = dom_handle_from_value(arg);
+                let path = h.append_child(js_value_to_node(arg), InsertPosition::Append)?;
+                reattach_inserted_dom_handles(moving.as_ref(), &h.root, &path);
             }
             Ok(JsValue::Undefined)
         }),
@@ -3623,6 +3633,35 @@ fn rekey_event_entry(old_key: &str, new_key: &str) {
     FOCUSED_ELEMENT.with(|focused| {
         if focused.borrow().as_deref() == Some(old_key) {
             *focused.borrow_mut() = Some(new_key.into());
+        }
+    });
+}
+
+fn reattach_inserted_dom_handles(
+    source: Option<&DomHandle>,
+    target_root: &Rc<RefCell<Node>>,
+    target_path: &[usize],
+) {
+    let Some(source) = source else {
+        return;
+    };
+    if Rc::ptr_eq(&source.root, target_root)
+        || matches!(source.node(), Some(Node::Element(el)) if el.tag == "#document-fragment")
+    {
+        return;
+    }
+    let source_root = source.root.clone();
+    let source_path = source.path.clone();
+    DOM_HANDLE_REGISTRY.with(|registry| {
+        for handle in registry.borrow_mut().values_mut() {
+            if !Rc::ptr_eq(&handle.root, &source_root) || !handle.path.starts_with(&source_path) {
+                continue;
+            }
+            let old_key = handle.event_key();
+            let suffix = handle.path[source_path.len()..].to_vec();
+            handle.root = target_root.clone();
+            handle.path = target_path.iter().copied().chain(suffix).collect();
+            rekey_event_entry(&old_key, &handle.event_key());
         }
     });
 }
