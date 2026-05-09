@@ -31,3 +31,16 @@ fn file_input_files_expose_multiple_indices_and_item() {
     .unwrap();
     assert_eq!(result.value, JsValue::String("2:a.txt:b.bin:null".into()));
 }
+
+#[test]
+fn file_input_files_expose_rows_and_for_each() {
+    let html = "<input id='u' type='file' data-agent-files='[{\"name\":\"a.txt\",\"type\":\"text/plain\",\"size\":1},{\"name\":\"b.bin\",\"type\":\"application/octet-stream\",\"size\":2}]'>";
+    let script = "let f=document.getElementById('u').files;let keys=f.keys();let vals=f.values();let rows=f.entries();let ctx={tag:'T'};let seen='';keys[0]=9;f.forEach(function(file,index,self){seen=seen+this.tag+':'+index+':'+file.name+':' +(self===f)+';';},ctx);f.keys()[0]+'|'+keys.join(',')+'|'+vals.length+':'+vals[0].name+','+vals[1].name+'|'+rows.length+':'+rows[0][0]+':'+rows[0][1].name+':'+rows[1][0]+':'+rows[1][1].name+'|'+seen";
+    let result = eval_with_dom(html, script).unwrap();
+    assert_eq!(
+        result.value,
+        JsValue::String(
+            "0|9,1|2:a.txt,b.bin|2:0:a.txt:1:b.bin|T:0:a.txt:true;T:1:b.bin:true;".into()
+        )
+    );
+}
