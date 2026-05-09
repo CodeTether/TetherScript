@@ -21,6 +21,13 @@ pub(super) fn install(
             Ok(promise::fulfilled(bytes::byte_array(buffer_data.clone())))
         }),
     );
+    let bytes_data = data.clone();
+    object.borrow_mut().insert(
+        "bytes".into(),
+        native("Blob.bytes", Some(0), move |_| {
+            Ok(promise::fulfilled(bytes::byte_array(bytes_data.clone())))
+        }),
+    );
     object.borrow_mut().insert(
         "slice".into(),
         native("Blob.slice", None, move |args| {

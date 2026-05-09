@@ -24,6 +24,7 @@ fn make_object(data: Vec<u8>, mime_type: String, file: Option<(String, f64)>) ->
         if let Some((name, last_modified)) = file {
             obj.insert("name".into(), JsValue::String(name));
             obj.insert("lastModified".into(), JsValue::Number(last_modified));
+            obj.insert("webkitRelativePath".into(), JsValue::String(String::new()));
         }
     }
     methods::install(&object, data, mime_type);

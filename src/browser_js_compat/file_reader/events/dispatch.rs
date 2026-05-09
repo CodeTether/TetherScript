@@ -6,7 +6,8 @@ pub(super) fn dispatch(
     kind: &str,
 ) -> Result<(), String> {
     let event = event_object(object, kind);
-    if let Some(handler) = object.borrow().get(&format!("on{kind}")).cloned() {
+    let handler = object.borrow().get(&format!("on{kind}")).cloned();
+    if let Some(handler) = handler {
         if !matches!(handler, JsValue::Undefined) {
             js::call_function_with_this(
                 handler,
