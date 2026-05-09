@@ -1,5 +1,7 @@
 use super::*;
 
+#[path = "fields/clipboard.rs"]
+mod clipboard;
 #[path = "fields/keyboard.rs"]
 mod keyboard;
 #[path = "fields/misc.rs"]
@@ -8,6 +10,8 @@ mod misc;
 mod mouse;
 #[path = "fields/pointer.rs"]
 mod pointer;
+#[path = "fields/storage.rs"]
+mod storage;
 #[path = "fields/text.rs"]
 mod text;
 #[path = "fields/wheel.rs"]
@@ -25,6 +29,8 @@ pub(super) fn insert(
         class::EventClass::Input => text::input(map, init),
         class::EventClass::Submit => misc::submit(map, init),
         class::EventClass::Focus => misc::focus(map, init),
+        class::EventClass::Storage => storage::insert(map, init),
+        class::EventClass::Clipboard => clipboard::insert(map, init),
         class::EventClass::Pointer => {
             mouse::insert(map, init);
             pointer::insert(map, init);

@@ -17,6 +17,9 @@ mod tests;
 #[cfg(test)]
 #[path = "events/tests_legacy.rs"]
 mod tests_legacy;
+#[cfg(test)]
+#[path = "events/tests_storage_clipboard.rs"]
+mod tests_storage_clipboard;
 
 pub(super) fn install(window: &mut HashMap<String, JsValue>) {
     for event_class in class::all() {
