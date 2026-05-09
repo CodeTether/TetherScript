@@ -6,6 +6,9 @@ mod common;
 mod control;
 mod edit;
 mod edit_set;
+mod editable_attr;
+pub(super) mod editable_props;
+mod editable_state;
 mod extent;
 mod props;
 mod range_clone;
@@ -23,6 +26,8 @@ mod text;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+mod tests_contenteditable;
+#[cfg(test)]
 mod tests_range_clone;
 
 pub(super) fn reset() {
@@ -39,10 +44,7 @@ pub(super) fn install_window(obj: &mut HashMap<String, JsValue>, handle: &DomHan
 }
 
 pub(super) fn is_contenteditable(element: &Element) -> bool {
-    element
-        .attrs
-        .get("contenteditable")
-        .is_some_and(|value| value != "false")
+    editable_state::state(element).unwrap_or(false)
 }
 
 pub(super) fn replace_contenteditable_selection(handle: &DomHandle, text: &str) -> Option<String> {

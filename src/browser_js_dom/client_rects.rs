@@ -28,3 +28,6 @@ fn visible((_, _, width, height): (i64, i64, i64, i64)) -> bool {
 #[cfg(test)]
 #[path = "tests_client_rects.rs"]
 mod tests_client_rects;
+#[cfg(test)]
+#[path = "tests_dom_rect.rs"]
+mod tests_dom_rect;
