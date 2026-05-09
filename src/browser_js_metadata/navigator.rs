@@ -41,6 +41,8 @@ mod thenable;
 mod user_agent_data;
 #[path = "navigator/vibration.rs"]
 mod vibration;
+#[path = "navigator/wake_lock.rs"]
+mod wake_lock;
 
 pub(super) fn install(navigator: &JsValue, route_handler: SharedBrowserJsRouteHandler) {
     installer::install(navigator, route_handler);
