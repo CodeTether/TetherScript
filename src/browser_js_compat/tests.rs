@@ -22,17 +22,9 @@ compat_test!(tests_request, "tests_request.rs");
 compat_test!(tests_response, "tests_response.rs");
 compat_test!(tests_response_static, "tests_response_static.rs");
 compat_test!(tests_structured, "tests_structured.rs");
+compat_test!(tests_text, "tests_text.rs");
+compat_test!(tests_text_decoder, "tests_text_decoder.rs");
 compat_test!(tests_url_search_params, "tests_url_search_params.rs");
-
-#[test]
-fn text_encoder_decoder_round_trip_bytes() {
-    let result = eval_with_dom(
-        "<main></main>",
-        "let enc=TextEncoder(); let bytes=enc.encode('Az'); let text=TextDecoder().decode(bytes); bytes.length + ':' + bytes[0] + ':' + bytes[1] + ':' + text + ':' + enc.encoding;",
-    )
-    .unwrap();
-    assert_eq!(result.value, JsValue::String("2:65:122:Az:utf-8".into()));
-}
 
 #[test]
 fn crypto_random_values_are_seedable_and_mutate_uint8_array() {

@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "class_list.rs"]
+mod class_list;
+
 type FieldInit = fn(&mut HashMap<String, JsValue>, Option<&JsValue>);
 
 #[derive(Clone, Copy)]
@@ -31,25 +34,6 @@ impl EventClass {
     }
 }
 
-pub(super) fn all() -> [EventClass; 16] {
-    use super::fields::constructors as init;
-
-    [
-        EventClass::new("Event", init::none, false),
-        EventClass::new("CustomEvent", init::custom, true),
-        EventClass::new("MouseEvent", init::mouse, false),
-        EventClass::new("KeyboardEvent", init::keyboard, false),
-        EventClass::new("InputEvent", init::input, false),
-        EventClass::new("SubmitEvent", init::submit, false),
-        EventClass::new("FocusEvent", init::focus, false),
-        EventClass::new("PointerEvent", init::pointer_event, false),
-        EventClass::new("WheelEvent", init::wheel_event, false),
-        EventClass::new("StorageEvent", init::storage, false),
-        EventClass::new("ClipboardEvent", init::clipboard, false),
-        EventClass::new("PopStateEvent", init::pop_state, false),
-        EventClass::new("HashChangeEvent", init::hash_change, false),
-        EventClass::new("PageTransitionEvent", init::page_transition, false),
-        EventClass::new("BeforeUnloadEvent", init::before_unload, false),
-        EventClass::new("ProgressEvent", init::progress, false),
-    ]
+pub(super) fn all() -> [EventClass; class_list::COUNT] {
+    class_list::all()
 }
