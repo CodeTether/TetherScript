@@ -554,6 +554,7 @@ fn reset_browser_js_state() {
     media_host::reset_all();
     selection_host::reset();
     dom_compat_host::form_validation::reset();
+    compat_host::promise::reset();
     MUTATION_OBSERVERS.with(|observers| observers.borrow_mut().clear());
     NEXT_MUTATION_OBSERVER_ID.with(|id| *id.borrow_mut() = 1);
     OBJECT_URLS.with(|urls| urls.borrow_mut().clear());

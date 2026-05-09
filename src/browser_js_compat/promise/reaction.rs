@@ -2,10 +2,17 @@ use super::*;
 
 #[path = "reaction/apply.rs"]
 mod apply;
+#[path = "reaction/child.rs"]
+mod child;
+#[path = "reaction/schedule.rs"]
+mod schedule;
+#[path = "reaction/settle.rs"]
+mod settle;
 #[path = "reaction/types.rs"]
 mod types;
 
 pub(super) type Queue = Rc<RefCell<Vec<types::Reaction>>>;
+type Object = Rc<RefCell<HashMap<String, JsValue>>>;
 
 pub(super) fn queue() -> Queue {
     Rc::new(RefCell::new(Vec::new()))
@@ -19,36 +26,31 @@ pub(super) fn push_finally(queue: Queue, callback: JsValue) -> JsValue {
     push(queue, types::Kind::Finally { callback })
 }
 
+pub(super) fn settled_then(ok: JsValue, err: JsValue, current: state::PromiseState) -> JsValue {
+    settled(types::Kind::Then { ok, err }, current)
+}
+
+pub(super) fn settled_finally(callback: JsValue, current: state::PromiseState) -> JsValue {
+    settled(types::Kind::Finally { callback }, current)
+}
+
 fn push(queue: Queue, kind: types::Kind) -> JsValue {
-    let state = Rc::new(RefCell::new(state::PromiseState::Pending));
-    let child_queue = self::queue();
-    let object = object::from_parts(state.clone(), child_queue.clone());
-    queue.borrow_mut().push(types::Reaction {
-        kind,
-        state,
-        object: object.clone(),
-        queue: child_queue,
-    });
+    let (reaction, object) = child::new(kind);
+    queue.borrow_mut().push(reaction);
+    JsValue::Object(object)
+}
+
+fn settled(kind: types::Kind, current: state::PromiseState) -> JsValue {
+    let (reaction, object) = child::new(kind);
+    schedule::reaction(reaction, current);
     JsValue::Object(object)
 }
 
 pub(super) fn settle(
     state: &Rc<RefCell<state::PromiseState>>,
-    object: &Rc<RefCell<HashMap<String, JsValue>>>,
+    object: &Object,
     queue: &Queue,
     next: state::PromiseState,
 ) {
-    if !matches!(*state.borrow(), state::PromiseState::Pending) {
-        return;
-    }
-    *state.borrow_mut() = next;
-    object::write_state(&mut object.borrow_mut(), &state.borrow());
-    deliver(queue, state.borrow().clone());
-}
-
-fn deliver(queue: &Queue, current: state::PromiseState) {
-    let reactions = queue.borrow_mut().drain(..).collect::<Vec<_>>();
-    for item in reactions {
-        apply::settle(item, current.clone());
-    }
+    settle::promise(state, object, queue, next);
 }
