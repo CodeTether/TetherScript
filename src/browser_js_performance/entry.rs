@@ -30,12 +30,7 @@ impl PerformanceEntry {
     }
 
     pub(super) fn to_js(&self) -> JsValue {
-        let mut map = HashMap::new();
-        map.insert("name".into(), JsValue::String(self.name.clone()));
-        map.insert("entryType".into(), JsValue::String(self.entry_type.clone()));
-        map.insert("startTime".into(), JsValue::Number(self.start_time));
-        map.insert("duration".into(), JsValue::Number(self.duration));
-        JsValue::Object(Rc::new(RefCell::new(map)))
+        entry_json::object(self.clone())
     }
 }
 
