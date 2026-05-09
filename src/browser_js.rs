@@ -713,6 +713,7 @@ fn install_dom_globals(
     install_intersection_observer(&mut window, root.clone());
     install_resize_observer(&mut window);
     install_web_api_bindings(&mut window);
+    cssom_host::install_window(&mut window);
     viewport_host::install_window(&mut window);
     dom_compat_host::install_window(&mut window);
     channels_host::install(&mut window, timers.clone());
@@ -808,6 +809,8 @@ fn install_dom_globals(
             "FileReader",
             "structuredClone",
             "crypto",
+            "CSS",
+            "CSSStyleSheet",
             "performance",
             "requestIdleCallback",
             "cancelIdleCallback",
