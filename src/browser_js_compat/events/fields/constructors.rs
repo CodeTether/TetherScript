@@ -27,6 +27,9 @@ forward!(hash_change, lifecycle::hash_change);
 forward!(page_transition, lifecycle::page_transition);
 forward!(before_unload, lifecycle::before_unload);
 forward!(progress, lifecycle::progress);
+forward!(message, message_event::insert);
+forward!(error, error_event::insert);
+forward!(close, close_event::insert);
 
 pub(crate) fn pointer_event(map: &mut Map, init: Init<'_>) {
     mouse::insert(map, init);
