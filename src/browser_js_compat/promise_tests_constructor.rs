@@ -3,21 +3,25 @@ use super::super::*;
 #[test]
 fn promise_constructor_resolve_path_runs_handler() {
     let result = eval_with_dom(
-        "<main></main>",
-        "let P=window.Promise;let out='';new P(function(resolve,reject){resolve('ok');}).then(function(v){out=v;});out;",
+        "<p id='out'></p>",
+        "let P=window.Promise;let out='sync';\
+         new P(function(resolve,reject){resolve('ok');}).then(function(v){out=v;document.getElementById('out').textContent=out;});out;",
     )
     .unwrap();
-    assert_eq!(result.value, JsValue::String("ok".into()));
+    assert_eq!(result.value, JsValue::String("sync".into()));
+    assert!(result.html.contains("ok"));
 }
 
 #[test]
 fn promise_constructor_reject_path_runs_handler() {
     let result = eval_with_dom(
-        "<main></main>",
-        "let P=window.Promise;let out='';P(function(resolve,reject){reject('no');}).catch(function(e){out=e;});out;",
+        "<p id='out'></p>",
+        "let P=window.Promise;let out='sync';\
+         P(function(resolve,reject){reject('no');}).catch(function(e){out=e;document.getElementById('out').textContent=out;});out;",
     )
     .unwrap();
-    assert_eq!(result.value, JsValue::String("no".into()));
+    assert_eq!(result.value, JsValue::String("sync".into()));
+    assert!(result.html.contains("no"));
 }
 
 #[test]

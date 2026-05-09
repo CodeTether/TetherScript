@@ -3,23 +3,25 @@ use super::super::*;
 #[test]
 fn blob_file_bytes_returns_byte_array_promise() {
     let result = eval_with_dom(
-        "<main></main>",
+        "<p id='out'></p>",
         "let out=''; Blob(['A',Uint8Array([66])]).bytes().then(function(v){\
-         out=v.length+':'+v[0]+':'+v[1]; }); out;",
+         out=v.length+':'+v[0]+':'+v[1];document.getElementById('out').textContent=out; }); out;",
     )
     .unwrap();
-    assert_eq!(result.value, JsValue::String("2:65:66".into()));
+    assert_eq!(result.value, JsValue::String("".into()));
+    assert!(result.html.contains("2:65:66"));
 }
 
 #[test]
 fn blob_file_sliced_blob_bytes_use_sliced_content() {
     let result = eval_with_dom(
-        "<main></main>",
+        "<p id='out'></p>",
         "let out=''; Blob(['abcd']).slice(1,3).bytes().then(function(v){\
-         out=v.length+':'+v[0]+':'+v[1]; }); out;",
+         out=v.length+':'+v[0]+':'+v[1];document.getElementById('out').textContent=out; }); out;",
     )
     .unwrap();
-    assert_eq!(result.value, JsValue::String("2:98:99".into()));
+    assert_eq!(result.value, JsValue::String("".into()));
+    assert!(result.html.contains("2:98:99"));
 }
 
 #[test]

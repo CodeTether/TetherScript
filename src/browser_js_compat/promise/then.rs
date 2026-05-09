@@ -7,14 +7,21 @@ pub(super) fn method(
     native("Promise.then", None, move |args| {
         let on_ok = args.first().cloned().unwrap_or(JsValue::Undefined);
         let on_err = args.get(1).cloned().unwrap_or(JsValue::Undefined);
-        let next = match state.borrow().clone() {
-            state::PromiseState::Fulfilled(value) => fulfilled(on_ok, value),
-            state::PromiseState::Rejected(reason) => rejected(on_err, reason),
+        match state.borrow().clone() {
+            state::PromiseState::Fulfilled(value) => Ok(reaction::settled_then(
+                on_ok,
+                on_err,
+                state::PromiseState::Fulfilled(value),
+            )),
+            state::PromiseState::Rejected(reason) => Ok(reaction::settled_then(
+                on_ok,
+                on_err,
+                state::PromiseState::Rejected(reason),
+            )),
             state::PromiseState::Pending => {
-                return Ok(reaction::push_then(reactions.clone(), on_ok, on_err))
+                Ok(reaction::push_then(reactions.clone(), on_ok, on_err))
             }
-        };
-        Ok(object::from_state(next))
+        }
     })
 }
 
