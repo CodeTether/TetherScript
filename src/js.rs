@@ -46,6 +46,7 @@ pub struct NativeFunction {
     name: String,
     arity: Option<usize>,
     func: Box<dyn Fn(&[JsValue]) -> Result<JsValue, String>>,
+    properties: HashMap<String, JsValue>,
 }
 
 impl NativeFunction {
@@ -58,7 +59,17 @@ impl NativeFunction {
             name: name.into(),
             arity,
             func: Box::new(func),
+            properties: HashMap::new(),
         }
+    }
+
+    pub fn with_property(mut self, name: impl Into<String>, value: JsValue) -> Self {
+        self.properties.insert(name.into(), value);
+        self
+    }
+
+    fn property(&self, name: &str) -> Option<JsValue> {
+        self.properties.get(name).cloned()
     }
 }
 
@@ -248,19 +259,15 @@ fn install_globals(env: &EnvRef, console_log: Rc<RefCell<Vec<String>>>) {
         .define("Infinity", JsValue::Number(f64::INFINITY));
 
     let log_capture = console_log.clone();
-    let log = JsValue::Native(Rc::new(NativeFunction {
-        name: "log".into(),
-        arity: None,
-        func: Box::new(move |args| {
-            let line = args
-                .iter()
-                .map(|v| v.display())
-                .collect::<Vec<_>>()
-                .join(" ");
-            log_capture.borrow_mut().push(line);
-            Ok(JsValue::Undefined)
-        }),
-    }));
+    let log = JsValue::Native(Rc::new(NativeFunction::new("log", None, move |args| {
+        let line = args
+            .iter()
+            .map(|v| v.display())
+            .collect::<Vec<_>>()
+            .join(" ");
+        log_capture.borrow_mut().push(line);
+        Ok(JsValue::Undefined)
+    })));
     let mut console = HashMap::new();
     console.insert("log".into(), log);
     env.borrow_mut()
@@ -268,39 +275,27 @@ fn install_globals(env: &EnvRef, console_log: Rc<RefCell<Vec<String>>>) {
 
     env.borrow_mut().define(
         "Number",
-        JsValue::Native(Rc::new(NativeFunction {
-            name: "Number".into(),
-            arity: Some(1),
-            func: Box::new(|args| {
-                Ok(JsValue::Number(
-                    args.first().unwrap_or(&JsValue::Undefined).number(),
-                ))
-            }),
-        })),
+        JsValue::Native(Rc::new(NativeFunction::new("Number", Some(1), |args| {
+            Ok(JsValue::Number(
+                args.first().unwrap_or(&JsValue::Undefined).number(),
+            ))
+        }))),
     );
     env.borrow_mut().define(
         "String",
-        JsValue::Native(Rc::new(NativeFunction {
-            name: "String".into(),
-            arity: Some(1),
-            func: Box::new(|args| {
-                Ok(JsValue::String(
-                    args.first().unwrap_or(&JsValue::Undefined).display(),
-                ))
-            }),
-        })),
+        JsValue::Native(Rc::new(NativeFunction::new("String", Some(1), |args| {
+            Ok(JsValue::String(
+                args.first().unwrap_or(&JsValue::Undefined).display(),
+            ))
+        }))),
     );
     env.borrow_mut().define(
         "Boolean",
-        JsValue::Native(Rc::new(NativeFunction {
-            name: "Boolean".into(),
-            arity: Some(1),
-            func: Box::new(|args| {
-                Ok(JsValue::Bool(
-                    args.first().unwrap_or(&JsValue::Undefined).truthy(),
-                ))
-            }),
-        })),
+        JsValue::Native(Rc::new(NativeFunction::new("Boolean", Some(1), |args| {
+            Ok(JsValue::Bool(
+                args.first().unwrap_or(&JsValue::Undefined).truthy(),
+            ))
+        }))),
     );
 
     for (name, func) in array_global_functions() {
@@ -309,8 +304,7 @@ fn install_globals(env: &EnvRef, console_log: Rc<RefCell<Vec<String>>>) {
 
     // ── Promise ──────────────────────────────────────────────────────────
     // Promise(executor) — returns a thenable object with synchronous resolution.
-    // Since our engine does not support property access on Native values,
-    // Promise.resolve / Promise.reject are separate globals.
+    // Promise.resolve / Promise.reject are also separate globals for older callers.
     env.borrow_mut().define(
         "Promise",
         JsValue::Native(Rc::new(NativeFunction::new("Promise", Some(1), |args| {
@@ -686,6 +680,7 @@ enum TokenKind {
     Else,
     While,
     For,
+    New,
     Break,
     Continue,
     True,
@@ -925,6 +920,7 @@ impl<'a> Lexer<'a> {
             "else" => TokenKind::Else,
             "while" => TokenKind::While,
             "for" => TokenKind::For,
+            "new" => TokenKind::New,
             "break" => TokenKind::Break,
             "continue" => TokenKind::Continue,
             "true" => TokenKind::True,
@@ -989,6 +985,7 @@ enum Expr {
     Binary(Box<Expr>, String, Box<Expr>),
     Assign(Box<Expr>, Box<Expr>),
     Call(Box<Expr>, Vec<Expr>),
+    New(Box<Expr>, Vec<Expr>),
     Get(Box<Expr>, String),
     Index(Box<Expr>, Box<Expr>),
 }
@@ -1239,26 +1236,50 @@ impl Parser {
             Ok(Expr::Unary(op.into(), Box::new(self.unary()?)))
         } else if self.matches(&[TokenKind::Typeof]) {
             Ok(Expr::Typeof(Box::new(self.unary()?)))
+        } else if self.matches(&[TokenKind::New]) {
+            self.new_expr()
         } else {
             self.call()
         }
+    }
+
+    fn new_expr(&mut self) -> Result<Expr, String> {
+        let mut callee = self.primary()?;
+        loop {
+            if self.matches(&[TokenKind::Dot]) {
+                callee = Expr::Get(Box::new(callee), self.consume_ident("Expected property")?);
+            } else if self.matches(&[TokenKind::LBracket]) {
+                let idx = self.expression()?;
+                self.consume(&TokenKind::RBracket, "Expected ']'")?;
+                callee = Expr::Index(Box::new(callee), Box::new(idx));
+            } else {
+                break;
+            }
+        }
+        self.consume(&TokenKind::LParen, "Expected '(' after constructor")?;
+        let args = self.args()?;
+        let mut expr = Expr::New(Box::new(callee), args);
+        loop {
+            if self.matches(&[TokenKind::LParen]) {
+                expr = Expr::Call(Box::new(expr), self.args()?);
+            } else if self.matches(&[TokenKind::Dot]) {
+                expr = Expr::Get(Box::new(expr), self.consume_ident("Expected property")?);
+            } else if self.matches(&[TokenKind::LBracket]) {
+                let idx = self.expression()?;
+                self.consume(&TokenKind::RBracket, "Expected ']'")?;
+                expr = Expr::Index(Box::new(expr), Box::new(idx));
+            } else {
+                break;
+            }
+        }
+        Ok(expr)
     }
 
     fn call(&mut self) -> Result<Expr, String> {
         let mut e = self.primary()?;
         loop {
             if self.matches(&[TokenKind::LParen]) {
-                let mut args = Vec::new();
-                if !self.check(&TokenKind::RParen) {
-                    loop {
-                        args.push(self.expression()?);
-                        if !self.matches(&[TokenKind::Comma]) {
-                            break;
-                        }
-                    }
-                }
-                self.consume(&TokenKind::RParen, "Expected ')' after arguments")?;
-                e = Expr::Call(Box::new(e), args);
+                e = Expr::Call(Box::new(e), self.args()?);
             } else if self.matches(&[TokenKind::Dot]) {
                 e = Expr::Get(Box::new(e), self.consume_ident("Expected property")?);
             } else if self.matches(&[TokenKind::LBracket]) {
@@ -1270,6 +1291,20 @@ impl Parser {
             }
         }
         Ok(e)
+    }
+
+    fn args(&mut self) -> Result<Vec<Expr>, String> {
+        let mut args = Vec::new();
+        if !self.check(&TokenKind::RParen) {
+            loop {
+                args.push(self.expression()?);
+                if !self.matches(&[TokenKind::Comma]) {
+                    break;
+                }
+            }
+        }
+        self.consume(&TokenKind::RParen, "Expected ')' after arguments")?;
+        Ok(args)
     }
 
     fn primary(&mut self) -> Result<Expr, String> {
@@ -1549,6 +1584,14 @@ fn eval_expr(expr: &Expr, env: EnvRef) -> Result<JsValue, String> {
                 .collect::<Result<Vec<_>, _>>()?;
             call_value(callee, &args)
         }
+        Expr::New(callee, args) => {
+            let callee = eval_expr(callee, env.clone())?;
+            let args = args
+                .iter()
+                .map(|a| eval_expr(a, env.clone()))
+                .collect::<Result<Vec<_>, _>>()?;
+            construct_value(callee, &args)
+        }
         Expr::Get(obj, prop) => get_property(&eval_expr(obj, env)?, prop),
         Expr::Index(obj, idx) => {
             let key = eval_expr(idx, env.clone())?.display();
@@ -1693,6 +1736,7 @@ fn get_property(value: &JsValue, prop: &str) -> Result<JsValue, String> {
             )))),
             _ => Ok(JsValue::Undefined),
         },
+        JsValue::Native(native) => Ok(native.property(prop).unwrap_or(JsValue::Undefined)),
         _ => Ok(JsValue::Undefined),
     }
 }
@@ -1809,10 +1853,14 @@ fn set_property(value: &JsValue, prop: &str, new_value: JsValue) -> Result<(), S
         JsValue::Object(obj) => {
             let setter_key = format!("__set:{}", prop);
             let setter = obj.borrow().get(&setter_key).cloned();
+            let mut stored_value = new_value.clone();
             if let Some(setter) = setter {
-                call_value(setter, std::slice::from_ref(&new_value))?;
+                let setter_result = call_value(setter, std::slice::from_ref(&new_value))?;
+                if !matches!(setter_result, JsValue::Undefined) {
+                    stored_value = setter_result;
+                }
             }
-            obj.borrow_mut().insert(prop.into(), new_value);
+            obj.borrow_mut().insert(prop.into(), stored_value);
             Ok(())
         }
         JsValue::Array(items) => {
@@ -1861,6 +1909,33 @@ fn call_value(callee: JsValue, args: &[JsValue]) -> Result<JsValue, String> {
             }
         }
         _ => Err(format!("TypeError: {} is not callable", callee.display())),
+    }
+}
+
+fn construct_value(callee: JsValue, args: &[JsValue]) -> Result<JsValue, String> {
+    match callee {
+        JsValue::Native(_) => call_value(callee, args),
+        JsValue::BoundFunction(bound) => construct_value(bound.function.clone(), args),
+        JsValue::Function(fun) => {
+            let this_value = JsValue::Object(Rc::new(RefCell::new(HashMap::new())));
+            let result = call_with_this(JsValue::Function(fun), this_value.clone(), args)?;
+            if matches!(
+                result,
+                JsValue::Array(_)
+                    | JsValue::Object(_)
+                    | JsValue::Function(_)
+                    | JsValue::BoundFunction(_)
+                    | JsValue::Native(_)
+            ) {
+                Ok(result)
+            } else {
+                Ok(this_value)
+            }
+        }
+        other => Err(format!(
+            "TypeError: {} is not a constructor",
+            other.display()
+        )),
     }
 }
 
@@ -1933,6 +2008,46 @@ mod tests {
         assert_eq!(
             eval(src).unwrap(),
             JsValue::String("4:4:1-2-3:2|3:011223:1,3,5:4:9".into())
+        );
+    }
+
+    #[test]
+    fn new_invokes_native_constructors_like_calls() {
+        let mut engine = JsEngine::new();
+        engine.set_global(
+            "Thing",
+            JsValue::Native(Rc::new(NativeFunction::new("Thing", None, |args| {
+                let mut obj = HashMap::new();
+                obj.insert(
+                    "kind".into(),
+                    args.first().cloned().unwrap_or(JsValue::Undefined),
+                );
+                obj.insert(
+                    "label".into(),
+                    JsValue::Native(Rc::new(NativeFunction::new("Thing.label", Some(0), |_| {
+                        Ok(JsValue::String("method".into()))
+                    }))),
+                );
+                Ok(JsValue::Object(Rc::new(RefCell::new(obj))))
+            }))),
+        );
+        assert_eq!(
+            engine
+                .eval("let a=Thing('call'); let b=new Thing('ctor'); a.kind + ':' + b.kind + ':' + new Thing('x').label();")
+                .unwrap(),
+            JsValue::String("call:ctor:method".into())
+        );
+    }
+
+    #[test]
+    fn new_constructs_user_functions_with_this_object() {
+        assert_eq!(
+            eval("function Person(name){ this.name=name; return 7; } let p=new Person('Ada'); p.name + ':' + typeof p;").unwrap(),
+            JsValue::String("Ada:object".into())
+        );
+        assert_eq!(
+            eval("function Box(v){ return {value:v}; } new Box(3).value;").unwrap(),
+            JsValue::Number(3.0)
         );
     }
 
