@@ -19,6 +19,7 @@ var PopStateEvent=window.PopStateEvent;var HashChangeEvent=window.HashChangeEven
 var PageTransitionEvent=window.PageTransitionEvent;var BeforeUnloadEvent=window.BeforeUnloadEvent;var ProgressEvent=window.ProgressEvent;
 var AnimationEvent=window.AnimationEvent;var TransitionEvent=window.TransitionEvent;var PromiseRejectionEvent=window.PromiseRejectionEvent;
 var open=window.open;var close=window.close;var print=window.print;var stop=window.stop;var focus=window.focus;var blur=window.blur;
+var showOpenFilePicker=window.showOpenFilePicker;var showSaveFilePicker=window.showSaveFilePicker;var showDirectoryPicker=window.showDirectoryPicker;
 function __tsSetScroll(x,y){x=x*1;y=y*1;window.scrollX=x;window.scrollY=y;window.pageXOffset=x;window.pageYOffset=y;scrollX=x;scrollY=y;pageXOffset=x;pageYOffset=y;window.__tsDispatchScroll();return undefined;}
 function scrollTo(x,y){return __tsSetScroll(x,y);}
 function scroll(x,y){return __tsSetScroll(x,y);}
