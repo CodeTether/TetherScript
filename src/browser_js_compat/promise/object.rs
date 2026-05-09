@@ -1,20 +1,21 @@
 use super::*;
 
+#[path = "object/methods.rs"]
+mod methods;
+
 pub(super) fn from_state(state: state::PromiseState) -> JsValue {
     let shared = Rc::new(RefCell::new(state));
-    let mut object = HashMap::new();
-    write_state(&mut object, &shared.borrow());
-    install_methods(&mut object, shared);
-    JsValue::Object(Rc::new(RefCell::new(object)))
+    JsValue::Object(from_parts(shared, reaction::queue()))
 }
 
-pub(super) fn install_methods(
-    object: &mut HashMap<String, JsValue>,
+pub(super) fn from_parts(
     state: Rc<RefCell<state::PromiseState>>,
-) {
-    object.insert("then".into(), then::method(state.clone()));
-    object.insert("catch".into(), catch::method(state.clone()));
-    object.insert("finally".into(), finally::method(state));
+    reactions: reaction::Queue,
+) -> Rc<RefCell<HashMap<String, JsValue>>> {
+    let mut object = HashMap::new();
+    write_state(&mut object, &state.borrow());
+    methods::install(&mut object, state, reactions);
+    Rc::new(RefCell::new(object))
 }
 
 pub(super) fn write_state(object: &mut HashMap<String, JsValue>, state: &state::PromiseState) {
