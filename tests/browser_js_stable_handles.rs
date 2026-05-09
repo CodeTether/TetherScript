@@ -38,3 +38,16 @@ fn shifted_element_keeps_existing_event_registrations() {
 
     assert_eq!(value, JsValue::String("yes:yes".into()));
 }
+
+#[test]
+fn inserted_detached_element_keeps_handle_and_event_registrations() {
+    let value = eval(
+        "let app=document.querySelector('main');let made=document.createElement('button');\
+         made.setAttribute('id','made');\
+         made.addEventListener('click',function(){this.setAttribute('data-hit','yes');});\
+         app.appendChild(made);made.click();let fresh=document.getElementById('made');\
+         fresh.getAttribute('data-hit')+':'+made.getAttribute('data-hit');",
+    );
+
+    assert_eq!(value, JsValue::String("yes:yes".into()));
+}
