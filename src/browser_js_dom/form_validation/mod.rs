@@ -11,6 +11,13 @@ mod elements_sync;
 mod form;
 mod form_methods;
 mod form_props;
+mod input_attr_sync;
+mod input_attrs;
+mod input_compat;
+mod input_indeterminate;
+mod input_number;
+mod input_number_arg;
+mod input_step;
 mod listed;
 mod message;
 mod names;
@@ -19,6 +26,9 @@ mod refresh;
 mod select;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+#[path = "tests_input_compat.rs"]
+mod tests_input_compat;
 mod types;
 mod value_setter;
 mod values;
