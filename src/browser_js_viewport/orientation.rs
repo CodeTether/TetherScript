@@ -4,6 +4,8 @@ use super::super::*;
 mod event;
 #[path = "orientation_events.rs"]
 mod events;
+#[path = "orientation_lock.rs"]
+mod lock;
 #[cfg(test)]
 #[path = "tests_orientation_events.rs"]
 mod tests_orientation_events;
@@ -15,5 +17,6 @@ pub(super) fn object() -> JsValue {
         ("onchange".into(), JsValue::Null),
     ])));
     events::install(&object);
+    lock::install(&object);
     JsValue::Object(object)
 }
