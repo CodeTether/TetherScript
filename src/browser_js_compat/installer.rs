@@ -13,6 +13,7 @@ pub(super) fn install(window: &mut HashMap<String, JsValue>) {
     clipboard_item::install(window);
     form_data::install(window);
     file_reader::install(window);
+    notification::install(window);
     promise::install(window);
     url_pattern::install(window);
 }

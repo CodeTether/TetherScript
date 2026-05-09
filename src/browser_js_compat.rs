@@ -24,6 +24,8 @@ mod file_reader;
 mod form_data;
 #[path = "browser_js_compat/installer.rs"]
 mod installer;
+#[path = "browser_js_compat/notification.rs"]
+mod notification;
 #[path = "browser_js_compat/promise.rs"]
 mod promise;
 #[path = "browser_js_compat/structured.rs"]
@@ -38,6 +40,9 @@ mod url_pattern;
 #[cfg(test)]
 #[path = "browser_js_compat/tests.rs"]
 mod tests;
+#[cfg(test)]
+#[path = "browser_js_compat/tests_notification.rs"]
+mod tests_notification;
 
 pub(super) fn install(window: &mut HashMap<String, JsValue>) {
     installer::install(window);
