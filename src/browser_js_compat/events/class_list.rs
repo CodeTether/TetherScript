@@ -1,6 +1,6 @@
 use super::EventClass;
 
-pub(super) const COUNT: usize = 19;
+pub(super) const COUNT: usize = 22;
 
 pub(super) fn all() -> [EventClass; COUNT] {
     use super::super::fields::constructors as init;
@@ -25,5 +25,8 @@ pub(super) fn all() -> [EventClass; COUNT] {
         EventClass::new("PageTransitionEvent", init::page_transition, false),
         EventClass::new("BeforeUnloadEvent", init::before_unload, false),
         EventClass::new("ProgressEvent", init::progress, false),
+        EventClass::new("MessageEvent", init::message, false),
+        EventClass::new("ErrorEvent", init::error, false),
+        EventClass::new("CloseEvent", init::close, false),
     ]
 }
