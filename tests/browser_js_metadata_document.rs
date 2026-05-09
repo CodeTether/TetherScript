@@ -41,3 +41,14 @@ fn document_default_view_points_at_window() {
 
     assert_eq!(result.value, JsValue::Bool(true));
 }
+
+#[test]
+fn document_visibility_metadata_is_visible_by_default() {
+    let result = eval_with_dom(
+        "<main></main>",
+        "[document.hidden,document.visibilityState,document.prerendering].join('|');",
+    )
+    .unwrap();
+
+    assert_eq!(result.value, JsValue::String("false|visible|false".into()));
+}
