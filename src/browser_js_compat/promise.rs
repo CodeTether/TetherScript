@@ -31,6 +31,9 @@ mod tests_constructor;
 #[path = "promise_tests_pending_aggregate.rs"]
 mod tests_pending_aggregate;
 #[cfg(test)]
+#[path = "promise_tests_pending_finally.rs"]
+mod tests_pending_finally;
+#[cfg(test)]
 #[path = "promise_tests_settled.rs"]
 mod tests_settled;
 
