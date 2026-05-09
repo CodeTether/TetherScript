@@ -1,5 +1,7 @@
 use super::*;
 
+#[path = "fields/animation.rs"]
+mod animation;
 #[path = "fields/clipboard.rs"]
 mod clipboard;
 #[path = "fields/close_event.rs"]
@@ -22,6 +24,8 @@ mod misc;
 mod mouse;
 #[path = "fields/pointer.rs"]
 mod pointer;
+#[path = "fields/promise_rejection.rs"]
+mod promise_rejection;
 #[path = "fields/storage.rs"]
 mod storage;
 #[path = "fields/text.rs"]
