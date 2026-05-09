@@ -13,7 +13,7 @@ pub(super) fn install(window: &mut HashMap<String, JsValue>) {
 }
 
 fn picker(name: &'static str) -> JsValue {
-    native(name, None, move |_| Ok(promise::rejected(reason())))
+    native(name, None, move |_| Ok(promise::api::rejected(reason())))
 }
 
 fn reason() -> JsValue {

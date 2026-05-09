@@ -12,6 +12,6 @@ pub(super) fn request_permission() -> JsValue {
                 )?;
             }
         }
-        Ok(promise::fulfilled(permission))
+        Ok(promise::api::fulfilled(permission))
     })
 }

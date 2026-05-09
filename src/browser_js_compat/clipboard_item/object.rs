@@ -34,7 +34,7 @@ fn create(entries: Vec<ItemEntry>) -> JsValue {
         native("ClipboardItem.getType", Some(1), move |args| {
             let requested = args.first().map(JsValue::display).unwrap_or_default();
             match lookup.iter().find(|(name, _)| name == &requested) {
-                Some((_, value)) => Ok(promise::fulfilled(value.clone())),
+                Some((_, value)) => Ok(promise::api::fulfilled(value.clone())),
                 None => Ok(reject::promise(&requested)),
             }
         }),
