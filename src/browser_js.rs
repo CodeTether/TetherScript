@@ -4333,6 +4333,7 @@ fn dom_collection(kind: &'static str, values: Vec<JsValue>) -> JsValue {
         }),
     );
     let weak = Rc::downgrade(&object);
+    let for_each_values = values.clone();
     object.borrow_mut().insert(
         "forEach".into(),
         native(&format!("{kind}.forEach"), None, move |args| {
@@ -4345,7 +4346,7 @@ fn dom_collection(kind: &'static str, values: Vec<JsValue>) -> JsValue {
                 .upgrade()
                 .map(JsValue::Object)
                 .unwrap_or(JsValue::Undefined);
-            for (index, value) in values.iter().cloned().enumerate() {
+            for (index, value) in for_each_values.iter().cloned().enumerate() {
                 js::call_function_with_this(
                     callback.clone(),
                     this_arg.clone(),
@@ -4355,7 +4356,54 @@ fn dom_collection(kind: &'static str, values: Vec<JsValue>) -> JsValue {
             Ok(JsValue::Undefined)
         }),
     );
+    if kind == "HTMLCollection" {
+        install_html_collection_named_items(&object, &values, kind);
+    }
     collection
+}
+
+fn install_html_collection_named_items(
+    object: &Rc<RefCell<HashMap<String, JsValue>>>,
+    values: &[JsValue],
+    kind: &'static str,
+) {
+    let named_values = values.to_vec();
+    object.borrow_mut().insert(
+        "namedItem".into(),
+        native(&format!("{kind}.namedItem"), Some(1), move |args| {
+            let name = args.first().unwrap_or(&JsValue::Undefined).display();
+            Ok(named_values
+                .iter()
+                .find(|value| html_collection_name_matches(value, &name))
+                .cloned()
+                .unwrap_or(JsValue::Null))
+        }),
+    );
+    for value in values {
+        for name in html_collection_names(value) {
+            object
+                .borrow_mut()
+                .entry(name)
+                .or_insert_with(|| value.clone());
+        }
+    }
+}
+
+fn html_collection_name_matches(value: &JsValue, name: &str) -> bool {
+    html_collection_names(value).iter().any(|item| item == name)
+}
+
+fn html_collection_names(value: &JsValue) -> Vec<String> {
+    let Some(Node::Element(el)) = dom_handle_from_value(value).and_then(|handle| handle.node())
+    else {
+        return Vec::new();
+    };
+    ["id", "name"]
+        .iter()
+        .filter_map(|attr| el.attrs.get(*attr))
+        .filter(|name| !name.is_empty())
+        .cloned()
+        .collect()
 }
 
 fn collection_index(value: Option<&JsValue>) -> usize {

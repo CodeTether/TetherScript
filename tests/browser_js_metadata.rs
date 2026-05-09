@@ -4,6 +4,8 @@ use tetherscript::js::JsValue;
 
 #[path = "browser_js_metadata/navigator_capabilities.rs"]
 mod navigator_capabilities;
+#[path = "browser_js_metadata/navigator_connection.rs"]
+mod navigator_connection;
 #[path = "browser_js_metadata/navigator_user_agent_data.rs"]
 mod navigator_user_agent_data;
 
