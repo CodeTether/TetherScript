@@ -1,21 +1,33 @@
 use super::*;
 
-pub(super) fn single(root: &Rc<RefCell<Node>>, x: i64, y: i64) -> JsValue {
-    if !inside_viewport(x, y) {
+pub(super) fn single_at(
+    root: &Rc<RefCell<Node>>,
+    viewport_x: i64,
+    viewport_y: i64,
+    document_x: i64,
+    document_y: i64,
+) -> JsValue {
+    if !inside_viewport(viewport_x, viewport_y) {
         return JsValue::Null;
     }
-    hit_collect::hits(root, x, y)
+    hit_collect::hits(root, document_x, document_y)
         .into_iter()
         .next()
         .map(|hit| node_for(root, hit.path))
         .unwrap_or(JsValue::Null)
 }
 
-pub(super) fn all(root: &Rc<RefCell<Node>>, x: i64, y: i64) -> JsValue {
-    if !inside_viewport(x, y) {
+pub(super) fn all_at(
+    root: &Rc<RefCell<Node>>,
+    viewport_x: i64,
+    viewport_y: i64,
+    document_x: i64,
+    document_y: i64,
+) -> JsValue {
+    if !inside_viewport(viewport_x, viewport_y) {
         return JsValue::Array(Rc::new(RefCell::new(Vec::new())));
     }
-    let nodes = hit_collect::hits(root, x, y)
+    let nodes = hit_collect::hits(root, document_x, document_y)
         .into_iter()
         .map(|hit| node_for(root, hit.path))
         .collect();

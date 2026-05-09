@@ -6,34 +6,25 @@ pub(super) fn install(document: &JsValue, root: Rc<RefCell<Node>>) {
     };
     let single_root = root.clone();
     let all_root = root;
+    let single_document = object.clone();
+    let all_document = object.clone();
     let mut object = object.borrow_mut();
     object.insert("hidden".into(), JsValue::Bool(false));
     object.insert("visibilityState".into(), JsValue::String("visible".into()));
     object.insert(
         "elementFromPoint".into(),
         native("document.elementFromPoint", Some(2), move |args| {
-            let (x, y) = point(args);
-            Ok(hit::single(&single_root, x, y))
+            let (x, y) = point::from_args(args);
+            let (doc_x, doc_y) = point::scrolled(&single_document, x, y);
+            Ok(hit::single_at(&single_root, x, y, doc_x, doc_y))
         }),
     );
     object.insert(
         "elementsFromPoint".into(),
         native("document.elementsFromPoint", Some(2), move |args| {
-            let (x, y) = point(args);
-            Ok(hit::all(&all_root, x, y))
+            let (x, y) = point::from_args(args);
+            let (doc_x, doc_y) = point::scrolled(&all_document, x, y);
+            Ok(hit::all_at(&all_root, x, y, doc_x, doc_y))
         }),
     );
-}
-
-fn point(args: &[JsValue]) -> (i64, i64) {
-    (number(args.first()), number(args.get(1)))
-}
-
-fn number(value: Option<&JsValue>) -> i64 {
-    value
-        .map(JsValue::display)
-        .and_then(|raw| raw.parse::<f64>().ok())
-        .filter(|value| value.is_finite())
-        .unwrap_or(0.0)
-        .trunc() as i64
 }
