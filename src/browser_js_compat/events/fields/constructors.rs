@@ -18,6 +18,8 @@ forward!(keyboard, keyboard::insert);
 forward!(input, text::input);
 forward!(submit, misc::submit);
 forward!(focus, misc::focus);
+forward!(composition, interactions::composition);
+forward!(touch, interactions::touch);
 forward!(storage, storage::insert);
 forward!(clipboard, clipboard::insert);
 forward!(pop_state, lifecycle::pop_state);
@@ -34,4 +36,9 @@ pub(crate) fn pointer_event(map: &mut Map, init: Init<'_>) {
 pub(crate) fn wheel_event(map: &mut Map, init: Init<'_>) {
     mouse::insert(map, init);
     wheel::insert(map, init);
+}
+
+pub(crate) fn drag_event(map: &mut Map, init: Init<'_>) {
+    mouse::insert(map, init);
+    interactions::drag(map, init);
 }
