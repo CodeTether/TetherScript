@@ -4,6 +4,8 @@ use super::*;
 mod clipboard;
 #[path = "fields/constructors.rs"]
 pub(super) mod constructors;
+#[path = "fields/interactions.rs"]
+mod interactions;
 #[path = "fields/keyboard.rs"]
 mod keyboard;
 #[path = "fields/lifecycle.rs"]
