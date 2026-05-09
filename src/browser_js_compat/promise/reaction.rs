@@ -49,7 +49,6 @@ pub(super) fn settle(
 fn deliver(queue: &Queue, current: state::PromiseState) {
     let reactions = queue.borrow_mut().drain(..).collect::<Vec<_>>();
     for item in reactions {
-        let next = apply::settle(item.kind, current.clone());
-        settle(&item.state, &item.object, &item.queue, next);
+        apply::settle(item, current.clone());
     }
 }
