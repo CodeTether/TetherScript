@@ -1,6 +1,9 @@
 use crate::browser_js::eval_with_dom;
 use crate::js::JsValue;
 
+#[path = "tests_class_list_edges.rs"]
+mod tests_class_list_edges;
+
 fn eval(script: &str) -> JsValue {
     eval_with_dom("<div id='x' class='a b c'></div>", script)
         .unwrap()
