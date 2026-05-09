@@ -19,3 +19,29 @@ fn promise_constructor_reject_path_runs_handler() {
     .unwrap();
     assert_eq!(result.value, JsValue::String("no".into()));
 }
+
+#[test]
+fn promise_pending_handlers_run_after_later_settlement() {
+    let result = eval_with_dom(
+        "<p id='out'></p>",
+        "let P=window.Promise;let resolve;let p=new P(function(r){resolve=r;});\
+         p.then(function(v){document.getElementById('out').textContent='then:'+v;});\
+         setTimeout(function(){resolve('late');},0);'sync';",
+    )
+    .unwrap();
+
+    assert!(result.html.contains("then:late"));
+}
+
+#[test]
+fn promise_pending_catch_runs_after_later_rejection() {
+    let result = eval_with_dom(
+        "<p id='out'></p>",
+        "let P=window.Promise;let reject;let p=new P(function(r,j){reject=j;});\
+         p.catch(function(e){document.getElementById('out').textContent='catch:'+e;});\
+         setTimeout(function(){reject('late');},0);'sync';",
+    )
+    .unwrap();
+
+    assert!(result.html.contains("catch:late"));
+}
