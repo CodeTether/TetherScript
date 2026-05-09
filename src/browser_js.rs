@@ -3629,8 +3629,10 @@ fn normalize_event(
         map.insert("target".into(), target);
         map.insert("currentTarget".into(), current_target);
         map.entry("bubbles".into()).or_insert(JsValue::Bool(true));
-        map.entry("cancelable".into()).or_insert(JsValue::Bool(true));
-        map.entry("eventPhase".into()).or_insert(JsValue::Number(0.0));
+        map.entry("cancelable".into())
+            .or_insert(JsValue::Bool(true));
+        map.entry("eventPhase".into())
+            .or_insert(JsValue::Number(0.0));
         map.entry("defaultPrevented".into())
             .or_insert(JsValue::Bool(false));
     }
