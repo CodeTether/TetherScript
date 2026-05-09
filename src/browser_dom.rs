@@ -20,6 +20,7 @@ impl NodeId {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DomNodeKind {
     Element(DomElement),
+    DocumentFragment,
     Text(String),
 }
 
@@ -60,7 +61,7 @@ impl DomArena {
             children: self
                 .roots
                 .iter()
-                .map(|root| self.to_browser_node(*root))
+                .flat_map(|root| self.to_browser_nodes(*root))
                 .collect(),
         }
     }
@@ -82,6 +83,82 @@ impl DomArena {
 
     pub fn add_text(&mut self, parent: Option<NodeId>, text: impl Into<String>) -> NodeId {
         self.push_node(parent, DomNodeKind::Text(text.into()))
+    }
+
+    pub fn create_detached_element(
+        &mut self,
+        tag: impl Into<String>,
+        attrs: HashMap<String, String>,
+    ) -> NodeId {
+        self.push_detached_node(DomNodeKind::Element(DomElement {
+            tag: tag.into(),
+            attrs,
+        }))
+    }
+
+    pub fn create_document_fragment(&mut self) -> NodeId {
+        self.push_detached_node(DomNodeKind::DocumentFragment)
+    }
+
+    pub fn append_child(&mut self, parent: NodeId, child: NodeId) -> Result<(), String> {
+        let index = self
+            .children(parent)
+            .map(|children| children.len())
+            .ok_or_else(|| "append_child: parent does not exist".to_string())?;
+        self.insert_child_at(parent, child, index)
+    }
+
+    pub fn insert_before(
+        &mut self,
+        parent: NodeId,
+        child: NodeId,
+        reference: Option<NodeId>,
+    ) -> Result<(), String> {
+        let index = match reference {
+            Some(reference) => self
+                .children(parent)
+                .and_then(|children| children.iter().position(|id| *id == reference))
+                .ok_or_else(|| "insert_before: reference is not a child of parent".to_string())?,
+            None => self
+                .children(parent)
+                .map(|children| children.len())
+                .ok_or_else(|| "insert_before: parent does not exist".to_string())?,
+        };
+        self.insert_child_at(parent, child, index)
+    }
+
+    pub fn replace_child(
+        &mut self,
+        parent: NodeId,
+        new_child: NodeId,
+        old_child: NodeId,
+    ) -> Result<NodeId, String> {
+        let index = self
+            .children(parent)
+            .and_then(|children| children.iter().position(|id| *id == old_child))
+            .ok_or_else(|| "replace_child: old child is not a child of parent".to_string())?;
+        self.detach_node(old_child)?;
+        self.insert_child_at(parent, new_child, index)?;
+        Ok(old_child)
+    }
+
+    pub fn remove_node(&mut self, id: NodeId) -> Result<(), String> {
+        self.detach_node(id)
+    }
+
+    pub fn clone_subtree(&mut self, id: NodeId, deep: bool) -> Result<NodeId, String> {
+        let node = self
+            .node(id)
+            .cloned()
+            .ok_or_else(|| "clone_subtree: node does not exist".to_string())?;
+        let clone = self.push_detached_node(node.kind);
+        if deep {
+            for child in node.children {
+                let child_clone = self.clone_subtree(child, true)?;
+                self.append_child(clone, child_clone)?;
+            }
+        }
+        Ok(clone)
     }
 
     pub fn len(&self) -> usize {
@@ -115,13 +192,13 @@ impl DomArena {
     pub fn element(&self, id: NodeId) -> Option<&DomElement> {
         match self.kind(id)? {
             DomNodeKind::Element(element) => Some(element),
-            DomNodeKind::Text(_) => None,
+            DomNodeKind::DocumentFragment | DomNodeKind::Text(_) => None,
         }
     }
 
     pub fn text(&self, id: NodeId) -> Option<&str> {
         match self.kind(id)? {
-            DomNodeKind::Element(_) => None,
+            DomNodeKind::Element(_) | DomNodeKind::DocumentFragment => None,
             DomNodeKind::Text(text) => Some(text),
         }
     }
@@ -170,19 +247,88 @@ impl DomArena {
         id
     }
 
-    fn to_browser_node(&self, id: NodeId) -> browser::Node {
+    fn push_detached_node(&mut self, kind: DomNodeKind) -> NodeId {
+        let id = NodeId(self.nodes.len());
+        self.nodes.push(ArenaNode {
+            parent: None,
+            children: Vec::new(),
+            kind,
+        });
+        id
+    }
+
+    fn insert_child_at(
+        &mut self,
+        parent: NodeId,
+        child: NodeId,
+        index: usize,
+    ) -> Result<(), String> {
+        if parent == child || self.is_descendant(parent, child) {
+            return Err("cannot insert an ancestor into its descendant".into());
+        }
+        if self.node(parent).is_none() || self.node(child).is_none() {
+            return Err("insert_child_at: parent or child does not exist".into());
+        }
+
+        if matches!(self.kind(child), Some(DomNodeKind::DocumentFragment)) {
+            let children = std::mem::take(&mut self.nodes[child.0].children);
+            for (offset, fragment_child) in children.into_iter().enumerate() {
+                self.nodes[fragment_child.0].parent = None;
+                self.insert_child_at(parent, fragment_child, index + offset)?;
+            }
+            return Ok(());
+        }
+
+        self.detach_node(child)?;
+        let parent_children = &mut self.nodes[parent.0].children;
+        let index = index.min(parent_children.len());
+        parent_children.insert(index, child);
+        self.nodes[child.0].parent = Some(parent);
+        Ok(())
+    }
+
+    fn detach_node(&mut self, id: NodeId) -> Result<(), String> {
+        if self.node(id).is_none() {
+            return Err("detach_node: node does not exist".into());
+        }
+        if let Some(parent) = self.nodes[id.0].parent {
+            self.nodes[parent.0].children.retain(|child| *child != id);
+        } else {
+            self.roots.retain(|root| *root != id);
+        }
+        self.nodes[id.0].parent = None;
+        Ok(())
+    }
+
+    fn is_descendant(&self, node: NodeId, possible_ancestor: NodeId) -> bool {
+        let mut current = self.parent(node);
+        while let Some(id) = current {
+            if id == possible_ancestor {
+                return true;
+            }
+            current = self.parent(id);
+        }
+        false
+    }
+
+    fn to_browser_nodes(&self, id: NodeId) -> Vec<browser::Node> {
         let node = &self.nodes[id.0];
         match &node.kind {
-            DomNodeKind::Element(element) => browser::Node::Element(browser::Element {
+            DomNodeKind::Element(element) => vec![browser::Node::Element(browser::Element {
                 tag: element.tag.clone(),
                 attrs: element.attrs.clone(),
                 children: node
                     .children
                     .iter()
-                    .map(|child| self.to_browser_node(*child))
+                    .flat_map(|child| self.to_browser_nodes(*child))
                     .collect(),
-            }),
-            DomNodeKind::Text(text) => browser::Node::Text(text.clone()),
+            })],
+            DomNodeKind::DocumentFragment => node
+                .children
+                .iter()
+                .flat_map(|child| self.to_browser_nodes(*child))
+                .collect(),
+            DomNodeKind::Text(text) => vec![browser::Node::Text(text.clone())],
         }
     }
 
@@ -223,6 +369,7 @@ impl DomArena {
                         |(left_child, right_child)| self.browser_node_eq(*left_child, right_child),
                     )
             }
+            (DomNodeKind::DocumentFragment, _) => false,
             _ => false,
         }
     }
@@ -292,5 +439,51 @@ mod tests {
         assert_eq!(items.len(), 2);
         assert_ne!(items[0], items[1]);
         assert!(items[0] < items[1]);
+    }
+
+    #[test]
+    fn detached_nodes_insert_replace_and_clone_with_stable_ids() {
+        let document = browser::parse_html(r#"<main><p id="old">Old</p></main>"#);
+        let mut arena = DomArena::from_document(&document);
+        let main = arena.query_selector("main")[0];
+        let old = arena.query_selector("#old")[0];
+
+        let next = arena.create_detached_element("p", HashMap::new());
+        arena.add_text(Some(next), "New");
+        arena.insert_before(main, next, Some(old)).unwrap();
+        assert_eq!(arena.parent(next), Some(main));
+        assert_eq!(arena.parent(old), Some(main));
+
+        let clone = arena.clone_subtree(next, true).unwrap();
+        let removed = arena.replace_child(main, clone, old).unwrap();
+        assert_eq!(removed, old);
+        assert_eq!(arena.parent(old), None);
+        assert_eq!(arena.parent(clone), Some(main));
+        assert_ne!(clone, next);
+
+        let doc = arena.to_document();
+        assert_eq!(browser::query_selector(&doc, "main > p").len(), 2);
+        assert_eq!(browser::text_content(&doc.children[0]), "New New");
+    }
+
+    #[test]
+    fn document_fragment_splices_children_without_extra_element() {
+        let document = browser::parse_html(r#"<ul><li>A</li></ul>"#);
+        let mut arena = DomArena::from_document(&document);
+        let ul = arena.query_selector("ul")[0];
+        let fragment = arena.create_document_fragment();
+        let b = arena.create_detached_element("li", HashMap::new());
+        arena.add_text(Some(b), "B");
+        let c = arena.create_detached_element("li", HashMap::new());
+        arena.add_text(Some(c), "C");
+        arena.append_child(fragment, b).unwrap();
+        arena.append_child(fragment, c).unwrap();
+
+        arena.append_child(ul, fragment).unwrap();
+
+        let doc = arena.to_document();
+        assert_eq!(browser::query_selector(&doc, "ul > li").len(), 3);
+        assert!(browser::query_selector(&doc, "#document-fragment").is_empty());
+        assert_eq!(arena.children(fragment).unwrap().len(), 0);
     }
 }
