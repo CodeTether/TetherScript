@@ -1,5 +1,10 @@
 use super::*;
 
+#[path = "finally/action.rs"]
+mod action;
+#[path = "finally/adopt.rs"]
+mod adopt;
+
 pub(super) fn method(
     state: Rc<RefCell<state::PromiseState>>,
     reactions: reaction::Queue,
@@ -10,26 +15,28 @@ pub(super) fn method(
         if matches!(current, state::PromiseState::Pending) {
             return Ok(reaction::push_finally(reactions.clone(), callback));
         }
-        let next = if handler::present(&callback) {
-            after_callback(callback, current)
-        } else {
-            current
-        };
-        Ok(object::from_state(next))
+        if !handler::present(&callback) {
+            return Ok(object::from_state(current));
+        }
+        adopt::from_action(action::after_callback(callback, current))
     })
 }
 
-fn after_callback(callback: JsValue, current: state::PromiseState) -> state::PromiseState {
-    match handler::invoke(callback, &[]) {
-        state::PromiseState::Rejected(reason) => state::PromiseState::Rejected(reason),
-        _ => current,
+pub(super) fn settle_reaction(
+    callback: JsValue,
+    current: state::PromiseState,
+    state: Rc<RefCell<state::PromiseState>>,
+    object: Rc<RefCell<HashMap<String, JsValue>>>,
+    queue: reaction::Queue,
+) {
+    if !handler::present(&callback) {
+        reaction::settle(&state, &object, &queue, current);
+        return;
     }
-}
-
-pub(super) fn settle(callback: JsValue, current: state::PromiseState) -> state::PromiseState {
-    if handler::present(&callback) {
-        after_callback(callback, current)
-    } else {
-        current
-    }
+    adopt::settle_into(
+        action::after_callback(callback, current),
+        state,
+        object,
+        queue,
+    );
 }
