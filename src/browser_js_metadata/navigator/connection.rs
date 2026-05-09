@@ -1,6 +1,5 @@
 use super::*;
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
 pub(super) fn install(navigator: &mut HashMap<String, JsValue>) {
     let connection = navigator
@@ -13,9 +12,7 @@ pub(super) fn install(navigator: &mut HashMap<String, JsValue>) {
 }
 
 fn network_information() -> JsValue {
-    let mut info = HashMap::new();
-    info.insert("onchange".into(), JsValue::Null);
-    let value = JsValue::Object(Rc::new(RefCell::new(info)));
+    let value = JsValue::Object(Rc::new(RefCell::new(HashMap::new())));
     enrich_network_information(&value);
     value
 }
@@ -25,15 +22,35 @@ fn enrich_network_information(value: &JsValue) {
         return;
     };
     let mut info = object.borrow_mut();
-    info.entry("effectiveType".into())
-        .or_insert_with(|| JsValue::String("4g".into()));
-    info.entry("type".into())
-        .or_insert_with(|| JsValue::String("wifi".into()));
-    info.entry("downlink".into())
-        .or_insert(JsValue::Number(10.0));
-    info.entry("downlinkMax".into())
-        .or_insert(JsValue::Number(10.0));
-    info.entry("rtt".into()).or_insert(JsValue::Number(50.0));
+    for (name, value) in [("effectiveType", "4g"), ("type", "wifi")] {
+        info.entry(name.into())
+            .or_insert(JsValue::String(value.into()));
+    }
+    for (name, value) in [("downlink", 10.0), ("downlinkMax", 10.0), ("rtt", 50.0)] {
+        info.entry(name.into()).or_insert(JsValue::Number(value));
+    }
     info.entry("saveData".into())
         .or_insert(JsValue::Bool(false));
+    info.entry("onchange".into()).or_insert(JsValue::Null);
+    events(&mut info);
+}
+
+fn events(info: &mut HashMap<String, JsValue>) {
+    for method in ["addEventListener", "removeEventListener"] {
+        info.entry(method.into())
+            .or_insert_with(|| noop_event_method(method));
+    }
+    info.entry("dispatchEvent".into())
+        .or_insert_with(dispatch_event);
+}
+
+fn noop_event_method(method: &str) -> JsValue {
+    let name = format!("NetworkInformation.{method}");
+    native(&name, None, |_| Ok(JsValue::Undefined))
+}
+
+fn dispatch_event() -> JsValue {
+    native("NetworkInformation.dispatchEvent", None, |_| {
+        Ok(JsValue::Bool(true))
+    })
 }
