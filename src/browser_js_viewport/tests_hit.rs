@@ -42,3 +42,15 @@ fn element_from_point_returns_null_for_empty_point() {
 
     assert_eq!(result.value, JsValue::Bool(true));
 }
+
+#[test]
+fn element_from_point_applies_window_scroll_offsets() {
+    let html = "<div id='top' style='position:absolute;left:0;top:0;\
+        width:10px;height:10px'></div>\
+        <div id='bottom' style='position:absolute;left:0;top:30px;\
+        width:10px;height:10px'></div>";
+    let script = "scrollTo(0,30);document.elementFromPoint(1,1).id;";
+    let result = eval_with_dom(html, script).unwrap();
+
+    assert_eq!(result.value, JsValue::String("bottom".into()));
+}

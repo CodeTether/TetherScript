@@ -30,6 +30,8 @@ mod media_query;
 mod media_window;
 #[path = "metrics.rs"]
 mod metrics;
+#[path = "point.rs"]
+mod point;
 #[path = "screen.rs"]
 mod screen;
 #[path = "visual_viewport.rs"]
