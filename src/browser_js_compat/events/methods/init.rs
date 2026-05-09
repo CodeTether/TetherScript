@@ -5,7 +5,7 @@ pub(super) fn install(
     event_class: class::EventClass,
 ) {
     install_event(event);
-    if matches!(event_class, class::EventClass::Custom) {
+    if event_class.has_custom_init() {
         install_custom(event);
     }
 }

@@ -29,3 +29,19 @@ fn response_default_body_is_empty_string() {
     .unwrap();
     assert_eq!(result.value, JsValue::String("200:true::0:true".into()));
 }
+
+#[test]
+fn response_blob_returns_body_blob() {
+    let result = eval_with_dom(
+        "<main></main>",
+        "let r=new Response('ABC',{headers:{'Content-Type':'text/custom'}});let c=r.clone();let out='';\
+         c.blob().then(function(b){let t='';let a='';b.text().then(function(v){t=v;});b.arrayBuffer().then(function(v){a=v.length+':'+v[0]+':'+v[1]+':'+v[2];});out=b.size+':'+b.type+':'+t+':'+a;});\
+         out+'|'+r.bodyUsed+'|'+c.bodyUsed;",
+    )
+    .unwrap();
+
+    assert_eq!(
+        result.value,
+        JsValue::String("3:text/custom:ABC:3:65:66:67|false|true".into())
+    );
+}
