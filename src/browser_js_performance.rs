@@ -6,6 +6,8 @@ use super::*;
 mod clear;
 #[path = "browser_js_performance/entry.rs"]
 mod entry;
+#[path = "browser_js_performance/entry_json.rs"]
+mod entry_json;
 #[path = "browser_js_performance/idle.rs"]
 mod idle;
 #[path = "browser_js_performance/idle_deadline.rs"]
