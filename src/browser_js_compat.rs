@@ -22,6 +22,8 @@ mod events;
 mod file_reader;
 #[path = "browser_js_compat/form_data.rs"]
 mod form_data;
+#[path = "browser_js_compat/installer.rs"]
+mod installer;
 #[path = "browser_js_compat/promise.rs"]
 mod promise;
 #[path = "browser_js_compat/structured.rs"]
@@ -30,25 +32,15 @@ mod structured;
 mod text;
 #[path = "browser_js_compat/typed_array.rs"]
 mod typed_array;
+#[path = "browser_js_compat/url_pattern.rs"]
+mod url_pattern;
 
 #[cfg(test)]
 #[path = "browser_js_compat/tests.rs"]
 mod tests;
 
 pub(super) fn install(window: &mut HashMap<String, JsValue>) {
-    base64::install(window);
-    typed_array::install(window);
-    text::install(window);
-    structured::install(window);
-    crypto::install(window);
-    dom_exception::install(window);
-    dom_constructors::install(window);
-    events::install(window);
-    blob::install(window);
-    clipboard_item::install(window);
-    form_data::install(window);
-    file_reader::install(window);
-    promise::install(window);
+    installer::install(window);
 }
 
 pub(super) fn structured_clone(value: &JsValue) -> Result<JsValue, String> {
