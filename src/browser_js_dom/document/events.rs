@@ -10,6 +10,9 @@ mod object;
 #[cfg(test)]
 #[path = "events/tests.rs"]
 mod tests;
+#[cfg(test)]
+#[path = "events/tests_path.rs"]
+mod tests_path;
 
 pub(super) fn install(obj: &mut HashMap<String, JsValue>) {
     obj.insert(
