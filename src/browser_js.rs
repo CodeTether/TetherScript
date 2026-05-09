@@ -2054,6 +2054,7 @@ fn node_object(handle: DomHandle) -> JsValue {
     obj.insert(
         "appendChild".into(),
         native("appendChild", Some(1), move |args| {
+            let h = current_dom_handle(&object_ref, &h);
             let child = js_value_to_node(args.first().unwrap_or(&JsValue::Undefined));
             let path = h.append_child(child, InsertPosition::Append)?;
             if let Some(object) = object_ref.borrow().as_ref() {
@@ -2071,6 +2072,7 @@ fn node_object(handle: DomHandle) -> JsValue {
     obj.insert(
         "insertBefore".into(),
         native("insertBefore", Some(2), move |args| {
+            let h = current_dom_handle(&object_ref, &h);
             let child = js_value_to_node(args.first().unwrap_or(&JsValue::Undefined));
             let reference = args.get(1).and_then(dom_handle_from_value);
             let path = h.insert_child_before(child, reference.as_ref())?;
@@ -2085,9 +2087,11 @@ fn node_object(handle: DomHandle) -> JsValue {
     );
 
     let h = handle.clone();
+    let object_ref = self_object.clone();
     obj.insert(
         "replaceChild".into(),
         native("replaceChild", Some(2), move |args| {
+            let h = current_dom_handle(&object_ref, &h);
             let child = js_value_to_node(args.first().unwrap_or(&JsValue::Undefined));
             let old = args.get(1).and_then(dom_handle_from_value);
             Ok(h.replace_child(child, old.as_ref())?
@@ -2097,9 +2101,11 @@ fn node_object(handle: DomHandle) -> JsValue {
     );
 
     let h = handle.clone();
+    let object_ref = self_object.clone();
     obj.insert(
         "removeChild".into(),
         native("removeChild", Some(1), move |args| {
+            let h = current_dom_handle(&object_ref, &h);
             let old = args.first().and_then(dom_handle_from_value);
             Ok(h.remove_child(old.as_ref())?
                 .map(detached_node_object)
@@ -2108,9 +2114,11 @@ fn node_object(handle: DomHandle) -> JsValue {
     );
 
     let h = handle.clone();
+    let object_ref = self_object.clone();
     obj.insert(
         "cloneNode".into(),
         native("cloneNode", None, move |args| {
+            let h = current_dom_handle(&object_ref, &h);
             let deep = args.first().is_some_and(JsValue::truthy);
             Ok(h.node()
                 .map(|node| detached_node_object(clone_node(&node, deep)))
@@ -2119,9 +2127,11 @@ fn node_object(handle: DomHandle) -> JsValue {
     );
 
     let h = handle.clone();
+    let object_ref = self_object.clone();
     obj.insert(
         "setSelectionRange".into(),
         native("setSelectionRange", None, move |args| {
+            let h = current_dom_handle(&object_ref, &h);
             let start = args.first().map(selection_index).unwrap_or(0);
             let end = args.get(1).map(selection_index).unwrap_or(start);
             set_selection_for_handle(&h, start, end);
@@ -2130,9 +2140,11 @@ fn node_object(handle: DomHandle) -> JsValue {
     );
 
     let h = handle.clone();
+    let object_ref = self_object.clone();
     obj.insert(
         "select".into(),
         native("select", Some(0), move |_| {
+            let h = current_dom_handle(&object_ref, &h);
             let len = h.input_value().chars().count();
             set_selection_for_handle(&h, 0, len);
             Ok(JsValue::Undefined)
@@ -2144,6 +2156,7 @@ fn node_object(handle: DomHandle) -> JsValue {
     obj.insert(
         "typeText".into(),
         native("typeText", Some(1), move |args| {
+            let h = current_dom_handle(&object_ref, &h);
             let text = args.first().unwrap_or(&JsValue::Undefined).display();
             h.insert_text_at_selection(&text)?;
             if let Some(object) = object_ref.borrow().as_ref() {
@@ -2154,27 +2167,33 @@ fn node_object(handle: DomHandle) -> JsValue {
     );
 
     let h = handle.clone();
+    let object_ref = self_object.clone();
     obj.insert(
         "focus".into(),
         native("focus", Some(0), move |_| {
+            let h = current_dom_handle(&object_ref, &h);
             h.focus()?;
             Ok(JsValue::Undefined)
         }),
     );
 
     let h = handle.clone();
+    let object_ref = self_object.clone();
     obj.insert(
         "blur".into(),
         native("blur", Some(0), move |_| {
+            let h = current_dom_handle(&object_ref, &h);
             h.blur()?;
             Ok(JsValue::Undefined)
         }),
     );
 
     let h = handle.clone();
+    let object_ref = self_object.clone();
     obj.insert(
         "getAttribute".into(),
         native("getAttribute", Some(1), move |args| {
+            let h = current_dom_handle(&object_ref, &h);
             let name = args.first().unwrap_or(&JsValue::Undefined).display();
             Ok(match h.node() {
                 Some(Node::Element(el)) => el
@@ -2188,9 +2207,11 @@ fn node_object(handle: DomHandle) -> JsValue {
     );
 
     let h = handle.clone();
+    let object_ref = self_object.clone();
     obj.insert(
         "setAttribute".into(),
         native("setAttribute", Some(2), move |args| {
+            let h = current_dom_handle(&object_ref, &h);
             let name = args.first().unwrap_or(&JsValue::Undefined).display();
             let value = args.get(1).unwrap_or(&JsValue::Undefined).display();
             let new_value = value.clone();
@@ -2220,9 +2241,11 @@ fn node_object(handle: DomHandle) -> JsValue {
     );
 
     let h = handle.clone();
+    let object_ref = self_object.clone();
     obj.insert(
         "removeAttribute".into(),
         native("removeAttribute", Some(1), move |args| {
+            let h = current_dom_handle(&object_ref, &h);
             let name = args.first().unwrap_or(&JsValue::Undefined).display();
             let old_value = h.node().and_then(|node| match node {
                 Node::Element(el) => el.attrs.get(&name).cloned(),
@@ -2250,9 +2273,11 @@ fn node_object(handle: DomHandle) -> JsValue {
     );
 
     let h = handle.clone();
+    let object_ref = self_object.clone();
     obj.insert(
         "hasAttribute".into(),
         native("hasAttribute", Some(1), move |args| {
+            let h = current_dom_handle(&object_ref, &h);
             let name = args.first().unwrap_or(&JsValue::Undefined).display();
             Ok(JsValue::Bool(
                 matches!(h.node(), Some(Node::Element(el)) if el.attrs.contains_key(&name)),
@@ -2271,9 +2296,11 @@ fn node_object(handle: DomHandle) -> JsValue {
     );
 
     let h = handle.clone();
+    let object_ref = self_object.clone();
     obj.insert(
         "prepend".into(),
         native("prepend", None, move |args| {
+            let h = current_dom_handle(&object_ref, &h);
             for arg in args.iter().rev() {
                 h.append_child(js_value_to_node(arg), InsertPosition::Prepend)?;
             }
@@ -2282,9 +2309,11 @@ fn node_object(handle: DomHandle) -> JsValue {
     );
 
     let h = handle.clone();
+    let object_ref = self_object.clone();
     obj.insert(
         "append".into(),
         native("append", None, move |args| {
+            let h = current_dom_handle(&object_ref, &h);
             for arg in args {
                 h.append_child(js_value_to_node(arg), InsertPosition::Append)?;
             }
@@ -2343,9 +2372,11 @@ fn node_object(handle: DomHandle) -> JsValue {
     );
 
     let h = handle.clone();
+    let object_ref = self_object.clone();
     obj.insert(
         "matches".into(),
         native("matches", Some(1), move |args| {
+            let h = current_dom_handle(&object_ref, &h);
             let selector = args.first().unwrap_or(&JsValue::Undefined).display();
             let Some(Node::Element(el)) = h.node() else {
                 return Ok(JsValue::Bool(false));
@@ -2359,9 +2390,11 @@ fn node_object(handle: DomHandle) -> JsValue {
     );
 
     let h = handle.clone();
+    let object_ref = self_object.clone();
     obj.insert(
         "closest".into(),
         native("closest", Some(1), move |args| {
+            let h = current_dom_handle(&object_ref, &h);
             let selector = args.first().unwrap_or(&JsValue::Undefined).display();
             let mut path = h.path.clone();
             loop {
@@ -2382,9 +2415,11 @@ fn node_object(handle: DomHandle) -> JsValue {
     );
 
     let h = handle.clone();
+    let object_ref = self_object.clone();
     obj.insert(
         "addEventListener".into(),
         native("addEventListener", None, move |args| {
+            let h = current_dom_handle(&object_ref, &h);
             let event_type = args.first().unwrap_or(&JsValue::Undefined).display();
             let listener = args.get(1).cloned().unwrap_or(JsValue::Undefined);
             let (capture, once) = event_listener_options(args.get(2));
@@ -2394,9 +2429,11 @@ fn node_object(handle: DomHandle) -> JsValue {
     );
 
     let h = handle.clone();
+    let object_ref = self_object.clone();
     obj.insert(
         "removeEventListener".into(),
         native("removeEventListener", None, move |args| {
+            let h = current_dom_handle(&object_ref, &h);
             let event_type = args.first().unwrap_or(&JsValue::Undefined).display();
             let listener = args.get(1).cloned().unwrap_or(JsValue::Undefined);
             let (capture, _) = event_listener_options(args.get(2));
@@ -2406,26 +2443,32 @@ fn node_object(handle: DomHandle) -> JsValue {
     );
 
     let h = handle.clone();
+    let object_ref = self_object.clone();
     obj.insert(
         "dispatchEvent".into(),
         native("dispatchEvent", Some(1), move |args| {
+            let h = current_dom_handle(&object_ref, &h);
             let event = args.first().cloned().unwrap_or(JsValue::Undefined);
             h.dispatch_event(event)
         }),
     );
 
     let h = handle.clone();
+    let object_ref = self_object.clone();
     obj.insert(
         "getBoundingClientRect".into(),
         native("getBoundingClientRect", Some(0), move |_| {
+            let h = current_dom_handle(&object_ref, &h);
             Ok(rect_object(&element_rect(&h)))
         }),
     );
 
     let h = handle.clone();
+    let object_ref = self_object.clone();
     obj.insert(
         "getComputedStyle".into(),
         native("getComputedStyle", Some(0), move |_| {
+            let h = current_dom_handle(&object_ref, &h);
             Ok(computed_style_object(&h))
         }),
     );
@@ -2439,37 +2482,51 @@ fn node_object(handle: DomHandle) -> JsValue {
     );
 
     let h = handle.clone();
+    let object_ref = self_object.clone();
     obj.insert(
         "collectFormData".into(),
         native("collectFormData", Some(0), move |_| {
+            let h = current_dom_handle(&object_ref, &h);
             Ok(form_data_object(&h))
         }),
     );
 
     let h = handle.clone();
+    let object_ref = self_object.clone();
     obj.insert(
         "requestSubmit".into(),
-        native("requestSubmit", Some(0), move |_| submit_form(&h, true)),
+        native("requestSubmit", Some(0), move |_| {
+            let h = current_dom_handle(&object_ref, &h);
+            submit_form(&h, true)
+        }),
     );
 
     let h = handle.clone();
+    let object_ref = self_object.clone();
     obj.insert(
         "submit".into(),
-        native("submit", Some(0), move |_| submit_form(&h, true)),
+        native("submit", Some(0), move |_| {
+            let h = current_dom_handle(&object_ref, &h);
+            submit_form(&h, true)
+        }),
     );
 
     let h = handle.clone();
+    let object_ref = self_object.clone();
     obj.insert(
         "click".into(),
         native("click", Some(0), move |_| {
+            let h = current_dom_handle(&object_ref, &h);
             h.dispatch_event(JsValue::String("click".into()))
         }),
     );
 
     let h = handle.clone();
+    let object_ref = self_object.clone();
     obj.insert(
         "inputText".into(),
         native("inputText", Some(1), move |args| {
+            let h = current_dom_handle(&object_ref, &h);
             let value = args.first().unwrap_or(&JsValue::Undefined).display();
             h.set_input_value(value);
             h.dispatch_event(JsValue::String("input".into()))?;
