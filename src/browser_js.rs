@@ -2054,19 +2054,17 @@ fn node_object(handle: DomHandle) -> JsValue {
     obj.insert(
         "appendChild".into(),
         native("appendChild", Some(1), move |args| {
-            let h = current_dom_handle(&object_ref, &h);
             let child_value = args.first().unwrap_or(&JsValue::Undefined);
-            let moving = dom_handle_from_value(child_value);
-            let child = js_value_to_node(child_value);
+            let mut h = current_dom_handle(&object_ref, &h);
+            let (child, moving) = adopted_node_for_insert(child_value, &h)?;
+            h = current_dom_handle(&object_ref, &h);
             let path = h.append_child(child, InsertPosition::Append)?;
             reattach_inserted_dom_handles(moving.as_ref(), &h.root, &path);
             if let Some(object) = object_ref.borrow().as_ref() {
                 refresh_node_properties(object, &h);
             }
-            Ok(node_object(DomHandle {
-                root: h.root.clone(),
-                path,
-            }))
+            refresh_value_node_properties(child_value);
+            Ok(child_value.clone())
         }),
     );
 
@@ -2075,20 +2073,24 @@ fn node_object(handle: DomHandle) -> JsValue {
     obj.insert(
         "insertBefore".into(),
         native("insertBefore", Some(2), move |args| {
-            let h = current_dom_handle(&object_ref, &h);
             let child_value = args.first().unwrap_or(&JsValue::Undefined);
-            let moving = dom_handle_from_value(child_value);
-            let child = js_value_to_node(child_value);
+            let mut h = current_dom_handle(&object_ref, &h);
+            if same_optional_dom_handle(
+                dom_handle_from_value(child_value).as_ref(),
+                args.get(1).and_then(dom_handle_from_value).as_ref(),
+            ) {
+                return Ok(child_value.clone());
+            }
+            let (child, moving) = adopted_node_for_insert(child_value, &h)?;
+            h = current_dom_handle(&object_ref, &h);
             let reference = args.get(1).and_then(dom_handle_from_value);
             let path = h.insert_child_before(child, reference.as_ref())?;
             reattach_inserted_dom_handles(moving.as_ref(), &h.root, &path);
             if let Some(object) = object_ref.borrow().as_ref() {
                 refresh_node_properties(object, &h);
             }
-            Ok(node_object(DomHandle {
-                root: h.root.clone(),
-                path,
-            }))
+            refresh_value_node_properties(child_value);
+            Ok(child_value.clone())
         }),
     );
 
@@ -2595,6 +2597,15 @@ fn refresh_node_properties(obj: &Rc<RefCell<HashMap<String, JsValue>>>, handle: 
             JsValue::String(browser::text_content(&node)),
         );
         obj.insert("innerHTML".into(), JsValue::String(inner_html(&node)));
+    }
+}
+
+fn refresh_value_node_properties(value: &JsValue) {
+    let JsValue::Object(obj) = value else {
+        return;
+    };
+    if let Some(handle) = dom_handle_from_value(value) {
+        refresh_node_properties(obj, &handle);
     }
 }
 
@@ -3522,6 +3533,61 @@ fn clone_node(node: &Node, deep: bool) -> Node {
     }
 }
 
+fn adopted_node_for_insert(
+    value: &JsValue,
+    target_parent: &DomHandle,
+) -> Result<(Node, Option<DomHandle>), String> {
+    let Some(handle) = dom_handle_from_value(value) else {
+        return Ok((js_value_to_node(value), None));
+    };
+    reject_insert_into_self_or_descendant(&handle, target_parent)?;
+    if is_document_fragment(&handle) {
+        return Ok((take_fragment_for_insert(&handle)?, Some(handle)));
+    }
+    if let Some(parent) = handle.parent() {
+        if let Some(node) = parent.remove_child(Some(&handle))? {
+            let current = dom_handle_from_value(value).unwrap_or(handle);
+            return Ok((node, Some(current)));
+        }
+    }
+    let node = handle
+        .node()
+        .ok_or_else(|| "Cannot insert a missing DOM node".to_string())?;
+    Ok((node, Some(handle)))
+}
+
+fn reject_insert_into_self_or_descendant(
+    handle: &DomHandle,
+    target_parent: &DomHandle,
+) -> Result<(), String> {
+    if Rc::ptr_eq(&handle.root, &target_parent.root) && target_parent.path.starts_with(&handle.path)
+    {
+        return Err("Cannot insert a DOM node into itself or its descendant".into());
+    }
+    Ok(())
+}
+
+fn is_document_fragment(handle: &DomHandle) -> bool {
+    matches!(handle.node(), Some(Node::Element(el)) if el.tag == "#document-fragment")
+}
+
+fn take_fragment_for_insert(handle: &DomHandle) -> Result<Node, String> {
+    let mut root = handle.root.borrow_mut();
+    let Some(Node::Element(fragment)) = get_node_mut(&mut root, &handle.path) else {
+        return Err("Cannot insert a missing DocumentFragment".into());
+    };
+    let children = std::mem::take(&mut fragment.children);
+    Ok(Node::Element(Element {
+        tag: fragment.tag.clone(),
+        attrs: fragment.attrs.clone(),
+        children,
+    }))
+}
+
+fn same_optional_dom_handle(left: Option<&DomHandle>, right: Option<&DomHandle>) -> bool {
+    matches!((left, right), (Some(left), Some(right)) if Rc::ptr_eq(&left.root, &right.root) && left.path == right.path)
+}
+
 fn added_nodes_for_record(node: &Node) -> Vec<Node> {
     match node {
         Node::Element(el) if el.tag == "#document-fragment" => el.children.clone(),
@@ -3645,22 +3711,41 @@ fn reattach_inserted_dom_handles(
     let Some(source) = source else {
         return;
     };
-    if Rc::ptr_eq(&source.root, target_root)
-        || matches!(source.node(), Some(Node::Element(el)) if el.tag == "#document-fragment")
-    {
+    if Rc::ptr_eq(&source.root, target_root) {
         return;
     }
     let source_root = source.root.clone();
     let source_path = source.path.clone();
+    let source_is_fragment =
+        matches!(source.node(), Some(Node::Element(el)) if el.tag == "#document-fragment");
     DOM_HANDLE_REGISTRY.with(|registry| {
         for handle in registry.borrow_mut().values_mut() {
             if !Rc::ptr_eq(&handle.root, &source_root) || !handle.path.starts_with(&source_path) {
                 continue;
             }
+            if source_is_fragment && handle.path.len() == source_path.len() {
+                continue;
+            }
             let old_key = handle.event_key();
-            let suffix = handle.path[source_path.len()..].to_vec();
+            let suffix_start = if source_is_fragment {
+                source_path.len() + 1
+            } else {
+                source_path.len()
+            };
+            let target_start = if source_is_fragment {
+                let mut path = target_path.to_vec();
+                if let (Some(last), Some(child_index)) =
+                    (path.last_mut(), handle.path.get(source_path.len()))
+                {
+                    *last += *child_index;
+                }
+                path
+            } else {
+                target_path.to_vec()
+            };
+            let suffix = handle.path[suffix_start..].to_vec();
             handle.root = target_root.clone();
-            handle.path = target_path.iter().copied().chain(suffix).collect();
+            handle.path = target_start.into_iter().chain(suffix).collect();
             rekey_event_entry(&old_key, &handle.event_key());
         }
     });
