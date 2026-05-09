@@ -1,5 +1,8 @@
 use super::super::*;
 
+#[path = "tests_url_static_object_url.rs"]
+mod object_url;
+
 #[test]
 fn url_can_parse_accepts_absolute_and_based_relative_urls() {
     let result = eval_with_dom(

@@ -11,7 +11,7 @@ var onscroll=window.onscroll;
 var DOMException=window.DOMException;
 var Image=window.Image;var Option=window.Option;
 var DOMPoint=window.DOMPoint;var DOMRect=window.DOMRect;
-var StorageEvent=window.StorageEvent;var ClipboardEvent=window.ClipboardEvent;
+var StorageEvent=window.StorageEvent;var ClipboardEvent=window.ClipboardEvent;var ClipboardItem=window.ClipboardItem;
 var DragEvent=window.DragEvent;var CompositionEvent=window.CompositionEvent;var TouchEvent=window.TouchEvent;var DataTransfer=window.DataTransfer;
 var PopStateEvent=window.PopStateEvent;var HashChangeEvent=window.HashChangeEvent;
 var PageTransitionEvent=window.PageTransitionEvent;var BeforeUnloadEvent=window.BeforeUnloadEvent;var ProgressEvent=window.ProgressEvent;

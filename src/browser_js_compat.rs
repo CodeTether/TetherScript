@@ -8,6 +8,8 @@ mod base64;
 mod blob;
 #[path = "browser_js_compat/bytes.rs"]
 mod bytes;
+#[path = "browser_js_compat/clipboard_item.rs"]
+mod clipboard_item;
 #[path = "browser_js_compat/crypto.rs"]
 mod crypto;
 #[path = "browser_js_compat/dom_constructors.rs"]
@@ -32,9 +34,6 @@ mod typed_array;
 #[cfg(test)]
 #[path = "browser_js_compat/tests.rs"]
 mod tests;
-#[cfg(test)]
-#[path = "browser_js_compat/tests_url_static.rs"]
-mod tests_url_static;
 
 pub(super) fn install(window: &mut HashMap<String, JsValue>) {
     base64::install(window);
@@ -46,6 +45,7 @@ pub(super) fn install(window: &mut HashMap<String, JsValue>) {
     dom_constructors::install(window);
     events::install(window);
     blob::install(window);
+    clipboard_item::install(window);
     form_data::install(window);
     file_reader::install(window);
     promise::install(window);
