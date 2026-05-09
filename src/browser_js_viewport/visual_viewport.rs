@@ -1,12 +1,20 @@
 use super::*;
 
+#[path = "visual_viewport_event_object.rs"]
+mod event_object;
+#[path = "visual_viewport_events.rs"]
+mod events;
+#[cfg(test)]
+#[path = "tests_visual_viewport_events.rs"]
+mod tests_visual_viewport_events;
+
 pub(super) fn install(window: &mut HashMap<String, JsValue>) {
     let object = Rc::new(RefCell::new(HashMap::new()));
     {
         let mut map = object.borrow_mut();
         install_metrics(&mut map);
-        install_events(&mut map);
     }
+    events::install(&object);
     window.insert("visualViewport".into(), JsValue::Object(object));
 }
 
@@ -22,25 +30,4 @@ fn install_metrics(map: &mut HashMap<String, JsValue>) {
     ] {
         map.insert(name.into(), JsValue::Number(value));
     }
-}
-
-fn install_events(map: &mut HashMap<String, JsValue>) {
-    map.insert(
-        "addEventListener".into(),
-        native("visualViewport.addEventListener", None, |_| {
-            Ok(JsValue::Undefined)
-        }),
-    );
-    map.insert(
-        "removeEventListener".into(),
-        native("visualViewport.removeEventListener", None, |_| {
-            Ok(JsValue::Undefined)
-        }),
-    );
-    map.insert(
-        "dispatchEvent".into(),
-        native("visualViewport.dispatchEvent", Some(1), |_| {
-            Ok(JsValue::Bool(true))
-        }),
-    );
 }
