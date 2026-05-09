@@ -37,7 +37,7 @@ pub(super) fn fulfilled(value: JsValue) -> JsValue {
     object::from_state(state::PromiseState::Fulfilled(value))
 }
 
-fn rejected(reason: JsValue) -> JsValue {
+pub(super) fn rejected(reason: JsValue) -> JsValue {
     object::from_state(state::PromiseState::Rejected(reason))
 }
 

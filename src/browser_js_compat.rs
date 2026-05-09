@@ -18,6 +18,8 @@ mod dom_constructors;
 mod dom_exception;
 #[path = "browser_js_compat/events.rs"]
 mod events;
+#[path = "browser_js_compat/file_picker.rs"]
+mod file_picker;
 #[path = "browser_js_compat/file_reader.rs"]
 mod file_reader;
 #[path = "browser_js_compat/form_data.rs"]
