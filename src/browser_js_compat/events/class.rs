@@ -9,9 +9,11 @@ pub(super) enum EventClass {
     Focus,
     Pointer,
     Wheel,
+    Storage,
+    Clipboard,
 }
 
-pub(super) fn all() -> [EventClass; 9] {
+pub(super) fn all() -> [EventClass; 11] {
     [
         EventClass::Event,
         EventClass::Custom,
@@ -22,6 +24,8 @@ pub(super) fn all() -> [EventClass; 9] {
         EventClass::Focus,
         EventClass::Pointer,
         EventClass::Wheel,
+        EventClass::Storage,
+        EventClass::Clipboard,
     ]
 }
 
@@ -37,6 +41,8 @@ impl EventClass {
             EventClass::Focus => "FocusEvent",
             EventClass::Pointer => "PointerEvent",
             EventClass::Wheel => "WheelEvent",
+            EventClass::Storage => "StorageEvent",
+            EventClass::Clipboard => "ClipboardEvent",
         }
     }
 }
