@@ -15,6 +15,9 @@ mod object;
 #[path = "events/tests.rs"]
 mod tests;
 #[cfg(test)]
+#[path = "events/tests_interactions.rs"]
+mod tests_interactions;
+#[cfg(test)]
 #[path = "events/tests_legacy.rs"]
 mod tests_legacy;
 #[cfg(test)]
