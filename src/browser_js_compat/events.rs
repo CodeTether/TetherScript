@@ -14,29 +14,8 @@ mod methods;
 mod object;
 
 #[cfg(test)]
-#[path = "events/tests.rs"]
-mod tests;
-#[cfg(test)]
-#[path = "events/tests_animation_transition.rs"]
-mod tests_animation_transition;
-#[cfg(test)]
-#[path = "events/tests_data_transfer.rs"]
-mod tests_data_transfer;
-#[cfg(test)]
-#[path = "events/tests_interactions.rs"]
-mod tests_interactions;
-#[cfg(test)]
-#[path = "events/tests_legacy.rs"]
-mod tests_legacy;
-#[cfg(test)]
-#[path = "events/tests_lifecycle.rs"]
-mod tests_lifecycle;
-#[cfg(test)]
-#[path = "events/tests_message_event.rs"]
-mod tests_message_event;
-#[cfg(test)]
-#[path = "events/tests_storage_clipboard.rs"]
-mod tests_storage_clipboard;
+#[path = "events/tests_all.rs"]
+mod tests_all;
 
 pub(super) fn install(window: &mut HashMap<String, JsValue>) {
     data_transfer::install(window);

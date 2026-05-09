@@ -1,6 +1,6 @@
 use super::EventClass;
 
-pub(super) const COUNT: usize = 25;
+pub(super) const COUNT: usize = 28;
 
 pub(super) fn all() -> [EventClass; COUNT] {
     use super::super::fields::constructors as init;
@@ -20,6 +20,9 @@ pub(super) fn all() -> [EventClass; COUNT] {
         EventClass::new("TouchEvent", init::touch, false),
         EventClass::new("StorageEvent", init::storage, false),
         EventClass::new("ClipboardEvent", init::clipboard, false),
+        EventClass::new("MediaQueryListEvent", init::media_query_list, false),
+        EventClass::new("DeviceOrientationEvent", init::device_orientation, false),
+        EventClass::new("DeviceMotionEvent", init::device_motion, false),
         EventClass::new("PopStateEvent", init::pop_state, false),
         EventClass::new("HashChangeEvent", init::hash_change, false),
         EventClass::new("PageTransitionEvent", init::page_transition, false),

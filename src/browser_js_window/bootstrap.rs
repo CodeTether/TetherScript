@@ -12,6 +12,7 @@ var DOMException=window.DOMException;
 var Image=window.Image;var Option=window.Option;
 var DOMPoint=window.DOMPoint;var DOMRect=window.DOMRect;
 var StorageEvent=window.StorageEvent;var ClipboardEvent=window.ClipboardEvent;var ClipboardItem=window.ClipboardItem;
+var MediaQueryListEvent=window.MediaQueryListEvent;var DeviceOrientationEvent=window.DeviceOrientationEvent;var DeviceMotionEvent=window.DeviceMotionEvent;
 var MessageEvent=window.MessageEvent;var ErrorEvent=window.ErrorEvent;var CloseEvent=window.CloseEvent;
 var DragEvent=window.DragEvent;var CompositionEvent=window.CompositionEvent;var TouchEvent=window.TouchEvent;var DataTransfer=window.DataTransfer;
 var PopStateEvent=window.PopStateEvent;var HashChangeEvent=window.HashChangeEvent;
