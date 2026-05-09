@@ -3566,8 +3566,10 @@ fn detach_removed_dom_handles(
     DOM_HANDLE_REGISTRY.with(|registry| {
         for handle in registry.borrow_mut().values_mut() {
             if Rc::ptr_eq(root, &handle.root) && handle.path.starts_with(&removed_path) {
+                let old_key = handle.event_key();
                 handle.root = detached_root.clone();
                 handle.path = handle.path[removed_path.len()..].to_vec();
+                rekey_event_entry(&old_key, &handle.event_key());
             }
         }
     });
@@ -3589,10 +3591,38 @@ fn shift_dom_handles(
             {
                 continue;
             }
-            let slot = &mut handle.path[depth];
-            if *slot > index || (include_index && *slot >= index) {
-                *slot = ((*slot as isize) + delta).max(0) as usize;
+            let slot = handle.path[depth];
+            if slot > index || (include_index && slot >= index) {
+                let old_key = handle.event_key();
+                handle.path[depth] = ((slot as isize) + delta).max(0) as usize;
+                rekey_event_entry(&old_key, &handle.event_key());
             }
+        }
+    });
+}
+
+fn rekey_event_entry(old_key: &str, new_key: &str) {
+    if old_key == new_key {
+        return;
+    }
+    EVENT_REGISTRY.with(|registry| {
+        let mut registry = registry.borrow_mut();
+        let Some(entry) = registry.remove(old_key) else {
+            return;
+        };
+        let target = registry.entry(new_key.into()).or_default();
+        for (event_type, mut listeners) in entry.listeners {
+            target
+                .listeners
+                .entry(event_type)
+                .or_default()
+                .append(&mut listeners);
+        }
+        target.handlers.extend(entry.handlers);
+    });
+    FOCUSED_ELEMENT.with(|focused| {
+        if focused.borrow().as_deref() == Some(old_key) {
+            *focused.borrow_mut() = Some(new_key.into());
         }
     });
 }
