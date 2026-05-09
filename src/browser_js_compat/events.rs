@@ -17,6 +17,9 @@ mod object;
 #[path = "events/tests.rs"]
 mod tests;
 #[cfg(test)]
+#[path = "events/tests_animation_transition.rs"]
+mod tests_animation_transition;
+#[cfg(test)]
 #[path = "events/tests_data_transfer.rs"]
 mod tests_data_transfer;
 #[cfg(test)]

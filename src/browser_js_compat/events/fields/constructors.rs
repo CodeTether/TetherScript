@@ -12,6 +12,7 @@ macro_rules! forward {
 }
 
 pub(crate) fn none(_: &mut Map, _: Init<'_>) {}
+forward!(animation, animation::animation);
 forward!(custom, misc::custom);
 forward!(mouse, mouse::insert);
 forward!(keyboard, keyboard::insert);
@@ -30,6 +31,8 @@ forward!(progress, lifecycle::progress);
 forward!(message, message_event::insert);
 forward!(error, error_event::insert);
 forward!(close, close_event::insert);
+forward!(transition, animation::transition);
+forward!(promise_rejection, promise_rejection::insert);
 
 pub(crate) fn pointer_event(map: &mut Map, init: Init<'_>) {
     mouse::insert(map, init);
