@@ -1,6 +1,9 @@
 use super::*;
 use crate::system;
 
+#[path = "crypto/subtle_unsupported.rs"]
+mod unsupported;
+
 pub(super) fn subtle_object() -> JsValue {
     let mut subtle = HashMap::new();
     subtle.insert(
@@ -16,6 +19,7 @@ pub(super) fn subtle_object() -> JsValue {
             ))))
         }),
     );
+    unsupported::install(&mut subtle);
     JsValue::Object(Rc::new(RefCell::new(subtle)))
 }
 

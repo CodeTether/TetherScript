@@ -13,6 +13,8 @@ use super::{beacon, set_str};
 mod capabilities;
 #[path = "navigator/connection.rs"]
 mod connection;
+#[path = "navigator/extras.rs"]
+mod extras;
 #[path = "navigator/locks.rs"]
 mod locks;
 #[path = "navigator/rejection.rs"]
@@ -36,6 +38,7 @@ pub(super) fn install(navigator: &JsValue, route_handler: SharedBrowserJsRouteHa
     let mut navigator = navigator_object.borrow_mut();
     identity(&mut navigator);
     capabilities::install(&mut navigator);
+    extras::install(&mut navigator);
     connection::install(&mut navigator);
     user_agent_data::install(&mut navigator);
     storage::install(&mut navigator);
