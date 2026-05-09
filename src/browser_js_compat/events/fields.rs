@@ -8,6 +8,8 @@ mod clipboard;
 mod close_event;
 #[path = "fields/constructors.rs"]
 pub(super) mod constructors;
+#[path = "fields/device.rs"]
+mod device;
 #[path = "fields/error_event.rs"]
 mod error_event;
 #[path = "fields/interactions.rs"]
@@ -16,6 +18,8 @@ mod interactions;
 mod keyboard;
 #[path = "fields/lifecycle.rs"]
 mod lifecycle;
+#[path = "fields/media_query.rs"]
+mod media_query;
 #[path = "fields/message_event.rs"]
 mod message_event;
 #[path = "fields/misc.rs"]
