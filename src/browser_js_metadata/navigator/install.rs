@@ -15,6 +15,7 @@ pub(super) fn install(navigator: &JsValue, route_handler: SharedBrowserJsRouteHa
     user_agent_data::install(&mut navigator);
     storage::install(&mut navigator);
     locks::install(&mut navigator);
+    media_capabilities::install(&mut navigator);
     media_session::install(&mut navigator);
     permissions::install(&mut navigator);
     share::install(&mut navigator, shared.clone());
