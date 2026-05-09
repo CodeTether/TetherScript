@@ -21,6 +21,8 @@ use crate::value::Value;
 mod canvas_host;
 #[path = "browser_js_channels.rs"]
 mod channels_host;
+#[path = "browser_js_dom/class_list.rs"]
+mod class_list_host;
 #[path = "browser_js_compat.rs"]
 mod compat_host;
 #[path = "browser_js_cookies.rs"]
@@ -252,6 +254,7 @@ pub(crate) type BrowserJsRouteHandler =
     Rc<RefCell<dyn FnMut(BrowserJsRouteRequest) -> BrowserJsRouteAction>>;
 
 type SharedBrowserJsRouteHandler = Rc<RefCell<Option<BrowserJsRouteHandler>>>;
+type StorageEventWindow = Rc<RefCell<Option<JsValue>>>;
 
 /// Persistent JavaScript runtime for one deterministic browser page.
 ///
@@ -642,9 +645,16 @@ fn install_dom_globals(
     install_location_methods(&location_map);
     let location = JsValue::Object(location_map.clone());
     let navigator = navigator_object();
-    let (local_storage, local_storage_area) = storage_object("localStorage", local_storage_entries);
+    let storage_event_window = Rc::new(RefCell::new(None));
+    let (local_storage, local_storage_area) = storage_object(
+        "localStorage",
+        local_storage_entries,
+        Some(storage_event_window.clone()),
+    );
+    // sessionStorage is scoped to this single page context, so this host skips
+    // cross-document storage events for it.
     let (session_storage, session_storage_area) =
-        storage_object("sessionStorage", session_storage_entries);
+        storage_object("sessionStorage", session_storage_entries, None);
     let history = history_object(location_map.clone());
     window.insert("location".into(), location.clone());
     window.insert("history".into(), history.clone());
@@ -712,6 +722,7 @@ fn install_dom_globals(
         route_handler.clone(),
     );
     let window = JsValue::Object(Rc::new(RefCell::new(window)));
+    *storage_event_window.borrow_mut() = Some(window.clone());
     window_host::install_dispatchers(&window);
     if let JsValue::Object(obj) = &window {
         obj.borrow_mut().insert("window".into(), window.clone());
@@ -1112,6 +1123,7 @@ fn install_window_event_bindings(window: &mut HashMap<String, JsValue>) {
         "onbeforeunload",
         "onunload",
         "onhashchange",
+        "onstorage",
     ] {
         window.insert(prop.into(), JsValue::Null);
         window.insert(
@@ -1562,6 +1574,7 @@ fn dispatch_network_information_event(
 fn storage_object(
     label: &'static str,
     entries: Vec<(String, String)>,
+    event_window: Option<StorageEventWindow>,
 ) -> (JsValue, Rc<RefCell<StorageArea>>) {
     let area = Rc::new(RefCell::new(StorageArea { entries }));
     let object = Rc::new(RefCell::new(HashMap::new()));
@@ -1589,11 +1602,25 @@ fn storage_object(
         let area = area.clone();
         let object = object.clone();
         let object_for_closure = object.clone();
+        let event_window = event_window.clone();
         let set_item = native(&format!("{}.setItem", label), Some(2), move |args| {
             let key = args.first().unwrap_or(&JsValue::Undefined).display();
             let value = args.get(1).unwrap_or(&JsValue::Undefined).display();
-            area.borrow_mut().set(key, value);
+            let old_value = area.borrow().get(&key);
+            if old_value.as_deref() == Some(value.as_str()) {
+                return Ok(JsValue::Undefined);
+            }
+            area.borrow_mut().set(key.clone(), value.clone());
             sync_storage_length(&object_for_closure, &area);
+            if let Some(window) = &event_window {
+                dispatch_storage_event(
+                    window,
+                    &object_for_closure,
+                    Some(key),
+                    old_value,
+                    Some(value),
+                )?;
+            }
             Ok(JsValue::Undefined)
         });
         object.borrow_mut().insert("setItem".into(), set_item);
@@ -1603,10 +1630,22 @@ fn storage_object(
         let area = area.clone();
         let object = object.clone();
         let object_for_closure = object.clone();
+        let event_window = event_window.clone();
         let remove_item = native(&format!("{}.removeItem", label), Some(1), move |args| {
             let key = args.first().unwrap_or(&JsValue::Undefined).display();
-            area.borrow_mut().remove(&key);
-            sync_storage_length(&object_for_closure, &area);
+            let old_value = area.borrow_mut().remove(&key);
+            if let Some(old_value) = old_value {
+                sync_storage_length(&object_for_closure, &area);
+                if let Some(window) = &event_window {
+                    dispatch_storage_event(
+                        window,
+                        &object_for_closure,
+                        Some(key),
+                        Some(old_value),
+                        None,
+                    )?;
+                }
+            }
             Ok(JsValue::Undefined)
         });
         object.borrow_mut().insert("removeItem".into(), remove_item);
@@ -1616,9 +1655,16 @@ fn storage_object(
         let area = area.clone();
         let object = object.clone();
         let object_for_closure = object.clone();
+        let event_window = event_window.clone();
         let clear = native(&format!("{}.clear", label), Some(0), move |_| {
+            if area.borrow().len() == 0 {
+                return Ok(JsValue::Undefined);
+            }
             area.borrow_mut().clear();
             sync_storage_length(&object_for_closure, &area);
+            if let Some(window) = &event_window {
+                dispatch_storage_event(window, &object_for_closure, None, None, None)?;
+            }
             Ok(JsValue::Undefined)
         });
         object.borrow_mut().insert("clear".into(), clear);
@@ -1640,6 +1686,47 @@ fn storage_object(
     }
 
     (JsValue::Object(object), area)
+}
+
+fn dispatch_storage_event(
+    window: &StorageEventWindow,
+    storage: &Rc<RefCell<HashMap<String, JsValue>>>,
+    key: Option<String>,
+    old_value: Option<String>,
+    new_value: Option<String>,
+) -> Result<(), String> {
+    let Some(window) = window.borrow().clone() else {
+        return Ok(());
+    };
+    let mut event = HashMap::new();
+    event.insert("key".into(), storage_event_value(key));
+    event.insert("oldValue".into(), storage_event_value(old_value));
+    event.insert("newValue".into(), storage_event_value(new_value));
+    event.insert("url".into(), JsValue::String(window_location_href(&window)));
+    event.insert("storageArea".into(), JsValue::Object(storage.clone()));
+    event.insert("bubbles".into(), JsValue::Bool(false));
+    event.insert("cancelable".into(), JsValue::Bool(false));
+    let event = normalize_event(
+        JsValue::Object(Rc::new(RefCell::new(event))),
+        "storage",
+        window.clone(),
+        window.clone(),
+    );
+    dispatch_window_normalized("storage", event, window)
+}
+
+fn storage_event_value(value: Option<String>) -> JsValue {
+    value.map(JsValue::String).unwrap_or(JsValue::Null)
+}
+
+fn window_location_href(window: &JsValue) -> String {
+    let JsValue::Object(window) = window else {
+        return "http://localhost/".into();
+    };
+    match window.borrow().get("location").cloned() {
+        Some(JsValue::Object(location)) => location_href(&location),
+        _ => "http://localhost/".into(),
+    }
 }
 
 fn sync_storage_length(
@@ -1676,8 +1763,12 @@ impl StorageArea {
             self.entries.push((key, value));
         }
     }
-    fn remove(&mut self, key: &str) {
-        self.entries.retain(|(existing, _)| existing != key);
+    fn remove(&mut self, key: &str) -> Option<String> {
+        let index = self
+            .entries
+            .iter()
+            .position(|(existing, _)| existing == key)?;
+        Some(self.entries.remove(index).1)
     }
     fn clear(&mut self) {
         self.entries.clear();
@@ -1792,7 +1883,7 @@ fn node_object(handle: DomHandle) -> JsValue {
             "className".into(),
             JsValue::String(el.attrs.get("class").cloned().unwrap_or_default()),
         );
-        obj.insert("classList".into(), class_list_object(handle.clone()));
+        obj.insert("classList".into(), class_list_host::object(handle.clone()));
         obj.insert("dataset".into(), dataset_object(handle.clone(), el));
         selection_host::editable_props::install(&mut obj, &handle, el, self_object.clone());
         if !el.tag.starts_with('#') {
@@ -3193,183 +3284,6 @@ fn install_property_setters(obj: &mut HashMap<String, JsValue>, handle: &DomHand
     );
 }
 
-fn class_list_object(handle: DomHandle) -> JsValue {
-    let obj = Rc::new(RefCell::new(HashMap::new()));
-    sync_class_list_object(&obj, &handle);
-    let weak = Rc::downgrade(&obj);
-    {
-        let mut obj = obj.borrow_mut();
-        let h = handle.clone();
-        obj.insert(
-            "contains".into(),
-            native("classList.contains", Some(1), move |args| {
-                Ok(JsValue::Bool(class_tokens(&h).iter().any(|item| {
-                    item == &args.first().unwrap_or(&JsValue::Undefined).display()
-                })))
-            }),
-        );
-        let h = handle.clone();
-        obj.insert(
-            "item".into(),
-            native("classList.item", Some(1), move |args| {
-                Ok(class_token_index(args.first())
-                    .and_then(|index| class_tokens(&h).get(index).cloned())
-                    .map(JsValue::String)
-                    .unwrap_or(JsValue::Null))
-            }),
-        );
-        let h = handle.clone();
-        let list = weak.clone();
-        obj.insert(
-            "add".into(),
-            native("classList.add", None, move |args| {
-                let mut tokens = class_tokens(&h);
-                for arg in args {
-                    let token = arg.display();
-                    if !token.is_empty() && !tokens.iter().any(|item| item == &token) {
-                        tokens.push(token);
-                    }
-                }
-                set_class_tokens(&h, tokens);
-                sync_class_list_weak(&list, &h);
-                Ok(JsValue::Undefined)
-            }),
-        );
-        let h = handle.clone();
-        let list = weak.clone();
-        obj.insert(
-            "remove".into(),
-            native("classList.remove", None, move |args| {
-                let remove = args.iter().map(JsValue::display).collect::<Vec<_>>();
-                set_class_tokens(
-                    &h,
-                    class_tokens(&h)
-                        .into_iter()
-                        .filter(|token| !remove.iter().any(|item| item == token))
-                        .collect(),
-                );
-                sync_class_list_weak(&list, &h);
-                Ok(JsValue::Undefined)
-            }),
-        );
-        let h = handle.clone();
-        let list = weak.clone();
-        obj.insert(
-            "replace".into(),
-            native("classList.replace", Some(2), move |args| {
-                let old = args.first().unwrap_or(&JsValue::Undefined).display();
-                let new = args.get(1).unwrap_or(&JsValue::Undefined).display();
-                let mut tokens = class_tokens(&h);
-                let Some(index) = tokens.iter().position(|item| item == &old) else {
-                    return Ok(JsValue::Bool(false));
-                };
-                if new.is_empty() {
-                    return Ok(JsValue::Bool(false));
-                }
-                if old != new {
-                    if tokens.iter().any(|item| item == &new) {
-                        tokens.remove(index);
-                    } else {
-                        tokens[index] = new;
-                    }
-                    set_class_tokens(&h, tokens);
-                    sync_class_list_weak(&list, &h);
-                }
-                Ok(JsValue::Bool(true))
-            }),
-        );
-        let h = handle.clone();
-        let list = weak.clone();
-        obj.insert(
-            "toggle".into(),
-            native("classList.toggle", None, move |args| {
-                let token = args.first().unwrap_or(&JsValue::Undefined).display();
-                let force = args.get(1).map(JsValue::truthy);
-                let mut tokens = class_tokens(&h);
-                let present = tokens.iter().any(|item| item == &token);
-                let should_have = force.unwrap_or(!present);
-                if should_have && !present && !token.is_empty() {
-                    tokens.push(token.clone());
-                }
-                if !should_have {
-                    tokens.retain(|item| item != &token);
-                }
-                set_class_tokens(&h, tokens);
-                sync_class_list_weak(&list, &h);
-                Ok(JsValue::Bool(should_have))
-            }),
-        );
-        let h = handle.clone();
-        obj.insert(
-            "toString".into(),
-            native("classList.toString", Some(0), move |_| {
-                Ok(JsValue::String(class_tokens(&h).join(" ")))
-            }),
-        );
-        let h = handle.clone();
-        obj.insert(
-            "keys".into(),
-            native("classList.keys", Some(0), move |_| {
-                Ok(class_list_keys(&class_tokens(&h)))
-            }),
-        );
-        let h = handle.clone();
-        obj.insert(
-            "values".into(),
-            native("classList.values", Some(0), move |_| {
-                Ok(class_list_values(&class_tokens(&h)))
-            }),
-        );
-        let h = handle.clone();
-        obj.insert(
-            "entries".into(),
-            native("classList.entries", Some(0), move |_| {
-                Ok(class_list_entries(&class_tokens(&h)))
-            }),
-        );
-        let h = handle.clone();
-        let list = weak.clone();
-        obj.insert(
-            "forEach".into(),
-            native("classList.forEach", None, move |args| {
-                let callback = args
-                    .first()
-                    .cloned()
-                    .ok_or_else(|| "classList.forEach: expected callback".to_string())?;
-                let this_arg = args.get(1).cloned().unwrap_or(JsValue::Undefined);
-                let this_list = list
-                    .upgrade()
-                    .map(JsValue::Object)
-                    .unwrap_or(JsValue::Undefined);
-                for (index, token) in class_tokens(&h).into_iter().enumerate() {
-                    js::call_function_with_this(
-                        callback.clone(),
-                        this_arg.clone(),
-                        &[
-                            JsValue::String(token),
-                            JsValue::Number(index as f64),
-                            this_list.clone(),
-                        ],
-                    )?;
-                }
-                Ok(JsValue::Undefined)
-            }),
-        );
-        let h = handle.clone();
-        let list = weak.clone();
-        obj.insert(
-            "__set:value".into(),
-            native("set_classList_value", Some(1), move |args| {
-                let value = args.first().unwrap_or(&JsValue::Undefined).display();
-                set_class_tokens(&h, parse_class_tokens(&value));
-                sync_class_list_weak(&list, &h);
-                Ok(JsValue::String(class_tokens(&h).join(" ")))
-            }),
-        );
-    }
-    JsValue::Object(obj)
-}
-
 fn dataset_object(handle: DomHandle, element: &Element) -> JsValue {
     let mut obj = HashMap::new();
     for (name, value) in &element.attrs {
@@ -3392,111 +3306,6 @@ fn dataset_object(handle: DomHandle, element: &Element) -> JsValue {
         }
     }
     JsValue::Object(Rc::new(RefCell::new(obj)))
-}
-
-fn class_tokens(handle: &DomHandle) -> Vec<String> {
-    match handle.node() {
-        Some(Node::Element(el)) => el
-            .attrs
-            .get("class")
-            .map(|s| parse_class_tokens(s))
-            .unwrap_or_default(),
-        _ => Vec::new(),
-    }
-}
-
-fn parse_class_tokens(value: &str) -> Vec<String> {
-    let mut tokens = Vec::new();
-    for token in value.split_whitespace() {
-        if !tokens.iter().any(|item: &String| item.as_str() == token) {
-            tokens.push(token.to_string());
-        }
-    }
-    tokens
-}
-
-fn class_token_index(value: Option<&JsValue>) -> Option<usize> {
-    let index = match value.unwrap_or(&JsValue::Undefined) {
-        JsValue::Number(number) => *number,
-        JsValue::String(text) => text.trim().parse().unwrap_or(f64::NAN),
-        JsValue::Bool(true) => 1.0,
-        JsValue::Bool(false) | JsValue::Null => 0.0,
-        _ => f64::NAN,
-    };
-    (index.is_finite() && index >= 0.0).then_some(index.trunc() as usize)
-}
-
-fn sync_class_list_weak(obj: &Weak<RefCell<HashMap<String, JsValue>>>, handle: &DomHandle) {
-    if let Some(obj) = obj.upgrade() {
-        sync_class_list_object(&obj, handle);
-    }
-}
-
-fn sync_class_list_object(obj: &Rc<RefCell<HashMap<String, JsValue>>>, handle: &DomHandle) {
-    let tokens = class_tokens(handle);
-    let mut obj = obj.borrow_mut();
-    let stale = obj
-        .keys()
-        .filter(|key| class_list_index_key(key).is_some())
-        .cloned()
-        .collect::<Vec<_>>();
-    for key in stale {
-        obj.remove(&key);
-    }
-    obj.insert("length".into(), JsValue::Number(tokens.len() as f64));
-    obj.insert("value".into(), JsValue::String(tokens.join(" ")));
-    for (index, token) in tokens.iter().enumerate() {
-        obj.insert(index.to_string(), JsValue::String(token.clone()));
-    }
-}
-
-fn class_list_index_key(key: &str) -> Option<usize> {
-    key.parse::<usize>()
-        .ok()
-        .filter(|index| index.to_string() == key)
-}
-
-fn class_list_keys(tokens: &[String]) -> JsValue {
-    class_list_array(
-        (0..tokens.len())
-            .map(|index| JsValue::Number(index as f64))
-            .collect(),
-    )
-}
-
-fn class_list_values(tokens: &[String]) -> JsValue {
-    class_list_array(tokens.iter().cloned().map(JsValue::String).collect())
-}
-
-fn class_list_entries(tokens: &[String]) -> JsValue {
-    class_list_array(
-        tokens
-            .iter()
-            .enumerate()
-            .map(|(index, token)| {
-                class_list_array(vec![
-                    JsValue::Number(index as f64),
-                    JsValue::String(token.clone()),
-                ])
-            })
-            .collect(),
-    )
-}
-
-fn class_list_array(items: Vec<JsValue>) -> JsValue {
-    JsValue::Array(Rc::new(RefCell::new(items)))
-}
-
-fn set_class_tokens(handle: &DomHandle, tokens: Vec<String>) {
-    handle.with_node_mut(|node| {
-        if let Node::Element(el) = node {
-            if tokens.is_empty() {
-                el.attrs.remove("class");
-            } else {
-                el.attrs.insert("class".into(), tokens.join(" "));
-            }
-        }
-    });
 }
 
 fn data_attr_to_prop(name: &str) -> Option<String> {
@@ -7954,6 +7763,41 @@ mod tests {
             result.value,
             JsValue::String("2:a:one:null|1:null|0:null".into())
         );
+    }
+
+    #[test]
+    fn local_storage_dispatches_storage_events_for_set_remove_clear() {
+        let result = eval_with_dom(
+            "<main></main>",
+            "let seen=[]; window.addEventListener('storage', function(e){ seen.push(e.type + ':' + e.key + ':' + e.oldValue + ':' + e.newValue + ':' + e.url + ':' + (e.storageArea === localStorage) + ':' + (e.target === window) + ':' + (e.currentTarget === window) + ':' + (this === window)); }); localStorage.setItem('a','1'); localStorage.setItem('a','2'); localStorage.removeItem('a'); localStorage.setItem('b','3'); localStorage.clear(); seen.join('|');",
+        )
+        .unwrap();
+        assert_eq!(
+            result.value,
+            JsValue::String(
+                "storage:a:null:1:http://localhost/:true:true:true:true|storage:a:1:2:http://localhost/:true:true:true:true|storage:a:2:null:http://localhost/:true:true:true:true|storage:b:null:3:http://localhost/:true:true:true:true|storage:null:null:null:http://localhost/:true:true:true:true".into()
+            )
+        );
+    }
+
+    #[test]
+    fn local_storage_skips_storage_event_for_same_value_set() {
+        let result = eval_with_dom(
+            "<main></main>",
+            "let count=0; window.addEventListener('storage', function(){ count=count+1; }); localStorage.setItem('same','x'); localStorage.setItem('same','x'); count + ':' + localStorage.length + ':' + localStorage.getItem('same');",
+        )
+        .unwrap();
+        assert_eq!(result.value, JsValue::String("1:1:x".into()));
+    }
+
+    #[test]
+    fn window_onstorage_receives_local_storage_event() {
+        let result = eval_with_dom(
+            "<main></main>",
+            "let seen=''; window.onstorage=function(e){ seen=e.key + ':' + e.newValue + ':' + (this === window); }; localStorage.setItem('mode','edit'); seen;",
+        )
+        .unwrap();
+        assert_eq!(result.value, JsValue::String("mode:edit:true".into()));
     }
 
     #[test]
