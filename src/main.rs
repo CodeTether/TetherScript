@@ -9,6 +9,7 @@
 //! tetherscript run --interp <file.tether>     run with tree-walking interpreter
 //! tetherscript check <file>                   parse and run ownership analysis
 //! tetherscript render <html-file> [css-file] [width] render HTML/CSS files to a text display list
+//! tetherscript raster <html-file> <output.ppm> [css-file] [width] [height] [scale] render to pixels
 //! tetherscript inspect --tokens <file>        dump tokens
 //! tetherscript inspect --ast <file>           dump AST
 //! tetherscript inspect --bytecode <file>      dump compiled bytecode
@@ -90,6 +91,7 @@ fn main() {
         "run" => cmd_run(&args[2..]),
         "check" => cmd_check(&args[2..]),
         "render" => cmd_render(&args[2..]),
+        "raster" => cmd_raster(&args[2..]),
         "js" => cmd_js(&args[2..]),
         "inspect" => cmd_inspect(&args[2..]),
         "lsp" => cmd_lsp(),
@@ -410,6 +412,58 @@ fn cmd_render(args: &[String]) {
     print!("{}", browser::render_text(&layout));
 }
 
+fn cmd_raster(args: &[String]) {
+    if args.len() < 2 || args[0] == "--help" || args[0] == "-h" {
+        println!(
+            "tetherscript raster -- Render HTML/CSS to a native software-rasterized PPM image"
+        );
+        println!();
+        println!("USAGE:");
+        println!(
+            "    tetherscript raster <html-file> <output.ppm> [css-file] [width] [height] [scale]"
+        );
+        if args.len() < 2 {
+            process::exit(2);
+        }
+        return;
+    }
+    let html = read_source(&args[0]);
+    let output = &args[1];
+    let css = args
+        .get(2)
+        .map(|path| read_source(path))
+        .unwrap_or_default();
+    let width = parse_i64_arg(args.get(3), "tetherscript raster: width", 80);
+    let height = args
+        .get(4)
+        .map(|raw| parse_i64_arg(Some(raw), "tetherscript raster: height", 0))
+        .filter(|height| *height > 0);
+    let scale = parse_i64_arg(args.get(5), "tetherscript raster: scale", 8);
+    if scale <= 0 {
+        eprintln!("tetherscript raster: scale must be positive");
+        process::exit(2);
+    }
+    let doc = browser::parse_html(&html);
+    let image = browser::render_document_to_raster(
+        &doc,
+        &css,
+        browser::RenderOptions {
+            viewport_width: width,
+            viewport_height: height,
+            scale: scale as usize,
+            ..browser::RenderOptions::default()
+        },
+    )
+    .unwrap_or_else(|err| {
+        eprintln!("tetherscript raster: {}", err);
+        process::exit(1);
+    });
+    fs::write(output, image.to_ppm()).unwrap_or_else(|err| {
+        eprintln!("tetherscript raster: failed to write '{}': {}", output, err);
+        process::exit(1);
+    });
+}
+
 fn cmd_js(args: &[String]) {
     if args.is_empty() || args[0] == "--help" || args[0] == "-h" {
         println!(
@@ -718,6 +772,17 @@ fn read_source(path: &str) -> String {
     }
 }
 
+fn parse_i64_arg(value: Option<&String>, label: &str, default: i64) -> i64 {
+    value
+        .map(|raw| {
+            raw.parse::<i64>().unwrap_or_else(|_| {
+                eprintln!("{} must be an integer", label);
+                process::exit(2);
+            })
+        })
+        .unwrap_or(default)
+}
+
 fn execute_file(
     path: &str,
     vm_mode: bool,
@@ -910,6 +975,7 @@ fn print_usage() {
     eprintln!("  run <file>           Run a TetherScript program");
     eprintln!("  inspect <file>       Inspect source (tokens, AST, bytecode)");
     eprintln!("  render <html>        Render HTML/CSS display list");
+    eprintln!("  raster <html> <ppm>  Render HTML/CSS to a PPM image");
     eprintln!("  js <file.js>         Run JavaScript with the built-in engine");
     eprintln!("  repl                 Interactive REPL");
     eprintln!("  lsp                  Start LSP server over stdio");
@@ -937,6 +1003,7 @@ fn print_help() {
     println!("    run <file>        Run a TetherScript program");
     println!("    inspect <file>    Inspect frontend output (tokens, AST, bytecode)");
     println!("    render <html>     Render HTML/CSS to a display list");
+    println!("    raster <html>     Render HTML/CSS to a native PPM image");
     println!("    js <file.js>      Run JavaScript with the built-in engine");
     println!("    repl              Start an interactive read-eval-print loop");
     println!("    lsp               Start the LSP server over stdio");
@@ -961,6 +1028,7 @@ fn print_help() {
     println!("    tetherscript inspect --ast hello.tether");
     println!("    tetherscript inspect --bytecode hello.tether");
     println!("    tetherscript render examples/browser.html examples/browser.css");
+    println!("    tetherscript raster examples/browser.html out.ppm examples/browser.css");
     println!("    tetherscript js app.js");
     println!("    tetherscript repl");
     println!("    tetherscript lsp");

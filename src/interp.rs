@@ -1467,6 +1467,16 @@ fn install_browser_builtins(env: &Rc<RefCell<Env>>) {
         false,
     );
     e.define(
+        "browser_raster",
+        pure_native("browser_raster", None, browser::raster_to_runtime_value),
+        false,
+    );
+    e.define(
+        "browser_render_ppm",
+        pure_native("browser_render_ppm", None, browser::render_ppm_to_value),
+        false,
+    );
+    e.define(
         "browser_layout",
         pure_native("browser_layout", None, browser::layout_to_runtime_value),
         false,
