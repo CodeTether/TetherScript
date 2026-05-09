@@ -1103,10 +1103,7 @@ fn install_window_event_bindings(window: &mut HashMap<String, JsValue>) {
     window.insert(
         "dispatchEvent".into(),
         native("window.dispatchEvent", Some(1), move |args| {
-            let event_type = event_type(args.first().unwrap_or(&JsValue::Undefined))
-                .unwrap_or_else(|| "event".into());
-            dispatch_window_event(&event_type)?;
-            Ok(JsValue::Bool(true))
+            dispatch_window_event_object(args.first().cloned().unwrap_or(JsValue::Undefined))
         }),
     );
     for prop in [
@@ -1139,8 +1136,11 @@ fn dispatch_window_lifecycle(window: &JsValue, event_type: &str) -> Result<(), S
     dispatch_window_event_with_this(event_type, window.clone())
 }
 
-fn dispatch_window_event(event_type: &str) -> Result<(), String> {
-    dispatch_window_event_with_this(event_type, JsValue::Undefined)
+fn dispatch_window_event_object(event: JsValue) -> Result<JsValue, String> {
+    let event_type = event_type(&event).unwrap_or_else(|| "event".into());
+    let normalized = normalize_event(event, &event_type, JsValue::Undefined, JsValue::Undefined);
+    dispatch_window_normalized(&event_type, normalized.clone(), JsValue::Undefined)?;
+    Ok(JsValue::Bool(!event_flag(&normalized, "defaultPrevented")))
 }
 
 fn dispatch_window_event_with_this(event_type: &str, this_value: JsValue) -> Result<(), String> {
@@ -1150,6 +1150,14 @@ fn dispatch_window_event_with_this(event_type: &str, this_value: JsValue) -> Res
         this_value.clone(),
         this_value.clone(),
     );
+    dispatch_window_normalized(event_type, event, this_value)
+}
+
+fn dispatch_window_normalized(
+    event_type: &str,
+    event: JsValue,
+    this_value: JsValue,
+) -> Result<(), String> {
     let (listeners, handler) = EVENT_REGISTRY.with(|registry| {
         registry
             .borrow()

@@ -19,6 +19,9 @@ pub(super) fn bootstrap(engine: &mut JsEngine) -> Result<(), String> {
 }
 
 #[cfg(test)]
+#[path = "tests_dispatch_event.rs"]
+mod tests_dispatch_event;
+#[cfg(test)]
 #[path = "tests_handlers.rs"]
 mod tests_handlers;
 
