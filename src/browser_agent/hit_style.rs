@@ -13,10 +13,25 @@ pub(crate) fn bounds_for(layout: &LayoutBox) -> BoundingBox {
 }
 
 pub(crate) fn pointer_enabled(layout: &LayoutBox) -> bool {
+    visible(layout)
+        && !layout
+            .styles
+            .get("pointer-events")
+            .is_some_and(|value| value.eq_ignore_ascii_case("none"))
+}
+
+fn visible(layout: &LayoutBox) -> bool {
     !layout
         .styles
-        .get("pointer-events")
-        .is_some_and(|value| value.eq_ignore_ascii_case("none"))
+        .get("visibility")
+        .is_some_and(|value| matches_hidden(value))
+}
+
+fn matches_hidden(value: &str) -> bool {
+    matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "hidden" | "collapse"
+    )
 }
 
 pub(crate) fn z_index(layout: &LayoutBox) -> i64 {
