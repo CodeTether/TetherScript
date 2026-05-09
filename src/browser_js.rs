@@ -1128,10 +1128,11 @@ fn install_window_event_bindings(window: &mut HashMap<String, JsValue>) {
         native("window.removeEventListener", None, move |args| {
             let event_type = args.first().unwrap_or(&JsValue::Undefined).display();
             let listener = args.get(1).cloned().unwrap_or(JsValue::Undefined);
+            let (capture, _) = event_listener_options(args.get(2));
             EVENT_REGISTRY.with(|registry| {
                 if let Some(entry) = registry.borrow_mut().get_mut("window") {
                     if let Some(list) = entry.listeners.get_mut(&event_type) {
-                        list.retain(|item| item.callback != listener);
+                        list.retain(|item| item.callback != listener || item.capture != capture);
                     }
                 }
             });
@@ -1203,26 +1204,32 @@ fn dispatch_window_normalized(
             .get("window")
             .map(|entry| {
                 (
-                    entry
-                        .listeners
-                        .get(event_type)
-                        .cloned()
-                        .unwrap_or_default()
-                        .into_iter()
-                        .map(|listener| listener.callback)
-                        .collect::<Vec<_>>(),
+                    entry.listeners.get(event_type).cloned().unwrap_or_default(),
                     entry.handlers.get(&format!("on{}", event_type)).cloned(),
                 )
             })
             .unwrap_or_default()
     });
     for listener in listeners {
-        call_dom_listener(listener, this_value.clone(), event.clone())?;
+        call_dom_listener(listener.callback.clone(), this_value.clone(), event.clone())?;
+        if listener.once {
+            remove_window_event_listener(event_type, &listener.callback, listener.capture);
+        }
     }
     if let Some(handler) = handler {
         call_dom_listener(handler, this_value, event)?;
     }
     Ok(())
+}
+
+fn remove_window_event_listener(event_type: &str, listener: &JsValue, capture: bool) {
+    EVENT_REGISTRY.with(|registry| {
+        if let Some(entry) = registry.borrow_mut().get_mut("window") {
+            if let Some(list) = entry.listeners.get_mut(event_type) {
+                list.retain(|item| item.callback != *listener || item.capture != capture);
+            }
+        }
+    });
 }
 
 fn dispatch_document_lifecycle(root: &Rc<RefCell<Node>>, event_type: &str) -> Result<(), String> {
@@ -2392,7 +2399,8 @@ fn node_object(handle: DomHandle) -> JsValue {
         native("removeEventListener", None, move |args| {
             let event_type = args.first().unwrap_or(&JsValue::Undefined).display();
             let listener = args.get(1).cloned().unwrap_or(JsValue::Undefined);
-            h.remove_event_listener(&event_type, &listener);
+            let (capture, _) = event_listener_options(args.get(2));
+            h.remove_event_listener(&event_type, &listener, capture);
             Ok(JsValue::Undefined)
         }),
     );
@@ -2894,11 +2902,11 @@ impl DomHandle {
         });
     }
 
-    fn remove_event_listener(&self, event_type: &str, listener: &JsValue) {
+    fn remove_event_listener(&self, event_type: &str, listener: &JsValue, capture: bool) {
         EVENT_REGISTRY.with(|registry| {
             if let Some(entry) = registry.borrow_mut().get_mut(&self.event_key()) {
                 if let Some(list) = entry.listeners.get_mut(event_type) {
-                    list.retain(|item| item.callback != *listener);
+                    list.retain(|item| item.callback != *listener || item.capture != capture);
                 }
             }
         });
@@ -3586,7 +3594,7 @@ fn call_registered_listener(
         event,
     )?;
     if listener.once {
-        handle.remove_event_listener(event_type, &listener.callback);
+        handle.remove_event_listener(event_type, &listener.callback, listener.capture);
     }
     Ok(())
 }
