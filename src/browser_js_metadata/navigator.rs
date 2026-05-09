@@ -1,11 +1,11 @@
 //! Navigator identity metadata and beacon registration.
 
-use std::{collections::HashMap, rc::Rc};
+use std::collections::HashMap;
 
 use crate::js::JsValue;
 
 use super::super::{native, SharedBrowserJsRouteHandler};
-use super::{beacon, set_str};
+use super::set_str;
 
 #[path = "navigator/battery.rs"]
 mod battery;
@@ -17,8 +17,12 @@ mod connection;
 mod extras;
 #[path = "navigator/identity.rs"]
 mod identity;
+#[path = "navigator/install.rs"]
+mod installer;
 #[path = "navigator/locks.rs"]
 mod locks;
+#[path = "navigator/permissions.rs"]
+mod permissions;
 #[path = "navigator/rejection.rs"]
 mod rejection;
 #[path = "navigator/scheduling.rs"]
@@ -35,21 +39,5 @@ mod user_agent_data;
 mod vibration;
 
 pub(super) fn install(navigator: &JsValue, route_handler: SharedBrowserJsRouteHandler) {
-    let JsValue::Object(navigator_object) = navigator else {
-        return;
-    };
-    let shared = Rc::clone(navigator_object);
-    let mut navigator = navigator_object.borrow_mut();
-    identity::install(&mut navigator);
-    battery::install(&mut navigator);
-    capabilities::install(&mut navigator);
-    extras::install(&mut navigator);
-    connection::install(&mut navigator);
-    scheduling::install(&mut navigator);
-    user_agent_data::install(&mut navigator);
-    storage::install(&mut navigator);
-    locks::install(&mut navigator);
-    share::install(&mut navigator, Rc::clone(&shared));
-    vibration::install(&mut navigator, shared);
-    beacon::install(&mut navigator, route_handler);
+    installer::install(navigator, route_handler);
 }
