@@ -2,14 +2,20 @@ use super::*;
 
 #[path = "fields/clipboard.rs"]
 mod clipboard;
+#[path = "fields/close_event.rs"]
+mod close_event;
 #[path = "fields/constructors.rs"]
 pub(super) mod constructors;
+#[path = "fields/error_event.rs"]
+mod error_event;
 #[path = "fields/interactions.rs"]
 mod interactions;
 #[path = "fields/keyboard.rs"]
 mod keyboard;
 #[path = "fields/lifecycle.rs"]
 mod lifecycle;
+#[path = "fields/message_event.rs"]
+mod message_event;
 #[path = "fields/misc.rs"]
 mod misc;
 #[path = "fields/mouse.rs"]

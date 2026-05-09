@@ -29,6 +29,9 @@ mod tests_legacy;
 #[path = "events/tests_lifecycle.rs"]
 mod tests_lifecycle;
 #[cfg(test)]
+#[path = "events/tests_message_event.rs"]
+mod tests_message_event;
+#[cfg(test)]
 #[path = "events/tests_storage_clipboard.rs"]
 mod tests_storage_clipboard;
 
