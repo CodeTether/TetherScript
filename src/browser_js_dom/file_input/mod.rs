@@ -8,8 +8,12 @@ mod file_object;
 mod json_number;
 #[path = "json_string.rs"]
 mod json_string;
+#[path = "list_each.rs"]
+mod list_each;
 #[path = "list_object.rs"]
 mod list_object;
+#[path = "list_rows.rs"]
+mod list_rows;
 #[path = "meta.rs"]
 mod meta;
 #[path = "meta_field.rs"]
