@@ -28,6 +28,9 @@ mod tests_all_race;
 #[path = "promise_tests_constructor.rs"]
 mod tests_constructor;
 #[cfg(test)]
+#[path = "promise_tests_pending_aggregate.rs"]
+mod tests_pending_aggregate;
+#[cfg(test)]
 #[path = "promise_tests_settled.rs"]
 mod tests_settled;
 
@@ -45,8 +48,4 @@ pub(super) fn resolved(value: JsValue) -> JsValue {
 
 pub(super) fn rejected(reason: JsValue) -> JsValue {
     object::from_state(state::PromiseState::Rejected(reason))
-}
-
-fn pending() -> JsValue {
-    object::from_state(state::PromiseState::Pending)
 }
