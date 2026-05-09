@@ -1,5 +1,7 @@
 use super::*;
 
+#[path = "reporting_observer.rs"]
+mod reporting_observer;
 #[path = "scheduler.rs"]
 mod scheduler;
 #[path = "trusted_types.rs"]
@@ -21,6 +23,7 @@ pub(super) fn install(window: &mut HashMap<String, JsValue>) {
     file_picker::install(window);
     notification::install(window);
     promise::install(window);
+    reporting_observer::install(window);
     scheduler::install(window);
     url_pattern::install(window);
     trusted_types::install(window);
