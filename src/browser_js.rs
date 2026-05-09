@@ -4091,33 +4091,84 @@ fn collect_form_entries_from_node(node: &Node, entries: &mut Vec<(String, String
         && !el.attrs.contains_key("disabled")
     {
         if let Some(name) = el.attrs.get("name") {
-            let input_type = el
-                .attrs
-                .get("type")
-                .map(|ty| ty.to_ascii_lowercase())
-                .unwrap_or_else(|| "text".into());
-            let include = !matches!(input_type.as_str(), "submit" | "button" | "reset")
-                && (!matches!(input_type.as_str(), "checkbox" | "radio")
-                    || el.attrs.contains_key("checked"));
-            if include {
-                let value = if el.tag == "textarea" {
-                    browser::text_content(node)
-                } else {
-                    el.attrs.get("value").cloned().unwrap_or_else(|| {
-                        if input_type == "checkbox" {
-                            "on".into()
-                        } else {
-                            String::new()
-                        }
-                    })
-                };
-                entries.push((name.clone(), value));
+            match el.tag.as_str() {
+                "select" => collect_select_entries(el, name, entries),
+                "textarea" => entries.push((name.clone(), browser::text_content(node))),
+                "input" => collect_input_entry(el, name, entries),
+                _ => {}
             }
         }
     }
     for child in &el.children {
         collect_form_entries_from_node(child, entries);
     }
+}
+
+fn collect_input_entry(el: &Element, name: &str, entries: &mut Vec<(String, String)>) {
+    let input_type = el
+        .attrs
+        .get("type")
+        .map(|ty| ty.to_ascii_lowercase())
+        .unwrap_or_else(|| "text".into());
+    let include = !matches!(input_type.as_str(), "submit" | "button" | "reset")
+        && (!matches!(input_type.as_str(), "checkbox" | "radio")
+            || el.attrs.contains_key("checked"));
+    if include {
+        let value = el.attrs.get("value").cloned().unwrap_or_else(|| {
+            if input_type == "checkbox" {
+                "on".into()
+            } else {
+                String::new()
+            }
+        });
+        entries.push((name.to_string(), value));
+    }
+}
+
+fn collect_select_entries(select: &Element, name: &str, entries: &mut Vec<(String, String)>) {
+    let mut options = Vec::new();
+    collect_select_options(select, &mut options);
+    if select.attrs.contains_key("multiple") {
+        for option in options
+            .into_iter()
+            .filter(|option| option.attrs.contains_key("selected"))
+        {
+            entries.push((name.to_string(), option_form_value(option)));
+        }
+    } else if let Some(option) = options
+        .iter()
+        .copied()
+        .find(|option| option.attrs.contains_key("selected"))
+        .or_else(|| options.first().copied())
+    {
+        entries.push((name.to_string(), option_form_value(option)));
+    }
+}
+
+fn collect_select_options<'a>(node: &'a Element, options: &mut Vec<&'a Element>) {
+    for child in &node.children {
+        let Node::Element(el) = child else {
+            continue;
+        };
+        if el.tag == "option" {
+            if !el.attrs.contains_key("disabled") {
+                options.push(el);
+            }
+        } else {
+            collect_select_options(el, options);
+        }
+    }
+}
+
+fn option_form_value(option: &Element) -> String {
+    option.attrs.get("value").cloned().unwrap_or_else(|| {
+        option
+            .children
+            .iter()
+            .map(text_content_raw)
+            .collect::<Vec<_>>()
+            .join("")
+    })
 }
 
 fn submit_form(handle: &DomHandle, dispatch_submit: bool) -> Result<JsValue, String> {

@@ -25,4 +25,7 @@ pub(super) fn install(document: &JsValue, location: &Rc<RefCell<HashMap<String, 
     set_str(&mut document, "charset", "UTF-8");
     set_str(&mut document, "contentType", "text/html");
     set_str(&mut document, "lastModified", "01/01/1970 00:00:00");
+    document.insert("hidden".into(), JsValue::Bool(false));
+    set_str(&mut document, "visibilityState", "visible");
+    document.insert("prerendering".into(), JsValue::Bool(false));
 }
