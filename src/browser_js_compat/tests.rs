@@ -11,14 +11,12 @@ compat_test!(tests_abort_signal, "tests_abort_signal.rs");
 compat_test!(tests_blob_file, "tests_blob_file.rs");
 compat_test!(tests_blob_file_bytes, "tests_blob_file_bytes.rs");
 compat_test!(tests_body_array_buffer, "tests_body_array_buffer.rs");
+compat_test!(tests_clipboard_item, "tests_clipboard_item.rs");
 compat_test!(tests_crypto, "tests_crypto.rs");
 compat_test!(tests_dom_exception, "tests_dom_exception.rs");
 compat_test!(tests_file_reader_abort, "tests_file_reader_abort.rs");
 compat_test!(tests_file_reader, "tests_file_reader.rs");
-compat_test!(
-    tests_file_reader_array_buffer,
-    "tests_file_reader_array_buffer.rs"
-);
+compat_test!(tests_fr_ab, "tests_file_reader_array_buffer.rs");
 compat_test!(tests_form_data, "tests_form_data.rs");
 compat_test!(tests_headers, "tests_headers.rs");
 compat_test!(tests_history_state, "tests_history_state.rs");
@@ -31,6 +29,7 @@ compat_test!(tests_structured, "tests_structured.rs");
 compat_test!(tests_text, "tests_text.rs");
 compat_test!(tests_text_decoder, "tests_text_decoder.rs");
 compat_test!(tests_url_search_params, "tests_url_search_params.rs");
+compat_test!(tests_url_static, "tests_url_static.rs");
 
 #[test]
 fn crypto_random_values_are_seedable_and_mutate_uint8_array() {
