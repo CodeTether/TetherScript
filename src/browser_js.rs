@@ -659,10 +659,12 @@ fn install_dom_globals(
     // cross-document storage events for it.
     let (session_storage, session_storage_area) =
         storage_object("sessionStorage", session_storage_entries, None);
+    let cookie_store = cookie_host::store_object(&document);
     let history = history_object(location_map.clone());
     window.insert("location".into(), location.clone());
     window.insert("history".into(), history.clone());
     window.insert("navigator".into(), navigator.clone());
+    window.insert("cookieStore".into(), cookie_store.clone());
     window.insert("localStorage".into(), local_storage.clone());
     window.insert("sessionStorage".into(), session_storage.clone());
     selection_host::install_window(
@@ -857,6 +859,7 @@ fn install_dom_globals(
     engine.set_global("location", location);
     engine.set_global("history", history);
     engine.set_global("navigator", navigator);
+    engine.set_global("cookieStore", cookie_store);
     engine.set_global("localStorage", local_storage);
     engine.set_global("sessionStorage", session_storage);
     window_host::bootstrap(engine)?;
