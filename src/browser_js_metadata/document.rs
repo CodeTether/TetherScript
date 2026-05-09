@@ -8,6 +8,9 @@ use crate::js::JsValue;
 
 use super::{href, set_str};
 
+#[path = "document_policy.rs"]
+mod policy;
+
 pub(super) fn install(document: &JsValue, location: &Rc<RefCell<HashMap<String, JsValue>>>) {
     let JsValue::Object(document) = document else {
         return;
@@ -28,4 +31,9 @@ pub(super) fn install(document: &JsValue, location: &Rc<RefCell<HashMap<String, 
     document.insert("hidden".into(), JsValue::Bool(false));
     set_str(&mut document, "visibilityState", "visible");
     document.insert("prerendering".into(), JsValue::Bool(false));
+    document.insert("featurePolicy".into(), policy::object("featurePolicy"));
+    document.insert(
+        "permissionsPolicy".into(),
+        policy::object("permissionsPolicy"),
+    );
 }
