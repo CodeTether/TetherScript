@@ -12,7 +12,7 @@ var DOMException=window.DOMException;
 var Image=window.Image;var Option=window.Option;
 var DOMPoint=window.DOMPoint;var DOMRect=window.DOMRect;
 var StorageEvent=window.StorageEvent;var ClipboardEvent=window.ClipboardEvent;
-var DragEvent=window.DragEvent;var CompositionEvent=window.CompositionEvent;var TouchEvent=window.TouchEvent;
+var DragEvent=window.DragEvent;var CompositionEvent=window.CompositionEvent;var TouchEvent=window.TouchEvent;var DataTransfer=window.DataTransfer;
 var PopStateEvent=window.PopStateEvent;var HashChangeEvent=window.HashChangeEvent;
 var PageTransitionEvent=window.PageTransitionEvent;var BeforeUnloadEvent=window.BeforeUnloadEvent;var ProgressEvent=window.ProgressEvent;
 function __tsSetScroll(x,y){x=x*1;y=y*1;window.scrollX=x;window.scrollY=y;window.pageXOffset=x;window.pageYOffset=y;scrollX=x;scrollY=y;pageXOffset=x;pageYOffset=y;window.__tsDispatchScroll();return undefined;}
