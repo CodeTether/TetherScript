@@ -793,6 +793,7 @@ fn install_dom_globals(
             "IntersectionObserver",
             "ResizeObserver",
             "URL",
+            "URLPattern",
             "URLSearchParams",
             "AbortController",
             "Request",
