@@ -5,7 +5,7 @@ use super::{BrowserPage, Locator};
 fn placeholder_title_and_alt_locators_work() {
     let page = BrowserPage::from_html(
         "mem://attrs",
-        "<input placeholder='Search docs'><img alt='Kiln logo'><button title='Close'></button>",
+        "<input placeholder='Search docs'><img alt='tetherscript logo'><button title='Close'></button>",
     );
 
     assert_eq!(
