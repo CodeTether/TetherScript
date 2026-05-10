@@ -4,9 +4,9 @@ use super::{webgl_constants as c, webgl_state::WebGlState, *};
 
 pub(super) fn get(state: &WebGlState, param: &JsValue) -> JsValue {
     match number(param) {
-        c::VENDOR => JsValue::String("Kiln deterministic WebGL".into()),
-        c::RENDERER => JsValue::String("Kiln native metadata renderer".into()),
-        c::VERSION => JsValue::String(format!("WebGL {}.0 (Kiln shim)", state.version)),
+        c::VENDOR => JsValue::String("tetherscript deterministic WebGL".into()),
+        c::RENDERER => JsValue::String("tetherscript native metadata renderer".into()),
+        c::VERSION => JsValue::String(format!("WebGL {}.0 (tetherscript shim)", state.version)),
         c::SHADING_LANGUAGE_VERSION => JsValue::String(shader_version(state.version)),
         c::MAX_TEXTURE_SIZE => JsValue::Number(4096.0),
         c::MAX_VIEWPORT_DIMS => array(&[state.width as f64, state.height as f64]),
@@ -26,9 +26,9 @@ pub(super) fn get(state: &WebGlState, param: &JsValue) -> JsValue {
 
 fn shader_version(version: u8) -> String {
     if version >= 2 {
-        "WebGL GLSL ES 3.00 (Kiln shim)".into()
+        "WebGL GLSL ES 3.00 (tetherscript shim)".into()
     } else {
-        "WebGL GLSL ES 1.0 (Kiln shim)".into()
+        "WebGL GLSL ES 1.0 (tetherscript shim)".into()
     }
 }
 

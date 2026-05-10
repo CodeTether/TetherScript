@@ -13,7 +13,7 @@ fn webgl_context_records_metadata_commands_and_parameters() {
     assert_eq!(
         result.value.display(),
         concat!(
-            "Kiln deterministic WebGL:1,2,3,4:",
+            "tetherscript deterministic WebGL:1,2,3,4:",
             "ANGLE_instanced_arrays|OES_element_index_uint|",
             "OES_standard_derivatives|OES_texture_float|WEBGL_debug_renderer_info"
         )
