@@ -3,9 +3,9 @@
 //! Exposes `smtp_send(host, port, from, to, subject, body)` to TetherScript scripts.
 //! Messages are DKIM-signed by default using signer settings from the host
 //! environment:
-//! - `TETHERSCRIPT_DKIM_SELECTOR` (required; `KILN_DKIM_SELECTOR` still works)
+//! - `TETHERSCRIPT_DKIM_SELECTOR` (required; `tetherscript_DKIM_SELECTOR` still works)
 //! - `TETHERSCRIPT_DKIM_PRIVATE_KEY_PEM` or `TETHERSCRIPT_DKIM_PRIVATE_KEY_FILE`
-//!   (required; legacy `KILN_DKIM_*` names still work)
+//!   (required; legacy `tetherscript_DKIM_*` names still work)
 //! - `TETHERSCRIPT_DKIM_DOMAIN` (optional; defaults to the domain in `from`)
 //!
 //! This is intentionally narrow:
@@ -194,26 +194,26 @@ fn expect_recipients(value: &Value) -> Result<Vec<String>, String> {
 }
 
 fn load_dkim_config(from: &str) -> Result<DkimConfig, String> {
-    let selector = dkim_env("TETHERSCRIPT_DKIM_SELECTOR", "KILN_DKIM_SELECTOR").map_err(|_| {
-        "smtp_send: missing TETHERSCRIPT_DKIM_SELECTOR or KILN_DKIM_SELECTOR".to_string()
+    let selector = dkim_env("TETHERSCRIPT_DKIM_SELECTOR", "tetherscript_DKIM_SELECTOR").map_err(|_| {
+        "smtp_send: missing TETHERSCRIPT_DKIM_SELECTOR or tetherscript_DKIM_SELECTOR".to_string()
     })?;
-    let domain = match dkim_env("TETHERSCRIPT_DKIM_DOMAIN", "KILN_DKIM_DOMAIN") {
+    let domain = match dkim_env("TETHERSCRIPT_DKIM_DOMAIN", "tetherscript_DKIM_DOMAIN") {
         Ok(v) if !v.trim().is_empty() => v,
         _ => from_domain(from)?,
     };
 
     let key_pem = match dkim_env(
         "TETHERSCRIPT_DKIM_PRIVATE_KEY_PEM",
-        "KILN_DKIM_PRIVATE_KEY_PEM",
+        "tetherscript_DKIM_PRIVATE_KEY_PEM",
     ) {
         Ok(v) if !v.trim().is_empty() => v,
         _ => {
             let path = dkim_env(
                 "TETHERSCRIPT_DKIM_PRIVATE_KEY_FILE",
-                "KILN_DKIM_PRIVATE_KEY_FILE",
+                "tetherscript_DKIM_PRIVATE_KEY_FILE",
             )
                 .map_err(|_| {
-                    "smtp_send: missing DKIM key; set TETHERSCRIPT_DKIM_PRIVATE_KEY_PEM, TETHERSCRIPT_DKIM_PRIVATE_KEY_FILE, or legacy KILN_DKIM_* equivalents".to_string()
+                    "smtp_send: missing DKIM key; set TETHERSCRIPT_DKIM_PRIVATE_KEY_PEM, TETHERSCRIPT_DKIM_PRIVATE_KEY_FILE, or legacy tetherscript_DKIM_* equivalents".to_string()
                 })?;
             fs::read_to_string(&path)
                 .map_err(|e| format!("smtp_send: read DKIM key {} failed: {}", path, e))?
