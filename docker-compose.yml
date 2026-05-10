@@ -1,8 +1,8 @@
 services:
-  kiln-landing:
+  tetherscript-landing:
     build: .
-    image: kiln:latest
-    container_name: kiln-landing
+    image: tetherscript:latest
+    container_name: tetherscript-landing
     ports:
       - "8787:8787"
     restart: unless-stopped
