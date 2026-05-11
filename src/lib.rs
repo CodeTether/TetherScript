@@ -33,4 +33,10 @@ pub mod token;
 pub mod value;
 pub mod vm;
 
+pub mod css_position;
+pub mod flex_layout;
+pub mod inline_layout;
+pub mod resource_loader;
+pub mod selector_heal;
+
 pub use vm::VM as Vm;
