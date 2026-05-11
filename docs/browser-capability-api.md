@@ -1,6 +1,6 @@
 # Browser Capability API
 
-TetherScript now has a live browser authority (`browser_cap::BrowserAuthority`) designed as the seam between scripts and CodeTether's real browser infrastructure / Chrome DevTools Protocol. It does not emulate Chromium. The authority posts compact JSON commands to a CodeTether/browserctl-compatible HTTP bridge and records an in-process trace for audit and replay.
+TetherScript now has a live browser authority (`browser_cap::BrowserAuthority`) designed as the seam between scripts and real browser infrastructure. It does not emulate Chromium. The authority posts compact browserctl action envelopes to a browserctl-compatible HTTP bridge and records an in-process trace for audit and replay.
 
 ## Granting
 
@@ -32,15 +32,15 @@ Supported scopes:
 
 Authorities can be narrowed with a map containing `origins`, `scopes`, `path_prefix`, `storage_scope`, and `human_approval`.
 
-## Bridge contract
+## Browserctl bridge contract
 
 For a method like `browser.goto(url)`, TetherScript sends:
 
 ```http
-POST /browser/goto
+POST /browser
 Content-Type: application/json
 
-{"url":"http://localhost:5173"}
+{"action":"goto","url":"http://localhost:5173"}
 ```
 
 The bridge may return either a raw JSON value or:
@@ -55,10 +55,35 @@ Errors use:
 {"ok": false, "error": "selector not found"}
 ```
 
+CodeTether-style tool results are also accepted. When a successful response has
+`success: true` and string `output`, TetherScript parses `output` as JSON when
+possible and otherwise returns it as a string.
+
+Live bridge smoke test:
+
+```bash
+TETHERSCRIPT_BROWSERCTL_ENDPOINT=http://127.0.0.1:41707/browser \
+  cargo test --test browser_cap_live
+```
+
+The test starts a local fixture page, then drives the configured browserctl
+bridge through start, goto, wait, eval, snapshot, screenshot, and stop.
+
 ## MVP methods
 
 Navigation/interaction:
 `goto`, `reload`, `back`, `forward`, `click`, `click_text`, `type`, `press`, `hover`, `focus`, `blur`, `scroll`, `wait_for_selector`, `wait_for_text`, `wait_for_url`, `wait_for_network_idle`.
+
+The wait helpers are tetherscript convenience methods over browserctl's single
+`wait` action:
+
+- `wait_for_selector(selector, timeout_ms?)` sends `{"action":"wait","selector":...,"state":"visible","timeout_ms":...}`.
+- `wait_for_text(text, timeout_ms?)` sends `{"action":"wait","text":...,"timeout_ms":...}`.
+- `wait_for_url(url_substring, timeout_ms?)` sends `{"action":"wait","url_contains":...,"timeout_ms":...}`.
+
+`wait_for_network_idle`, `compare_screenshots`, and `visual_diff` are reserved
+language-level methods. The current browserctl backend rejects them before
+network I/O until matching bridge actions exist.
 
 Snapshots:
 `screenshot`, `screenshot_element`, `dom_snapshot`, `page_snapshot`.
@@ -77,6 +102,12 @@ Use string method syntax for dotted method names, e.g. `browser."react.detect"()
 
 Trace/export:
 `trace`, `export_trace_json`, `export_har`, `agent_summary`, `minimal_reproduction_script`.
+
+Raw browserctl:
+`raw(action, params)` sends an explicit browserctl action envelope after the same
+scope and origin checks as high-level methods. This is an FFI-style escape hatch;
+the stable API remains the language-level browser methods above. Raw action
+names are restricted to browserctl's advertised action enum.
 
 ## Agent assertions
 
