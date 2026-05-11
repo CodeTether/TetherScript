@@ -38,7 +38,7 @@ TetherScript's trusted CLI/runtime should include these scripting primitives. Ho
 - Path: `path_sep()`, `path_join(parts)`, `path_dirname(path)`, `path_basename(path)`, `path_extname(path)`, `path_normalize(path)`, `path_resolve(path)`.
 - URL: `url_parse(url)`.
 - Process execution: `process_run(command[, args[, stdin[, timeout_ms]]])`.
-- HTTP: `http_get(url)`, `http_head(url)`, `http_post(url, body)`, `http_request(method, url[, body[, headers]])`, `http_serve(port, handler)`.
+- HTTP: `http_get(url)`, `http_head(url)`, `http_post(url, body)`, `http_request(method, url[, body[, headers]])`, `http_serve(port, handler)`, `http_serve_static(port, root_dir)`.
 - Browser runtime: `browser_parse_html(html)`, `browser_parse_css(css)`, `browser_styles(html[, css])`, `browser_query_selector(html, selector)`, `browser_text_content(html, selector)`, `browser_snapshot(html[, css[, width]])`, `browser_layout(html[, css[, width]])`, `browser_display_list(html[, css[, width]])`, `browser_render(html[, css[, width]])`, `js_eval(source)`, `browser_eval_js(html, script)`, `browser_run_scripts(html)`, `browser_compatibility_report()`. The browser JS host exposes DOM querying/mutation, synchronous event listeners/property handlers, `this`, `typeof`, function expressions, `location`, and `navigator`.
 - SMTP: `smtp_send(host, port, from, to, subject, body)`.
 
