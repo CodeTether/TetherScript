@@ -10,3 +10,4 @@
 editor/vscode/node_modules/
 editor/vscode/*.vsix
 editor/vscode/package-lock.json
+.codetether-worktrees/
