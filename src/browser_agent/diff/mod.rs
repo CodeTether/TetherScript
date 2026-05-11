@@ -10,6 +10,7 @@ mod entry;
 mod path;
 mod summary;
 mod types;
+pub mod visual;
 mod walk;
 
 pub use summary::{diff_documents, diff_html};

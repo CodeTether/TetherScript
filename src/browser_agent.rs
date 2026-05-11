@@ -16,6 +16,7 @@ mod editable;
 pub mod events;
 pub mod frames;
 pub mod hit;
+pub mod hit_layout;
 mod hit_style;
 mod hit_target;
 mod idrefs;
@@ -47,6 +48,7 @@ pub mod scroll;
 mod selector_ext;
 mod text_match;
 pub mod trace;
+pub mod understanding;
 pub mod wait;
 mod wait_options;
 

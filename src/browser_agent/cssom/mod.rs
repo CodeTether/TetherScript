@@ -7,6 +7,8 @@
 mod active_css;
 mod conditions;
 mod defaults;
+pub mod flex;
+pub mod inline;
 mod lookup;
 mod model;
 mod page;
