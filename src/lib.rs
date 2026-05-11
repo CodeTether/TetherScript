@@ -25,6 +25,7 @@ pub mod parser;
 pub mod plugin;
 pub mod provider_cap;
 pub mod rpc_cap;
+pub mod scheduler;
 pub mod smtp;
 pub mod system;
 pub mod tls;
