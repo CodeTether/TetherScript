@@ -27,6 +27,10 @@ pub enum Token {
     False,
     Nil,
     Panic,
+    Async,
+    Await,
+    Spawn,
+    Join,
 
     // Punctuation
     LParen,   // (

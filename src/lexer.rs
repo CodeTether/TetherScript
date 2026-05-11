@@ -242,6 +242,10 @@ impl<'a> Lexer<'a> {
             "false" => Token::Bool(false),
             "nil" => Token::Nil,
             "panic" => Token::Panic,
+            "async" => Token::Async,
+            "await" => Token::Await,
+            "spawn" => Token::Spawn,
+            "join" => Token::Join,
             _ => Token::Ident(s),
         };
 

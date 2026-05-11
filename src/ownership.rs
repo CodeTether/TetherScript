@@ -144,7 +144,17 @@ impl Analyzer {
                     self.expr(rhs);
                 }
             }
-            Expr::Unary { rhs, .. } | Expr::Try(rhs) | Expr::Panic(rhs) => self.expr(rhs),
+            Expr::Unary { rhs, .. }
+            | Expr::Try(rhs)
+            | Expr::Panic(rhs)
+            | Expr::Await(rhs)
+            | Expr::Spawn(rhs) => self.expr(rhs),
+            Expr::AsyncFn { body, .. } => self.block(body),
+            Expr::Join(exprs) => {
+                for expr in exprs {
+                    self.expr(expr);
+                }
+            }
             Expr::Call { callee, args } => {
                 self.expr(callee);
                 for arg in args {

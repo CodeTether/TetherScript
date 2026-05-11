@@ -6,9 +6,5 @@ fn fib(n) {
 }
 
 fn main() {
-    let start = time_ms()
-    let result = fib(30)
-    let elapsed = time_ms() - start
-    println("fib(30) = " + result)
-    println("elapsed: " + elapsed + "ms")
+    println(fib(30))
 }
