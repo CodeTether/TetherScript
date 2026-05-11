@@ -403,15 +403,13 @@ impl Compiler {
                 self.emit(Instr::Const(zero));
                 self.emit(Instr::PushScope);
 
-                // Allocate a local slot for the loop variable.
-                let name_local = self.locals.alloc(name);
+                // Keep loop variables environment-backed. `ForNext` also keeps
+                // the next index on the stack, so treating that value as a
+                // local binding would corrupt the loop state.
                 let name_idx = self.intern_name(name);
 
                 let loop_start = self.chunk.code.len();
                 let exhausted = self.emit(Instr::ForNext(name_idx, 0));
-
-                // Store the loop variable in the fast local slot.
-                self.emit(Instr::DefLocal(name_local, true));
 
                 self.emit(Instr::PushScope);
                 self.compile_block(body);
