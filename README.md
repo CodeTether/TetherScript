@@ -1,18 +1,18 @@
-# TetherScript
+# tetherscript
 
-TetherScript is a small, embeddable scripting language for Rust hosts and AI-agent
+tetherscript is a small, embeddable scripting language for Rust hosts and AI-agent
 workflows. It is dynamically typed, uses Rust-like syntax, and is implemented in
 Rust with two runtimes: a tree-walking interpreter and a stack-based bytecode VM.
 
 The package, library, and binary are named `tetherscript`.
 
-TetherScript is meant for project policy, validators, workflow glue, plugin hooks,
+tetherscript is meant for project policy, validators, workflow glue, plugin hooks,
 and other fast-changing behavior that should not require rebuilding a Rust
 application.
 
 ## Status
 
-TetherScript currently includes:
+tetherscript currently includes:
 
 - A tree-walking interpreter used as the reference runtime.
 - A stack-based bytecode VM targeting the same observable semantics.
@@ -24,7 +24,8 @@ TetherScript currently includes:
 - `Result` values and `?` propagation for expected failures.
 - Method calls on built-in values.
 - JSON parsing/encoding implemented in-tree.
-- Blocking HTTP client helpers and a blocking HTTP/1.1 server.
+- Blocking HTTP client helpers, a blocking HTTP/1.1 handler server, and a
+  native cached static-file server.
 - Experimental browser primitives for parsing small HTML fragments, applying
   simple CSS rules, computing block layout, and rendering deterministic text
   display lists.
@@ -37,11 +38,11 @@ TetherScript currently includes:
 - SMTP sending support.
 - Standard tools for filesystem, process, environment, path, time, Base64,
   SHA-256, and URL parsing.
-- A Rust plugin host for loading TetherScript source and calling named hooks.
+- A Rust plugin host for loading tetherscript source and calling named hooks.
 - A small LSP server plus VSCode extension.
 
 The long-term direction is controlled extensibility for Rust applications:
-TetherScript source is editable and inspectable, while the Rust host remains
+tetherscript source is editable and inspectable, while the Rust host remains
 responsible for trust, capabilities, auditing, and resource budgets.
 
 ## Quick start
@@ -49,21 +50,21 @@ responsible for trust, capabilities, auditing, and resource budgets.
 ```bash
 cargo build --release
 
-# Run with the reference interpreter
-./target/release/tetherscript examples/hello.tether
-./target/release/tetherscript examples/fib.tether
+# Run with the bytecode VM (default)
+./target/release/tetherscript run examples/hello.tether
+./target/release/tetherscript run examples/fib.tether
 
-# Run with the bytecode VM
-./target/release/tetherscript --vm examples/hello.tether
-./target/release/tetherscript --vm examples/fib.tether
+# Run with the reference interpreter
+./target/release/tetherscript run --interp examples/hello.tether
+./target/release/tetherscript run --interp examples/fib.tether
 
 # Inspect the frontend / compiler output
-./target/release/tetherscript --tokens   examples/hello.tether
-./target/release/tetherscript --ast      examples/hello.tether
-./target/release/tetherscript --bytecode examples/hello.tether
+./target/release/tetherscript inspect --tokens   examples/hello.tether
+./target/release/tetherscript inspect --ast      examples/hello.tether
+./target/release/tetherscript inspect --bytecode examples/hello.tether
 
 # Serve LSP over stdio for editors
-./target/release/tetherscript --lsp
+./target/release/tetherscript lsp
 ```
 
 ## Language example
@@ -83,7 +84,7 @@ fn main() {
 
 ## HTTP server
 
-TetherScript ships with a dependency-free blocking HTTP/1.1 server exposed as
+tetherscript ships with a dependency-free blocking HTTP/1.1 server exposed as
 `http_serve`:
 
 ```kl
@@ -103,13 +104,31 @@ The handler receives a request map with `method`, `path`, `query`, `headers`, an
 `body`. It may return either a string, sent as `200 text/plain`, or a map with
 optional `status`, `headers`, and `body`.
 
+For static sites, `http_serve_static(port, root_dir)` preloads files through the
+granted `fs` capability and serves precomputed responses from native Rust without
+calling a tetherscript handler per request:
+
+```kl
+fn main() {
+    http_serve_static(8788, "dist")
+}
+```
+
+Run it with a filesystem grant scoped to the site root:
+
+```bash
+./target/release/tetherscript run --grant-fs examples/content_site \
+  examples/static_site_server_native.tether
+```
+
 ## Standard tools
 
 The runtime includes dependency-free standard tools exposed as built-ins,
 including:
 
 - `json_parse`, `json_encode`, `json_encode_pretty`
-- `http_get`, `http_head`, `http_post`, `http_request`, `http_serve`
+- `http_get`, `http_head`, `http_post`, `http_request`, `http_serve`,
+  `http_serve_static`
 - `browser_parse_html`, `browser_parse_css`, `browser_styles`,
   `browser_query_selector`, `browser_text_content`, `browser_snapshot`,
   `browser_layout`, `browser_display_list`, `browser_render`
@@ -130,14 +149,14 @@ See [`docs/standard-tools.md`](docs/standard-tools.md) for more detail.
 
 ## Plugin embedding
 
-TetherScript can be embedded as a local plugin language. A Rust host can load
-TetherScript source, grant host-provided authority, and call named functions as
+tetherscript can be embedded as a local plugin language. A Rust host can load
+tetherscript source, grant host-provided authority, and call named functions as
 hooks.
 
 This is the intended boundary:
 
 ```text
-Rust host / agent system -> TetherScript hook -> granted host capability -> structured result
+Rust host / agent system -> tetherscript hook -> granted host capability -> structured result
 ```
 
 See [`docs/tetherscript-and-codetether.md`](docs/tetherscript-and-codetether.md)
@@ -146,7 +165,7 @@ for the CodeTether integration model.
 ## Editor support
 
 A VSCode extension lives in [`editor/vscode/`](editor/vscode/). It provides syntax
-highlighting and connects VSCode to `tetherscript --lsp` for live lex/parse
+highlighting and connects VSCode to `tetherscript lsp` for live lex/parse
 diagnostics.
 
 ## Design principles
@@ -190,7 +209,10 @@ src/
   bytecode.rs    — bytecode instruction/chunk/function types
   capability.rs  — capability trait/object model
   compiler.rs    — AST to bytecode compiler
-  http.rs        — HTTP client/server built-ins
+  http.rs        — HTTP built-in module surface
+  http_client.rs — plain HTTP client helpers
+  http_server.rs — dynamic handler HTTP server
+  http_static/   — native cached static-file HTTP server
   interp.rs      — tree-walking interpreter
   json.rs        — in-tree JSON parser/encoder
   lexer.rs       — lexer

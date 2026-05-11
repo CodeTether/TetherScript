@@ -194,9 +194,11 @@ fn expect_recipients(value: &Value) -> Result<Vec<String>, String> {
 }
 
 fn load_dkim_config(from: &str) -> Result<DkimConfig, String> {
-    let selector = dkim_env("TETHERSCRIPT_DKIM_SELECTOR", "tetherscript_DKIM_SELECTOR").map_err(|_| {
-        "smtp_send: missing TETHERSCRIPT_DKIM_SELECTOR or tetherscript_DKIM_SELECTOR".to_string()
-    })?;
+    let selector =
+        dkim_env("TETHERSCRIPT_DKIM_SELECTOR", "tetherscript_DKIM_SELECTOR").map_err(|_| {
+            "smtp_send: missing TETHERSCRIPT_DKIM_SELECTOR or tetherscript_DKIM_SELECTOR"
+                .to_string()
+        })?;
     let domain = match dkim_env("TETHERSCRIPT_DKIM_DOMAIN", "tetherscript_DKIM_DOMAIN") {
         Ok(v) if !v.trim().is_empty() => v,
         _ => from_domain(from)?,

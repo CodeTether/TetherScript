@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+mkdir -p examples/content_site/dist
+tetherscript run --grant-fs examples/content_site examples/static_site_gen.tether
