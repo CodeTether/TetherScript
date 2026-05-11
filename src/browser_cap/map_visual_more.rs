@@ -13,14 +13,9 @@ pub(crate) fn point_eval(args: &[Value]) -> Result<BrowserCall, String> {
     ))
 }
 
-pub(crate) fn raw_visual(method: &str, args: &[Value]) -> Result<BrowserCall, String> {
-    Ok(BrowserCall::new(
-        method,
-        "browser.visual",
-        super::super::value::map_value(vec![
-            ("action", super::super::value::str_value(method)),
-            ("before", super::super::args::expect_value(method, args, 0)?),
-            ("after", super::super::args::expect_value(method, args, 1)?),
-        ]),
+pub(crate) fn raw_visual(method: &str, _: &[Value]) -> Result<BrowserCall, String> {
+    Err(format!(
+        "browser.{}: browserctl backend does not support visual diff actions",
+        method
     ))
 }

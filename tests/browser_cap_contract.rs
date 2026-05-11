@@ -86,8 +86,78 @@ fn map(entries: Vec<(&str, Value)>) -> Value {
     )))
 }
 
+fn list(values: Vec<Value>) -> Value {
+    Value::List(Rc::new(RefCell::new(values)))
+}
+
 fn invoke(auth: &Rc<dyn Authority>, method: &str, args: &[Value]) -> Result<Value, String> {
     auth.invoke(&mut NoopRuntime, method, args)
+}
+
+fn all_scopes() -> Vec<String> {
+    [
+        "browser.navigate",
+        "browser.interact",
+        "browser.inspect.dom",
+        "browser.inspect.network",
+        "browser.inspect.console",
+        "browser.inspect.storage",
+        "browser.inspect.react",
+        "browser.mutate.storage",
+        "browser.replay.network",
+        "browser.screenshot",
+        "browser.visual",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect()
+}
+
+fn body_action(body: &str) -> String {
+    let needle = "\"action\":\"";
+    let start = body.find(needle).unwrap() + needle.len();
+    let rest = &body[start..];
+    rest[..rest.find('"').unwrap()].to_string()
+}
+
+fn is_browserctl_action(action: &str) -> bool {
+    matches!(
+        action,
+        "health"
+            | "detect"
+            | "start"
+            | "stop"
+            | "snapshot"
+            | "goto"
+            | "back"
+            | "click"
+            | "upload"
+            | "fill"
+            | "type"
+            | "press"
+            | "text"
+            | "html"
+            | "eval"
+            | "click_text"
+            | "fill_native"
+            | "toggle"
+            | "screenshot"
+            | "mouse_click"
+            | "keyboard_type"
+            | "keyboard_press"
+            | "reload"
+            | "wait"
+            | "tabs"
+            | "tabs_select"
+            | "tabs_new"
+            | "tabs_close"
+            | "network_log"
+            | "fetch"
+            | "axios"
+            | "xhr"
+            | "replay"
+            | "diagnose"
+    )
 }
 
 #[test]
@@ -171,4 +241,108 @@ fn origin_denial_happens_before_network_io() {
     );
     let err = invoke(&auth, "goto", &[str_value("http://evil.test")]).unwrap_err();
     assert!(err.contains("origin http://evil.test is not granted"));
+}
+
+#[test]
+fn high_level_methods_emit_only_browserctl_actions() {
+    let cases = vec![
+        ("health", vec![]),
+        ("detect", vec![]),
+        ("start", vec![]),
+        ("stop", vec![]),
+        ("goto", vec![str_value("http://app.test/home")]),
+        ("reload", vec![]),
+        ("back", vec![]),
+        ("tabs", vec![]),
+        ("tabs_select", vec![Value::Int(0)]),
+        ("tabs_new", vec![str_value("http://app.test/new")]),
+        ("tabs_close", vec![Value::Int(0)]),
+        ("wait_for_url", vec![str_value("/ready")]),
+        ("click", vec![str_value("#save")]),
+        (
+            "upload",
+            vec![
+                str_value("input[type=file]"),
+                list(vec![str_value("a.txt")]),
+            ],
+        ),
+        (
+            "fill",
+            vec![str_value("#email"), str_value("riley@example.com")],
+        ),
+        ("type", vec![str_value("#email"), str_value("abc")]),
+        ("press", vec![str_value("Enter")]),
+        ("click_text", vec![str_value("Save")]),
+        ("fill_native", vec![str_value("#email")]),
+        ("toggle", vec![str_value("#enabled")]),
+        ("mouse_click", vec![Value::Int(1), Value::Int(2)]),
+        ("keyboard_type", vec![str_value("hello")]),
+        ("keyboard_press", vec![str_value("Enter")]),
+        ("snapshot", vec![]),
+        ("page_snapshot", vec![]),
+        ("dom_snapshot", vec![]),
+        ("text", vec![str_value("body")]),
+        ("html", vec![str_value("body")]),
+        ("eval", vec![str_value("document.title")]),
+        ("wait_for_selector", vec![str_value("#ready")]),
+        ("wait_for_text", vec![str_value("Ready")]),
+        ("screenshot", vec![str_value("screen.png")]),
+        ("console_logs", vec![]),
+        ("react.detect", vec![]),
+        ("network_log", vec![str_value("/api")]),
+        ("failed_requests", vec![]),
+        ("fetch", vec![str_value("http://app.test/api")]),
+        ("axios", vec![str_value("http://app.test/api")]),
+        ("xhr", vec![str_value("http://app.test/api")]),
+        ("replay", vec![str_value("/api")]),
+        ("replay_request", vec![str_value("/api")]),
+        ("diagnose", vec![]),
+        ("wait_for_request", vec![str_value("/api")]),
+        ("wait_for_response", vec![str_value("/api")]),
+        ("cookies", vec![]),
+        ("local_storage", vec![]),
+        ("session_storage", vec![]),
+        ("indexed_db_summary", vec![]),
+        ("set_cookie", vec![str_value("a=b")]),
+        ("set_local_storage", vec![str_value("k"), str_value("v")]),
+        ("clear_storage", vec![]),
+        ("is_visible", vec![str_value("#save")]),
+        ("is_enabled", vec![str_value("#save")]),
+        ("bounding_box", vec![str_value("#save")]),
+        ("screenshot_element", vec![str_value("#save")]),
+        ("find_visual_text", vec![str_value("Save")]),
+        ("find_element_at", vec![Value::Int(1), Value::Int(2)]),
+    ];
+
+    for (method, args) in cases {
+        let bridge = FakeBridge::new("{\"ok\":true,\"value\":null}");
+        let auth = BrowserAuthority::new(
+            &bridge.endpoint,
+            vec!["http://app.test".into()],
+            all_scopes(),
+        );
+        invoke(&auth, method, &args)
+            .unwrap_or_else(|err| panic!("browser.{method} failed before bridge: {err}"));
+        bridge.handle.join().unwrap();
+        let action = body_action(&bridge.body.lock().unwrap());
+        assert!(
+            is_browserctl_action(&action),
+            "browser.{method} emitted non-browserctl action `{action}`"
+        );
+    }
+}
+
+#[test]
+fn unsupported_backend_methods_fail_before_network_io() {
+    let auth = BrowserAuthority::new("http://127.0.0.1:1/browser", Vec::new(), all_scopes());
+    let idle = invoke(&auth, "wait_for_network_idle", &[]).unwrap_err();
+    assert!(idle.contains("does not support network idle waits"));
+
+    let diff = invoke(
+        &auth,
+        "visual_diff",
+        &[str_value("before.png"), str_value("after.png")],
+    )
+    .unwrap_err();
+    assert!(diff.contains("does not support visual diff actions"));
 }
