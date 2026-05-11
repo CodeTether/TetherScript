@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.0-alpha.11] - 2026-05-11
+
+### Added
+
+- Added integration tests that run the core example programs and verify stdout against checked-in golden files.
+- Added regression coverage for the use-after-move example's expected ownership error.
+
 ## [0.1.0-alpha.8] - 2026-05-02
 
 ### Added
