@@ -83,6 +83,15 @@ pub enum Expr {
     // `panic "msg"` — unconditional halt
     Panic(Box<Expr>),
 
+    // Async/concurrency expressions.
+    AsyncFn {
+        params: Vec<String>,
+        body: Rc<Block>,
+    },
+    Await(Box<Expr>),
+    Spawn(Box<Expr>),
+    Join(Vec<Expr>),
+
     // `expr?` — if expr is Err(e), short-circuit out of the enclosing fn
     // by returning Err(e); if Ok(v), evaluate to v. See interp for semantics.
     Try(Box<Expr>),

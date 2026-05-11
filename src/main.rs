@@ -38,6 +38,7 @@ mod ownership;
 mod parser;
 mod provider_cap;
 mod rpc_cap;
+mod scheduler;
 mod smtp;
 mod system;
 mod tls;

@@ -15,7 +15,8 @@ application.
 tetherscript currently includes:
 
 - A tree-walking interpreter used as the reference runtime.
-- A stack-based bytecode VM targeting the same observable semantics.
+- A stack-based bytecode VM targeting the same observable semantics, with local
+  slots for function parameters and locals plus constant-pool deduplication.
 - Dynamic values: integers, floats, booleans, strings, lists, maps, functions,
   native functions, `nil`, and `Result`.
 - Variables, lexical scopes, functions, closures, recursion, `if`/`else`,
@@ -196,7 +197,6 @@ diagnostics.
   implements a practical DOM/JS subset rather than every web standard.
 - Capability audit logs and richer resource budgets.
 - Moving ambient host tools behind explicit capabilities where practical.
-- VM local-slot optimization; variable lookup is still name-based.
 - Async scheduler.
 
 ## Repository layout

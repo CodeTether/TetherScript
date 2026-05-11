@@ -407,7 +407,6 @@ impl Compiler {
                 // the next index on the stack, so treating that value as a
                 // local binding would corrupt the loop state.
                 let name_idx = self.intern_name(name);
-
                 let loop_start = self.chunk.code.len();
                 let exhausted = self.emit(Instr::ForNext(name_idx, 0));
 
@@ -453,6 +452,22 @@ impl Compiler {
             Expr::Try(inner) => {
                 self.compile_expr(inner);
                 self.emit(Instr::Try);
+            }
+
+            Expr::AsyncFn { params, body } => {
+                let proto = Self::compile_fn(None, params, body);
+                let idx = self.chunk.protos.len() as u16;
+                self.chunk.protos.push(Rc::new(proto));
+                self.emit(Instr::MakeFn(idx));
+            }
+            Expr::Await(inner) | Expr::Spawn(inner) => {
+                self.compile_expr(inner);
+            }
+            Expr::Join(handles) => {
+                for h in handles {
+                    self.compile_expr(h);
+                }
+                self.emit(Instr::BuildList(handles.len() as u16));
             }
         }
     }

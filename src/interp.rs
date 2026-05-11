@@ -365,6 +365,23 @@ impl Interpreter {
                 Err(Unwind::Panic(format!("panic: {}", v)))
             }
 
+            Expr::AsyncFn { params, body } => Ok(Value::Fn(Rc::new(FnObj {
+                params: params.clone(),
+                body: body.clone(),
+                closure: env.clone(),
+                name: None,
+            }))),
+
+            Expr::Await(inner) | Expr::Spawn(inner) => self.eval(inner, env),
+
+            Expr::Join(exprs) => {
+                let mut out = Vec::with_capacity(exprs.len());
+                for expr in exprs {
+                    out.push(self.eval(expr, env)?);
+                }
+                Ok(Value::List(Rc::new(RefCell::new(out))))
+            }
+
             Expr::Try(inner) => {
                 let v = self.eval(inner, env)?;
                 match v {

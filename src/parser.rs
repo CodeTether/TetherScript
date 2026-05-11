@@ -99,6 +99,18 @@ impl Parser {
     fn parse_stmt(&mut self) -> Result<Stmt, ParseError> {
         match self.peek() {
             Token::Let => self.parse_let(),
+            Token::Async
+                if matches!(
+                    self.tokens.get(self.pos + 1).map(|s| &s.token),
+                    Some(Token::Fn)
+                ) && matches!(
+                    self.tokens.get(self.pos + 2).map(|s| &s.token),
+                    Some(Token::Ident(_))
+                ) =>
+            {
+                self.bump();
+                self.parse_fn_decl()
+            }
             // `fn` followed by an identifier is a declaration; `fn (` is an
             // anonymous function expression (e.g. returned from a block).
             Token::Fn
@@ -310,6 +322,10 @@ impl Parser {
             Token::While => self.parse_while(),
             Token::For => self.parse_for(),
             Token::Fn => self.parse_fn_expr(),
+            Token::Async => self.parse_async_fn(),
+            Token::Await => self.parse_await(),
+            Token::Spawn => self.parse_spawn(),
+            Token::Join => self.parse_join(),
             Token::Return => self.parse_return(),
             Token::Panic => self.parse_panic(),
 
@@ -349,6 +365,7 @@ impl Parser {
                 self.bump();
                 let name = match self.bump().token {
                     Token::Ident(s) => s,
+                    Token::Join => "join".to_string(),
                     other => {
                         return Err(self.error(format!("expected field name, got {:?}", other)))
                     }
@@ -487,6 +504,43 @@ impl Parser {
             _ => Some(Box::new(self.parse_expr()?)),
         };
         Ok(Expr::Return(expr))
+    }
+
+    fn parse_async_fn(&mut self) -> Result<Expr, ParseError> {
+        self.bump();
+        self.expect(&Token::Fn, "`fn` after `async`")?;
+        let params = self.parse_params()?;
+        let body = Rc::new(self.parse_block()?);
+        Ok(Expr::AsyncFn { params, body })
+    }
+
+    fn parse_await(&mut self) -> Result<Expr, ParseError> {
+        self.bump();
+        let expr = self.parse_expr()?;
+        Ok(Expr::Await(Box::new(expr)))
+    }
+
+    fn parse_spawn(&mut self) -> Result<Expr, ParseError> {
+        self.bump();
+        let expr = self.parse_expr()?;
+        Ok(Expr::Spawn(Box::new(expr)))
+    }
+
+    fn parse_join(&mut self) -> Result<Expr, ParseError> {
+        self.bump();
+        self.expect(&Token::LParen, "`(` after `join`")?;
+        let mut handles = Vec::new();
+        self.skip_newlines();
+        while !self.check(&Token::RParen) {
+            handles.push(self.parse_expr()?);
+            self.skip_newlines();
+            if !self.eat(&Token::Comma) {
+                break;
+            }
+            self.skip_newlines();
+        }
+        self.expect(&Token::RParen, "`)`")?;
+        Ok(Expr::Join(handles))
     }
 
     fn parse_panic(&mut self) -> Result<Expr, ParseError> {
