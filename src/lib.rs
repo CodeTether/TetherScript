@@ -2,8 +2,14 @@
 
 pub mod ast;
 pub mod browser;
+pub mod browser_agent;
 pub mod browser_cap;
+pub mod browser_cookie;
+pub mod browser_dom;
+pub mod browser_events;
 pub mod browser_js;
+pub mod browser_loop;
+pub mod browser_session;
 pub mod bytecode;
 pub mod capability;
 pub mod compiler;

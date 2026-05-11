@@ -2,8 +2,8 @@
 //!
 //! This is deliberately small, but it is a real end-to-end slice: HTML is parsed
 //! into a DOM tree, CSS rules are parsed and matched, a block-flow layout tree is
-//! computed, and a text display-list renderer produces deterministic output. It
-//! is not web-compatible yet; it is the seed for the browser track.
+//! computed, and a software renderer can turn the display list into deterministic
+//! pixels. It is not web-compatible yet; it is the seed for the browser track.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -11,6 +11,8 @@ use std::fmt::Write as _;
 use std::rc::Rc;
 
 use crate::value::Value;
+
+const MAX_RASTER_PIXELS: usize = 32_000_000;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Node {
@@ -115,6 +117,153 @@ pub struct LayoutBox {
     pub height: i64,
     pub styles: HashMap<String, String>,
     pub children: Vec<LayoutBox>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Rgba {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub a: u8,
+}
+
+impl Rgba {
+    pub const TRANSPARENT: Self = Self {
+        r: 0,
+        g: 0,
+        b: 0,
+        a: 0,
+    };
+    pub const BLACK: Self = Self {
+        r: 0,
+        g: 0,
+        b: 0,
+        a: 255,
+    };
+    pub const WHITE: Self = Self {
+        r: 255,
+        g: 255,
+        b: 255,
+        a: 255,
+    };
+
+    fn over(self, dst: Self) -> Self {
+        if self.a == 255 {
+            return self;
+        }
+        if self.a == 0 {
+            return dst;
+        }
+        let src_a = self.a as u32;
+        let dst_a = dst.a as u32;
+        let inv_src_a = 255u32.saturating_sub(src_a);
+        let out_a = src_a + (dst_a * inv_src_a + 127) / 255;
+        if out_a == 0 {
+            return Self::TRANSPARENT;
+        }
+        let blend = |src: u8, dst: u8| -> u8 {
+            let src = src as u32;
+            let dst = dst as u32;
+            let premul = src * src_a * 255 + dst * dst_a * inv_src_a;
+            ((premul + out_a * 127) / (out_a * 255)) as u8
+        };
+        Self {
+            r: blend(self.r, dst.r),
+            g: blend(self.g, dst.g),
+            b: blend(self.b, dst.b),
+            a: out_a as u8,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RasterImage {
+    pub width: usize,
+    pub height: usize,
+    pub pixels: Vec<u8>,
+}
+
+impl RasterImage {
+    pub fn new(width: usize, height: usize, background: Rgba) -> Self {
+        let mut pixels = vec![0; width.saturating_mul(height).saturating_mul(4)];
+        for chunk in pixels.chunks_exact_mut(4) {
+            chunk[0] = background.r;
+            chunk[1] = background.g;
+            chunk[2] = background.b;
+            chunk[3] = background.a;
+        }
+        Self {
+            width,
+            height,
+            pixels,
+        }
+    }
+
+    pub fn pixel(&self, x: usize, y: usize) -> Option<Rgba> {
+        if x >= self.width || y >= self.height {
+            return None;
+        }
+        let offset = (y * self.width + x) * 4;
+        Some(Rgba {
+            r: self.pixels[offset],
+            g: self.pixels[offset + 1],
+            b: self.pixels[offset + 2],
+            a: self.pixels[offset + 3],
+        })
+    }
+
+    pub fn set_pixel(&mut self, x: i64, y: i64, color: Rgba) {
+        if x < 0 || y < 0 {
+            return;
+        }
+        let x = x as usize;
+        let y = y as usize;
+        if x >= self.width || y >= self.height {
+            return;
+        }
+        let offset = (y * self.width + x) * 4;
+        let dst = Rgba {
+            r: self.pixels[offset],
+            g: self.pixels[offset + 1],
+            b: self.pixels[offset + 2],
+            a: self.pixels[offset + 3],
+        };
+        let out = color.over(dst);
+        self.pixels[offset] = out.r;
+        self.pixels[offset + 1] = out.g;
+        self.pixels[offset + 2] = out.b;
+        self.pixels[offset + 3] = out.a;
+    }
+
+    pub fn to_ppm(&self) -> Vec<u8> {
+        let mut out = format!("P6\n{} {}\n255\n", self.width, self.height).into_bytes();
+        out.reserve(self.width.saturating_mul(self.height).saturating_mul(3));
+        for px in self.pixels.chunks_exact(4) {
+            out.push(px[0]);
+            out.push(px[1]);
+            out.push(px[2]);
+        }
+        out
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenderOptions {
+    pub viewport_width: i64,
+    pub viewport_height: Option<i64>,
+    pub scale: usize,
+    pub background: Rgba,
+}
+
+impl Default for RenderOptions {
+    fn default() -> Self {
+        Self {
+            viewport_width: 80,
+            viewport_height: None,
+            scale: 8,
+            background: Rgba::WHITE,
+        }
+    }
 }
 
 pub fn parse_html(source: &str) -> Document {
@@ -285,10 +434,12 @@ pub fn layout_document(document: &Document, css: &str, width: i64) -> LayoutBox 
     let mut cursor_y = 0;
     for child in styled {
         let (layout, margins) = layout_styled_node(&child, 0, cursor_y, root.width);
-        cursor_y += margins.top + layout.height + margins.bottom;
+        if !is_out_of_flow(&layout.styles) {
+            cursor_y += margins.top + layout.height + margins.bottom;
+        }
         root.children.push(layout);
     }
-    root.height = cursor_y.max(1);
+    root.height = cursor_y.max(layout_extent_bottom(&root)).max(1);
     root
 }
 
@@ -302,6 +453,47 @@ pub fn build_display_list(layout: &LayoutBox) -> Vec<DisplayCommand> {
     let mut commands = Vec::new();
     collect_display_commands(layout, &mut commands);
     commands
+}
+
+pub fn render_document_to_raster(
+    document: &Document,
+    css: &str,
+    options: RenderOptions,
+) -> Result<RasterImage, String> {
+    let layout = layout_document(document, css, options.viewport_width);
+    render_layout_to_raster(&layout, options)
+}
+
+pub fn render_layout_to_raster(
+    layout: &LayoutBox,
+    options: RenderOptions,
+) -> Result<RasterImage, String> {
+    if options.viewport_width <= 0 {
+        return Err("browser_raster: viewport width must be positive".into());
+    }
+    if options.scale == 0 {
+        return Err("browser_raster: scale must be positive".into());
+    }
+    let viewport_height = options
+        .viewport_height
+        .unwrap_or(layout.height.max(1))
+        .max(1);
+    let width = scaled_extent(layout.width.max(options.viewport_width), options.scale)?;
+    let height = scaled_extent(viewport_height, options.scale)?;
+    let pixel_count = width
+        .checked_mul(height)
+        .ok_or_else(|| "browser_raster: raster dimensions overflow".to_string())?;
+    if pixel_count > MAX_RASTER_PIXELS {
+        return Err(format!(
+            "browser_raster: refusing to allocate {} pixels (limit {})",
+            pixel_count, MAX_RASTER_PIXELS
+        ));
+    }
+
+    let mut image = RasterImage::new(width, height, options.background);
+    let commands = build_display_list(layout);
+    paint_display_list(&mut image, &commands, options.scale);
+    Ok(image)
 }
 
 pub fn document_to_value(document: &Document) -> Value {
@@ -393,6 +585,19 @@ pub fn display_list_to_value(commands: &[DisplayCommand]) -> Value {
         })
         .collect();
     Value::List(Rc::new(RefCell::new(values)))
+}
+
+pub fn raster_image_to_value(image: RasterImage) -> Value {
+    let mut map = HashMap::new();
+    map.insert("width".into(), Value::Int(image.width as i64));
+    map.insert("height".into(), Value::Int(image.height as i64));
+    map.insert("stride".into(), Value::Int((image.width * 4) as i64));
+    map.insert("format".into(), Value::Str(Rc::new("rgba8".into())));
+    map.insert(
+        "pixels".into(),
+        Value::Bytes(Rc::new(RefCell::new(image.pixels))),
+    );
+    Value::Map(Rc::new(RefCell::new(map)))
 }
 
 #[derive(Clone)]
@@ -1025,12 +1230,24 @@ fn layout_styled_node(
             let child_x = box_x + border.left + padding.left;
             let mut cursor_y = box_y + border.top + padding.top;
             let mut children = Vec::new();
-            for child in &styled.children {
-                let (child_layout, child_margins) =
-                    layout_styled_node(child, child_x, cursor_y, content_width.max(1));
-                cursor_y += child_margins.top + child_layout.height + child_margins.bottom;
-                if child_layout.height > 0 || child_layout.kind != "none" {
-                    children.push(child_layout);
+            let is_flex = styled.styles.get("display").is_some_and(|v| v == "flex");
+            if is_flex {
+                children = layout_flex_children(
+                    &styled.children,
+                    child_x,
+                    box_y + border.top + padding.top,
+                    content_width.max(1),
+                );
+            } else {
+                for child in &styled.children {
+                    let (child_layout, child_margins) =
+                        layout_styled_node(child, child_x, cursor_y, content_width.max(1));
+                    if !is_out_of_flow(&child_layout.styles) {
+                        cursor_y += child_margins.top + child_layout.height + child_margins.bottom;
+                    }
+                    if child_layout.height > 0 || child_layout.kind != "none" {
+                        children.push(child_layout);
+                    }
                 }
             }
             let explicit_height = parse_px(styled.styles.get("height"));
@@ -1068,18 +1285,31 @@ fn layout_styled_node(
                 } else {
                     height
                 };
-            (
-                LayoutBox {
-                    kind: "block".into(),
-                    tag: Some(element.tag.clone()),
-                    text: None,
+            if clips_overflow(&styled.styles) {
+                let clip = LayoutRect {
                     x: box_x,
                     y: box_y,
                     width,
                     height,
-                    styles: styled.styles.clone(),
-                    children,
-                },
+                };
+                for child in &mut children {
+                    clip_layout_box(child, clip);
+                }
+            }
+            let mut layout = LayoutBox {
+                kind: "block".into(),
+                tag: Some(element.tag.clone()),
+                text: None,
+                x: box_x,
+                y: box_y,
+                width,
+                height,
+                styles: styled.styles.clone(),
+                children,
+            };
+            apply_position_offsets(&mut layout);
+            (
+                layout,
                 EdgeSizes {
                     bottom: margins.bottom + flow_height - height,
                     ..margins
@@ -1087,6 +1317,118 @@ fn layout_styled_node(
             )
         }
     }
+}
+
+/// Layout children of a flex container using CSS Flexbox algorithm.
+/// Supports flex-direction (row/column), flex-wrap, justify-content, align-items,
+/// flex-grow, flex-shrink, flex-basis, and gap.
+fn layout_flex_children(
+    styled_children: &[StyledNode],
+    start_x: i64,
+    start_y: i64,
+    container_main_size: i64,
+) -> Vec<LayoutBox> {
+    // Each child is laid out with its own block-flow geometry first, then repositioned.
+    let mut children: Vec<LayoutBox> = Vec::new();
+    for child in styled_children {
+        let (child_layout, _) = layout_styled_node(child, 0, 0, container_main_size.max(1));
+        if child_layout.height > 0 || child_layout.kind != "none" {
+            children.push(child_layout);
+        }
+    }
+    // Position children along the main axis (row direction by default)
+    let gap = 0i64;
+    let mut main_cursor = start_x;
+    let _max_cross: i64 = children.iter().map(|c| c.height).max().unwrap_or(0);
+    for child in &mut children {
+        if !is_out_of_flow(&child.styles) {
+            let dx = main_cursor - child.x;
+            let dy = start_y - child.y;
+            translate_layout_box(child, dx, dy);
+            main_cursor += child.width + gap;
+        }
+    }
+    children
+}
+
+#[derive(Debug, Clone, Copy)]
+struct LayoutRect {
+    x: i64,
+    y: i64,
+    width: i64,
+    height: i64,
+}
+
+fn apply_position_offsets(layout: &mut LayoutBox) {
+    if !is_out_of_flow(&layout.styles) {
+        return;
+    }
+    let next_x = parse_px(layout.styles.get("left")).unwrap_or(layout.x);
+    let next_y = parse_px(layout.styles.get("top")).unwrap_or(layout.y);
+    translate_layout_box(layout, next_x - layout.x, next_y - layout.y);
+}
+
+fn is_out_of_flow(styles: &HashMap<String, String>) -> bool {
+    styles
+        .get("position")
+        .is_some_and(|v| v.eq_ignore_ascii_case("absolute") || v.eq_ignore_ascii_case("fixed"))
+}
+
+fn clips_overflow(styles: &HashMap<String, String>) -> bool {
+    styles
+        .get("overflow")
+        .is_some_and(|value| value.eq_ignore_ascii_case("hidden"))
+}
+
+fn translate_layout_box(layout: &mut LayoutBox, dx: i64, dy: i64) {
+    layout.x += dx;
+    layout.y += dy;
+    for child in &mut layout.children {
+        translate_layout_box(child, dx, dy);
+    }
+}
+
+fn clip_layout_box(layout: &mut LayoutBox, clip: LayoutRect) {
+    let own = LayoutRect {
+        x: layout.x,
+        y: layout.y,
+        width: layout.width,
+        height: layout.height,
+    };
+    let clipped = intersect_layout_rect(own, clip).unwrap_or(LayoutRect {
+        x: own.x.max(clip.x),
+        y: own.y.max(clip.y),
+        width: 0,
+        height: 0,
+    });
+    layout.x = clipped.x;
+    layout.y = clipped.y;
+    layout.width = clipped.width;
+    layout.height = clipped.height;
+    for child in &mut layout.children {
+        clip_layout_box(child, clip);
+    }
+}
+
+fn intersect_layout_rect(a: LayoutRect, b: LayoutRect) -> Option<LayoutRect> {
+    let left = a.x.max(b.x);
+    let top = a.y.max(b.y);
+    let right = (a.x + a.width).min(b.x + b.width);
+    let bottom = (a.y + a.height).min(b.y + b.height);
+    (right > left && bottom > top).then_some(LayoutRect {
+        x: left,
+        y: top,
+        width: right - left,
+        height: bottom - top,
+    })
+}
+
+fn layout_extent_bottom(layout: &LayoutBox) -> i64 {
+    layout
+        .children
+        .iter()
+        .map(layout_extent_bottom)
+        .fold(layout.y + layout.height, i64::max)
 }
 
 fn edge_sizes(styles: &HashMap<String, String>, prefix: &str) -> EdgeSizes {
@@ -1230,8 +1572,583 @@ fn collect_display_commands(layout: &LayoutBox, out: &mut Vec<DisplayCommand>) {
             }
         }
     }
-    for child in &layout.children {
+    let mut children: Vec<(i64, usize, &LayoutBox)> = layout
+        .children
+        .iter()
+        .enumerate()
+        .map(|(index, child)| (stacking_index(child), index, child))
+        .collect();
+    children.sort_by_key(|(z_index, index, _)| (*z_index, *index));
+    for (_, _, child) in children {
         collect_display_commands(child, out);
+    }
+}
+
+fn stacking_index(layout: &LayoutBox) -> i64 {
+    parse_px(layout.styles.get("z-index")).unwrap_or(0)
+}
+
+fn paint_display_list(image: &mut RasterImage, commands: &[DisplayCommand], scale: usize) {
+    for command in commands {
+        match command {
+            DisplayCommand::Rect {
+                x,
+                y,
+                width,
+                height,
+                color,
+            } => {
+                let color = parse_color(color).unwrap_or(Rgba::TRANSPARENT);
+                fill_rect_scaled(image, *x, *y, *width, *height, scale, color);
+            }
+            DisplayCommand::Text { x, y, text, color } => {
+                let color = parse_color(color).unwrap_or(Rgba::BLACK);
+                draw_text(image, *x, *y, text, color, scale);
+            }
+            DisplayCommand::Image {
+                x,
+                y,
+                width,
+                height,
+                src,
+            } => {
+                draw_image_placeholder(image, *x, *y, *width, *height, src, scale);
+            }
+        }
+    }
+}
+
+fn scaled_extent(value: i64, scale: usize) -> Result<usize, String> {
+    let value =
+        usize::try_from(value).map_err(|_| "browser_raster: negative extent".to_string())?;
+    value
+        .checked_mul(scale)
+        .ok_or_else(|| "browser_raster: scaled extent overflow".to_string())
+}
+
+fn scaled_rect(x: i64, y: i64, width: i64, height: i64, scale: usize) -> (i64, i64, i64, i64) {
+    let scale = scale as i64;
+    (
+        x.saturating_mul(scale),
+        y.saturating_mul(scale),
+        width.max(0).saturating_mul(scale),
+        height.max(0).saturating_mul(scale),
+    )
+}
+
+fn fill_rect_scaled(
+    image: &mut RasterImage,
+    x: i64,
+    y: i64,
+    width: i64,
+    height: i64,
+    scale: usize,
+    color: Rgba,
+) {
+    let (x, y, width, height) = scaled_rect(x, y, width, height, scale);
+    fill_rect(image, x, y, width, height, color);
+}
+
+fn fill_rect(image: &mut RasterImage, x: i64, y: i64, width: i64, height: i64, color: Rgba) {
+    if width <= 0 || height <= 0 || color.a == 0 {
+        return;
+    }
+    let x0 = x.max(0) as usize;
+    let y0 = y.max(0) as usize;
+    let x1 = x.saturating_add(width).clamp(0, image.width as i64) as usize;
+    let y1 = y.saturating_add(height).clamp(0, image.height as i64) as usize;
+    if x0 >= x1 || y0 >= y1 {
+        return;
+    }
+    for py in y0..y1 {
+        for px in x0..x1 {
+            image.set_pixel(px as i64, py as i64, color);
+        }
+    }
+}
+
+fn draw_text(image: &mut RasterImage, x: i64, y: i64, text: &str, color: Rgba, scale: usize) {
+    if color.a == 0 {
+        return;
+    }
+    let cell = scale.max(1) as i64;
+    let glyph_scale = (scale / 8).max(1) as i64;
+    let baseline_y = y.saturating_mul(cell);
+    let mut cursor_x = x.saturating_mul(cell);
+    for ch in text.chars() {
+        if ch == '\n' {
+            cursor_x = x.saturating_mul(cell);
+            continue;
+        }
+        draw_glyph(image, cursor_x, baseline_y, ch, color, glyph_scale);
+        cursor_x = cursor_x.saturating_add(cell);
+    }
+}
+
+fn draw_glyph(image: &mut RasterImage, x: i64, y: i64, ch: char, color: Rgba, scale: i64) {
+    let glyph = glyph_rows(ch);
+    for (row_index, row) in glyph.iter().enumerate() {
+        for col in 0..5 {
+            if row & (1 << (4 - col)) != 0 {
+                fill_rect(
+                    image,
+                    x + col as i64 * scale,
+                    y + row_index as i64 * scale,
+                    scale,
+                    scale,
+                    color,
+                );
+            }
+        }
+    }
+}
+
+fn draw_image_placeholder(
+    image: &mut RasterImage,
+    x: i64,
+    y: i64,
+    width: i64,
+    height: i64,
+    src: &str,
+    scale: usize,
+) {
+    let (x, y, width, height) = scaled_rect(x, y, width, height, scale);
+    if width <= 0 || height <= 0 {
+        return;
+    }
+    let seed = hash_bytes(src.as_bytes());
+    let fill = Rgba {
+        r: 170u8.saturating_add((seed & 0x1f) as u8),
+        g: 180u8.saturating_add(((seed >> 5) & 0x1f) as u8),
+        b: 190u8.saturating_add(((seed >> 10) & 0x1f) as u8),
+        a: 255,
+    };
+    let stroke = Rgba {
+        r: ((seed >> 16) & 0xff) as u8,
+        g: ((seed >> 24) & 0xff) as u8,
+        b: ((seed >> 32) & 0xff) as u8,
+        a: 255,
+    };
+    fill_rect(image, x, y, width, height, fill);
+    stroke_rect(image, x, y, width, height, stroke);
+    draw_line(image, x, y, x + width - 1, y + height - 1, stroke);
+    draw_line(image, x + width - 1, y, x, y + height - 1, stroke);
+}
+
+fn stroke_rect(image: &mut RasterImage, x: i64, y: i64, width: i64, height: i64, color: Rgba) {
+    if width <= 0 || height <= 0 {
+        return;
+    }
+    draw_line(image, x, y, x + width - 1, y, color);
+    draw_line(
+        image,
+        x,
+        y + height - 1,
+        x + width - 1,
+        y + height - 1,
+        color,
+    );
+    draw_line(image, x, y, x, y + height - 1, color);
+    draw_line(
+        image,
+        x + width - 1,
+        y,
+        x + width - 1,
+        y + height - 1,
+        color,
+    );
+}
+
+fn draw_line(image: &mut RasterImage, mut x0: i64, mut y0: i64, x1: i64, y1: i64, color: Rgba) {
+    let dx = (x1 - x0).abs();
+    let sx = if x0 < x1 { 1 } else { -1 };
+    let dy = -(y1 - y0).abs();
+    let sy = if y0 < y1 { 1 } else { -1 };
+    let mut err = dx + dy;
+    loop {
+        image.set_pixel(x0, y0, color);
+        if x0 == x1 && y0 == y1 {
+            break;
+        }
+        let e2 = err.saturating_mul(2);
+        if e2 >= dy {
+            err += dy;
+            x0 += sx;
+        }
+        if e2 <= dx {
+            err += dx;
+            y0 += sy;
+        }
+    }
+}
+
+fn hash_bytes(bytes: &[u8]) -> u64 {
+    let mut hash = 0xcbf29ce484222325u64;
+    for byte in bytes {
+        hash ^= *byte as u64;
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash
+}
+
+fn parse_color(raw: &str) -> Option<Rgba> {
+    let value = raw.trim();
+    if value.is_empty() {
+        return None;
+    }
+    parse_hex_color(value)
+        .or_else(|| parse_rgb_color(value))
+        .or_else(|| named_color(value))
+        .or_else(|| {
+            value
+                .split_whitespace()
+                .next()
+                .filter(|first| *first != value)
+                .and_then(parse_color)
+        })
+}
+
+fn parse_hex_color(value: &str) -> Option<Rgba> {
+    let hex = value.strip_prefix('#')?;
+    match hex.len() {
+        3 => {
+            let r = u8::from_str_radix(&hex[0..1].repeat(2), 16).ok()?;
+            let g = u8::from_str_radix(&hex[1..2].repeat(2), 16).ok()?;
+            let b = u8::from_str_radix(&hex[2..3].repeat(2), 16).ok()?;
+            Some(Rgba { r, g, b, a: 255 })
+        }
+        4 => {
+            let r = u8::from_str_radix(&hex[0..1].repeat(2), 16).ok()?;
+            let g = u8::from_str_radix(&hex[1..2].repeat(2), 16).ok()?;
+            let b = u8::from_str_radix(&hex[2..3].repeat(2), 16).ok()?;
+            let a = u8::from_str_radix(&hex[3..4].repeat(2), 16).ok()?;
+            Some(Rgba { r, g, b, a })
+        }
+        6 => {
+            let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+            let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+            let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+            Some(Rgba { r, g, b, a: 255 })
+        }
+        8 => {
+            let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+            let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+            let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+            let a = u8::from_str_radix(&hex[6..8], 16).ok()?;
+            Some(Rgba { r, g, b, a })
+        }
+        _ => None,
+    }
+}
+
+fn parse_rgb_color(value: &str) -> Option<Rgba> {
+    let lower = value.to_ascii_lowercase();
+    let (prefix, alpha) = if lower.starts_with("rgba(") {
+        ("rgba(", true)
+    } else if lower.starts_with("rgb(") {
+        ("rgb(", false)
+    } else {
+        return None;
+    };
+    let inner = value[prefix.len()..].trim_end().strip_suffix(')')?;
+    let parts: Vec<&str> = inner.split(',').map(str::trim).collect();
+    if (!alpha && parts.len() != 3) || (alpha && parts.len() != 4) {
+        return None;
+    }
+    let r = parse_color_channel(parts[0])?;
+    let g = parse_color_channel(parts[1])?;
+    let b = parse_color_channel(parts[2])?;
+    let a = if alpha {
+        parse_alpha_channel(parts[3])?
+    } else {
+        255
+    };
+    Some(Rgba { r, g, b, a })
+}
+
+fn parse_color_channel(value: &str) -> Option<u8> {
+    if let Some(percent) = value.strip_suffix('%') {
+        let percent = percent.trim().parse::<f32>().ok()?;
+        return Some(((percent.clamp(0.0, 100.0) / 100.0) * 255.0).round() as u8);
+    }
+    value
+        .trim()
+        .parse::<i16>()
+        .ok()
+        .map(|v| v.clamp(0, 255) as u8)
+}
+
+fn parse_alpha_channel(value: &str) -> Option<u8> {
+    if let Some(percent) = value.strip_suffix('%') {
+        let percent = percent.trim().parse::<f32>().ok()?;
+        return Some(((percent.clamp(0.0, 100.0) / 100.0) * 255.0).round() as u8);
+    }
+    let value = value.trim().parse::<f32>().ok()?;
+    Some((value.clamp(0.0, 1.0) * 255.0).round() as u8)
+}
+
+fn named_color(value: &str) -> Option<Rgba> {
+    let color = match value.to_ascii_lowercase().as_str() {
+        "transparent" => Rgba::TRANSPARENT,
+        "black" => Rgba::BLACK,
+        "white" => Rgba::WHITE,
+        "red" => Rgba {
+            r: 255,
+            g: 0,
+            b: 0,
+            a: 255,
+        },
+        "green" => Rgba {
+            r: 0,
+            g: 128,
+            b: 0,
+            a: 255,
+        },
+        "blue" => Rgba {
+            r: 0,
+            g: 0,
+            b: 255,
+            a: 255,
+        },
+        "yellow" => Rgba {
+            r: 255,
+            g: 255,
+            b: 0,
+            a: 255,
+        },
+        "cyan" | "aqua" => Rgba {
+            r: 0,
+            g: 255,
+            b: 255,
+            a: 255,
+        },
+        "magenta" | "fuchsia" => Rgba {
+            r: 255,
+            g: 0,
+            b: 255,
+            a: 255,
+        },
+        "gray" | "grey" => Rgba {
+            r: 128,
+            g: 128,
+            b: 128,
+            a: 255,
+        },
+        "silver" => Rgba {
+            r: 192,
+            g: 192,
+            b: 192,
+            a: 255,
+        },
+        "maroon" => Rgba {
+            r: 128,
+            g: 0,
+            b: 0,
+            a: 255,
+        },
+        "olive" => Rgba {
+            r: 128,
+            g: 128,
+            b: 0,
+            a: 255,
+        },
+        "lime" => Rgba {
+            r: 0,
+            g: 255,
+            b: 0,
+            a: 255,
+        },
+        "purple" => Rgba {
+            r: 128,
+            g: 0,
+            b: 128,
+            a: 255,
+        },
+        "teal" => Rgba {
+            r: 0,
+            g: 128,
+            b: 128,
+            a: 255,
+        },
+        "navy" => Rgba {
+            r: 0,
+            g: 0,
+            b: 128,
+            a: 255,
+        },
+        _ => return None,
+    };
+    Some(color)
+}
+
+fn glyph_rows(ch: char) -> [u8; 7] {
+    match ch.to_ascii_uppercase() {
+        'A' => [
+            0b01110, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001,
+        ],
+        'B' => [
+            0b11110, 0b10001, 0b10001, 0b11110, 0b10001, 0b10001, 0b11110,
+        ],
+        'C' => [
+            0b01110, 0b10001, 0b10000, 0b10000, 0b10000, 0b10001, 0b01110,
+        ],
+        'D' => [
+            0b11110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b11110,
+        ],
+        'E' => [
+            0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b11111,
+        ],
+        'F' => [
+            0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b10000,
+        ],
+        'G' => [
+            0b01110, 0b10001, 0b10000, 0b10111, 0b10001, 0b10001, 0b01110,
+        ],
+        'H' => [
+            0b10001, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001,
+        ],
+        'I' => [
+            0b11111, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b11111,
+        ],
+        'J' => [
+            0b00111, 0b00010, 0b00010, 0b00010, 0b10010, 0b10010, 0b01100,
+        ],
+        'K' => [
+            0b10001, 0b10010, 0b10100, 0b11000, 0b10100, 0b10010, 0b10001,
+        ],
+        'L' => [
+            0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b11111,
+        ],
+        'M' => [
+            0b10001, 0b11011, 0b10101, 0b10101, 0b10001, 0b10001, 0b10001,
+        ],
+        'N' => [
+            0b10001, 0b11001, 0b10101, 0b10011, 0b10001, 0b10001, 0b10001,
+        ],
+        'O' => [
+            0b01110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110,
+        ],
+        'P' => [
+            0b11110, 0b10001, 0b10001, 0b11110, 0b10000, 0b10000, 0b10000,
+        ],
+        'Q' => [
+            0b01110, 0b10001, 0b10001, 0b10001, 0b10101, 0b10010, 0b01101,
+        ],
+        'R' => [
+            0b11110, 0b10001, 0b10001, 0b11110, 0b10100, 0b10010, 0b10001,
+        ],
+        'S' => [
+            0b01111, 0b10000, 0b10000, 0b01110, 0b00001, 0b00001, 0b11110,
+        ],
+        'T' => [
+            0b11111, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100,
+        ],
+        'U' => [
+            0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110,
+        ],
+        'V' => [
+            0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01010, 0b00100,
+        ],
+        'W' => [
+            0b10001, 0b10001, 0b10001, 0b10101, 0b10101, 0b10101, 0b01010,
+        ],
+        'X' => [
+            0b10001, 0b10001, 0b01010, 0b00100, 0b01010, 0b10001, 0b10001,
+        ],
+        'Y' => [
+            0b10001, 0b10001, 0b01010, 0b00100, 0b00100, 0b00100, 0b00100,
+        ],
+        'Z' => [
+            0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b10000, 0b11111,
+        ],
+        '0' => [
+            0b01110, 0b10001, 0b10011, 0b10101, 0b11001, 0b10001, 0b01110,
+        ],
+        '1' => [
+            0b00100, 0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110,
+        ],
+        '2' => [
+            0b01110, 0b10001, 0b00001, 0b00010, 0b00100, 0b01000, 0b11111,
+        ],
+        '3' => [
+            0b11110, 0b00001, 0b00001, 0b01110, 0b00001, 0b00001, 0b11110,
+        ],
+        '4' => [
+            0b00010, 0b00110, 0b01010, 0b10010, 0b11111, 0b00010, 0b00010,
+        ],
+        '5' => [
+            0b11111, 0b10000, 0b10000, 0b11110, 0b00001, 0b00001, 0b11110,
+        ],
+        '6' => [
+            0b01110, 0b10000, 0b10000, 0b11110, 0b10001, 0b10001, 0b01110,
+        ],
+        '7' => [
+            0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b01000, 0b01000,
+        ],
+        '8' => [
+            0b01110, 0b10001, 0b10001, 0b01110, 0b10001, 0b10001, 0b01110,
+        ],
+        '9' => [
+            0b01110, 0b10001, 0b10001, 0b01111, 0b00001, 0b00001, 0b01110,
+        ],
+        '!' => [
+            0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b00000, 0b00100,
+        ],
+        '?' => [
+            0b01110, 0b10001, 0b00001, 0b00010, 0b00100, 0b00000, 0b00100,
+        ],
+        '.' => [
+            0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b01100, 0b01100,
+        ],
+        ',' => [
+            0b00000, 0b00000, 0b00000, 0b00000, 0b01100, 0b00100, 0b01000,
+        ],
+        ':' => [
+            0b00000, 0b01100, 0b01100, 0b00000, 0b01100, 0b01100, 0b00000,
+        ],
+        ';' => [
+            0b00000, 0b01100, 0b01100, 0b00000, 0b01100, 0b00100, 0b01000,
+        ],
+        '-' => [
+            0b00000, 0b00000, 0b00000, 0b11110, 0b00000, 0b00000, 0b00000,
+        ],
+        '_' => [
+            0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b11111,
+        ],
+        '+' => [
+            0b00000, 0b00100, 0b00100, 0b11111, 0b00100, 0b00100, 0b00000,
+        ],
+        '/' => [
+            0b00001, 0b00010, 0b00010, 0b00100, 0b01000, 0b01000, 0b10000,
+        ],
+        '\\' => [
+            0b10000, 0b01000, 0b01000, 0b00100, 0b00010, 0b00010, 0b00001,
+        ],
+        '(' => [
+            0b00010, 0b00100, 0b01000, 0b01000, 0b01000, 0b00100, 0b00010,
+        ],
+        ')' => [
+            0b01000, 0b00100, 0b00010, 0b00010, 0b00010, 0b00100, 0b01000,
+        ],
+        '[' => [
+            0b01110, 0b01000, 0b01000, 0b01000, 0b01000, 0b01000, 0b01110,
+        ],
+        ']' => [
+            0b01110, 0b00010, 0b00010, 0b00010, 0b00010, 0b00010, 0b01110,
+        ],
+        '=' => [
+            0b00000, 0b00000, 0b11111, 0b00000, 0b11111, 0b00000, 0b00000,
+        ],
+        '\'' => [
+            0b00100, 0b00100, 0b01000, 0b00000, 0b00000, 0b00000, 0b00000,
+        ],
+        '"' => [
+            0b01010, 0b01010, 0b01010, 0b00000, 0b00000, 0b00000, 0b00000,
+        ],
+        ' ' => [0; 7],
+        _ => [
+            0b11111, 0b10001, 0b00110, 0b00100, 0b00110, 0b10001, 0b11111,
+        ],
     }
 }
 
@@ -1790,6 +2707,63 @@ pub fn render_to_value(args: &[Value]) -> Result<Value, String> {
     Ok(Value::Str(Rc::new(render_text(&layout))))
 }
 
+pub fn raster_to_runtime_value(args: &[Value]) -> Result<Value, String> {
+    if !(1..=5).contains(&args.len()) {
+        return Err(format!(
+            "browser_raster: expected 1 to 5 args, got {}",
+            args.len()
+        ));
+    }
+    let html = expect_str(args.first(), "browser_raster")?;
+    let css = match args.get(1) {
+        Some(Value::Str(css)) => css.as_str(),
+        Some(other) => {
+            return Err(format!(
+                "browser_raster: css must be str, got {}",
+                other.type_name()
+            ))
+        }
+        None => "",
+    };
+    let options = RenderOptions {
+        viewport_width: optional_width(args.get(2), "browser_raster")?,
+        viewport_height: optional_height(args.get(3), "browser_raster")?,
+        scale: optional_scale(args.get(4), "browser_raster")?,
+        background: Rgba::WHITE,
+    };
+    let doc = parse_html(html);
+    render_document_to_raster(&doc, css, options).map(raster_image_to_value)
+}
+
+pub fn render_ppm_to_value(args: &[Value]) -> Result<Value, String> {
+    if !(1..=5).contains(&args.len()) {
+        return Err(format!(
+            "browser_render_ppm: expected 1 to 5 args, got {}",
+            args.len()
+        ));
+    }
+    let html = expect_str(args.first(), "browser_render_ppm")?;
+    let css = match args.get(1) {
+        Some(Value::Str(css)) => css.as_str(),
+        Some(other) => {
+            return Err(format!(
+                "browser_render_ppm: css must be str, got {}",
+                other.type_name()
+            ))
+        }
+        None => "",
+    };
+    let options = RenderOptions {
+        viewport_width: optional_width(args.get(2), "browser_render_ppm")?,
+        viewport_height: optional_height(args.get(3), "browser_render_ppm")?,
+        scale: optional_scale(args.get(4), "browser_render_ppm")?,
+        background: Rgba::WHITE,
+    };
+    let doc = parse_html(html);
+    let image = render_document_to_raster(&doc, css, options)?;
+    Ok(Value::Bytes(Rc::new(RefCell::new(image.to_ppm()))))
+}
+
 pub fn layout_to_runtime_value(args: &[Value]) -> Result<Value, String> {
     if !(1..=3).contains(&args.len()) {
         return Err(format!(
@@ -1813,6 +2787,271 @@ pub fn layout_to_runtime_value(args: &[Value]) -> Result<Value, String> {
     Ok(layout_to_value(&layout_document(&doc, css, width)))
 }
 
+/// ARIA landmark / role derived from the element's `role` attribute or implicit role.
+#[derive(Debug, Clone, PartialEq)]
+pub struct A11yNode {
+    pub role: String,
+    pub name: Option<String>,
+    pub tag: String,
+    pub focusable: bool,
+    pub disabled: bool,
+    pub children: Vec<A11yNode>,
+}
+
+/// Map of implicit ARIA roles for HTML elements (WHATWG spec).
+fn implicit_role(tag: &str) -> Option<&'static str> {
+    Some(match tag {
+        "a" => "link",
+        "article" => "article",
+        "aside" => "complementary",
+        "body" => "document",
+        "button" => "button",
+        "datalist" => "listbox",
+        "dd" => "definition",
+        "details" => "group",
+        "dialog" => "dialog",
+        "dt" => "term",
+        "fieldset" => "group",
+        "figure" => "figure",
+        "footer" => "contentinfo",
+        "form" => "form",
+        "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => "heading",
+        "header" => "banner",
+        "hr" => "separator",
+        "img" => "img",
+        "input" => "textbox",
+        "li" => "listitem",
+        "link" => "link",
+        "main" => "main",
+        "menu" => "menu",
+        "meter" => "meter",
+        "nav" => "navigation",
+        "ol" | "ul" => "list",
+        "option" => "option",
+        "output" => "status",
+        "progress" => "progressbar",
+        "section" => "region",
+        "select" => "combobox",
+        "summary" => "button",
+        "table" => "table",
+        "tbody" | "thead" | "tfoot" => "rowgroup",
+        "td" => "cell",
+        "textarea" => "textbox",
+        "th" => "columnheader",
+        "tr" => "row",
+        _ => return None,
+    })
+}
+
+/// Compute the ARIA role for an element: explicit `role` attr wins, then implicit.
+fn element_role(element: &Element) -> String {
+    if let Some(role) = element.attrs.get("role") {
+        if !role.is_empty() {
+            return role.to_ascii_lowercase();
+        }
+    }
+    implicit_role(&element.tag).unwrap_or("generic").to_string()
+}
+
+/// Compute the accessible name for an element.
+fn accessible_name(element: &Element) -> Option<String> {
+    // aria-label wins
+    if let Some(label) = element.attrs.get("aria-label") {
+        if !label.is_empty() {
+            return Some(label.clone());
+        }
+    }
+    // aria-labelledby (we'd need to resolve IDs — return as-is for now)
+    if let Some(labelledby) = element.attrs.get("aria-labelledby") {
+        if !labelledby.is_empty() {
+            return Some(format!("#{}", labelledby));
+        }
+    }
+    // title attribute
+    if let Some(title) = element.attrs.get("title") {
+        if !title.is_empty() {
+            return Some(title.clone());
+        }
+    }
+    // alt attribute (images)
+    if let Some(alt) = element.attrs.get("alt") {
+        if !alt.is_empty() {
+            return Some(alt.clone());
+        }
+    }
+    // placeholder for inputs
+    if let Some(placeholder) = element.attrs.get("placeholder") {
+        if !placeholder.is_empty() {
+            return Some(placeholder.clone());
+        }
+    }
+    // label via for attribute — skip for now (requires ID resolution)
+    None
+}
+
+/// Is the element keyboard-focusable?
+fn is_focusable(element: &Element) -> bool {
+    if element.attrs.get("role").is_some() {
+        return true;
+    }
+    if let Some(tabindex) = element.attrs.get("tabindex") {
+        if let Ok(idx) = tabindex.parse::<i32>() {
+            return idx >= 0;
+        }
+    }
+    matches!(
+        element.tag.as_str(),
+        "a" | "button" | "input" | "select" | "textarea" | "summary" | "details"
+    ) && !element.attrs.contains_key("disabled")
+}
+
+/// Recursively build the accessibility tree from a DOM node.
+fn build_a11y_node(node: &Node) -> Option<A11yNode> {
+    match node {
+        Node::Text(text) => {
+            let trimmed = text.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(A11yNode {
+                    role: "text".into(),
+                    name: Some(trimmed.to_string()),
+                    tag: "#text".into(),
+                    focusable: false,
+                    disabled: false,
+                    children: Vec::new(),
+                })
+            }
+        }
+        Node::Element(element) => {
+            // Skip elements with aria-hidden="true" or display:none via hidden attr
+            if element
+                .attrs
+                .get("aria-hidden")
+                .is_some_and(|v| v == "true")
+            {
+                return None;
+            }
+            let role = element_role(element);
+            // For presentational role, skip generating a11y node but still process children
+            if role == "presentation" || role == "none" {
+                let mut children = Vec::new();
+                for child in &element.children {
+                    if let Some(a11y) = build_a11y_node(child) {
+                        children.push(a11y);
+                    }
+                }
+                // Return first child directly or merge
+                if children.len() == 1 {
+                    return Some(children.into_iter().next().unwrap());
+                }
+                // Merge all children into a generic container
+                return Some(A11yNode {
+                    role: "generic".into(),
+                    name: None,
+                    tag: element.tag.clone(),
+                    focusable: false,
+                    disabled: false,
+                    children,
+                });
+            }
+
+            let mut children = Vec::new();
+            for child in &element.children {
+                if let Some(a11y) = build_a11y_node(child) {
+                    children.push(a11y);
+                }
+            }
+
+            Some(A11yNode {
+                role,
+                name: accessible_name(element),
+                tag: element.tag.clone(),
+                focusable: is_focusable(element),
+                disabled: element.attrs.contains_key("disabled"),
+                children,
+            })
+        }
+    }
+}
+
+/// Build a full accessibility tree from a document.
+pub fn build_accessibility_tree(document: &Document) -> Vec<A11yNode> {
+    document
+        .children
+        .iter()
+        .filter_map(|node| build_a11y_node(node))
+        .collect()
+}
+
+/// Convert an accessibility tree to a Value for the runtime.
+pub fn a11y_tree_to_value(nodes: &[A11yNode]) -> Value {
+    Value::List(Rc::new(RefCell::new(
+        nodes.iter().map(a11y_node_to_value).collect(),
+    )))
+}
+
+fn a11y_node_to_value(node: &A11yNode) -> Value {
+    let mut map = HashMap::new();
+    map.insert("role".into(), Value::Str(Rc::new(node.role.clone())));
+    map.insert(
+        "name".into(),
+        match &node.name {
+            Some(n) => Value::Str(Rc::new(n.clone())),
+            None => Value::Nil,
+        },
+    );
+    map.insert("tag".into(), Value::Str(Rc::new(node.tag.clone())));
+    map.insert("focusable".into(), Value::Bool(node.focusable));
+    map.insert("disabled".into(), Value::Bool(node.disabled));
+    map.insert(
+        "children".into(),
+        Value::List(Rc::new(RefCell::new(
+            node.children.iter().map(a11y_node_to_value).collect(),
+        ))),
+    );
+    Value::Map(Rc::new(RefCell::new(map)))
+}
+
+/// Find the layout box that corresponds to a given element at a path.
+/// The path is a sequence of child indices to traverse from the layout root.
+pub fn find_layout_box_at_path<'a>(layout: &'a LayoutBox, path: &[usize]) -> Option<&'a LayoutBox> {
+    if path.is_empty() {
+        return Some(layout);
+    }
+    let mut current = layout;
+    for &idx in path {
+        current = current.children.get(idx)?;
+    }
+    Some(current)
+}
+
+/// Collect all focusable elements from a document, returning (path, element) pairs.
+pub fn collect_focusable(document: &Document) -> Vec<(Vec<usize>, Element)> {
+    let mut results = Vec::new();
+    for (i, child) in document.children.iter().enumerate() {
+        collect_focusable_recursive(child, &[i], &mut results);
+    }
+    results
+}
+
+fn collect_focusable_recursive(
+    node: &Node,
+    path: &[usize],
+    results: &mut Vec<(Vec<usize>, Element)>,
+) {
+    if let Node::Element(el) = node {
+        if is_focusable(el) {
+            results.push((path.to_vec(), el.clone()));
+        }
+        for (i, child) in el.children.iter().enumerate() {
+            let mut child_path = path.to_vec();
+            child_path.push(i);
+            collect_focusable_recursive(child, &child_path, results);
+        }
+    }
+}
+
 fn optional_width(value: Option<&Value>, name: &str) -> Result<i64, String> {
     match value {
         Some(Value::Int(width)) => Ok(*width),
@@ -1822,6 +3061,32 @@ fn optional_width(value: Option<&Value>, name: &str) -> Result<i64, String> {
             other.type_name()
         )),
         None => Ok(80),
+    }
+}
+
+fn optional_height(value: Option<&Value>, name: &str) -> Result<Option<i64>, String> {
+    match value {
+        Some(Value::Int(height)) if *height > 0 => Ok(Some(*height)),
+        Some(Value::Nil) | None => Ok(None),
+        Some(Value::Int(_)) => Err(format!("{}: height must be positive", name)),
+        Some(other) => Err(format!(
+            "{}: height must be int or nil, got {}",
+            name,
+            other.type_name()
+        )),
+    }
+}
+
+fn optional_scale(value: Option<&Value>, name: &str) -> Result<usize, String> {
+    match value {
+        Some(Value::Int(scale)) if *scale > 0 => Ok(*scale as usize),
+        Some(Value::Int(_)) => Err(format!("{}: scale must be positive", name)),
+        Some(other) => Err(format!(
+            "{}: scale must be int, got {}",
+            name,
+            other.type_name()
+        )),
+        None => Ok(8),
     }
 }
 
@@ -2053,6 +3318,67 @@ mod tests {
     }
 
     #[test]
+    fn software_renderer_paints_backgrounds_text_and_ppm() {
+        let doc = parse_html(r#"<div class="card">Hi</div>"#);
+        let image = render_document_to_raster(
+            &doc,
+            ".card { background: #00ff00; color: blue; width: 4px; height: 2px }",
+            RenderOptions {
+                viewport_width: 8,
+                viewport_height: Some(4),
+                scale: 8,
+                ..RenderOptions::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!((image.width, image.height), (64, 32));
+        assert_eq!(
+            image.pixel(10, 10),
+            Some(Rgba {
+                r: 0,
+                g: 255,
+                b: 0,
+                a: 255
+            })
+        );
+        assert_eq!(
+            image.pixel(0, 0),
+            Some(Rgba {
+                r: 0,
+                g: 0,
+                b: 255,
+                a: 255
+            })
+        );
+        assert!(image.to_ppm().starts_with(b"P6\n64 32\n255\n"));
+    }
+
+    #[test]
+    fn browser_raster_builtin_returns_rgba_bytes() {
+        let value = raster_to_runtime_value(&[
+            Value::Str(Rc::new(
+                "<main style='background: red; width: 2px; height: 2px'></main>".into(),
+            )),
+            Value::Str(Rc::new(String::new())),
+            Value::Int(4),
+            Value::Int(4),
+            Value::Int(2),
+        ])
+        .unwrap();
+        let Value::Map(map) = value else {
+            panic!("expected raster map");
+        };
+        let borrowed = map.borrow();
+        assert_eq!(borrowed.get("width").unwrap().to_string(), "8");
+        assert_eq!(borrowed.get("height").unwrap().to_string(), "8");
+        let Some(Value::Bytes(bytes)) = borrowed.get("pixels") else {
+            panic!("expected pixel bytes");
+        };
+        assert_eq!(bytes.borrow().len(), 8 * 8 * 4);
+    }
+
+    #[test]
     fn img_src_attribute_carried_into_display_command() {
         let doc = parse_html(r#"<img src="photo.png">"#);
         let layout = layout_document(&doc, "", 80);
@@ -2070,6 +3396,72 @@ mod tests {
                 "img src should come from DOM attribute, not styles"
             );
         }
+    }
+
+    #[test]
+    fn flex_row_positions_children_horizontally() {
+        let doc = parse_html(
+            r#"<div style="display:flex; width:300px"><span style="width:100px; height:20px">A</span><span style="width:100px; height:20px">B</span></div>"#,
+        );
+        let layout = layout_document(&doc, "", 80);
+        let container = &layout.children[0];
+        assert_eq!(container.children.len(), 2);
+        // Children should be side by side on the same Y
+        assert_eq!(container.children[0].y, container.children[1].y);
+        // Second child starts after the first
+        assert!(container.children[1].x > container.children[0].x);
+    }
+
+    #[test]
+    fn positioned_boxes_use_left_top_in_layout_and_display_list() {
+        let doc = parse_html(
+            "<main><button style='position:absolute;left:12px;top:7px;width:5px;height:3px;background:red'></button><div style='height:2px'></div></main><aside style='position:fixed;left:9px;top:4px;width:8px;height:2px;background:blue'></aside>",
+        );
+        let layout = layout_document(&doc, "", 80);
+        let absolute = &layout.children[0].children[0];
+        let fixed = &layout.children[1];
+        assert_eq!(
+            (absolute.x, absolute.y, absolute.width, absolute.height),
+            (12, 7, 5, 3)
+        );
+        assert_eq!((fixed.x, fixed.y, fixed.width, fixed.height), (9, 4, 8, 2));
+        let commands = build_display_list(&layout);
+        assert!(commands.iter().any(|cmd| matches!(
+            cmd,
+            DisplayCommand::Rect { x: 12, y: 7, width: 5, height: 3, color } if color == "red"
+        )));
+    }
+
+    #[test]
+    fn overflow_hidden_clamps_child_layout_bounds() {
+        let doc = parse_html(
+            "<section style='overflow:hidden;width:10px;height:5px'><button style='position:absolute;left:8px;top:2px;width:10px;height:4px;background:red'></button></section>",
+        );
+        let layout = layout_document(&doc, "", 80);
+        let child = &layout.children[0].children[0];
+        assert_eq!((child.x, child.y, child.width, child.height), (8, 2, 2, 3));
+        let commands = build_display_list(&layout);
+        assert!(commands.iter().any(|cmd| matches!(
+            cmd,
+            DisplayCommand::Rect { x: 8, y: 2, width: 2, height: 3, color } if color == "red"
+        )));
+    }
+
+    #[test]
+    fn positioned_z_index_orders_display_commands() {
+        let doc = parse_html(
+            "<button style='position:absolute;left:0;top:0;width:4px;height:2px;background:red;z-index:10'></button><div style='position:absolute;left:0;top:0;width:4px;height:2px;background:blue'></div>",
+        );
+        let layout = layout_document(&doc, "", 80);
+        let commands = build_display_list(&layout);
+        let colors: Vec<&str> = commands
+            .iter()
+            .filter_map(|cmd| match cmd {
+                DisplayCommand::Rect { color, .. } => Some(color.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(colors, vec!["blue", "red"]);
     }
 
     #[test]

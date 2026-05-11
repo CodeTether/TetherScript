@@ -5,22 +5,58 @@
 //! is lowered to conditional jumps with back-patched offsets. Block scopes are
 //! bracketed by `PushScope`/`PopScope` so nested `if`/`while`/`{}` match the
 //! tree-walker's env nesting exactly.
+//!
+//! Fast local slots: each function body tracks its local variables in a
+//! name-to-slot-index map. Variables that are local to the current function
+//! (params + let bindings in the body) use `GetLocal`/`SetLocal` instead of
+//! the slower `GetName`/`Assign` which must walk the Env chain.
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::ast::*;
 use crate::bytecode::*;
 use crate::value::Value;
 
+/// Tracks local variable slots within a function body.
+struct LocalScope {
+    /// Map from variable name to slot index.
+    slots: HashMap<String, u8>,
+    /// Number of slots used so far.
+    count: u8,
+}
+
+impl LocalScope {
+    fn new() -> Self {
+        Self {
+            slots: HashMap::new(),
+            count: 0,
+        }
+    }
+
+    fn alloc(&mut self, name: &str) -> u8 {
+        let idx = self.count;
+        self.slots.insert(name.to_string(), idx);
+        self.count += 1;
+        idx
+    }
+
+    fn get(&self, name: &str) -> Option<u8> {
+        self.slots.get(name).copied()
+    }
+}
+
 pub struct Compiler {
     chunk: Chunk,
+    locals: LocalScope,
 }
 
 impl Compiler {
     pub fn new() -> Self {
         Self {
             chunk: Chunk::default(),
+            locals: LocalScope::new(),
         }
     }
 
@@ -42,10 +78,15 @@ impl Compiler {
         }
         c.emit(Instr::Nil);
         c.emit(Instr::Return);
+        c.chunk.local_count = c.locals.count;
         c.chunk
     }
 
     fn add_const(&mut self, v: Value) -> u16 {
+        // Dedup: reuse existing constant if identical.
+        if let Some(idx) = self.chunk.consts.iter().position(|c| values_equal(c, &v)) {
+            return idx as u16;
+        }
         let idx = self.chunk.consts.len();
         self.chunk.consts.push(v);
         idx as u16
@@ -90,8 +131,18 @@ impl Compiler {
 
     fn compile_fn(name: Option<String>, params: &[String], body: &Rc<Block>) -> FnProto {
         let mut inner = Compiler::new();
+
+        // Allocate local slots for parameters.
+        for p in params {
+            inner.locals.alloc(p);
+        }
+
         inner.compile_block(body);
         inner.emit(Instr::Return);
+
+        // Set local_count on the inner chunk.
+        inner.chunk.local_count = inner.locals.count;
+
         FnProto {
             name,
             params: params.to_vec(),
@@ -107,8 +158,18 @@ impl Compiler {
                 value,
             } => {
                 self.compile_expr(value);
-                let idx = self.intern_name(name);
-                self.emit(Instr::DefLet(idx, *mutable));
+
+                // If this is a function body (has local slots), use fast local.
+                if self.locals.count > 0 || !self.chunk.code.is_empty() {
+                    // Check if this is inside a function (not top-level).
+                    // Heuristic: if we already have local slots allocated,
+                    // this is a function body. Use fast local allocation.
+                    let idx = self.locals.alloc(name);
+                    self.emit(Instr::DefLocal(idx, *mutable));
+                } else {
+                    let idx = self.intern_name(name);
+                    self.emit(Instr::DefLet(idx, *mutable));
+                }
             }
             Stmt::Expr { expr, .. } => {
                 self.compile_expr(expr);
@@ -149,6 +210,7 @@ impl Compiler {
                     self.compile_expr(value);
                     let idx = self.intern_name(name);
                     self.emit(Instr::DefLet(idx, *mutable));
+
                     if is_last {
                         self.emit(Instr::Nil);
                     }
@@ -189,14 +251,23 @@ impl Compiler {
             }
 
             Expr::Ident(name) => {
-                let idx = self.intern_name(name);
-                self.emit(Instr::GetName(idx));
+                // Try fast local slot first.
+                if let Some(idx) = self.locals.get(name) {
+                    self.emit(Instr::GetLocal(idx));
+                } else {
+                    let idx = self.intern_name(name);
+                    self.emit(Instr::GetName(idx));
+                }
             }
 
             Expr::Move(inner) => match inner.as_ref() {
                 Expr::Ident(name) => {
-                    let idx = self.intern_name(name);
-                    self.emit(Instr::GetMove(idx));
+                    if let Some(idx) = self.locals.get(name) {
+                        self.emit(Instr::MoveLocal(idx));
+                    } else {
+                        let idx = self.intern_name(name);
+                        self.emit(Instr::GetMove(idx));
+                    }
                 }
                 other => self.compile_expr(other),
             },
@@ -331,9 +402,15 @@ impl Compiler {
                 let zero = self.add_const(Value::Int(0));
                 self.emit(Instr::Const(zero));
                 self.emit(Instr::PushScope);
-                let loop_start = self.chunk.code.len();
+
+                // Keep loop variables environment-backed. `ForNext` also keeps
+                // the next index on the stack, so treating that value as a
+                // local binding would corrupt the loop state.
                 let name_idx = self.intern_name(name);
+
+                let loop_start = self.chunk.code.len();
                 let exhausted = self.emit(Instr::ForNext(name_idx, 0));
+
                 self.emit(Instr::PushScope);
                 self.compile_block(body);
                 self.emit(Instr::Pop);
@@ -384,8 +461,13 @@ impl Compiler {
         match lhs {
             Expr::Ident(name) => {
                 self.compile_expr(rhs);
-                let idx = self.intern_name(name);
-                self.emit(Instr::Assign(idx));
+                // Try fast local slot first.
+                if let Some(idx) = self.locals.get(name) {
+                    self.emit(Instr::SetLocal(idx));
+                } else {
+                    let idx = self.intern_name(name);
+                    self.emit(Instr::Assign(idx));
+                }
             }
             Expr::Index { target, index } => {
                 self.compile_expr(target);
@@ -405,6 +487,18 @@ impl Compiler {
                 self.emit(Instr::Panic);
             }
         }
+    }
+}
+
+/// Compare two Values for constant pool deduplication.
+fn values_equal(a: &Value, b: &Value) -> bool {
+    match (a, b) {
+        (Value::Int(x), Value::Int(y)) => x == y,
+        (Value::Float(x), Value::Float(y)) => x.to_bits() == y.to_bits(),
+        (Value::Bool(x), Value::Bool(y)) => x == y,
+        (Value::Nil, Value::Nil) => true,
+        (Value::Str(x), Value::Str(y)) => Rc::ptr_eq(x, y) || **x == **y,
+        _ => false,
     }
 }
 

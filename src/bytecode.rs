@@ -29,6 +29,12 @@ pub enum Instr {
     DefLet(u16, bool), // name_idx, mutable
     Assign(u16),
 
+    // Fast local slots (indexed access, no HashMap lookup)
+    GetLocal(u8),       // load local by slot index
+    SetLocal(u8),       // store stack top into local slot
+    DefLocal(u8, bool), // pop stack top into local slot (mutable flag for debug)
+    MoveLocal(u8),      // take ownership from local slot (heap values leave tombstone)
+
     // Unary
     Neg,
     Not,
@@ -89,6 +95,9 @@ pub struct Chunk {
     pub consts: Vec<Value>,
     pub names: Vec<String>,
     pub protos: Vec<Rc<FnProto>>,
+    /// Number of local variable slots this function body needs.
+    /// The VM pre-allocates this many slots in the frame.
+    pub local_count: u8,
 }
 
 #[derive(Debug)]

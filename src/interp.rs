@@ -1064,12 +1064,20 @@ fn invoke_browser_result(
 pub(crate) fn install_builtins(env: &Rc<RefCell<Env>>) {
     install_pure_builtins(env);
     install_browser_builtins(env);
+    let static_globals = env.clone();
     let mut e = env.borrow_mut();
 
     e.define(
         "http_serve",
         runtime_native("http_serve", Some(2), |rt, args| {
             http::serve(rt, &args[0], &args[1])
+        }),
+        false,
+    );
+    e.define(
+        "http_serve_static",
+        runtime_native("http_serve_static", Some(2), move |rt, args| {
+            http::serve_static(rt, &static_globals, &args[0], &args[1])
         }),
         false,
     );
@@ -1464,6 +1472,16 @@ fn install_browser_builtins(env: &Rc<RefCell<Env>>) {
     e.define(
         "browser_render",
         pure_native("browser_render", None, browser::render_to_value),
+        false,
+    );
+    e.define(
+        "browser_raster",
+        pure_native("browser_raster", None, browser::raster_to_runtime_value),
+        false,
+    );
+    e.define(
+        "browser_render_ppm",
+        pure_native("browser_render_ppm", None, browser::render_ppm_to_value),
         false,
     );
     e.define(
