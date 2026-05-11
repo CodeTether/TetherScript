@@ -59,6 +59,16 @@ CodeTether-style tool results are also accepted. When a successful response has
 `success: true` and string `output`, TetherScript parses `output` as JSON when
 possible and otherwise returns it as a string.
 
+Live bridge smoke test:
+
+```bash
+TETHERSCRIPT_BROWSERCTL_ENDPOINT=http://127.0.0.1:41707/browser \
+  cargo test --test browser_cap_live
+```
+
+The test starts a local fixture page, then drives the configured browserctl
+bridge through start, goto, wait, eval, snapshot, screenshot, and stop.
+
 ## MVP methods
 
 Navigation/interaction:
