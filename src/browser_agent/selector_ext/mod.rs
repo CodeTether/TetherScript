@@ -1,6 +1,7 @@
 //! Agent-side selector extensions layered over the deterministic CSS matcher.
 
 mod args;
+pub mod heal;
 mod matches;
 mod order;
 mod parse;

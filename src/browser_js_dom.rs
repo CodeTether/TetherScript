@@ -29,6 +29,8 @@ mod serializer;
 mod template;
 #[path = "browser_js_dom/traversal/mod.rs"]
 mod traversal;
+#[path = "browser_js_dom/observer/mod.rs"]
+pub(crate) mod observer;
 
 pub(super) fn install_window(window: &mut HashMap<String, JsValue>) {
     parser::install(window);
