@@ -64,6 +64,17 @@ possible and otherwise returns it as a string.
 Navigation/interaction:
 `goto`, `reload`, `back`, `forward`, `click`, `click_text`, `type`, `press`, `hover`, `focus`, `blur`, `scroll`, `wait_for_selector`, `wait_for_text`, `wait_for_url`, `wait_for_network_idle`.
 
+The wait helpers are tetherscript convenience methods over browserctl's single
+`wait` action:
+
+- `wait_for_selector(selector, timeout_ms?)` sends `{"action":"wait","selector":...,"state":"visible","timeout_ms":...}`.
+- `wait_for_text(text, timeout_ms?)` sends `{"action":"wait","text":...,"timeout_ms":...}`.
+- `wait_for_url(url_substring, timeout_ms?)` sends `{"action":"wait","url_contains":...,"timeout_ms":...}`.
+
+`wait_for_network_idle`, `compare_screenshots`, and `visual_diff` are reserved
+language-level methods. The current browserctl backend rejects them before
+network I/O until matching bridge actions exist.
+
 Snapshots:
 `screenshot`, `screenshot_element`, `dom_snapshot`, `page_snapshot`.
 
@@ -85,7 +96,8 @@ Trace/export:
 Raw browserctl:
 `raw(action, params)` sends an explicit browserctl action envelope after the same
 scope and origin checks as high-level methods. This is an FFI-style escape hatch;
-the stable API remains the language-level browser methods above.
+the stable API remains the language-level browser methods above. Raw action
+names are restricted to browserctl's advertised action enum.
 
 ## Agent assertions
 
