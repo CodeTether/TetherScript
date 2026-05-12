@@ -23,8 +23,6 @@ pub enum Token {
     For,
     In,
     Return,
-    True,
-    False,
     Nil,
     Panic,
     Async,
@@ -64,7 +62,6 @@ pub enum Token {
     Or,      // ||
     Not,     // !
     Amp,     // & (borrow)
-    AmpMut,  // &mut (lexed as two tokens; we fuse in parser)
 
     // Meta
     Newline,
