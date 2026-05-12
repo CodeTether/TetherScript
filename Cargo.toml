@@ -12,6 +12,7 @@ categories = ["compilers", "parser-implementations", "embedded"]
 exclude = ["trd.md"]
 
 [dependencies]
+ureq = { version = "3.3.0", features = ["_tls", "cookies"] }
 
 [lib]
 name = "tetherscript"
