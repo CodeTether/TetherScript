@@ -27,6 +27,7 @@ mod bytecode;
 mod capability;
 mod compiler;
 mod fs_cap;
+mod git_tui;
 mod http;
 mod interp;
 mod js;
@@ -97,6 +98,7 @@ fn main() {
         "inspect" => cmd_inspect(&args[2..]),
         "lsp" => cmd_lsp(),
         "repl" => cmd_repl(),
+        "git" => cmd_git(),
         // Legacy: bare file path as first arg (backward compat)
         other => {
             // If it looks like a flag, error
@@ -491,6 +493,16 @@ fn cmd_js(args: &[String]) {
         }
         Err(e) => {
             eprintln!("tetherscript js: {}", e);
+            process::exit(1);
+        }
+    }
+}
+
+fn cmd_git() {
+    match git_tui::load_panel(std::path::Path::new(".")) {
+        Ok(panel) => print!("{}", git_tui::render_panel(&panel)),
+        Err(error) => {
+            eprintln!("tetherscript git: {error}");
             process::exit(1);
         }
     }
@@ -978,6 +990,7 @@ fn print_usage() {
     eprintln!("  render <html>        Render HTML/CSS display list");
     eprintln!("  raster <html> <ppm>  Render HTML/CSS to a PPM image");
     eprintln!("  js <file.js>         Run JavaScript with the built-in engine");
+    eprintln!("  git                  Show first-class git workspace status");
     eprintln!("  repl                 Interactive REPL");
     eprintln!("  lsp                  Start LSP server over stdio");
     eprintln!();
@@ -1006,6 +1019,7 @@ fn print_help() {
     println!("    render <html>     Render HTML/CSS to a display list");
     println!("    raster <html>     Render HTML/CSS to a native PPM image");
     println!("    js <file.js>      Run JavaScript with the built-in engine");
+    println!("    git               Show first-class git workspace status");
     println!("    repl              Start an interactive read-eval-print loop");
     println!("    lsp               Start the LSP server over stdio");
     println!();
@@ -1031,6 +1045,7 @@ fn print_help() {
     println!("    tetherscript render examples/browser.html examples/browser.css");
     println!("    tetherscript raster examples/browser.html out.ppm examples/browser.css");
     println!("    tetherscript js app.js");
+    println!("    tetherscript git");
     println!("    tetherscript repl");
     println!("    tetherscript lsp");
     println!();
