@@ -14,6 +14,7 @@ pub mod bytecode;
 pub mod capability;
 pub mod compiler;
 pub mod fs_cap;
+pub mod git_tui;
 pub mod http;
 pub mod interp;
 pub mod js;
