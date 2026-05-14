@@ -10,9 +10,7 @@ pub fn discover_resources<D: core::fmt::Debug>(
     let mut out = Vec::new();
     for tag in tags(&html) {
         let name = tag_name(&tag);
-        let rel = attr(&tag, "rel")
-            .unwrap_or_default()
-            .to_ascii_lowercase();
+        let rel = attr(&tag, "rel").unwrap_or_default().to_ascii_lowercase();
         let src = attr(&tag, "src");
         let href = attr(&tag, "href");
         let (url, kind, pri) = match name.as_str() {
@@ -90,13 +88,7 @@ fn attr(t: &str, n: &str) -> Option<String> {
         let e = t[i + 1..].find(q)?;
         Some(t[i + 1..i + 1 + e].into())
     } else {
-        Some(
-            t[i..]
-                .split_whitespace()
-                .next()?
-                .trim_matches('/')
-                .into(),
-        )
+        Some(t[i..].split_whitespace().next()?.trim_matches('/').into())
     }
 }
 

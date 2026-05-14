@@ -1,14 +1,23 @@
 //! Candidate confidence ranking.
-use std::collections::HashMap;
 use super::{DomFingerprint, DomNode, HealStrategy, SelectorCandidate};
+use std::collections::HashMap;
 
 /// Rank candidates by uniqueness, fingerprint similarity, and strategy prior.
-pub fn rank_candidates(root: &DomNode, mut xs: Vec<SelectorCandidate>, fp: Option<&DomFingerprint>) -> Vec<SelectorCandidate> {
+pub fn rank_candidates(
+    root: &DomNode,
+    mut xs: Vec<SelectorCandidate>,
+    fp: Option<&DomFingerprint>,
+) -> Vec<SelectorCandidate> {
     for c in &mut xs {
         let unique = if c.matches.len() == 1 { 0.18 } else { 0.0 };
-        let sim = fp.and_then(|f| c.matches.first()
-            .and_then(|p| DomFingerprint::from_dom(root, p))
-            .map(|g| f.similarity(&g) * 0.35)).unwrap_or(0.0);
+        let sim = fp
+            .and_then(|f| {
+                c.matches
+                    .first()
+                    .and_then(|p| DomFingerprint::from_dom(root, p))
+                    .map(|g| f.similarity(&g) * 0.35)
+            })
+            .unwrap_or(0.0);
         c.confidence = (c.confidence + unique + sim + strategy_prior(&c.strategy)).clamp(0.0, 1.0);
     }
     xs.sort_by(|a, b| b.confidence.total_cmp(&a.confidence));
@@ -31,7 +40,11 @@ fn dedup(xs: Vec<SelectorCandidate>) -> Vec<SelectorCandidate> {
     let mut best: HashMap<String, SelectorCandidate> = HashMap::new();
     for x in xs {
         best.entry(x.selector.clone())
-            .and_modify(|b| { if x.confidence > b.confidence { *b = x.clone(); } })
+            .and_modify(|b| {
+                if x.confidence > b.confidence {
+                    *b = x.clone();
+                }
+            })
             .or_insert(x);
     }
     let mut v: Vec<_> = best.into_values().collect();

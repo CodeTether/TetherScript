@@ -24,6 +24,7 @@ impl Diagnostic {
 #[derive(Default, Clone)]
 struct BindingState {
     moved: bool,
+    copy: bool,
     shared_borrows: usize,
     mutable_borrow: bool,
 }
@@ -82,9 +83,14 @@ impl Analyzer {
         }
     }
 
-    fn define(&mut self, name: &str) {
-        self.bindings
-            .insert(name.to_string(), BindingState::default());
+    fn define(&mut self, name: &str, copy: bool) {
+        self.bindings.insert(
+            name.to_string(),
+            BindingState {
+                copy,
+                ..BindingState::default()
+            },
+        );
         if let Some(scope) = self.scopes.last_mut() {
             scope.names.insert(name.to_string());
         }
@@ -93,15 +99,16 @@ impl Analyzer {
     fn stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::Let { name, value, .. } => {
+                let copy = self.expr_is_copy(value);
                 self.expr(value);
-                self.define(name);
+                self.define(name, copy);
                 if let Some((owner, mutable)) = borrowed_ident(value) {
                     self.register_borrow(name, owner, mutable);
                 }
             }
             Stmt::Expr { expr, .. } => self.expr(expr),
             Stmt::FnDecl { name, body, .. } => {
-                self.define(name);
+                self.define(name, false);
                 self.block(body);
             }
         }
@@ -133,9 +140,10 @@ impl Analyzer {
             }
             Expr::Binary { op, lhs, rhs } => {
                 if *op == BinOp::Assign {
+                    let copy = self.expr_is_copy(rhs);
                     self.expr(rhs);
                     if let Expr::Ident(name) = lhs.as_ref() {
-                        self.assign_binding(name);
+                        self.assign_binding(name, copy);
                     } else {
                         self.expr(lhs);
                     }
@@ -195,7 +203,7 @@ impl Analyzer {
             Expr::For { iter, body, name } => {
                 self.expr(iter);
                 self.push_scope();
-                self.define(name);
+                self.define(name, false);
                 for stmt in &body.stmts {
                     self.stmt(stmt);
                 }
@@ -246,7 +254,9 @@ impl Analyzer {
                         name
                     )));
                 }
-                state.moved = true;
+                if !state.copy {
+                    state.moved = true;
+                }
             }
             None => self.diagnostics.push(Diagnostic::new(format!(
                 "cannot move undefined binding `{}`",
@@ -298,7 +308,7 @@ impl Analyzer {
         let _ = borrower;
     }
 
-    fn assign_binding(&mut self, name: &str) {
+    fn assign_binding(&mut self, name: &str, copy: bool) {
         if let Some(state) = self.bindings.get_mut(name) {
             if state.shared_borrows > 0 || state.mutable_borrow {
                 self.diagnostics.push(Diagnostic::new(format!(
@@ -307,6 +317,25 @@ impl Analyzer {
                 )));
             }
             state.moved = false;
+            state.copy = copy;
+        }
+    }
+
+    fn expr_is_copy(&self, expr: &Expr) -> bool {
+        match expr {
+            Expr::Int(_) | Expr::Float(_) | Expr::Bool(_) | Expr::Nil => true,
+            Expr::Ident(name) => self
+                .bindings
+                .get(name)
+                .map(|state| state.copy)
+                .unwrap_or(false),
+            Expr::Move(inner) => self.expr_is_copy(inner),
+            Expr::Unary { op, .. } => matches!(op, crate::ast::UnOp::Neg | crate::ast::UnOp::Not),
+            Expr::Binary { op, .. } => matches!(
+                op,
+                BinOp::Eq | BinOp::NotEq | BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq
+            ),
+            _ => false,
         }
     }
 }

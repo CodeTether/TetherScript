@@ -76,6 +76,7 @@ const RPC_USER_AGENT: &str = "tetherscript-rpc/0.1";
 const MAX_RESPONSE_BYTES: usize = 8 * 1024 * 1024;
 const MAX_SSE_LINE_BYTES: usize = 1024 * 1024;
 const WS_GUID: &str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+type HttpResponse = (u16, HashMap<String, String>, Vec<u8>);
 
 pub struct RpcAuthority {
     /// Allowed endpoint: `http://host[:port]`. Must be http:// (no TLS).
@@ -96,6 +97,7 @@ pub struct RpcAuthority {
 impl RpcAuthority {
     /// Create a new RPC capability scoped to the given HTTP endpoint.
     /// Endpoint must be `http://host[:port]`.
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(endpoint: &str) -> Rc<dyn Authority> {
         let (host, port) = parse_endpoint(endpoint).unwrap_or_else(|_| ("localhost".into(), 80));
         Rc::new(RpcAuthority {
@@ -203,10 +205,7 @@ impl RpcAuthority {
     }
 
     /// Read HTTP response and return (status, headers, body).
-    fn read_response(
-        &self,
-        stream: &mut TcpStream,
-    ) -> Result<(u16, HashMap<String, String>, Vec<u8>), String> {
+    fn read_response(&self, stream: &mut TcpStream) -> Result<HttpResponse, String> {
         let mut reader = BufReader::new(stream);
 
         // Read status line
@@ -533,7 +532,7 @@ impl RpcAuthority {
                 break;
             }
             if let Some((name, value)) = trimmed.split_once(':') {
-                if name.trim().to_ascii_lowercase() == "sec-websocket-accept" {
+                if name.trim().eq_ignore_ascii_case("sec-websocket-accept") {
                     accept_key = Some(value.trim().to_string());
                 }
             }
@@ -786,7 +785,7 @@ fn sha1(message: &[u8]) -> [u8; 20] {
         let mut e = h4;
 
         // 80 rounds
-        for i in 0..80 {
+        for (i, word) in w.iter().enumerate() {
             let (f, k) = match i {
                 0..=19 => ((b & c) | ((!b) & d), 0x5A827999u32),
                 20..=39 => (b ^ c ^ d, 0x6ED9EBA1u32),
@@ -799,7 +798,7 @@ fn sha1(message: &[u8]) -> [u8; 20] {
                 .wrapping_add(f)
                 .wrapping_add(e)
                 .wrapping_add(k)
-                .wrapping_add(w[i]);
+                .wrapping_add(*word);
             e = d;
             d = c;
             c = b.rotate_left(30);
@@ -918,6 +917,7 @@ fn read_ws_frame<R: Read>(reader: &mut BufReader<R>) -> Result<Option<(u8, Vec<u
     Ok(Some((opcode, payload)))
 }
 
+#[allow(dead_code)]
 fn write_ws_frame(stream: &mut TcpStream, opcode: u8, payload: &[u8]) -> Result<(), String> {
     let len = payload.len();
 

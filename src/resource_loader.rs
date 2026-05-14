@@ -66,7 +66,9 @@ impl ResourceLoader {
 
     /// Complete a load and update progress/state.
     pub fn complete(&mut self, response: ResourceResponse) {
-        let len = response.content_length.unwrap_or(response.body.len() as u64);
+        let len = response
+            .content_length
+            .unwrap_or(response.body.len() as u64);
         self.scheduler.finish(&response.url);
         self.states.set_progress(&response.url, len, Some(len));
         self.states.insert(

@@ -4,7 +4,9 @@ use super::*;
 fn discovers_common_resources() {
     let html = r#"<link rel="stylesheet" href="a.css"><script src="b.js"></script><img src="c.png"><iframe src="f.html">"#;
     let r = discover_resources(&html, "https://e.test/p");
-    assert!(r.iter().any(|x| x.resource_type == ResourceType::Stylesheet));
+    assert!(r
+        .iter()
+        .any(|x| x.resource_type == ResourceType::Stylesheet));
     assert!(r.iter().any(|x| x.resource_type == ResourceType::Script));
     assert!(r.iter().any(|x| x.resource_type == ResourceType::Image));
 }

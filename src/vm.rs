@@ -8,10 +8,9 @@
 //! current env. `PushScope`/`PopScope` nest envs within a frame; `Call`
 //! pushes a new frame; `Return` pops one.
 //!
-//! Fast local slots: each frame has a `locals: Vec<Value>` array indexed by
-//! slot number. `GetLocal`/`SetLocal`/`DefLocal` use this for O(1) access
-//! instead of the Env HashMap, which dramatically speeds up tight loops and
-//! recursive functions.
+//! Local-slot opcodes exist for a future optimization, but the compiler keeps
+//! user bindings environment-backed so runtime ownership tombstones and
+//! mutability checks match the reference interpreter.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -21,7 +20,7 @@ use crate::interp::{
     apply_binary, apply_unary, call_method, field_value, index_value, install_builtins,
     iterable_values,
 };
-use crate::value::{Env, NativeFunc, Runtime, Slot, Value};
+use crate::value::{Env, NativeFunc, Runtime, Value};
 
 pub enum Unwind {
     Error(String),
@@ -170,9 +169,11 @@ impl VM {
     }
 
     /// Step using a reference to avoid cloning instructions on the hot path.
-    fn step_ref(&mut self, instr: &Instr, code_len: usize) -> Result<(), Unwind> {
+    fn step_ref(&mut self, instr: &Instr, _code_len: usize) -> Result<(), Unwind> {
         match instr {
-            Instr::Pop => { self.stack.pop(); }
+            Instr::Pop => {
+                self.stack.pop();
+            }
             Instr::Const(idx) => {
                 let v = clone_const_value(
                     &self.frames.last().unwrap().proto.chunk.consts[*idx as usize],
@@ -197,12 +198,22 @@ impl VM {
             Instr::DefLet(idx, mutable) => {
                 let name = self.name(*idx);
                 let v = self.stack.pop().expect("DefLet with empty stack");
-                self.frames.last().unwrap().env.borrow_mut().define(&name, v, *mutable);
+                self.frames
+                    .last()
+                    .unwrap()
+                    .env
+                    .borrow_mut()
+                    .define(&name, v, *mutable);
             }
             Instr::Assign(idx) => {
                 let name = self.name(*idx);
                 let v = self.stack.pop().expect("Assign with empty stack");
-                self.frames.last().unwrap().env.borrow_mut().assign(&name, v.clone())?;
+                self.frames
+                    .last()
+                    .unwrap()
+                    .env
+                    .borrow_mut()
+                    .assign(&name, v.clone())?;
                 self.stack.push(v);
             }
             Instr::GetLocal(idx) => {
@@ -244,13 +255,19 @@ impl VM {
             Instr::Jump(off) => self.jump(*off),
             Instr::JumpIfFalse(off) => {
                 let v = self.stack.pop().unwrap();
-                if !v.truthy() { self.jump(*off); }
+                if !v.truthy() {
+                    self.jump(*off);
+                }
             }
             Instr::JumpIfFalseKeep(off) => {
-                if !self.stack.last().unwrap().truthy() { self.jump(*off); }
+                if !self.stack.last().unwrap().truthy() {
+                    self.jump(*off);
+                }
             }
             Instr::JumpIfTrueKeep(off) => {
-                if self.stack.last().unwrap().truthy() { self.jump(*off); }
+                if self.stack.last().unwrap().truthy() {
+                    self.jump(*off);
+                }
             }
             Instr::IterInit => {
                 let iterable = self.stack.pop().expect("IterInit with empty stack");
@@ -261,13 +278,22 @@ impl VM {
                 let name = self.name(*idx);
                 let index = match self.stack.pop().expect("ForNext with empty stack") {
                     Value::Int(i) if i >= 0 => i,
-                    other => return Err(Unwind::Error(format!(
-                        "for loop internal index must be non-negative int, got {}", other.type_name()))),
+                    other => {
+                        return Err(Unwind::Error(format!(
+                            "for loop internal index must be non-negative int, got {}",
+                            other.type_name()
+                        )))
+                    }
                 };
                 let iterable = self.stack.last().expect("ForNext missing iterable").clone();
                 let items = iterable_values(&iterable)?;
                 if let Some(item) = items.get(index as usize).cloned() {
-                    self.frames.last().unwrap().env.borrow_mut().define(&name, item, true);
+                    self.frames
+                        .last()
+                        .unwrap()
+                        .env
+                        .borrow_mut()
+                        .define(&name, item, true);
                     self.stack.push(Value::Int(index + 1));
                 } else {
                     self.stack.pop();
@@ -295,7 +321,10 @@ impl VM {
                         let len = xs.len() as i64;
                         let ix = if *idx < 0 { idx + len } else { *idx };
                         if ix < 0 || ix >= len {
-                            return Err(Unwind::Error(format!("index {} out of bounds (len {})", idx, len)));
+                            return Err(Unwind::Error(format!(
+                                "index {} out of bounds (len {})",
+                                idx, len
+                            )));
                         }
                         xs[ix as usize] = v.clone();
                     }
@@ -304,20 +333,35 @@ impl VM {
                     }
                     (Value::Bytes(bytes), Value::Int(idx)) => {
                         let byte = match v {
-                            Value::Int(n) => u8::try_from(n).map_err(|_| Unwind::Error("byte value must be 0..=255".into()))?,
-                            ref other => return Err(Unwind::Error(format!("byte value must be int, got {}", other.type_name()))),
+                            Value::Int(n) => u8::try_from(n)
+                                .map_err(|_| Unwind::Error("byte value must be 0..=255".into()))?,
+                            ref other => {
+                                return Err(Unwind::Error(format!(
+                                    "byte value must be int, got {}",
+                                    other.type_name()
+                                )))
+                            }
                         };
                         let mut bytes = bytes.borrow_mut();
                         let len = bytes.len() as i64;
                         let ix = if *idx < 0 { idx + len } else { *idx };
                         if ix < 0 || ix >= len {
-                            return Err(Unwind::Error(format!("index {} out of bounds (len {})", idx, len)));
+                            return Err(Unwind::Error(format!(
+                                "index {} out of bounds (len {})",
+                                idx, len
+                            )));
                         }
                         bytes[ix as usize] = byte;
                         self.stack.push(Value::Int(byte as i64));
                         return Ok(());
                     }
-                    _ => return Err(Unwind::Error(format!("cannot index-assign into {} with {}", t.type_name(), i.type_name()))),
+                    _ => {
+                        return Err(Unwind::Error(format!(
+                            "cannot index-assign into {} with {}",
+                            t.type_name(),
+                            i.type_name()
+                        )))
+                    }
                 }
                 self.stack.push(v);
             }
@@ -331,8 +375,16 @@ impl VM {
                 let v = self.stack.pop().unwrap();
                 let t = self.stack.pop().unwrap();
                 match t {
-                    Value::Map(m) => { m.borrow_mut().insert(name, v.clone()); }
-                    other => return Err(Unwind::Error(format!("cannot set field `{}` on {}", name, other.type_name()))),
+                    Value::Map(m) => {
+                        m.borrow_mut().insert(name, v.clone());
+                    }
+                    other => {
+                        return Err(Unwind::Error(format!(
+                            "cannot set field `{}` on {}",
+                            name,
+                            other.type_name()
+                        )))
+                    }
                 }
                 self.stack.push(v);
             }
@@ -344,7 +396,12 @@ impl VM {
                 let target = self.stack.pop().unwrap();
                 let result = if let Value::Capability(c) = &target {
                     let c = c.clone();
-                    crate::interp::call_capability_method(&c, &name, &args, self as &mut dyn Runtime)?
+                    crate::interp::call_capability_method(
+                        &c,
+                        &name,
+                        &args,
+                        self as &mut dyn Runtime,
+                    )?
                 } else {
                     call_method(&target, &name, &args)?
                 };
@@ -357,12 +414,18 @@ impl VM {
                 let callee = self.stack.pop().unwrap();
                 self.dispatch_call(callee, args)?;
             }
-            Instr::Return => { self.do_return(); }
+            Instr::Return => {
+                self.do_return();
+            }
             Instr::MakeFn(idx) => {
                 let proto = self.frames.last().unwrap().proto.chunk.protos[*idx as usize].clone();
                 let closure = self.frames.last().unwrap().env.clone();
                 let name = proto.name.clone();
-                self.stack.push(Value::VmFn(Rc::new(VmFnObj { proto, closure, name })));
+                self.stack.push(Value::VmFn(Rc::new(VmFnObj {
+                    proto,
+                    closure,
+                    name,
+                })));
             }
             Instr::PushScope => {
                 let f = self.frames.last_mut().unwrap();
@@ -371,7 +434,12 @@ impl VM {
             }
             Instr::PopScope => {
                 let f = self.frames.last_mut().unwrap();
-                let parent = f.env.borrow().parent.clone().expect("PopScope with no parent env");
+                let parent = f
+                    .env
+                    .borrow()
+                    .parent
+                    .clone()
+                    .expect("PopScope with no parent env");
                 f.env = parent;
             }
             Instr::Panic => {
@@ -385,7 +453,12 @@ impl VM {
                         crate::value::ResultValue::Ok(inner) => self.stack.push(inner.clone()),
                         crate::value::ResultValue::Err(e) => return Err(Unwind::TryErr(e.clone())),
                     },
-                    other => return Err(Unwind::Error(format!("? operator applied to {}, expected Result", other.type_name()))),
+                    other => {
+                        return Err(Unwind::Error(format!(
+                            "? operator applied to {}, expected Result",
+                            other.type_name()
+                        )))
+                    }
                 }
             }
         }
@@ -731,8 +804,7 @@ impl VM {
     fn take_local(&mut self, idx: usize) -> Value {
         let f = self.frames.last_mut().unwrap();
         if idx < f.locals.len() {
-            let v = std::mem::replace(&mut f.locals[idx], Value::Nil);
-            v
+            std::mem::replace(&mut f.locals[idx], Value::Nil)
         } else {
             Value::Nil
         }
@@ -775,20 +847,19 @@ impl VM {
                         args.len(),
                     )));
                 }
-                let local_count = f.proto.chunk.local_count as usize;
-                let mut locals = vec![Value::Nil; local_count];
-                // Copy args into local slots.
-                for (i, val) in args.into_iter().enumerate() {
-                    if i < locals.len() {
-                        locals[i] = val;
+                let scope = Env::child(&f.closure);
+                {
+                    let mut env = scope.borrow_mut();
+                    for (name, val) in f.proto.params.iter().zip(args.into_iter()) {
+                        env.define(name, val, true);
                     }
                 }
-                let scope = Env::child(&f.closure);
+                let local_count = f.proto.chunk.local_count as usize;
                 self.frames.push(Frame {
                     proto: f.proto.clone(),
                     ip: 0,
                     env: scope,
-                    locals,
+                    locals: vec![Value::Nil; local_count],
                 });
                 Ok(())
             }

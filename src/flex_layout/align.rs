@@ -12,8 +12,8 @@ pub fn line_cross_positions(
     align: AlignContent,
 ) -> Vec<f32> {
     let n = lines.len();
-    let used: f32 = lines.iter().map(|l| l.cross_size).sum::<f32>()
-        + gap * n.saturating_sub(1) as f32;
+    let used: f32 =
+        lines.iter().map(|l| l.cross_size).sum::<f32>() + gap * n.saturating_sub(1) as f32;
     let free = (available_cross - used).max(0.0);
 
     let (start, between) = match align {

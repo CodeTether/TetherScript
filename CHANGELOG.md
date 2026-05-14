@@ -2,6 +2,50 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.0-alpha.13] - 2026-05-14
+
+### Added
+
+- Added native browser-agent release coverage for external resources, classic
+  scripts, module scripts, static module imports, dynamic `import()`, DOM
+  assertions, traces, and CLI browser grants.
+- Added `BrowserPage::production_debug_report()` with console-error, page-error,
+  HAR-style network entries, source-mapped page-error stack frames,
+  failed-request, source-map, framework, classified runtime exception, and React
+  hydration diagnostics for bundled production UI validation.
+- Added source-map resource registration for deterministic production bundles.
+- Added a native-browser contract test that rejects external browser engines
+  and remote-control drivers as browser backends.
+- Added `LICENSE-MIT`, `LICENSE-APACHE`, `CONTRIBUTING.md`, and GitHub Actions
+  CI for format, clippy, tests, doc tests, rustdoc warnings, file limits, and
+  package verification.
+- Added `check_file_limits.sh` and `check_file_limits.ps1` to enforce the
+  50-line source-file ratchet for changed `src/**/*.rs` files.
+- Added VM and ownership regression tests for function-local bindings, moved
+  function locals, immutable assignment rejection, and scalar Copy moves.
+
+### Changed
+
+- Prepared crates.io metadata for `0.1.0-alpha.13`, including the canonical
+  repository URL, dual MIT/Apache-2.0 license metadata, and a strict package
+  include list.
+- Split newly expanded source files into focused modules so changed Rust source
+  files respect the file-limit ratchet, including CSS layout, selector healing,
+  source discovery, and browser support helpers.
+- Updated browser capability documentation and the agent browser contract.
+
+### Fixed
+
+- Fixed rustdoc links so `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps`
+  passes cleanly.
+- Fixed VM function-call binding behavior so parameters and locals use the
+  environment path that preserves mutability and move tombstone semantics.
+- Fixed static ownership analysis so moving Copy scalar values does not mark
+  the source binding as moved.
+- Prevented internal/dev artifacts such as `AGENTS.md`, editor files, Docker
+  files, benchmark scripts, and `experiments/examples` from entering the crate
+  package.
+
 ## [0.1.0-alpha.11] - 2026-05-11
 
 ### Added

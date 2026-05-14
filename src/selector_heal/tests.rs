@@ -1,5 +1,5 @@
-use std::collections::BTreeMap;
 use super::*;
+use std::collections::BTreeMap;
 
 fn node(tag: &str, text: &str, attrs: &[(&str, &str)], children: Vec<DomNode>) -> DomNode {
     DomNode {

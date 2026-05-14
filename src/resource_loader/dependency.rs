@@ -62,12 +62,7 @@ impl DependencyGraph {
             .any(|n| self.visit(n, &mut seen, &mut stack))
     }
 
-    fn visit(
-        &self,
-        n: &str,
-        seen: &mut HashSet<String>,
-        stack: &mut HashSet<String>,
-    ) -> bool {
+    fn visit(&self, n: &str, seen: &mut HashSet<String>, stack: &mut HashSet<String>) -> bool {
         if stack.contains(n) {
             return true;
         }

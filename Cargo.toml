@@ -1,15 +1,29 @@
 [package]
 name = "tetherscript"
-version = "0.1.0-alpha.12"
+version = "0.1.0-alpha.13"
 authors = ["Riley Seaburg <riley@rileyseaburg.com>"]
 edition = "2021"
 description = "A dynamically-typed scripting language with Rust-style ownership, implemented as a bytecode VM in Rust"
-license = "MIT"
-repository = "https://github.com/CodeTether/TetherScript"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/tetherscript-Rs/tetherscript"
 readme = "README.md"
 keywords = ["scripting", "embedded", "language", "vm", "sandbox"]
 categories = ["compilers", "parser-implementations", "embedded"]
-exclude = ["trd.md"]
+include = [
+    "/Cargo.lock",
+    "/Cargo.toml",
+    "/CHANGELOG.md",
+    "/CONTRIBUTING.md",
+    "/check_file_limits.ps1",
+    "/check_file_limits.sh",
+    "/LICENSE-APACHE",
+    "/LICENSE-MIT",
+    "/README.md",
+    "/docs/**",
+    "/examples/**",
+    "/src/**",
+    "/tests/**",
+]
 
 [dependencies]
 ureq = { version = "3.3.0", features = ["_tls", "cookies"] }

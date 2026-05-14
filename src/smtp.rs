@@ -393,7 +393,7 @@ impl RsaPrivateKey {
         let mut encoded = Vec::with_capacity(self.size);
         encoded.push(0x00);
         encoded.push(0x01);
-        encoded.extend(std::iter::repeat(0xff).take(self.size - digest_info_len - 3));
+        encoded.extend(std::iter::repeat_n(0xff, self.size - digest_info_len - 3));
         encoded.push(0x00);
         encoded.extend_from_slice(&SHA256_DIGEST_INFO_PREFIX);
         encoded.extend_from_slice(digest);

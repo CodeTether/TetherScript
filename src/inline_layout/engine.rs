@@ -34,9 +34,7 @@ impl InlineLayoutEngine {
     ) {
         match child.kind.clone() {
             InlineBoxKind::LineBreak => self.finish_line(line, lines, y, true),
-            InlineBoxKind::Text(run) => {
-                self.layout_text(child, run.text, line, lines, y)
-            }
+            InlineBoxKind::Text(run) => self.layout_text(child, run.text, line, lines, y),
             _ => self.layout_atomic(child, line, lines, y),
         }
     }

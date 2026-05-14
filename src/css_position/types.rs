@@ -1,5 +1,7 @@
 //! Shared positioning data types.
 
+mod element_methods;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PositionType {
     Static,
@@ -55,18 +57,4 @@ pub struct PositionedElement<E = usize> {
     pub margin: BoxEdges,
     pub padding: BoxEdges,
     pub border: BoxEdges,
-}
-
-impl<E> PositionedElement<E> {
-    pub fn rect(&self) -> Rect {
-        Rect { x: self.computed_x, y: self.computed_y, width: self.width, height: self.height }
-    }
-
-    pub fn is_positioned(&self) -> bool {
-        self.position != PositionType::Static
-    }
-
-    pub fn effective_z_index(&self) -> i32 {
-        self.z_index.unwrap_or(0)
-    }
 }
