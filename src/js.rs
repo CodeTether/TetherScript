@@ -14,6 +14,11 @@ use std::rc::Rc;
 
 use crate::value::Value;
 
+#[path = "js_console.rs"]
+mod js_console;
+
+type NativeCallback = dyn Fn(&[JsValue]) -> Result<JsValue, String>;
+
 #[derive(Clone)]
 pub enum JsValue {
     Undefined,
@@ -45,7 +50,7 @@ pub struct BoundFunction {
 pub struct NativeFunction {
     name: String,
     arity: Option<usize>,
-    func: Box<dyn Fn(&[JsValue]) -> Result<JsValue, String>>,
+    func: Box<NativeCallback>,
     properties: HashMap<String, JsValue>,
 }
 
@@ -258,20 +263,7 @@ fn install_globals(env: &EnvRef, console_log: Rc<RefCell<Vec<String>>>) {
     env.borrow_mut()
         .define("Infinity", JsValue::Number(f64::INFINITY));
 
-    let log_capture = console_log.clone();
-    let log = JsValue::Native(Rc::new(NativeFunction::new("log", None, move |args| {
-        let line = args
-            .iter()
-            .map(|v| v.display())
-            .collect::<Vec<_>>()
-            .join(" ");
-        log_capture.borrow_mut().push(line);
-        Ok(JsValue::Undefined)
-    })));
-    let mut console = HashMap::new();
-    console.insert("log".into(), log);
-    env.borrow_mut()
-        .define("console", JsValue::Object(Rc::new(RefCell::new(console))));
+    js_console::install(env, console_log);
 
     env.borrow_mut().define(
         "Number",
@@ -317,7 +309,7 @@ fn install_globals(env: &EnvRef, console_log: Rc<RefCell<Vec<String>>>) {
         JsValue::Native(Rc::new(NativeFunction::new(
             "Promise_resolve",
             Some(1),
-            |args| promise_resolve(args),
+            promise_resolve,
         ))),
     );
     env.borrow_mut().define(
@@ -325,7 +317,7 @@ fn install_globals(env: &EnvRef, console_log: Rc<RefCell<Vec<String>>>) {
         JsValue::Native(Rc::new(NativeFunction::new(
             "Promise_reject",
             Some(1),
-            |args| promise_reject(args),
+            promise_reject,
         ))),
     );
 }
@@ -433,7 +425,7 @@ fn install_then_catch(obj: &mut HashMap<String, JsValue>, state: Rc<RefCell<Prom
             match &current {
                 PromiseState::Fulfilled(val) => {
                     if on_ok.truthy() {
-                        match call_value(on_ok, &[val.clone()]) {
+                        match call_value(on_ok, std::slice::from_ref(val)) {
                             Ok(result) => {
                                 // If result is itself a promise-like object, propagate
                                 if let JsValue::Object(ref robj) = result {
@@ -465,7 +457,7 @@ fn install_then_catch(obj: &mut HashMap<String, JsValue>, state: Rc<RefCell<Prom
                 }
                 PromiseState::Rejected(reason) => {
                     if on_err.truthy() {
-                        match call_value(on_err, &[reason.clone()]) {
+                        match call_value(on_err, std::slice::from_ref(reason)) {
                             Ok(result) => {
                                 next.insert(
                                     "__promise_state".into(),
@@ -527,7 +519,7 @@ fn install_then_catch(obj: &mut HashMap<String, JsValue>, state: Rc<RefCell<Prom
                 match &current {
                     PromiseState::Rejected(reason) => {
                         if handler.truthy() {
-                            match call_value(handler, &[reason.clone()]) {
+                            match call_value(handler, std::slice::from_ref(reason)) {
                                 Ok(result) => {
                                     next.insert(
                                         "__promise_state".into(),
@@ -588,30 +580,15 @@ fn install_then_catch(obj: &mut HashMap<String, JsValue>, state: Rc<RefCell<Prom
 
 fn array_global_functions() -> Vec<(&'static str, JsValue)> {
     vec![
-        (
-            "push",
-            native_array_global("push", |array, args| array_push(array, args)),
-        ),
+        ("push", native_array_global("push", array_push)),
         (
             "pop",
             native_array_global("pop", |array, _| array_pop(array)),
         ),
-        (
-            "slice",
-            native_array_global("slice", |array, args| array_slice(array, args)),
-        ),
-        (
-            "join",
-            native_array_global("join", |array, args| array_join(array, args)),
-        ),
-        (
-            "forEach",
-            native_array_global("forEach", |array, args| array_for_each(array, args)),
-        ),
-        (
-            "map",
-            native_array_global("map", |array, args| array_map(array, args)),
-        ),
+        ("slice", native_array_global("slice", array_slice)),
+        ("join", native_array_global("join", array_join)),
+        ("forEach", native_array_global("forEach", array_for_each)),
+        ("map", native_array_global("map", array_map)),
     ]
 }
 

@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 //! Flexbox layout engine for the tetherscript browser.
 
-pub mod align;
 pub mod algorithm;
+pub mod align;
 pub mod container;
 pub mod distribute;
 pub mod item;

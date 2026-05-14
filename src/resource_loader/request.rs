@@ -1,6 +1,6 @@
 //! Resource request description.
-use std::collections::HashMap;
 use core::cmp::Ordering;
+use std::collections::HashMap;
 
 use super::{CorsMode, CredentialsMode, ResourcePriority, ResourceType};
 

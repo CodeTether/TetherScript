@@ -25,11 +25,7 @@ pub fn distribute_line(
         if total > 0.0 {
             for li in &mut line.items {
                 let item = &items[li.index];
-                li.target = clamp_main(
-                    c,
-                    item,
-                    li.base + free * item.flex_grow.max(0.0) / total,
-                );
+                li.target = clamp_main(c, item, li.base + free * item.flex_grow.max(0.0) / total);
             }
         }
     } else if free < 0.0 {

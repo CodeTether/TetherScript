@@ -977,7 +977,7 @@ fn browser_assert(
     message: &str,
 ) -> Result<Value, String> {
     let browser = args
-        .get(0)
+        .first()
         .ok_or_else(|| format!("{}: missing browser", method))?;
     let arg = args.get(1).cloned().unwrap_or(Value::Nil);
     let call_args = if matches!(arg, Value::Nil) {
@@ -1002,7 +1002,7 @@ fn browser_assert_empty(
     message: &str,
 ) -> Result<Value, String> {
     let browser = args
-        .get(0)
+        .first()
         .ok_or_else(|| format!("{}: missing browser", method))?;
     match invoke_browser_result(rt, browser, method, &[])? {
         crate::value::ResultValue::Ok(Value::List(xs)) if xs.borrow().is_empty() => Ok(
@@ -1027,7 +1027,7 @@ fn browser_assert_bool(
     message: &str,
 ) -> Result<Value, String> {
     let browser = args
-        .get(0)
+        .first()
         .ok_or_else(|| format!("{}: missing browser", method))?;
     let arg = args
         .get(1)

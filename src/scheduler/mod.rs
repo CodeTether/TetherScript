@@ -12,5 +12,7 @@ mod task;
 #[cfg(test)]
 mod tests;
 
+#[allow(unused_imports)]
 pub use queue::Scheduler;
+#[allow(unused_imports)]
 pub use task::{Task, TaskState};

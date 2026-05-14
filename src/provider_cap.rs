@@ -105,6 +105,7 @@ pub struct ProviderAuthority {
 impl ProviderAuthority {
     /// Create a new provider capability scoped to the given HTTP endpoint.
     /// Endpoint must be `http://host[:port]`.
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(endpoint: &str) -> Rc<dyn Authority> {
         let (scheme, host, port) =
             parse_endpoint(endpoint).unwrap_or_else(|| (Scheme::Http, "localhost".into(), 80));
@@ -212,52 +213,50 @@ impl ProviderAuthority {
 
         // Extract model from overrides or default
         let mut model = String::new();
-        if let Some(overrides) = args.get(1) {
-            if let Value::Map(m) = overrides {
-                let m = m.borrow();
-                if let Some(Value::Str(m_name)) = m.get("model") {
-                    model = m_name.to_string();
-                    body.insert("model".to_string(), Value::Str(Rc::new(model.clone())));
-                }
-                if let Some(Value::Int(mt)) = m.get("max_tokens") {
-                    let capped = if self.max_tokens > 0 {
-                        (*mt).min(self.max_tokens as i64)
-                    } else {
-                        *mt
-                    };
-                    body.insert("max_tokens".to_string(), Value::Int(capped));
-                }
-                if let Some(Value::Float(t)) = m.get("temperature") {
-                    body.insert("temperature".to_string(), Value::Float(*t));
-                }
-                if let Some(Value::Str(s)) = m.get("stream") {
-                    body.insert("stream".to_string(), Value::Str(s.clone()));
-                }
+        if let Some(Value::Map(m)) = args.get(1) {
+            let m = m.borrow();
+            if let Some(Value::Str(m_name)) = m.get("model") {
+                model = m_name.to_string();
+                body.insert("model".to_string(), Value::Str(Rc::new(model.clone())));
+            }
+            if let Some(Value::Int(mt)) = m.get("max_tokens") {
+                let capped = if self.max_tokens > 0 {
+                    (*mt).min(self.max_tokens as i64)
+                } else {
+                    *mt
+                };
+                body.insert("max_tokens".to_string(), Value::Int(capped));
+            }
+            if let Some(Value::Float(t)) = m.get("temperature") {
+                body.insert("temperature".to_string(), Value::Float(*t));
+            }
+            if let Some(Value::Str(s)) = m.get("stream") {
+                body.insert("stream".to_string(), Value::Str(s.clone()));
+            }
 
-                // top_p sampling (used by GLM 4.7 and others)
-                if let Some(Value::Float(p)) = m.get("top_p") {
-                    body.insert("top_p".to_string(), Value::Float(*p));
-                }
+            // top_p sampling (used by GLM 4.7 and others)
+            if let Some(Value::Float(p)) = m.get("top_p") {
+                body.insert("top_p".to_string(), Value::Float(*p));
+            }
 
-                // GLM 4.7 / Cerebras parameters
-                if let Some(Value::Int(mt)) = m.get("max_completion_tokens") {
-                    let capped = if self.max_tokens > 0 {
-                        (*mt).min(self.max_tokens as i64)
-                    } else {
-                        *mt
-                    };
-                    body.insert("max_completion_tokens".to_string(), Value::Int(capped));
-                }
-                if let Some(Value::Str(effort)) = m.get("reasoning_effort") {
-                    body.insert("reasoning_effort".to_string(), Value::Str(effort.clone()));
-                }
-                if let Some(Value::Bool(ct)) = m.get("clear_thinking") {
-                    body.insert("clear_thinking".to_string(), Value::Bool(*ct));
-                }
-                // Bool-valued stream parameter
-                if let Some(Value::Bool(b)) = m.get("stream") {
-                    body.insert("stream".to_string(), Value::Bool(*b));
-                }
+            // GLM 4.7 / Cerebras parameters
+            if let Some(Value::Int(mt)) = m.get("max_completion_tokens") {
+                let capped = if self.max_tokens > 0 {
+                    (*mt).min(self.max_tokens as i64)
+                } else {
+                    *mt
+                };
+                body.insert("max_completion_tokens".to_string(), Value::Int(capped));
+            }
+            if let Some(Value::Str(effort)) = m.get("reasoning_effort") {
+                body.insert("reasoning_effort".to_string(), Value::Str(effort.clone()));
+            }
+            if let Some(Value::Bool(ct)) = m.get("clear_thinking") {
+                body.insert("clear_thinking".to_string(), Value::Bool(*ct));
+            }
+            // Bool-valued stream parameter
+            if let Some(Value::Bool(b)) = m.get("stream") {
+                body.insert("stream".to_string(), Value::Bool(*b));
             }
         }
 

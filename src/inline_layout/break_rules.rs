@@ -39,8 +39,8 @@ pub fn break_text_to_width(text: &str, available_width: f32) -> BreakToken {
     let chars: Vec<char> = before_newline.chars().collect();
     let limit = max_chars.min(chars.len());
     let mut break_at = None;
-    for i in 1..limit {
-        if chars[i].is_whitespace() {
+    for (i, ch) in chars.iter().enumerate().take(limit).skip(1) {
+        if ch.is_whitespace() {
             break_at = Some(i);
         }
     }

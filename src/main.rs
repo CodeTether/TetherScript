@@ -19,6 +19,9 @@
 //! tetherscript --version                      show version
 //! ```
 
+#![allow(dead_code)]
+#![allow(clippy::too_many_arguments)]
+
 mod ast;
 mod browser;
 mod browser_cap;

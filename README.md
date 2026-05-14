@@ -12,6 +12,8 @@ application.
 
 ## Status
 
+tetherscript is preparing `0.1.0-alpha.13` for crates.io publication.
+
 tetherscript currently includes:
 
 - A tree-walking interpreter used as the reference runtime.
@@ -36,6 +38,15 @@ tetherscript currently includes:
   `location`/`navigator` globals, `this`, `typeof`, function expressions,
   classic `for` loops for NodeList-style iteration, and deterministic
   `setTimeout`/`clearTimeout` draining after scripts.
+- Native browser-agent APIs for agent validation workflows, including page
+  loading from provided HTML, external resource registration, resource
+  validation, stylesheet/script inlining, classic and module script execution,
+  static module import rewriting, dynamic `import()` resolution, DOM assertions,
+  screenshots/traces, production debug reports, HAR-style network exports,
+  source-mapped runtime error locations and generated stack frames, React
+  root/hydration diagnostics, classified runtime exceptions, and explicit tests
+  that reject external browser engines and remote-control drivers as required
+  browser backends.
 - SMTP sending support.
 - Standard tools for filesystem, process, environment, path, time, Base64,
   SHA-256, and URL parsing.
@@ -49,6 +60,8 @@ responsible for trust, capabilities, auditing, and resource budgets.
 ## Quick start
 
 ```bash
+cargo install tetherscript --version 0.1.0-alpha.13
+
 cargo build --release
 
 # Run with the bytecode VM (default)
@@ -195,6 +208,10 @@ diagnostics.
 - Complete Test262 and Web Platform Tests coverage. The JavaScript/browser
   runtime is an in-tree, zero-dependency compatibility track and currently
   implements a practical DOM/JS subset rather than every web standard.
+- Full browser networking, navigation, DOM, CSS, rendering, JS, and Web API
+  parity. The browser track is intended to become a native full-parity browser
+  for agents, with conformance tracked explicitly rather than delegated to an
+  external browser engine.
 - Capability audit logs and richer resource budgets.
 - Moving ambient host tools behind explicit capabilities where practical.
 - Async scheduler.
@@ -249,7 +266,9 @@ docs/
 - [x] Standard filesystem/process/env/path/time/hash/base64/url tools
 - [x] Experimental browser parser/layout/text renderer
 - [x] Experimental dependency-free browser JavaScript host bindings
+- [x] Native production debug report for bundled UI validation
 - [x] Rust embedding/plugin host
+- [ ] Native full browser parity
 - [ ] Runtime `&mut` exclusivity enforcement
 - [ ] Modules and imports
 - [ ] Plugin and capability manifests as stable formats

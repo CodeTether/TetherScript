@@ -2,9 +2,9 @@
 //!
 //! This module re-exports the public API from focused sub-modules:
 //!
-//! - [`http_client`] — `get`, `head`, `post`, `request` functions
-//! - [`http_server`] — `serve` function for the accept loop
-//! - [`http_url`] — URL parsing for `http://` scheme
+//! - [`get`], [`head`], [`post`], [`request`] - blocking client functions
+//! - [`serve`] - blocking server accept loop
+//! - `http://` URL parsing used by the client and server helpers
 //!
 //! Internal sub-modules handle headers, response serialization,
 //! response extraction, and status reason phrases.

@@ -1,6 +1,7 @@
 //! Containing block resolution.
 
 use super::types::{PositionType, PositionedElement, Rect};
+mod content_box;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ContainingBlock {
@@ -9,7 +10,14 @@ pub struct ContainingBlock {
 
 impl ContainingBlock {
     pub fn viewport(width: f32, height: f32) -> Self {
-        Self { rect: Rect { x: 0.0, y: 0.0, width, height } }
+        Self {
+            rect: Rect {
+                x: 0.0,
+                y: 0.0,
+                width,
+                height,
+            },
+        }
     }
 }
 
@@ -34,17 +42,14 @@ impl ContainingBlockResolver {
                 }
                 viewport
             }
-            PositionType::Static | PositionType::Relative | PositionType::Sticky => {
-                el.parent.map(|i| Self::content_box(&elements[i])).unwrap_or(viewport)
-            }
+            PositionType::Static | PositionType::Relative | PositionType::Sticky => el
+                .parent
+                .map(|i| Self::content_box(&elements[i]))
+                .unwrap_or(viewport),
         }
     }
 
     pub fn content_box<E>(el: &PositionedElement<E>) -> ContainingBlock {
-        let x = el.computed_x + el.border.left + el.padding.left;
-        let y = el.computed_y + el.border.top + el.padding.top;
-        let w = el.width - el.border.left - el.border.right - el.padding.left - el.padding.right;
-        let h = el.height - el.border.top - el.border.bottom - el.padding.top - el.padding.bottom;
-        ContainingBlock { rect: Rect { x, y, width: w.max(0.0), height: h.max(0.0) } }
+        content_box::resolve(el)
     }
 }

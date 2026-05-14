@@ -9,7 +9,9 @@ pub struct SelfHealingSelector {
 
 impl SelfHealingSelector {
     pub fn new() -> Self {
-        Self { generator: SelectorGenerator }
+        Self {
+            generator: SelectorGenerator,
+        }
     }
 
     /// Heal using a known previous fingerprint.
@@ -62,9 +64,7 @@ impl SelfHealingSelector {
         let mut all = Vec::new();
         root.walk(&mut all, vec![]);
         all.into_iter()
-            .filter_map(|(p, _)| {
-                DomFingerprint::from_dom(root, &p).map(|f| (p, fp.similarity(&f)))
-            })
+            .filter_map(|(p, _)| DomFingerprint::from_dom(root, &p).map(|f| (p, fp.similarity(&f))))
             .filter(|(_, s)| *s >= 0.55)
             .map(|(p, _)| p)
             .collect()

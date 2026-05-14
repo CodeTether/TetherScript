@@ -29,11 +29,16 @@ pub enum Instr {
     DefLet(u16, bool), // name_idx, mutable
     Assign(u16),
 
-    // Fast local slots (indexed access, no HashMap lookup)
-    GetLocal(u8),       // load local by slot index
-    SetLocal(u8),       // store stack top into local slot
-    DefLocal(u8, bool), // pop stack top into local slot (mutable flag for debug)
-    MoveLocal(u8),      // take ownership from local slot (heap values leave tombstone)
+    // Reserved local-slot opcodes. The compiler does not emit these for user
+    // bindings while runtime ownership lives in Env slots.
+    #[allow(dead_code)]
+    GetLocal(u8), // load local by slot index
+    #[allow(dead_code)]
+    SetLocal(u8), // store stack top into local slot
+    #[allow(dead_code)]
+    DefLocal(u8, bool), // pop stack top into local slot
+    #[allow(dead_code)]
+    MoveLocal(u8), // take ownership from local slot
 
     // Unary
     Neg,
@@ -95,8 +100,8 @@ pub struct Chunk {
     pub consts: Vec<Value>,
     pub names: Vec<String>,
     pub protos: Vec<Rc<FnProto>>,
-    /// Number of local variable slots this function body needs.
-    /// The VM pre-allocates this many slots in the frame.
+    /// Reserved local-slot count for future optimized bytecode.
+    /// Current compiler output keeps source variables in [`Env`] slots.
     pub local_count: u8,
 }
 
