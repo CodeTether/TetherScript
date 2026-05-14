@@ -12,7 +12,7 @@ application.
 
 ## Status
 
-tetherscript is preparing `0.1.0-alpha.13` for crates.io publication.
+tetherscript is preparing `0.1.0-alpha.14` for crates.io publication.
 
 tetherscript currently includes:
 
@@ -60,7 +60,7 @@ responsible for trust, capabilities, auditing, and resource budgets.
 ## Quick start
 
 ```bash
-cargo install tetherscript --version 0.1.0-alpha.13
+cargo install tetherscript --version 0.1.0-alpha.14
 
 cargo build --release
 

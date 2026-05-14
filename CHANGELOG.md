@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.1.0-alpha.13] - 2026-05-14
+## [0.1.0-alpha.14] - 2026-05-14
 
 ### Added
 
@@ -26,7 +26,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Prepared crates.io metadata for `0.1.0-alpha.13`, including the canonical
+- Prepared crates.io metadata for `0.1.0-alpha.14`, including the canonical
   repository URL, dual MIT/Apache-2.0 license metadata, and a strict package
   include list.
 - Split newly expanded source files into focused modules so changed Rust source
