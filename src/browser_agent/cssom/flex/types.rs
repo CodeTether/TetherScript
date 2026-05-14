@@ -1,16 +1,38 @@
 //! Core flexbox types.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FlexDirection { Row, RowReverse, Column, ColumnReverse }
+pub enum FlexDirection {
+    Row,
+    RowReverse,
+    Column,
+    ColumnReverse,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum JustifyContent { FlexStart, FlexEnd, Center, SpaceBetween, SpaceAround, SpaceEvenly }
+pub enum JustifyContent {
+    FlexStart,
+    FlexEnd,
+    Center,
+    SpaceBetween,
+    SpaceAround,
+    SpaceEvenly,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AlignItems { Stretch, FlexStart, FlexEnd, Center, Baseline }
+pub enum AlignItems {
+    Stretch,
+    FlexStart,
+    FlexEnd,
+    Center,
+    Baseline,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FlexWrap { NoWrap, Wrap, WrapReverse }
+pub enum FlexWrap {
+    NoWrap,
+    Wrap,
+    WrapReverse,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FlexItem {

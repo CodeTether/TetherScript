@@ -22,7 +22,10 @@ pub fn measure_line_height(styles: &HashMap<String, String>) -> i64 {
 }
 
 fn font_size(styles: &HashMap<String, String>) -> i64 {
-    styles.get("font-size").and_then(|v| parse_px(v)).unwrap_or(16)
+    styles
+        .get("font-size")
+        .and_then(|v| parse_px(v))
+        .unwrap_or(16)
 }
 
 fn parse_px(value: &str) -> Option<i64> {

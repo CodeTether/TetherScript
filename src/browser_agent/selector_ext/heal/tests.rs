@@ -4,9 +4,14 @@ use super::*;
 
 fn props(tag: &str, id: &str, classes: &[&str], text: &str) -> ElementProps {
     ElementProps {
-        tag: tag.into(), id: if id.is_empty() { None } else { Some(id.into()) },
+        tag: tag.into(),
+        id: if id.is_empty() { None } else { Some(id.into()) },
         classes: classes.iter().map(|s| s.to_string()).collect(),
-        text: if text.is_empty() { None } else { Some(text.into()) },
+        text: if text.is_empty() {
+            None
+        } else {
+            Some(text.into())
+        },
         ..Default::default()
     }
 }

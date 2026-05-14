@@ -1,16 +1,18 @@
 # Browser WPT/Compliance Map
 
-This inventory maps the current in-tree browser/runtime slice to Web Platform
-Tests (WPT)-style coverage. It is intentionally lightweight: entries name the
-implemented surface, the closest WPT area or test shape, local coverage, and
-known gaps that would block claiming web compatibility.
+This inventory maps the native tetherscript browser parity track to Web
+Platform Tests (WPT)-style coverage. Entries name the implemented surface, the
+closest WPT area or test shape, local coverage, and known gaps that block
+claiming full browser parity.
 
 ## Scope
 
-The browser track is a deterministic, dependency-free seed implementation. It
-parses a small HTML subset into a DOM, parses/matches basic CSS selectors and
-declarations, computes a block-oriented layout tree, emits a text display list,
-and exposes a small DOM/Window surface to the in-tree JavaScript interpreter.
+The browser track is a native full-parity target for agents. It starts from a
+deterministic in-tree implementation: HTML is parsed into a DOM, CSS is parsed
+and matched, layout/rendering are computed natively, and browser APIs are
+exposed to the in-tree JavaScript interpreter. Full parity means closing this
+map against spec/WPT behavior without delegating execution to an external
+browser engine or remote-control driver.
 
 This document is not a pass/fail WPT report. It is a planning map for turning
 local unit tests and fixtures into WPT-like compliance cases.
@@ -31,6 +33,7 @@ local unit tests and fixtures into WPT-like compliance cases.
 | Web Storage | In-memory `localStorage`/`sessionStorage` with `getItem`, `setItem`, `removeItem`, `clear`, `key`, `length` | `webstorage` | `src/browser_js.rs::local_storage_implements_minimal_storage_api`, `session_storage_is_separate_from_local_storage_and_per_eval`, `compatibility_report_lists_storage_apis` | Partial | Per-eval ephemeral storage, no origin scoping/persistence/quota/events/security errors, no property-indexed access |
 | JavaScript integration | Inline `<script>` execution, expression return value, console log capture, functions, loops, `typeof`, `this` in supported callbacks | `html/semantics/scripting-1`, `console`, `ecmascript` host smoke | `src/browser_js.rs` unit tests | Project-specific | Interpreter is a tiny subset, no modules, promises/microtasks, fetch, exceptions parity, script loading/networking |
 | Runtime builtins | `browser_parse_html`, `browser_parse_css`, `browser_styles`, `browser_query_selector`, `browser_text_content`, `browser_snapshot`, `browser_display_list`, `browser_render`, `browser_layout`, `browser_run_scripts`, `browser_eval_js`, compatibility report | Project API contract; WPT harness adapter candidates | `src/browser.rs::browser_builtins_return_values`, `browser_variadics_reject_extra_args`; `src/browser_js.rs::compatibility_report_lists_storage_apis` | Local API covered | Need stable JSON fixture format and harness glue before importing external WPT data |
+| Production diagnostics | Console/page errors, HAR-style network entries, source-mapped error locations and generated stack frames, failed requests, source-map references, classified runtime exceptions, React roots and hydration warnings | `console`, `fetch`, source maps, framework integration smoke | `tests/agent_browser_production_debug.rs` | Agent-debug subset | Needs async stack frames and framework component stack reconstruction |
 
 ## Suggested WPT-like fixture layout
 

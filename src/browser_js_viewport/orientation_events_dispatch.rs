@@ -24,10 +24,14 @@ fn dispatch(
     if event::event_type(&event) == "change" {
         let this_value = JsValue::Object(object.clone());
         for listener in listeners.borrow().clone() {
-            js::call_function_with_this(listener, this_value.clone(), &[event.clone()])?;
+            js::call_function_with_this(
+                listener,
+                this_value.clone(),
+                std::slice::from_ref(&event),
+            )?;
         }
         if let Some(handler) = object.borrow().get("onchange").cloned().filter(callable) {
-            js::call_function_with_this(handler, this_value, &[event])?;
+            js::call_function_with_this(handler, this_value, std::slice::from_ref(&event))?;
         }
     }
     Ok(JsValue::Bool(true))

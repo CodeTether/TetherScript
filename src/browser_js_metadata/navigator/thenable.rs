@@ -24,8 +24,11 @@ fn then_method(value: JsValue) -> JsValue {
             if matches!(callback, JsValue::Undefined | JsValue::Null) {
                 return Ok(resolved(value.clone()));
             }
-            let result =
-                js::call_function_with_this(callback, JsValue::Undefined, &[value.clone()])?;
+            let result = js::call_function_with_this(
+                callback,
+                JsValue::Undefined,
+                std::slice::from_ref(&value),
+            )?;
             Ok(resolved(result))
         },
     )))

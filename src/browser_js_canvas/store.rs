@@ -26,7 +26,7 @@ pub(super) fn ensure(handle: &DomHandle) {
         let mut surfaces = surfaces.borrow_mut();
         let refresh = surfaces
             .get(&key)
-            .map_or(true, |s| s.width != width || s.height != height);
+            .is_none_or(|s| s.width != width || s.height != height);
         if refresh {
             surfaces.insert(key.clone(), Surface::new(width, height));
         }

@@ -1,10 +1,12 @@
 //! Flexbox unit tests.
 
+use super::perform_flex_layout;
 use std::collections::HashMap;
-use super::{perform_flex_layout, types::*};
 
 fn map(p: &[(&str, &str)]) -> HashMap<String, String> {
-    p.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+    p.iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect()
 }
 
 #[test]

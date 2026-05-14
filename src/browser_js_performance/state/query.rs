@@ -23,7 +23,7 @@ pub(super) fn by_name(name: &str, entry_type: Option<&str>) -> Vec<PerformanceEn
             .entries
             .iter()
             .filter(|entry| entry.name == name)
-            .filter(|entry| entry_type.map_or(true, |kind| entry.entry_type == kind))
+            .filter(|entry| entry_type.is_none_or(|kind| entry.entry_type == kind))
             .cloned()
             .collect()
     })

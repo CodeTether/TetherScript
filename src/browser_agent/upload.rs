@@ -1,4 +1,4 @@
-//! Page method for Playwright-style file-input uploads.
+//! Page method for deterministic file-input uploads.
 
 #[path = "upload_script.rs"]
 mod upload_script;

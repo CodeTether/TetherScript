@@ -1,7 +1,7 @@
 //! Top-level flex layout algorithm.
 
+use super::{align, parse, position, resolve, types::*, wrap_lines};
 use std::collections::HashMap;
-use super::{align, parse, position, resolve, wrap_lines, types::*};
 
 /// Perform flex layout on a container's children.
 ///
@@ -29,14 +29,21 @@ pub fn perform_flex_layout(
     let mut off = 0;
     for (s, e, line_cross) in flex_lines {
         position::position_line(
-            &mut items[s..e], row, main,
-            parse::justify(container_styles), resolve::is_reverse(dir),
+            &mut items[s..e],
+            row,
+            main,
+            parse::justify(container_styles),
+            resolve::is_reverse(dir),
         );
         let line_styles = &children_styles[s..e.min(children_styles.len())];
         let c = if cross > 0 { cross } else { line_cross };
         align::align_line(
-            &mut items[s..e], line_styles, row, c,
-            parse::align_items(container_styles), off,
+            &mut items[s..e],
+            line_styles,
+            row,
+            c,
+            parse::align_items(container_styles),
+            off,
         );
         off += line_cross;
     }

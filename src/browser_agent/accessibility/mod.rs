@@ -1,6 +1,6 @@
 //! Deterministic accessibility snapshots for agent-controlled pages.
 //!
-//! This module builds compact, Playwright-style accessibility metadata from the
+//! This module builds compact agent accessibility metadata from the
 //! browser-agent DOM without owning layout, network, or script runtime state.
 
 mod build;

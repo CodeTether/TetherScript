@@ -1,4 +1,4 @@
-//! Playwright-style automation helpers for the deterministic browser.
+//! Agent automation helpers for the deterministic browser.
 //!
 //! The module wraps [`BrowserSession`](crate::browser_session::BrowserSession)
 //! with small page, locator, and action primitives that are useful to agents.

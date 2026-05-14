@@ -9,7 +9,10 @@ fn text(content: &str, size: i64) -> InlineFragment {
         width,
         size * 6 / 5,
         size,
-        FragmentKind::Text { content: content.to_string(), font_size: size },
+        FragmentKind::Text {
+            content: content.to_string(),
+            font_size: size,
+        },
     )
 }
 

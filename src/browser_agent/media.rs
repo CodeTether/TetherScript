@@ -67,7 +67,7 @@ pub enum ForcedColors {
 /// let media = MediaEmulation { color_scheme: ColorScheme::Dark, ..Default::default() };
 /// assert_eq!(media.color_scheme, ColorScheme::Dark);
 /// ```
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub struct MediaEmulation {
     /// Emulated color-scheme preference.
     pub color_scheme: ColorScheme,
@@ -92,15 +92,5 @@ impl Default for ReducedMotion {
 impl Default for ForcedColors {
     fn default() -> Self {
         Self::None
-    }
-}
-
-impl Default for MediaEmulation {
-    fn default() -> Self {
-        Self {
-            color_scheme: ColorScheme::default(),
-            reduced_motion: ReducedMotion::default(),
-            forced_colors: ForcedColors::default(),
-        }
     }
 }

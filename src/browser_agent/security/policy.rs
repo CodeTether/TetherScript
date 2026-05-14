@@ -13,7 +13,7 @@ use super::{Origin, SandboxFlags};
 /// policy.allow_origin(Origin::parse("https://api.test"));
 /// assert!(policy.allows(&Origin::parse("https://app.test"), &Origin::parse("https://api.test")));
 /// ```
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct SecurityPolicy {
     allowed_origins: Vec<Origin>,
     /// Sandbox metadata associated with this policy.
@@ -41,14 +41,5 @@ impl SecurityPolicy {
     /// Return explicitly allowed cross-origin targets.
     pub fn allowed_origins(&self) -> &[Origin] {
         &self.allowed_origins
-    }
-}
-
-impl Default for SecurityPolicy {
-    fn default() -> Self {
-        Self {
-            allowed_origins: Vec::new(),
-            sandbox: SandboxFlags::default(),
-        }
     }
 }

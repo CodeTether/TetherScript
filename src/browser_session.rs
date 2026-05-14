@@ -16,6 +16,8 @@ pub use crate::browser_cookie::{Cookie, SameSite};
 use crate::browser_js::{
     eval_with_dom_state, run_html_scripts_with_state, BrowserJsResult, BrowserJsState,
 };
+#[path = "browser_session_console.rs"]
+mod browser_session_console;
 
 const BLANK_URL: &str = "about:blank";
 
@@ -396,11 +398,8 @@ impl BrowserSession {
         self.css = css;
         self.document = document;
         self.apply_browser_js_state(state);
-        self.console.extend(
-            console
-                .into_iter()
-                .map(|message| ConsoleEvent::new("log", message)),
-        );
+        self.console
+            .extend(console.into_iter().map(browser_session_console::event));
         self.network.extend(network.into_iter().map(|event| {
             NetworkEvent::with_route_result(
                 event.method,

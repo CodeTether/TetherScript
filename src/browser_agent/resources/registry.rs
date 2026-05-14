@@ -43,6 +43,12 @@ impl ResourceRegistry {
         })
     }
 
+    pub(crate) fn has(&self, kind: ResourceKind, url: &str) -> bool {
+        self.entries
+            .iter()
+            .any(|entry| entry.kind == kind && entry.url == url)
+    }
+
     fn upsert(&mut self, resource: BrowserResource) {
         if let Some(existing) = self
             .entries

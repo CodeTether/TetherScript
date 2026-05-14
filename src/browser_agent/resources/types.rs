@@ -9,6 +9,8 @@ pub enum ResourceKind {
     Stylesheet,
     /// Image bytes referenced by image elements.
     Image,
+    /// Source-map text referenced by bundled JavaScript.
+    SourceMap,
 }
 
 /// Payload held for a deterministic external resource.

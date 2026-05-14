@@ -36,15 +36,16 @@ impl Default for MediaState {
 
 impl MediaState {
     pub(super) fn from_attrs(attrs: &HashMap<String, String>) -> Self {
-        let mut state = Self::default();
-        state.src = attrs.get("src").cloned().unwrap_or_default();
-        state.duration = attr_number(attrs, "duration")
-            .or_else(|| attr_number(attrs, "data-duration"))
-            .unwrap_or(0.0);
-        state.muted = attrs.contains_key("muted");
-        state.volume = attr_number(attrs, "volume").unwrap_or(1.0).clamp(0.0, 1.0);
-        state.playback_rate = attr_number(attrs, "playbackrate").unwrap_or(1.0);
-        state
+        Self {
+            src: attrs.get("src").cloned().unwrap_or_default(),
+            duration: attr_number(attrs, "duration")
+                .or_else(|| attr_number(attrs, "data-duration"))
+                .unwrap_or(0.0),
+            muted: attrs.contains_key("muted"),
+            volume: attr_number(attrs, "volume").unwrap_or(1.0).clamp(0.0, 1.0),
+            playback_rate: attr_number(attrs, "playbackrate").unwrap_or(1.0),
+            ..Self::default()
+        }
     }
 }
 

@@ -13,7 +13,7 @@ pub(super) fn ensure(handle: &DomHandle, version: u8) {
     let (width, height) = super::dimensions::dimensions(handle);
     let state = STATES.with(|states| {
         let mut states = states.borrow_mut();
-        let refresh = states.get(&key).map_or(true, |state| {
+        let refresh = states.get(&key).is_none_or(|state| {
             state.version != version || state.width != width || state.height != height
         });
         if refresh {

@@ -2,14 +2,14 @@ use super::*;
 
 mod constants;
 mod equality;
-#[path = "../handle_ref.rs"]
-mod handle_ref;
 mod identity;
 mod normalize;
 mod normalize_edit;
 mod order;
 mod position;
 mod position_install;
+
+use super::handle_ref;
 
 pub(super) fn install(obj: &mut HashMap<String, JsValue>, handle: &DomHandle) {
     constants::install(obj);

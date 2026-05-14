@@ -1215,9 +1215,7 @@ fn layout_styled_node(
                 css_width.max(0)
             };
             let width = if specified_width.is_some() {
-                if uniform_padding_only {
-                    css_width.max(0)
-                } else if border_box {
+                if uniform_padding_only || border_box {
                     css_width.max(0)
                 } else {
                     (content_width + horizontal_extras).max(0)
@@ -2891,7 +2889,7 @@ fn accessible_name(element: &Element) -> Option<String> {
 
 /// Is the element keyboard-focusable?
 fn is_focusable(element: &Element) -> bool {
-    if element.attrs.get("role").is_some() {
+    if element.attrs.contains_key("role") {
         return true;
     }
     if let Some(tabindex) = element.attrs.get("tabindex") {
@@ -2980,7 +2978,7 @@ pub fn build_accessibility_tree(document: &Document) -> Vec<A11yNode> {
     document
         .children
         .iter()
-        .filter_map(|node| build_a11y_node(node))
+        .filter_map(build_a11y_node)
         .collect()
 }
 

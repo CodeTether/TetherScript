@@ -19,7 +19,9 @@ pub(crate) fn prepare(method: &str, args: &[Value]) -> Result<BrowserCall, Strin
         "screenshot_element" => visual_actions::screenshot_element(args),
         "find_visual_text" => visual_actions::text_wait(args),
         "find_element_at" => visual_more::point_eval(args),
-        "compare_screenshots" | "visual_diff" => visual_more::raw_visual(method, args),
+        "compare_screenshots" | "visual_diff" | "assert_screenshot_matches" => {
+            visual_more::raw_visual(method, args)
+        }
         _ => unreachable!(),
     }
 }

@@ -28,7 +28,11 @@ pub(super) fn thenable(name: String, ready: Option<JsValue>) -> JsValue {
 
 pub(super) fn notify(name: &str, definition: JsValue) -> Result<(), String> {
     for callback in registry::take_waiters(name) {
-        js::call_function_with_this(callback, JsValue::Undefined, &[definition.clone()])?;
+        js::call_function_with_this(
+            callback,
+            JsValue::Undefined,
+            std::slice::from_ref(&definition),
+        )?;
     }
     Ok(())
 }

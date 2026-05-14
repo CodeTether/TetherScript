@@ -26,7 +26,7 @@ pub struct StorageOriginSnapshot {
     pub entries: Vec<(String, String)>,
 }
 
-/// Playwright-style shared browser storage snapshot.
+/// Shared native browser storage snapshot.
 ///
 /// This excludes per-page `sessionStorage`, which remains tab-scoped.
 #[derive(Clone, Debug, Default, PartialEq)]

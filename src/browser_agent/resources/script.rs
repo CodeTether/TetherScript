@@ -1,37 +1,18 @@
 //! External script application for page resources.
 
-use super::discover::ResourceReference;
-use super::{inline, url, ResourceKind, ResourceRegistry};
+use crate::browser::Document;
+
+use super::{inline, script_dom, ResourceRegistry};
 
 pub(crate) fn inline_scripts(
-    mut html: String,
-    refs: &[ResourceReference],
+    document: &Document,
     registry: &ResourceRegistry,
     base_url: &str,
-) -> Result<String, String> {
-    for reference in refs.iter().filter(|item| item.kind == ResourceKind::Script) {
-        let (url, source) = text_resource(registry, ResourceKind::Script, base_url, &reference.url)
-            .ok_or_else(|| missing("script", base_url, &reference.url))?;
-        html = inline::append_script(html, &url, source);
+) -> Result<Option<String>, String> {
+    let mut document = document.clone();
+    let mut changed = false;
+    for child in &mut document.children {
+        script_dom::inline_node(child, registry, base_url, &mut changed)?;
     }
-    Ok(html)
-}
-
-fn text_resource<'a>(
-    registry: &'a ResourceRegistry,
-    kind: ResourceKind,
-    base_url: &str,
-    reference: &str,
-) -> Option<(String, &'a str)> {
-    url::candidates(base_url, reference)
-        .into_iter()
-        .find_map(|url| registry.text(kind, &url).map(|text| (url, text)))
-}
-
-fn missing(kind: &str, base_url: &str, reference: &str) -> String {
-    let resolved = url::resolve(base_url, reference);
-    format!(
-        "missing external {} resource: {} (resolved {})",
-        kind, reference, resolved
-    )
+    Ok(changed.then(|| inline::document_html(&document)))
 }
