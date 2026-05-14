@@ -15,7 +15,8 @@ pub(super) fn reset() {
 pub(super) fn enqueue(job: JsValue) {
     let queued = QUEUE_MICROTASK.with(|queue| {
         queue.borrow().clone().is_some_and(|callback| {
-            js::call_function_with_this(callback, JsValue::Undefined, &[job.clone()]).is_ok()
+            js::call_function_with_this(callback, JsValue::Undefined, std::slice::from_ref(&job))
+                .is_ok()
         })
     });
     if !queued {

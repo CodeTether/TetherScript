@@ -13,8 +13,9 @@ pub(crate) fn prepare(auth: &BrowserAuthority, method: &str, args: &[Value]) -> 
         | "tabs" | "tabs_select" | "tabs_new" | "tabs_close" | "wait_for_url" => {
             super::nav::prepare(auth, method, args)
         }
-        "click" | "upload" | "fill" | "type" | "press" | "click_text" | "fill_native"
-        | "toggle" | "mouse_click" | "keyboard_type" | "keyboard_press" => {
+        "click" | "upload" | "fill" | "type" | "press" | "hover" | "focus" | "blur"
+        | "scroll" | "click_text" | "fill_native" | "toggle" | "mouse_click"
+        | "keyboard_type" | "keyboard_press" => {
             super::dom::prepare(method, args)
         }
         "snapshot" | "page_snapshot" | "dom_snapshot" | "text" | "html" | "eval"
@@ -37,9 +38,8 @@ pub(crate) fn prepare(auth: &BrowserAuthority, method: &str, args: &[Value]) -> 
             super::storage::prepare(method, args)
         }
         "is_visible" | "is_enabled" | "bounding_box" | "screenshot_element"
-        | "find_visual_text" | "find_element_at" | "compare_screenshots" | "visual_diff" => {
-            super::visual::prepare(method, args)
-        }
+        | "find_visual_text" | "find_element_at" | "compare_screenshots" | "visual_diff"
+        | "assert_screenshot_matches" => super::visual::prepare(method, args),
         "screenshot" => super::extra::screenshot(args),
         _ => Err(format!("browser: no method `{}`", method)),
     }

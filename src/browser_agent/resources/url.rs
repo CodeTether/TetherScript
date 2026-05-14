@@ -6,14 +6,14 @@ pub(crate) fn resolve(base: &str, reference: &str) -> String {
     }
     if reference.starts_with('/') {
         return origin(base)
-            .map(|origin| format!("{}{}", origin, reference))
+            .map(|origin| super::url_norm::clean(format!("{}{}", origin, reference)))
             .unwrap_or_else(|| reference.into());
     }
     let prefix = base.rsplit_once('/').map_or(base, |(prefix, _)| prefix);
     if prefix.is_empty() {
-        reference.into()
+        super::url_norm::clean(reference.into())
     } else {
-        format!("{}/{}", prefix.trim_end_matches('/'), reference)
+        super::url_norm::clean(format!("{}/{}", prefix.trim_end_matches('/'), reference))
     }
 }
 

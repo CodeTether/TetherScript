@@ -47,6 +47,7 @@ mod metadata_host;
 mod performance_host;
 #[path = "browser_js_realtime_model.rs"]
 mod realtime_model;
+#[allow(unused_imports)]
 pub(crate) use realtime_model::{BrowserJsRealtimeEvent, BrowserJsRealtimeEventKind};
 #[path = "browser_js_selection/mod.rs"]
 mod selection_host;
@@ -251,6 +252,9 @@ pub(crate) type BrowserJsRouteHandler =
     Rc<RefCell<dyn FnMut(BrowserJsRouteRequest) -> BrowserJsRouteAction>>;
 
 type SharedBrowserJsRouteHandler = Rc<RefCell<Option<BrowserJsRouteHandler>>>;
+type JsObjectRef = Rc<RefCell<HashMap<String, JsValue>>>;
+type OptionalJsObjectRef = Rc<RefCell<Option<JsObjectRef>>>;
+type RealtimeObjectLookup = Option<(String, JsObjectRef)>;
 type StorageEventWindow = Rc<RefCell<Option<JsValue>>>;
 
 /// Persistent JavaScript runtime for one deterministic browser page.
@@ -3538,10 +3542,7 @@ fn detached_node_object(node: Node) -> JsValue {
     })
 }
 
-fn current_dom_handle(
-    object: &Rc<RefCell<Option<Rc<RefCell<HashMap<String, JsValue>>>>>>,
-    fallback: &DomHandle,
-) -> DomHandle {
+fn current_dom_handle(object: &OptionalJsObjectRef, fallback: &DomHandle) -> DomHandle {
     object
         .borrow()
         .as_ref()
@@ -4338,13 +4339,12 @@ fn option_form_value(option: &Element) -> String {
 }
 
 fn submit_form(handle: &DomHandle, dispatch_submit: bool) -> Result<JsValue, String> {
-    if dispatch_submit {
-        if !handle
+    if dispatch_submit
+        && !handle
             .dispatch_event(JsValue::String("submit".into()))?
             .truthy()
-        {
-            return Ok(JsValue::Bool(false));
-        }
+    {
+        return Ok(JsValue::Bool(false));
     }
     let mut obj = HashMap::new();
     if let Some(Node::Element(el)) = handle.node() {
@@ -4442,12 +4442,13 @@ fn find_unclaimed_browser_node(
     path: &mut Vec<usize>,
     claimed: &mut Vec<Vec<usize>>,
 ) -> Option<Vec<usize>> {
-    if node_name(node) != "#document" && !claimed.iter().any(|existing| existing == path) {
-        if browser_node_eq(node, matched) {
-            let found = path.clone();
-            claimed.push(found.clone());
-            return Some(found);
-        }
+    if node_name(node) != "#document"
+        && !claimed.iter().any(|existing| existing == path)
+        && browser_node_eq(node, matched)
+    {
+        let found = path.clone();
+        claimed.push(found.clone());
+        return Some(found);
     }
     if let Node::Element(el) = node {
         for (index, child) in el.children.iter().enumerate() {
@@ -4980,8 +4981,11 @@ fn install_then_catch_simple(obj: &mut HashMap<String, JsValue>, fulfilled_value
         native("Promise.then", Some(1), move |args| {
             let on_fulfilled = args.first().cloned().unwrap_or(JsValue::Undefined);
             if !matches!(on_fulfilled, JsValue::Undefined) {
-                let result =
-                    js::call_function_with_this(on_fulfilled, JsValue::Undefined, &[v.clone()])?;
+                let result = js::call_function_with_this(
+                    on_fulfilled,
+                    JsValue::Undefined,
+                    std::slice::from_ref(&v),
+                )?;
                 let mut next = HashMap::new();
                 next.insert(
                     "__promise_state".into(),
@@ -6011,7 +6015,7 @@ fn realtime_object(
     host: &Rc<RefCell<RealtimeHost>>,
     kind: BrowserJsRealtimeKind,
     connection_id: u64,
-) -> Option<(String, Rc<RefCell<HashMap<String, JsValue>>>)> {
+) -> RealtimeObjectLookup {
     host.borrow()
         .connections
         .iter()
@@ -6066,6 +6070,7 @@ fn fail_realtime_connection(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn push_realtime_event(
     host: &Rc<RefCell<RealtimeHost>>,
     connection_id: u64,

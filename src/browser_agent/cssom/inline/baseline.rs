@@ -13,8 +13,18 @@ pub fn align_baselines(line: &mut LineBox) {
         return;
     }
 
-    let baseline = line.fragments.iter().map(|f| f.baseline_offset).max().unwrap_or(0);
-    let descent = line.fragments.iter().map(|f| f.height - f.baseline_offset).max().unwrap_or(0);
+    let baseline = line
+        .fragments
+        .iter()
+        .map(|f| f.baseline_offset)
+        .max()
+        .unwrap_or(0);
+    let descent = line
+        .fragments
+        .iter()
+        .map(|f| f.height - f.baseline_offset)
+        .max()
+        .unwrap_or(0);
 
     line.baseline = baseline;
     line.height = baseline + descent;

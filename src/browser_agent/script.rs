@@ -1,5 +1,6 @@
 //! JavaScript snippets used by page actions.
 
+#[allow(dead_code)]
 pub(crate) fn click(path: &[usize]) -> String {
     format!("let n={}; n.click();", node(path))
 }

@@ -8,7 +8,8 @@ impl BrowserPage {
     ///
     /// # Errors
     ///
-    /// Returns `Err` when the page is not attached to a [`BrowserContext`].
+    /// Returns `Err` when the page is not attached to a
+    /// [`BrowserContext`](crate::browser_agent::BrowserContext).
     pub fn indexed_db_get(
         &self,
         database: &str,
@@ -28,7 +29,8 @@ impl BrowserPage {
     ///
     /// # Errors
     ///
-    /// Returns `Err` when the page is not attached to a [`BrowserContext`].
+    /// Returns `Err` when the page is not attached to a
+    /// [`BrowserContext`](crate::browser_agent::BrowserContext).
     pub fn indexed_db_delete(
         &mut self,
         database: &str,
@@ -48,7 +50,8 @@ impl BrowserPage {
     ///
     /// # Errors
     ///
-    /// Returns `Err` when the page is not attached to a [`BrowserContext`].
+    /// Returns `Err` when the page is not attached to a
+    /// [`BrowserContext`](crate::browser_agent::BrowserContext).
     pub fn indexed_db_records(&self) -> Result<Vec<IndexedDbRecord>, String> {
         let origin = indexed_db_origin(&self.session.url);
         Ok(self

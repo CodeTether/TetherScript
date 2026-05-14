@@ -2,6 +2,8 @@
 
 #[path = "cssom/mod.rs"]
 pub mod cssom;
+#[path = "diagnostics/mod.rs"]
+pub mod diagnostics;
 #[path = "page_bounds.rs"]
 mod page_bounds;
 #[path = "page_factory.rs"]

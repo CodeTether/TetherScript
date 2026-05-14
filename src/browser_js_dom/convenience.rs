@@ -9,7 +9,6 @@ macro_rules! dom_mod {
 
 dom_mod!("adjacent.rs", adjacent);
 dom_mod!("adjacent_position.rs", adjacent_position);
-dom_mod!("attr_update.rs", attr_update);
 dom_mod!("attrs.rs", attrs);
 dom_mod!("client_rects.rs", client_rects);
 dom_mod!("element_match/mod.rs", element_match);
@@ -31,6 +30,8 @@ dom_mod!("style_methods.rs", style_methods);
 dom_mod!("style_refresh.rs", style_refresh);
 dom_mod!("style_remove.rs", style_remove);
 dom_mod!("style_write.rs", style_write);
+
+use super::attr_update;
 
 pub(super) fn install(obj: &mut HashMap<String, JsValue>, handle: &DomHandle, node: &Node) {
     node_relations::install(obj, handle);

@@ -31,8 +31,8 @@ fn simple(source: &str, index: usize, name: &str) -> Option<usize> {
 }
 
 fn boundary(source: &str, index: usize) -> bool {
-    source[index..].chars().next().map_or(
-        true,
-        |ch| !matches!(ch, 'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_'),
-    )
+    source[index..]
+        .chars()
+        .next()
+        .is_none_or(|ch| !matches!(ch, 'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_'))
 }

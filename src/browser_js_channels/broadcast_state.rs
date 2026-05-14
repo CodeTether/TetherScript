@@ -1,7 +1,7 @@
 use super::*;
 
 thread_local! {
-    static CHANNELS: RefCell<Vec<Record>> = RefCell::new(Vec::new());
+    static CHANNELS: RefCell<Vec<Record>> = const { RefCell::new(Vec::new()) };
     static NEXT_ID: RefCell<u64> = const { RefCell::new(1) };
 }
 

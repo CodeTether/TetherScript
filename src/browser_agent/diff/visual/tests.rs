@@ -1,10 +1,14 @@
 //! Visual diff unit tests.
 
+use super::compare_rasters;
 use crate::browser::RasterImage;
-use super::{compare_rasters, diff_image};
 
 fn img(w: usize, h: usize, rgba: u8) -> RasterImage {
-    RasterImage { width: w, height: h, pixels: vec![rgba; w * h * 4] }
+    RasterImage {
+        width: w,
+        height: h,
+        pixels: vec![rgba; w * h * 4],
+    }
 }
 
 #[test]

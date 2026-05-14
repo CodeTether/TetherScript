@@ -1,6 +1,6 @@
 //! Agent-side CSSOM inspection for computed style snapshots.
 //!
-//! This module layers small Playwright-style style inspection APIs over the
+//! This module layers small agent style-inspection APIs over the
 //! deterministic browser style engine. It keeps viewport/media filtering local
 //! to agent pages and returns stable property maps for agent assertions.
 

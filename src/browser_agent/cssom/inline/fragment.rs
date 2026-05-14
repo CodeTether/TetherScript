@@ -22,6 +22,13 @@ pub enum FragmentKind {
 impl InlineFragment {
     /// Create a fragment with given dimensions and kind at origin (0,0).
     pub fn new(width: i64, height: i64, baseline_offset: i64, kind: FragmentKind) -> Self {
-        Self { x: 0, y: 0, width, height, baseline_offset, kind }
+        Self {
+            x: 0,
+            y: 0,
+            width,
+            height,
+            baseline_offset,
+            kind,
+        }
     }
 }

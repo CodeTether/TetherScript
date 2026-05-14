@@ -13,7 +13,7 @@ pub(super) fn install(window: &mut HashMap<String, JsValue>) {
 fn uint8_array(source: &JsValue) -> JsValue {
     match source {
         JsValue::Number(len) if len.is_finite() && *len > 0.0 => {
-            bytes::byte_array(std::iter::repeat(0).take(*len as usize))
+            bytes::byte_array(std::iter::repeat_n(0, *len as usize))
         }
         JsValue::Array(_) | JsValue::Object(_) | JsValue::String(_) => {
             bytes::byte_array(bytes::bytes_from_value(source))

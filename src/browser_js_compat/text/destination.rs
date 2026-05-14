@@ -8,7 +8,7 @@ pub(super) fn write_utf8(target: &JsValue, source: &str) -> (usize, usize) {
     }
 }
 
-fn write_array(items: &mut Vec<JsValue>, source: &str) -> (usize, usize) {
+fn write_array(items: &mut [JsValue], source: &str) -> (usize, usize) {
     write_slots(items.len(), source, |index, byte| {
         items[index] = JsValue::Number(byte as f64);
     })

@@ -13,7 +13,10 @@ pub fn heal_selector(
     let mut best_score = threshold;
     for (i, c) in candidates.iter().enumerate() {
         let score = element_similarity(original_props, c);
-        if score >= best_score { best = Some(i); best_score = score; }
+        if score >= best_score {
+            best = Some(i);
+            best_score = score;
+        }
     }
     best
 }

@@ -16,7 +16,13 @@ pub struct LineBox {
 impl LineBox {
     /// Create an empty line at the given y offset with the given container width.
     pub fn new(y: i64, width: i64) -> Self {
-        Self { y, width, height: 0, baseline: 0, fragments: Vec::new() }
+        Self {
+            y,
+            width,
+            height: 0,
+            baseline: 0,
+            fragments: Vec::new(),
+        }
     }
 
     /// Total width used by fragments in this line.

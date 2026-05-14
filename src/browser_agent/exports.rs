@@ -36,6 +36,7 @@ pub use super::network::{
     NetworkLogEntry, NetworkRoute, RouteAction, RouteFulfillment, RouteId, RoutePattern,
     RouteRequest, RouteRule, RouteTable,
 };
+pub use super::page::diagnostics::*;
 pub use super::page::resources::{
     BrowserResource, ImageResourceMetadata, ResourceKind, ResourcePayload,
 };

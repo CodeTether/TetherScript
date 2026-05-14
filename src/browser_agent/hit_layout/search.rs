@@ -1,8 +1,8 @@
 //! Search for the deepest layout box at a given point.
 
-use crate::browser::LayoutBox;
 use super::point::point_in_box;
 use super::result::HitResult;
+use crate::browser::LayoutBox;
 
 /// Find the deepest LayoutBox at the given coordinates.
 pub fn hit_test_layout(layout: &LayoutBox, x: i64, y: i64) -> Option<HitResult> {
@@ -22,7 +22,8 @@ fn hit_inner(layout: &LayoutBox, x: i64, y: i64, path: &mut Vec<usize>) -> Optio
         path.pop();
     }
     Some(HitResult {
-        x, y,
+        x,
+        y,
         tag: layout.tag.clone(),
         text: layout.text.clone(),
         path: path.clone(),

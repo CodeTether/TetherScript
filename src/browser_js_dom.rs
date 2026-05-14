@@ -17,6 +17,8 @@ mod document;
 mod file_input;
 #[path = "browser_js_dom/form_validation/mod.rs"]
 pub(super) mod form_validation;
+#[path = "browser_js_dom/observer/mod.rs"]
+pub(crate) mod observer;
 #[path = "browser_js_dom/ops.rs"]
 mod ops;
 #[path = "browser_js_dom/parser.rs"]
@@ -29,8 +31,6 @@ mod serializer;
 mod template;
 #[path = "browser_js_dom/traversal/mod.rs"]
 mod traversal;
-#[path = "browser_js_dom/observer/mod.rs"]
-pub(crate) mod observer;
 
 pub(super) fn install_window(window: &mut HashMap<String, JsValue>) {
     parser::install(window);

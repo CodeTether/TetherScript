@@ -1,8 +1,8 @@
 //! DOM scanning for external resource references.
 
-use crate::browser::{Document, Element, Node};
+use crate::browser::{Document, Element};
 
-use super::ResourceKind;
+use super::{walk, ResourceKind};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ResourceReference {
@@ -12,20 +12,8 @@ pub(crate) struct ResourceReference {
 
 pub(crate) fn collect(document: &Document) -> Vec<ResourceReference> {
     let mut out = Vec::new();
-    for child in &document.children {
-        walk(child, &mut out);
-    }
+    walk::elements(document, |element| collect_element(element, &mut out));
     out
-}
-
-fn walk(node: &Node, out: &mut Vec<ResourceReference>) {
-    let Node::Element(element) = node else {
-        return;
-    };
-    collect_element(element, out);
-    for child in &element.children {
-        walk(child, out);
-    }
 }
 
 fn collect_element(element: &Element, out: &mut Vec<ResourceReference>) {

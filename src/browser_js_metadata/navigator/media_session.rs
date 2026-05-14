@@ -27,11 +27,10 @@ fn object() -> JsValue {
 }
 
 fn base() -> JsObject {
-    let session = Rc::new(RefCell::new(HashMap::from([
+    Rc::new(RefCell::new(HashMap::from([
         ("metadata".into(), JsValue::Null),
         ("playbackState".into(), JsValue::String("none".into())),
         ("__actionHandlers".into(), value::empty_object()),
         ("__positionState".into(), JsValue::Undefined),
-    ])));
-    session
+    ])))
 }

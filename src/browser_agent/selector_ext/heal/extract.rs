@@ -8,8 +8,12 @@ pub trait ElementLike {
     fn attr(&self, name: &str) -> Option<String>;
     fn classes(&self) -> Vec<String>;
     fn text(&self) -> Option<String>;
-    fn parent_tag(&self) -> Option<String> { None }
-    fn position_hint(&self) -> Option<usize> { None }
+    fn parent_tag(&self) -> Option<String> {
+        None
+    }
+    fn position_hint(&self) -> Option<usize> {
+        None
+    }
 }
 
 /// Extract a property fingerprint from any ElementLike.

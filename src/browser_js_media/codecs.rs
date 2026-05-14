@@ -15,9 +15,17 @@ pub(super) fn can_play_type(tag: &str, mime: &str) -> &'static str {
 }
 
 fn audio(tag: &str, answer: &'static str) -> &'static str {
-    (tag == "audio").then_some(answer).unwrap_or("")
+    if tag == "audio" {
+        answer
+    } else {
+        ""
+    }
 }
 
 fn video(tag: &str, answer: &'static str) -> &'static str {
-    (tag == "video").then_some(answer).unwrap_or("")
+    if tag == "video" {
+        answer
+    } else {
+        ""
+    }
 }

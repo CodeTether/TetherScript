@@ -12,12 +12,16 @@ pub(super) fn dispatch(
             js::call_function_with_this(
                 handler,
                 JsValue::Object(object.clone()),
-                &[event.clone()],
+                std::slice::from_ref(&event),
             )?;
         }
     }
     for listener in listener_snapshot(listeners, kind) {
-        js::call_function_with_this(listener, JsValue::Object(object.clone()), &[event.clone()])?;
+        js::call_function_with_this(
+            listener,
+            JsValue::Object(object.clone()),
+            std::slice::from_ref(&event),
+        )?;
     }
     Ok(())
 }

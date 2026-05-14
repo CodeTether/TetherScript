@@ -41,6 +41,10 @@ fn call_this(
     object: &Rc<RefCell<HashMap<String, JsValue>>>,
     event: &JsValue,
 ) -> Result<(), String> {
-    js::call_function_with_this(callback, JsValue::Object(object.clone()), &[event.clone()])?;
+    js::call_function_with_this(
+        callback,
+        JsValue::Object(object.clone()),
+        std::slice::from_ref(event),
+    )?;
     Ok(())
 }

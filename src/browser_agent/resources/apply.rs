@@ -32,13 +32,15 @@ impl BrowserPage {
         &mut self,
         refs: &[discover::ResourceReference],
     ) -> Result<(), String> {
-        let html = script::inline_scripts(
-            self.session.html.clone(),
-            refs,
-            &self.resources,
-            &self.session.url,
-        )?;
-        if html != self.session.html {
+        if !refs
+            .iter()
+            .any(|item| item.kind == super::ResourceKind::Script)
+        {
+            return Ok(());
+        }
+        if let Some(html) =
+            script::inline_scripts(&self.session.document, &self.resources, &self.session.url)?
+        {
             self.session.html = html;
             self.session.document = parse_html(&self.session.html);
             self.runtime = None;

@@ -1,6 +1,6 @@
 //! Form-control actions for agent-driven pages.
 //!
-//! This module adds Playwright-style state actions for checkable controls and
+//! This module adds agent state actions for checkable controls and
 //! select boxes without changing locator or retry internals.
 
 mod actions;

@@ -8,7 +8,7 @@ pub(super) fn input(input: &str) -> Result<Vec<char>, String> {
     match chars.len() % 4 {
         1 => return Err("atob: invalid base64 length".into()),
         0 => strip_padding(&mut chars)?,
-        _ if chars.iter().any(|ch| *ch == '=') => {
+        _ if chars.contains(&'=') => {
             return Err("atob: invalid base64 padding".into());
         }
         _ => {}
@@ -23,7 +23,7 @@ fn strip_padding(chars: &mut Vec<char>) -> Result<(), String> {
         return Err("atob: invalid base64 padding".into());
     }
     chars.truncate(chars.len() - padding);
-    if chars.iter().any(|ch| *ch == '=') {
+    if chars.contains(&'=') {
         return Err("atob: padding is only allowed at the end".into());
     }
     Ok(())
