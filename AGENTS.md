@@ -118,7 +118,7 @@ Work these in order unless instructed otherwise. Each is one PR.
    cases (numbers, strings with escapes, `&mut` sequence). Parser: AST
    shape tests for precedence. Interpreter: scalar Copy vs heap move
    semantics, closure capture, use-after-move.
-3. Add `LICENSE-MIT`, `LICENSE-APACHE`, `CONTRIBUTING.md`, `.github/workflows/ci.yml`
+3. Add `LICENSE-MIT`, `CONTRIBUTING.md`, `.github/workflows/ci.yml`
    running `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test`.
 4. Fix the `dead_code` warnings in `token.rs` — the unused `True`, `False`,
    `AmpMut` variants should be removed (they're artifacts from the initial

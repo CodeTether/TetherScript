@@ -1516,6 +1516,15 @@ fn install_browser_builtins(env: &Rc<RefCell<Env>>) {
         false,
     );
     e.define(
+        "browser_run_scripts_at",
+        pure_native(
+            "browser_run_scripts_at",
+            Some(2),
+            browser_js::browser_run_scripts_at_to_value,
+        ),
+        false,
+    );
+    e.define(
         "browser_eval_js",
         pure_native(
             "browser_eval_js",

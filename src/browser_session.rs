@@ -1,8 +1,9 @@
 //! Persistent in-process browser session state.
 //!
-//! `BrowserSession` is the deterministic/offline companion to the live browser
-//! capability. It keeps the mutable page/session state that agents need between
-//! navigation calls while reusing the lightweight HTML/CSS parser in `browser`.
+//! `BrowserSession` is the deterministic page state model used by the
+//! tetherscript browser implementation. It keeps the mutable page/session state
+//! that agents need between navigation calls while reusing the lightweight
+//! HTML/CSS parser in `browser`.
 
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -366,6 +367,7 @@ impl BrowserSession {
     pub(crate) fn browser_js_state(&self) -> BrowserJsState {
         let origin = browser_cookie::storage_origin(&self.url);
         BrowserJsState {
+            url: self.url.clone(),
             cookies: browser_cookie::document_cookie_pairs(&self.cookies, &self.url),
             set_cookies: Vec::new(),
             local_storage: storage_pairs(self.local_storage.get(&origin)),
@@ -413,6 +415,9 @@ impl BrowserSession {
     }
 
     fn apply_browser_js_state(&mut self, state: BrowserJsState) {
+        if !state.url.is_empty() {
+            self.url = state.url;
+        }
         let origin = browser_cookie::storage_origin(&self.url);
         browser_cookie::apply_document_cookies(&mut self.cookies, state.set_cookies, &self.url);
         self.local_storage

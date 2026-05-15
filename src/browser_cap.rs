@@ -1,7 +1,8 @@
-//! Live browser capability backed by browserctl action envelopes.
+//! Browser capability backed by tetherscript browser action envelopes.
 //!
 //! The public tetherscript API stays language-owned. This module translates
-//! those calls into the browserctl protocol used by live browser hosts.
+//! those calls into the browserctl protocol implemented by tetherscript browser
+//! runtimes.
 
 #[path = "browser_cap/actions.rs"]
 mod actions;

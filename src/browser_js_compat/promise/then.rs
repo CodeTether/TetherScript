@@ -1,5 +1,14 @@
 use super::*;
 
+#[path = "then/action.rs"]
+mod action;
+#[path = "then/link.rs"]
+mod link;
+#[path = "then/settle.rs"]
+mod settle;
+
+type Object = Rc<RefCell<HashMap<String, JsValue>>>;
+
 pub(super) fn method(
     state: Rc<RefCell<state::PromiseState>>,
     reactions: reaction::Queue,
@@ -25,30 +34,13 @@ pub(super) fn method(
     })
 }
 
-fn fulfilled(handler_value: JsValue, value: JsValue) -> state::PromiseState {
-    if handler::present(&handler_value) {
-        handler::invoke(handler_value, &[value])
-    } else {
-        state::PromiseState::Fulfilled(value)
-    }
-}
-
-fn rejected(handler_value: JsValue, reason: JsValue) -> state::PromiseState {
-    if handler::present(&handler_value) {
-        handler::invoke(handler_value, &[reason])
-    } else {
-        state::PromiseState::Rejected(reason)
-    }
-}
-
-pub(super) fn settle(
+pub(super) fn settle_reaction(
     ok: JsValue,
     err: JsValue,
     current: state::PromiseState,
-) -> state::PromiseState {
-    match current {
-        state::PromiseState::Fulfilled(value) => fulfilled(ok, value),
-        state::PromiseState::Rejected(reason) => rejected(err, reason),
-        state::PromiseState::Pending => state::PromiseState::Pending,
-    }
+    state: Rc<RefCell<state::PromiseState>>,
+    object: Object,
+    queue: reaction::Queue,
+) {
+    settle::reaction(ok, err, current, state, object, queue);
 }

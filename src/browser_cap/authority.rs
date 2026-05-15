@@ -13,7 +13,7 @@ mod authority_trait;
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// Live browser authority exposed to tetherscript as a capability value.
+/// Tetherscript browser authority exposed as a capability value.
 #[derive(Clone, Debug)]
 pub struct BrowserAuthority {
     pub(crate) endpoint: String,
@@ -27,7 +27,7 @@ pub struct BrowserAuthority {
 }
 
 impl BrowserAuthority {
-    /// Create a root browser authority for a browserctl HTTP endpoint.
+    /// Create a root browser authority for a tetherscript browser endpoint.
     #[allow(clippy::new_ret_no_self)]
     pub fn new(endpoint: &str, origins: Vec<String>, scopes: Vec<String>) -> Rc<dyn Authority> {
         Rc::new(Self {

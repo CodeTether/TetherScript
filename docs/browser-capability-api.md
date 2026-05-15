@@ -70,8 +70,9 @@ TETHERSCRIPT_BROWSERCTL_ENDPOINT=http://127.0.0.1:41707/browser \
   cargo test --test browser_cap_live
 ```
 
-The test starts a local fixture page, then drives the configured native host
-through start, goto, wait, eval, snapshot, screenshot, and stop.
+The test starts a local fixture page, then drives the configured tetherscript
+browser endpoint through start, goto, wait, eval, snapshot, screenshot, and
+stop.
 
 ## MVP methods
 
@@ -159,13 +160,14 @@ When `BrowserPage::run_scripts()` is called, registered `<script src="...">`
 resources, including `type="module"` entries, are inlined at their original
 script element and executed by the in-tree JavaScript runtime in document order.
 Static module imports are resolved from the registered resource set and executed
-before the importing module. Named import aliases and bundle-style
-`export { local as Name }` lists are rewritten into runtime bindings for the
-existing JavaScript engine. Literal dynamic imports such as `import("./chunk.js")`
-are resolved through the same registry and rewritten to a fulfilled namespace
-promise. Common arrow functions in module resources are rewritten to function
-expressions before evaluation. Passive preload links are validated but do not
-execute by themselves.
+before the importing module. Relative imports can match registered page paths or
+fully resolved URLs. Default imports, named import aliases, `export default`,
+and bundle-style `export { local as Name }` lists are rewritten into runtime
+bindings for the existing JavaScript engine. Literal dynamic imports such as
+`import("./chunk.js")` are resolved through the same registry and rewritten to a
+fulfilled namespace promise. Common arrow functions in module resources are
+rewritten to function expressions before evaluation. Passive preload links are
+validated but do not execute by themselves.
 
 ## Page snapshot schema target
 

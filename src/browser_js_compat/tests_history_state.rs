@@ -15,6 +15,22 @@ fn history_state_reflects_push_and_replace() {
 }
 
 #[test]
+fn history_state_url_is_optional() {
+    let result = eval_with_dom(
+        "<main></main>",
+        "let before=location.href; history.pushState({page:1},'');\
+         history.replaceState({page:2},'');\
+         before+':' +location.href+':' +history.state.page+':' +history.length;",
+    )
+    .unwrap();
+
+    assert_eq!(
+        result.value,
+        JsValue::String("http://localhost/:http://localhost/:2:2".into())
+    );
+}
+
+#[test]
 fn history_state_is_isolated_from_original_mutation() {
     let result = eval_with_dom(
         "<main></main>",

@@ -40,6 +40,14 @@ fn closures_output_matches_golden() {
 }
 
 #[test]
+fn tethercstp_browser_renders_react() {
+    assert_example(
+        "examples/tethercstp_browser.tether",
+        include_str!("examples/tethercstp_browser.stdout"),
+    );
+}
+
+#[test]
 fn use_after_move_reports_error() {
     let output = run_example("examples/use_after_move.tether");
     assert!(!output.status.success(), "use_after_move should fail");

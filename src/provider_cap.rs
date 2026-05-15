@@ -6,7 +6,7 @@
 //!
 //! # Protocol
 //!
-//! The provider speaks HTTP/1.1 over plain TCP or TLS (via `native-tls`):
+//! The provider speaks HTTP/1.1 over plain TCP or platform OpenSSL TLS:
 //!
 //! - **Ollama** (`http://localhost:11434`)
 //! - **LM Studio** (`http://localhost:1234`)

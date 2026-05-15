@@ -49,6 +49,7 @@ mod tls;
 mod token;
 mod value;
 mod vm;
+mod zlib;
 
 use std::env;
 use std::fs;

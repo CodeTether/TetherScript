@@ -7,10 +7,9 @@ pub fn explicit_position(message: &str) -> Option<(usize, usize)> {
 }
 
 pub fn reference_name(message: &str) -> Option<String> {
-    message
-        .strip_prefix("ReferenceError: ")?
-        .strip_suffix(" is not defined")
-        .map(str::to_string)
+    let rest = message.strip_prefix("ReferenceError: ")?;
+    let (name, _) = rest.split_once(" is not defined")?;
+    Some(name.to_string())
 }
 
 pub fn find(source: &str, name: &str) -> Option<(usize, usize)> {

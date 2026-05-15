@@ -1,24 +1,23 @@
 //! HTTP client: send requests and read responses over plain TCP.
 //!
 //! Public functions `get`, `head`, `post`, `request` wrap `client_request`.
-//! The client uses only `std::net::TcpStream`, so it intentionally supports
-//! plain `http://` URLs only.
+//! The client uses std TCP plus the crate's platform TLS stream.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
-use std::net::TcpStream;
 use std::rc::Rc;
 use std::time::Duration;
 
 use crate::value::{ResultValue, Value};
 
+use super::http_stream::HttpStream;
 use super::http_url::ParsedHttpUrl;
 
 const MAX_START_LINE_BYTES: usize = 8 * 1024;
 const MAX_HEADER_LINE_BYTES: usize = 8 * 1024;
 const MAX_HEADER_BYTES: usize = 64 * 1024;
-const MAX_BODY_BYTES: usize = 1024 * 1024;
+const MAX_BODY_BYTES: usize = 16 * 1024 * 1024;
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(15);
 const CLIENT_USER_AGENT: &str = "tetherscript/0.1 std-http";
 
@@ -76,7 +75,7 @@ fn result_value(result: Result<Value, String>) -> Value {
     }))
 }
 
-pub(super) fn client_request(
+pub(crate) fn client_request(
     method: &str,
     raw_url: &str,
     body: Option<&str>,
@@ -91,18 +90,7 @@ pub(super) fn client_request(
         ));
     }
 
-    let mut stream = TcpStream::connect((url.host.as_str(), url.port)).map_err(|e| {
-        format!(
-            "http_request: connect to {}:{} failed: {}",
-            url.host, url.port, e
-        )
-    })?;
-    stream
-        .set_read_timeout(Some(CLIENT_TIMEOUT))
-        .map_err(|e| format!("http_request: set read timeout failed: {}", e))?;
-    stream
-        .set_write_timeout(Some(CLIENT_TIMEOUT))
-        .map_err(|e| format!("http_request: set write timeout failed: {}", e))?;
+    let mut stream = super::http_stream::connect(&url, CLIENT_TIMEOUT)?;
 
     write!(
         stream,
@@ -131,7 +119,10 @@ pub(super) fn client_request(
     read_client_response(&mut reader, method)
 }
 
-fn read_client_response(reader: &mut BufReader<TcpStream>, method: &str) -> Result<Value, String> {
+fn read_client_response(
+    reader: &mut BufReader<Box<dyn HttpStream>>,
+    method: &str,
+) -> Result<Value, String> {
     let line = read_line_limited(reader, MAX_START_LINE_BYTES, "response status-line")?
         .ok_or_else(|| "http_request: empty response".to_string())?;
     let status_line = line.trim_end_matches(['\r', '\n']);
@@ -169,7 +160,7 @@ fn read_client_response(reader: &mut BufReader<TcpStream>, method: &str) -> Resu
 }
 
 fn read_response_headers(
-    reader: &mut BufReader<TcpStream>,
+    reader: &mut BufReader<Box<dyn HttpStream>>,
 ) -> Result<HashMap<String, String>, String> {
     let mut headers = HashMap::new();
     let mut header_bytes = 0;
@@ -197,7 +188,7 @@ fn read_response_headers(
 }
 
 fn read_content_length_body(
-    reader: &mut BufReader<TcpStream>,
+    reader: &mut BufReader<Box<dyn HttpStream>>,
     content_length: &str,
 ) -> Result<Vec<u8>, String> {
     let len: usize = content_length
@@ -219,7 +210,9 @@ fn read_content_length_body(
     Ok(body)
 }
 
-fn read_close_delimited_body(reader: &mut BufReader<TcpStream>) -> Result<Vec<u8>, String> {
+fn read_close_delimited_body(
+    reader: &mut BufReader<Box<dyn HttpStream>>,
+) -> Result<Vec<u8>, String> {
     let mut body = Vec::new();
     reader
         .take((MAX_BODY_BYTES + 1) as u64)
@@ -234,7 +227,7 @@ fn read_close_delimited_body(reader: &mut BufReader<TcpStream>) -> Result<Vec<u8
     Ok(body)
 }
 
-fn read_chunked_body(reader: &mut BufReader<TcpStream>) -> Result<Vec<u8>, String> {
+fn read_chunked_body(reader: &mut BufReader<Box<dyn HttpStream>>) -> Result<Vec<u8>, String> {
     let mut body = Vec::new();
     loop {
         let line = read_line_limited(reader, MAX_HEADER_LINE_BYTES, "chunk size")?
@@ -276,7 +269,7 @@ fn read_chunked_body(reader: &mut BufReader<TcpStream>) -> Result<Vec<u8>, Strin
     Ok(body)
 }
 
-fn drain_trailing_headers(reader: &mut BufReader<TcpStream>) -> Result<(), String> {
+fn drain_trailing_headers(reader: &mut BufReader<Box<dyn HttpStream>>) -> Result<(), String> {
     let mut bytes = 0;
     loop {
         let Some(line) = read_line_limited(reader, MAX_HEADER_LINE_BYTES, "trailer header")? else {
@@ -404,7 +397,7 @@ fn has_token(value: &str, token: &str) -> bool {
 }
 
 fn read_line_limited(
-    reader: &mut BufReader<TcpStream>,
+    reader: &mut BufReader<Box<dyn HttpStream>>,
     limit: usize,
     label: &str,
 ) -> Result<Option<String>, String> {

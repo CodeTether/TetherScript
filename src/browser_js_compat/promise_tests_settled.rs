@@ -37,3 +37,15 @@ fn promise_finally_preserves_original_settlement() {
     assert!(result.html.contains("fok"));
     assert!(result.html.contains("fno"));
 }
+
+#[test]
+fn await_unwraps_window_promise_fulfillment() {
+    let result = eval_with_dom(
+        "<p id='out'></p>",
+        "let P=window.Promise;async function f(){let r=await P.resolve({data:'ok'});\
+         document.getElementById('out').textContent=r.data;return r.data;}f();",
+    )
+    .unwrap();
+    assert_eq!(result.value, JsValue::String("ok".into()));
+    assert!(result.html.contains("ok"));
+}

@@ -9,6 +9,22 @@ pub(super) fn install(obj: &mut HashMap<String, JsValue>, handle: &DomHandle) {
     install_method(obj, handle, "getElementsByTagName", collect::by_tag);
     install_method(obj, handle, "getElementsByClassName", collect::by_class);
     install_method(obj, handle, "getElementsByName", collect::by_name);
+    obj.insert(
+        "execCommand".into(),
+        native("document.execCommand", None, |_| Ok(JsValue::Bool(false))),
+    );
+    obj.insert(
+        "queryCommandSupported".into(),
+        native("document.queryCommandSupported", None, |_| {
+            Ok(JsValue::Bool(false))
+        }),
+    );
+    obj.insert(
+        "queryCommandEnabled".into(),
+        native("document.queryCommandEnabled", None, |_| {
+            Ok(JsValue::Bool(false))
+        }),
+    );
 }
 
 fn install_method(

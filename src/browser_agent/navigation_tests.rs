@@ -32,7 +32,7 @@ fn run_scripts_advances_to_network_idle() {
         .session
         .network
         .iter()
-        .any(|event| event.url == "/ping"));
+        .any(|event| event.url == "mem://script/ping"));
 }
 
 #[test]

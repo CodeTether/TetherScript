@@ -2,6 +2,49 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.0-alpha.15] - 2026-05-17
+
+### Added
+
+- Added regression coverage for a React-style ESM `createRoot(...).render(...)`
+  flow that mutates the native browser DOM from registered module resources.
+- Added browser JavaScript regression coverage for pending `await` microtask
+  resolution, Promise `.then()` adoption of handler-returned pending promises,
+  and XHR `loadend`/`response`/`responseType` parity used by Axios-style
+  production request adapters.
+- Added a `tethercstp_browser.tether` example that mounts a React-style app
+  through `ReactDOM.createRoot(...).render(...)` and renders the mounted result.
+- Expanded experimental browser runtime built-ins with CSS rule introspection,
+  computed styles, query selection, text extraction, page snapshots,
+  framework-root/resource discovery, and structured display-list output.
+
+### Fixed
+
+- Fixed deterministic module resource resolution so relative imports can match
+  registered absolute page paths as well as fully resolved URLs.
+- Fixed browser module rewriting for default imports and `export default`
+  bindings used by React-style module bundles.
+- Removed the external HTTP client dependency from the capability path so the
+  crate remains zero-dependency and `cargo install --path .` does not lock or
+  download transitive packages.
+- Split the HTTP capability authority into focused modules that satisfy the
+  changed-file 50-line source ratchet.
+- Added zero-Rust-dependency HTTPS support to `http_get`/`http_request` through
+  the existing platform TLS shim, including Windows Git OpenSSL discovery.
+- Added a live `realm_micro1_login_probe.tether` script that fetches the Realm
+  login page through tetherscript and exposes the current production-bundle
+  execution gap.
+- Added fast diagnostics for unsupported modern JavaScript bundle syntax so
+  tetherscript browser probes report the blocking construct instead of timing
+  out while parsing large inlined scripts.
+- Fixed native browser execution gaps found against the live Realm React login
+  bundle, including route-regex `String.prototype.match()` captures,
+  `Array.prototype.reduceRight()`, browser `await` unwrapping, deterministic
+  pending-promise microtask draining, Promise adoption, and XHR lifecycle
+  response fields. The Realm login root now mounts and renders through the
+  native tetherscript browser path while the live profile request records its
+  401 network event.
+
 ## [0.1.0-alpha.14] - 2026-05-14
 
 ### Added
@@ -16,7 +59,7 @@ All notable changes to this project will be documented in this file.
 - Added source-map resource registration for deterministic production bundles.
 - Added a native-browser contract test that rejects external browser engines
   and remote-control drivers as browser backends.
-- Added `LICENSE-MIT`, `LICENSE-APACHE`, `CONTRIBUTING.md`, and GitHub Actions
+- Added `LICENSE-MIT`, `CONTRIBUTING.md`, and GitHub Actions
   CI for format, clippy, tests, doc tests, rustdoc warnings, file limits, and
   package verification.
 - Added `check_file_limits.sh` and `check_file_limits.ps1` to enforce the
@@ -67,12 +110,6 @@ All notable changes to this project will be documented in this file.
 
 - EVENT_REGISTRY thread_local now cleared per evaluation to prevent memory leaks.
 - <img src> DOM attribute carried into LayoutBox.styles so DisplayCommand::Image.src is non-empty.
-
-## Unreleased
-
-### Added
-
-- Expanded experimental browser runtime built-ins with CSS rule introspection, computed styles, query selection, text extraction, page snapshots, framework-root/resource discovery, and structured display-list output.
 
 ## [0.1.0-alpha.6] - 2026-05-01
 

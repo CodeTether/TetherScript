@@ -50,5 +50,5 @@ fn event_log_order_is_stable() {
     assert_eq!(log[1].kind, PageEventKind::PageError);
     assert_eq!(log[2].message, "b");
     assert_eq!(log[3].action, "GET");
-    assert_eq!(log[3].message, "/api/order 200");
+    assert_eq!(log[3].message, "mem://events/api/order 200");
 }

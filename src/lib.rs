@@ -33,6 +33,7 @@ pub mod tls;
 pub mod token;
 pub mod value;
 pub mod vm;
+pub(crate) mod zlib;
 
 pub mod css_position;
 pub mod flex_layout;
