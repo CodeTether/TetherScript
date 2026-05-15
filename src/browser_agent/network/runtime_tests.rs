@@ -28,7 +28,7 @@ fn fetch_fulfilled_by_route_returns_status_headers_and_body() {
     let log = page.route_log();
     let entry = log.last().unwrap();
     assert_eq!(entry.method, "POST");
-    assert_eq!(entry.url, "/api/data");
+    assert_eq!(entry.url, "https://app.test/api/data");
     assert_eq!(entry.body.as_deref(), Some("payload"));
     assert_eq!(entry.headers, vec![("x-test".into(), "yes".into())]);
 }

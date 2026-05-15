@@ -23,6 +23,17 @@ fn dom_rect_constructor_static_and_json_work() {
     );
 }
 
+#[test]
+fn dom_matrix_constructor_static_and_json_work() {
+    assert_eval(
+        "let a=DOMMatrix();let b=new DOMMatrix('matrix(1, 2, 3, 4, 5, 6)');\
+         let c=DOMMatrix.fromMatrix({a:7,b:8,c:9,d:10,e:11,f:12});let j=c.toJSON();\
+         [typeof DOMMatrix,window.DOMMatrix===DOMMatrix,a.isIdentity,b.a,b.b,b.e,b.f,\
+         c.m11,c.m12,c.m41,c.m42,j.a,j.f,b.toString()].join('|');",
+        "function|true|true|1|2|5|6|7|8|11|12|7|12|matrix(1, 2, 3, 4, 5, 6)",
+    );
+}
+
 fn assert_eval(script: &str, expected: &str) {
     let result = eval_with_dom("<main></main>", script).unwrap();
     assert_eq!(result.value, JsValue::String(expected.into()));

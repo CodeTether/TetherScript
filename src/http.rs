@@ -23,9 +23,12 @@ mod http_server;
 mod http_static;
 #[path = "http_status.rs"]
 mod http_status;
+#[path = "http_stream.rs"]
+mod http_stream;
 #[path = "http_url.rs"]
 mod http_url;
 
+pub(crate) use http_client::client_request;
 pub use http_client::{get, head, post, request};
 pub use http_server::serve;
 pub(crate) use http_static::serve as serve_static;

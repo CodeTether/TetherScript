@@ -12,7 +12,7 @@ application.
 
 ## Status
 
-tetherscript is preparing `0.1.0-alpha.14` for crates.io publication.
+tetherscript `0.1.0-alpha.15` is the current release candidate for crates.io.
 
 tetherscript currently includes:
 
@@ -37,16 +37,21 @@ tetherscript currently includes:
   mutation, basic DOM tree mutation APIs, synchronous DOM events,
   `location`/`navigator` globals, `this`, `typeof`, function expressions,
   classic `for` loops for NodeList-style iteration, and deterministic
-  `setTimeout`/`clearTimeout` draining after scripts.
+  timers, microtasks, Promise reactions, `await`, `fetch`, and
+  `XMLHttpRequest` lifecycle draining after scripts.
+- Browser JavaScript compatibility for common production bundle constructs used
+  by Vite/React login flows, including arrow functions, classes, optional
+  chaining, nullish coalescing, dynamic import, spread/rest, template literals,
+  regex route matching, Promise adoption, and XHR response fields.
 - Native browser-agent APIs for agent validation workflows, including page
   loading from provided HTML, external resource registration, resource
   validation, stylesheet/script inlining, classic and module script execution,
-  static module import rewriting, dynamic `import()` resolution, DOM assertions,
-  screenshots/traces, production debug reports, HAR-style network exports,
-  source-mapped runtime error locations and generated stack frames, React
-  root/hydration diagnostics, classified runtime exceptions, and explicit tests
-  that reject external browser engines and remote-control drivers as required
-  browser backends.
+  static module import rewriting, default ESM import/export rewriting, dynamic
+  `import()` resolution, DOM assertions, screenshots/traces, production debug
+  reports, HAR-style network exports, source-mapped runtime error locations and
+  generated stack frames, React root/render/hydration diagnostics, classified
+  runtime exceptions, and explicit tests that reject external browser engines
+  and remote-control drivers as required browser backends.
 - SMTP sending support.
 - Standard tools for filesystem, process, environment, path, time, Base64,
   SHA-256, and URL parsing.
@@ -60,7 +65,7 @@ responsible for trust, capabilities, auditing, and resource budgets.
 ## Quick start
 
 ```bash
-cargo install tetherscript --version 0.1.0-alpha.14
+cargo install tetherscript --version 0.1.0-alpha.15
 
 cargo build --release
 

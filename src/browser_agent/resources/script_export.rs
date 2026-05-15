@@ -2,6 +2,7 @@
 
 pub(crate) fn strip(source: &str) -> String {
     let (body, aliases) = remove_export_lists(source);
+    let body = super::script_export_default::rewrite(&body);
     let body = body
         .lines()
         .map(|line| line.trim_start().strip_prefix("export ").unwrap_or(line))
@@ -38,7 +39,13 @@ fn alias_source(statement: &str) -> String {
     names
         .split(',')
         .filter_map(alias)
-        .map(|(local, exported)| format!("let {} = {};\n", exported, local))
+        .map(|(local, exported)| {
+            format!(
+                "let {} = {};\n",
+                super::script_export_binding::local(&exported),
+                local
+            )
+        })
         .collect()
 }
 

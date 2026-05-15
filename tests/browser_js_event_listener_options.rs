@@ -51,3 +51,29 @@ fn window_remove_event_listener_matches_capture_flag_and_once() {
 
     assert_eq!(value, JsValue::String("xxx".into()));
 }
+
+#[test]
+fn owner_document_exposes_event_target_methods() {
+    let value = eval(
+        "let root=document.getElementById('p');let seen='';\
+         root.ownerDocument.addEventListener('selectionchange',function(e){seen=e.type;});\
+         root.ownerDocument.dispatchEvent({type:'selectionchange'});seen;",
+    );
+
+    assert_eq!(value, JsValue::String("selectionchange".into()));
+}
+
+#[test]
+fn owner_document_exposes_node_creation_methods() {
+    let value = eval(
+        "let doc=document.getElementById('p').ownerDocument;\
+         let svg=doc.createElementNS('http://www.w3.org/2000/svg','svg:path');\
+         let span=doc.createElement('span');span.appendChild(doc.createTextNode('x'));\
+         svg.namespaceURI+'|'+svg.localName+'|'+svg.prefix+'|'+svg.nodeName+'|'+span.textContent;",
+    );
+
+    assert_eq!(
+        value,
+        JsValue::String("http://www.w3.org/2000/svg|path|svg|svg:path|x".into())
+    );
+}

@@ -6,6 +6,8 @@ mod args;
 mod image;
 #[path = "dom_constructors/json.rs"]
 mod json;
+#[path = "dom_constructors/matrix.rs"]
+mod matrix;
 #[path = "dom_constructors/node.rs"]
 mod node;
 #[path = "dom_constructors/number.rs"]
@@ -37,5 +39,10 @@ pub(super) fn install(window: &mut HashMap<String, JsValue>) {
     window.insert("Option".into(), native("Option", None, option::create));
     window.insert("DOMPoint".into(), point::constructor());
     window.insert("DOMRect".into(), rect::constructor());
+    window.insert("DOMMatrix".into(), matrix::constructor("DOMMatrix"));
+    window.insert(
+        "DOMMatrixReadOnly".into(),
+        matrix::constructor("DOMMatrixReadOnly"),
+    );
     unsupported::install(window);
 }

@@ -11,7 +11,7 @@ use crate::compiler::Compiler;
 use crate::interp::Interpreter;
 use crate::lexer::Lexer;
 use crate::parser::Parser;
-use crate::value::{ResultValue, Value};
+use crate::value::Value;
 use crate::vm::VM;
 
 fn spawn_once(response: Vec<u8>) -> (String, JoinHandle<String>) {
@@ -44,6 +44,7 @@ fn parses_plain_http_urls() {
     assert_eq!(
         ParsedHttpUrl::parse("http://example.com:8080/path?q=1").unwrap(),
         ParsedHttpUrl {
+            https: false,
             host: "example.com".into(),
             port: 8080,
             host_header: "example.com:8080".into(),
@@ -59,18 +60,12 @@ fn parses_plain_http_urls() {
 }
 
 #[test]
-fn rejects_https_without_tls() {
-    let result = super::get(&Value::Str(Rc::new("https://example.com/".into())));
-    match result {
-        Value::Result(result) => match result.as_ref() {
-            ResultValue::Err(error) => assert!(error.contains("https:// requires TLS")),
-            other => panic!(
-                "expected Err, got {:?}",
-                Value::Result(Rc::new(other.clone()))
-            ),
-        },
-        other => panic!("expected Result, got {:?}", other),
-    }
+fn parses_https_urls() {
+    let parsed = ParsedHttpUrl::parse("https://example.com/login").unwrap();
+    assert!(parsed.https);
+    assert_eq!(parsed.port, 443);
+    assert_eq!(parsed.host_header, "example.com");
+    assert_eq!(parsed.target, "/login");
 }
 
 #[test]

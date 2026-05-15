@@ -30,7 +30,7 @@ fn report_flags_react_errors_failed_requests_and_missing_source_maps() {
         report
             .network_har
             .iter()
-            .find(|entry| entry.request.url == "/not-found")
+            .find(|entry| entry.request.url == "https://app.test/not-found")
             .unwrap()
             .response
             .status,
@@ -62,10 +62,10 @@ fn report_exports_har_style_network_entries() {
     let entry = report
         .network_har
         .iter()
-        .find(|entry| entry.request.url == "/api/data")
+        .find(|entry| entry.request.url == "https://app.test/api/data")
         .unwrap();
     assert_eq!(entry.request.method, "POST");
-    assert_eq!(entry.request.url, "/api/data");
+    assert_eq!(entry.request.url, "https://app.test/api/data");
     assert_eq!(entry.request.headers, vec![("x-test".into(), "yes".into())]);
     assert_eq!(entry.request.post_data.as_deref(), Some("payload"));
     assert_eq!(entry.response.status, 201);

@@ -9,7 +9,10 @@
 //! already-connected TCP target.
 
 use std::io::{self, Read, Write};
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+#[path = "tls_openssl.rs"]
+mod openssl;
+
+use std::process::{Child, ChildStdin, ChildStdout};
 
 pub struct TlsConnector;
 
@@ -31,29 +34,7 @@ pub struct TlsStream {
 
 impl TlsStream {
     fn connect(domain: &str, port: u16) -> io::Result<Self> {
-        let connect = format!("{}:{}", domain, port);
-        let mut child = Command::new("openssl")
-            .arg("s_client")
-            .arg("-quiet")
-            .arg("-servername")
-            .arg(domain)
-            .arg("-connect")
-            .arg(connect)
-            .arg("-verify_return_error")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn()
-            .map_err(|e| {
-                io::Error::new(
-                    e.kind(),
-                    format!(
-                        "failed to spawn `openssl s_client`; install OpenSSL or use http:// reverse proxy: {}",
-                        e
-                    ),
-                )
-            })?;
-
+        let mut child = openssl::spawn(domain, port)?;
         let stdin = child
             .stdin
             .take()

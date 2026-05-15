@@ -37,6 +37,8 @@ mod dom_compat_host;
 mod event_path_host;
 #[path = "browser_js_fullscreen.rs"]
 mod fullscreen_host;
+#[path = "browser_js_inline_preflight.rs"]
+mod inline_preflight;
 #[path = "browser_js_lifecycle.rs"]
 mod lifecycle_host;
 #[path = "browser_js_media/mod.rs"]
@@ -49,10 +51,14 @@ mod performance_host;
 mod realtime_model;
 #[allow(unused_imports)]
 pub(crate) use realtime_model::{BrowserJsRealtimeEvent, BrowserJsRealtimeEventKind};
+#[path = "browser_js_script_budget.rs"]
+mod script_budget;
 #[path = "browser_js_selection/mod.rs"]
 mod selection_host;
 #[path = "browser_js_timers.rs"]
 mod timers_host;
+#[path = "browser_js_trace.rs"]
+mod trace_host;
 #[path = "browser_js_viewport/mod.rs"]
 mod viewport_host;
 #[path = "browser_js_window/mod.rs"]
@@ -177,6 +183,7 @@ struct MutationObserverOptions {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct BrowserJsState {
+    pub url: String,
     pub cookies: Vec<(String, String)>,
     pub set_cookies: Vec<String>,
     pub local_storage: Vec<(String, String)>,
@@ -257,6 +264,14 @@ type OptionalJsObjectRef = Rc<RefCell<Option<JsObjectRef>>>;
 type RealtimeObjectLookup = Option<(String, JsObjectRef)>;
 type StorageEventWindow = Rc<RefCell<Option<JsValue>>>;
 
+struct DomGlobalInstall {
+    css: String,
+    local_storage_entries: Vec<(String, String)>,
+    session_storage_entries: Vec<(String, String)>,
+    url: String,
+    route_handler: SharedBrowserJsRouteHandler,
+}
+
 /// Persistent JavaScript runtime for one deterministic browser page.
 ///
 /// This keeps the JS heap, DOM handles, timers, event listeners, and storage
@@ -267,7 +282,6 @@ pub struct BrowserJsRuntime {
     root: Rc<RefCell<Node>>,
     timers: Rc<RefCell<TimerQueue>>,
     runtime: BrowserRuntime,
-    css: String,
     console_offset: usize,
     network_offset: usize,
     scripts_ran: bool,
@@ -277,6 +291,7 @@ pub struct BrowserJsRuntime {
 impl BrowserJsRuntime {
     /// Create a persistent runtime from HTML and an initial browser state.
     pub fn new(html: &str, state: BrowserJsState) -> Result<Self, String> {
+        inline_preflight::reject(html)?;
         reset_browser_js_state();
         seed_browser_js_state(&state);
         let root = html_to_root(html);
@@ -288,17 +303,19 @@ impl BrowserJsRuntime {
             &mut engine,
             root.clone(),
             timers.clone(),
-            css.clone(),
-            state.local_storage,
-            state.session_storage,
-            route_handler.clone(),
+            DomGlobalInstall {
+                css: css.clone(),
+                local_storage_entries: state.local_storage,
+                session_storage_entries: state.session_storage,
+                url: state.url.clone(),
+                route_handler: route_handler.clone(),
+            },
         )?;
         Ok(Self {
             engine,
             root,
             timers,
             runtime,
-            css,
             console_offset: 0,
             network_offset: 0,
             scripts_ran: false,
@@ -316,6 +333,7 @@ impl BrowserJsRuntime {
         seed_browser_js_state(&state);
         self.runtime.local_storage.borrow_mut().entries = state.local_storage;
         self.runtime.session_storage.borrow_mut().entries = state.session_storage;
+        set_runtime_location(&self.runtime.window, &state.url);
     }
 
     /// Install or clear the host request route handler used by fetch and XHR.
@@ -401,7 +419,7 @@ impl BrowserJsRuntime {
             let mut last = JsValue::Undefined;
             for source in scripts {
                 if !source.trim().is_empty() {
-                    last = self.engine.eval(&source)?;
+                    last = self.eval_script(&source)?;
                     self.drain_microtasks()?;
                 }
             }
@@ -417,8 +435,17 @@ impl BrowserJsRuntime {
 
     /// Evaluate JavaScript inside the persistent page context.
     pub fn eval(&mut self, script: &str) -> Result<BrowserJsResult, String> {
-        let value = self.engine.eval(script)?;
+        let value = self.eval_script(script)?;
         self.settle(value)
+    }
+
+    fn eval_script(&mut self, script: &str) -> Result<JsValue, String> {
+        eval_browser_script_with_drain(
+            &mut self.engine,
+            script,
+            self.timers.clone(),
+            self.runtime.window.clone(),
+        )
     }
 
     fn settle(&mut self, value: JsValue) -> Result<BrowserJsResult, String> {
@@ -449,7 +476,6 @@ impl BrowserJsRuntime {
             &self.runtime,
             value,
             console_delta,
-            self.css.clone(),
             network_delta,
         )
     }
@@ -459,31 +485,60 @@ pub fn run_html_scripts(html: &str) -> Result<BrowserJsResult, String> {
     run_html_scripts_with_state(html, BrowserJsState::default())
 }
 
+pub fn run_html_scripts_at_url(html: &str, url: &str) -> Result<BrowserJsResult, String> {
+    run_html_scripts_with_state(
+        html,
+        BrowserJsState {
+            url: url.into(),
+            ..BrowserJsState::default()
+        },
+    )
+}
+
 pub fn run_html_scripts_with_state(
     html: &str,
     state: BrowserJsState,
 ) -> Result<BrowserJsResult, String> {
+    trace_host::mark("run_html_scripts start");
+    inline_preflight::reject(html)?;
+    trace_host::mark("inline preflight complete");
     reset_browser_js_state();
     seed_browser_js_state(&state);
     let root = html_to_root(html);
+    trace_host::mark("html parsed");
+    trace_host::mark("js engine init start");
     let mut engine = JsEngine::new();
+    trace_host::mark("js engine init complete");
     let timers = Rc::new(RefCell::new(TimerQueue::default()));
-    // Extract embedded CSS for layout computation
+    trace_host::mark("embedded css extraction start");
     let css = browser::extract_embedded_css(&root_to_document(&root));
+    trace_host::mark("embedded css extraction complete");
+    trace_host::mark("dom globals install start");
     let runtime = install_dom_globals(
         &mut engine,
         root.clone(),
         timers.clone(),
-        css.clone(),
-        state.local_storage,
-        state.session_storage,
-        Rc::new(RefCell::new(None)),
+        DomGlobalInstall {
+            css: css.clone(),
+            local_storage_entries: state.local_storage,
+            session_storage_entries: state.session_storage,
+            url: state.url.clone(),
+            route_handler: Rc::new(RefCell::new(None)),
+        },
     )?;
+    trace_host::mark("dom globals installed");
     let scripts = collect_inline_scripts(&root.borrow());
     let mut last = JsValue::Undefined;
     for source in scripts {
         if !source.trim().is_empty() {
-            last = engine.eval(&source)?;
+            trace_host::mark("inline script eval start");
+            last = eval_browser_script_with_drain(
+                &mut engine,
+                &source,
+                timers.clone(),
+                runtime.window.clone(),
+            )?;
+            trace_host::mark("inline script eval complete");
             drain_microtasks(timers.clone(), runtime.window.clone())?;
         }
     }
@@ -498,7 +553,6 @@ pub fn run_html_scripts_with_state(
         &runtime,
         last,
         engine.console_output(),
-        css,
     ))
 }
 
@@ -511,6 +565,7 @@ pub fn eval_with_dom_state(
     script: &str,
     state: BrowserJsState,
 ) -> Result<BrowserJsResult, String> {
+    trace_host::mark("eval_with_dom start");
     reset_browser_js_state();
     seed_browser_js_state(&state);
     let root = html_to_root(html);
@@ -521,12 +576,22 @@ pub fn eval_with_dom_state(
         &mut engine,
         root.clone(),
         timers.clone(),
-        css.clone(),
-        state.local_storage,
-        state.session_storage,
-        Rc::new(RefCell::new(None)),
+        DomGlobalInstall {
+            css: css.clone(),
+            local_storage_entries: state.local_storage,
+            session_storage_entries: state.session_storage,
+            url: state.url.clone(),
+            route_handler: Rc::new(RefCell::new(None)),
+        },
     )?;
-    let value = engine.eval(script)?;
+    trace_host::mark("dom globals installed");
+    let value = eval_browser_script_with_drain(
+        &mut engine,
+        script,
+        timers.clone(),
+        runtime.window.clone(),
+    )?;
+    trace_host::mark("script eval complete");
     drain_microtasks(timers.clone(), runtime.window.clone())?;
     dispatch_document_lifecycle(&root, "DOMContentLoaded")?;
     drain_microtasks(timers.clone(), runtime.window.clone())?;
@@ -538,7 +603,6 @@ pub fn eval_with_dom_state(
         &runtime,
         value,
         engine.console_output(),
-        css,
     ))
 }
 
@@ -565,8 +629,42 @@ fn reset_browser_js_state() {
     NEXT_OBJECT_URL_ID.with(|id| *id.borrow_mut() = 1);
 }
 
+fn eval_browser_script(engine: &mut JsEngine, source: &str) -> Result<JsValue, String> {
+    engine.eval_with_budget(source, script_budget::for_source(source))
+}
+
+fn eval_browser_script_with_drain(
+    engine: &mut JsEngine,
+    source: &str,
+    timers: Rc<RefCell<TimerQueue>>,
+    window: JsValue,
+) -> Result<JsValue, String> {
+    let hook_timers = timers.clone();
+    let hook_window = window.clone();
+    js::with_await_drain(
+        Rc::new(move || {
+            drain_microtasks_count(hook_timers.clone(), hook_window.clone())
+                .map(|drained| drained > 0)
+        }),
+        || eval_browser_script(engine, source),
+    )
+}
+
 fn seed_browser_js_state(state: &BrowserJsState) {
     cookie_host::seed(state.cookies.clone());
+}
+
+fn set_runtime_location(window: &JsValue, url: &str) {
+    if url.is_empty() {
+        return;
+    }
+    let JsValue::Object(window) = window else {
+        return;
+    };
+    let Some(JsValue::Object(location)) = window.borrow().get("location").cloned() else {
+        return;
+    };
+    set_location_href(&location, url);
 }
 
 fn browser_js_result(
@@ -574,14 +672,12 @@ fn browser_js_result(
     runtime: &BrowserRuntime,
     value: JsValue,
     console: Vec<String>,
-    css: String,
 ) -> BrowserJsResult {
     browser_js_result_with_network(
         root,
         runtime,
         value,
         console,
-        css,
         NETWORK_EVENTS.with(|events| events.borrow().clone()),
     )
 }
@@ -591,7 +687,6 @@ fn browser_js_result_with_network(
     runtime: &BrowserRuntime,
     value: JsValue,
     console: Vec<String>,
-    _css: String,
     network: Vec<BrowserJsNetworkEvent>,
 ) -> BrowserJsResult {
     let document = root_to_document(&root);
@@ -605,6 +700,7 @@ fn browser_js_result_with_network(
         viewport_width: 80,
         html,
         state: BrowserJsState {
+            url: window_location_href(&runtime.window),
             cookies: cookie_host::visible_pairs(),
             set_cookies: cookie_host::mutations(),
             local_storage: runtime.local_storage.borrow().entries.clone(),
@@ -627,25 +723,40 @@ fn install_dom_globals(
     engine: &mut JsEngine,
     root: Rc<RefCell<Node>>,
     timers: Rc<RefCell<TimerQueue>>,
-    css: String,
-    local_storage_entries: Vec<(String, String)>,
-    session_storage_entries: Vec<(String, String)>,
-    route_handler: SharedBrowserJsRouteHandler,
+    install: DomGlobalInstall,
 ) -> Result<BrowserRuntime, String> {
+    let DomGlobalInstall {
+        css,
+        local_storage_entries,
+        session_storage_entries,
+        url,
+        route_handler,
+    } = install;
     // Store CSS in thread-local for layout computations
     LAYOUT_CSS.with(|c| *c.borrow_mut() = css.clone());
 
+    trace_host::mark("document object install start");
     let document = node_object(DomHandle {
         root: root.clone(),
         path: Vec::new(),
     });
+    trace_host::mark("document object install complete");
     fullscreen_host::register_document(&document);
+    trace_host::mark("cssom document install start");
     cssom_host::install_document(&document, &root_to_document(&root), css.clone());
+    trace_host::mark("cssom document install complete");
+    trace_host::mark("viewport document install start");
     viewport_host::install_document(&document, root.clone());
+    trace_host::mark("viewport document install complete");
     engine.set_global("document", document.clone());
     let mut window = HashMap::new();
     window.insert("document".into(), document.clone());
-    let location_map = Rc::new(RefCell::new(parse_location("http://localhost/")));
+    let location_url = if url.is_empty() {
+        "http://localhost/"
+    } else {
+        &url
+    };
+    let location_map = Rc::new(RefCell::new(parse_location(location_url)));
     install_location_methods(&location_map);
     let location = JsValue::Object(location_map.clone());
     let navigator = navigator_object();
@@ -708,8 +819,18 @@ fn install_dom_globals(
     install_window_event_bindings(&mut window);
     window_host::install_event_handlers(&mut window);
     performance_host::install(&mut window, timers.clone());
-    install_fetch_binding(&mut window, timers.clone(), route_handler.clone());
-    install_xml_http_request(&mut window, timers.clone(), route_handler.clone());
+    install_fetch_binding(
+        &mut window,
+        timers.clone(),
+        route_handler.clone(),
+        location_map.clone(),
+    );
+    install_xml_http_request(
+        &mut window,
+        timers.clone(),
+        route_handler.clone(),
+        location_map.clone(),
+    );
     install_realtime_bindings(&mut window, timers.clone(), realtime.clone());
     install_mutation_observer(&mut window);
     install_intersection_observer(&mut window, root.clone());
@@ -795,6 +916,8 @@ fn install_dom_globals(
             "IntersectionObserver",
             "ResizeObserver",
             "ReportingObserver",
+            "DOMMatrix",
+            "DOMMatrixReadOnly",
             "URL",
             "URLPattern",
             "URLSearchParams",
@@ -805,6 +928,12 @@ fn install_dom_globals(
             "atob",
             "btoa",
             "Uint8Array",
+            "Uint32Array",
+            "Uint16Array",
+            "Int32Array",
+            "Float32Array",
+            "ArrayBuffer",
+            "SharedArrayBuffer",
             "TextEncoder",
             "TextDecoder",
             "Blob",
@@ -1050,7 +1179,14 @@ fn drain_timers(timers: Rc<RefCell<TimerQueue>>, window: JsValue) -> Result<(), 
     Ok(())
 }
 
-fn drain_microtasks(timers: Rc<RefCell<TimerQueue>>, _window: JsValue) -> Result<(), String> {
+fn drain_microtasks(timers: Rc<RefCell<TimerQueue>>, window: JsValue) -> Result<(), String> {
+    drain_microtasks_count(timers, window).map(|_| ())
+}
+
+fn drain_microtasks_count(
+    timers: Rc<RefCell<TimerQueue>>,
+    _window: JsValue,
+) -> Result<usize, String> {
     let mut drained = 0;
     loop {
         loop {
@@ -1079,7 +1215,7 @@ fn drain_microtasks(timers: Rc<RefCell<TimerQueue>>, _window: JsValue) -> Result
             break;
         }
     }
-    Ok(())
+    Ok(drained)
 }
 
 fn timer_id(value: &JsValue) -> u32 {
@@ -1289,7 +1425,7 @@ fn history_object(location: Rc<RefCell<HashMap<String, JsValue>>>) -> JsValue {
     let push_object = object.clone();
     object.borrow_mut().insert(
         "pushState".into(),
-        native("history.pushState", Some(3), move |args| {
+        native("history.pushState", Some(2), move |args| {
             let state = history_state_arg(args)?;
             let url = args.get(2).map(JsValue::display).unwrap_or_default();
             if !url.is_empty() {
@@ -1312,7 +1448,7 @@ fn history_object(location: Rc<RefCell<HashMap<String, JsValue>>>) -> JsValue {
     let replace_object = object.clone();
     object.borrow_mut().insert(
         "replaceState".into(),
-        native("history.replaceState", Some(3), move |args| {
+        native("history.replaceState", Some(2), move |args| {
             let state = history_state_arg(args)?;
             let url = args.get(2).map(JsValue::display).unwrap_or_default();
             if !url.is_empty() {
@@ -1844,16 +1980,7 @@ fn node_object(handle: DomHandle) -> JsValue {
         "tagName".into(),
         JsValue::String(node_name(&node).to_ascii_uppercase()),
     );
-    obj.insert(
-        "textContent".into(),
-        JsValue::String(text_content_raw(&node)),
-    );
-    obj.insert(
-        "innerText".into(),
-        JsValue::String(browser::text_content(&node)),
-    );
-    obj.insert("innerHTML".into(), JsValue::String(inner_html(&node)));
-    obj.insert("outerHTML".into(), JsValue::String(outer_html(&node)));
+    install_node_text_getters(&mut obj, &handle);
     obj.insert(
         "children".into(),
         children_collection(&handle, &node, "HTMLCollection"),
@@ -1974,9 +2101,7 @@ fn node_object(handle: DomHandle) -> JsValue {
             JsValue::Bool(el.attrs.contains_key("checked")),
         );
 
-        let (offset_width, offset_height) = element_offset_size(&handle);
-        obj.insert("offsetWidth".into(), JsValue::Number(offset_width as f64));
-        obj.insert("offsetHeight".into(), JsValue::Number(offset_height as f64));
+        install_offset_getters(&mut obj, &handle);
 
         if el.tag == "form" {
             obj.insert(
@@ -2024,14 +2149,7 @@ fn node_object(handle: DomHandle) -> JsValue {
                 .unwrap_or(&JsValue::Undefined)
                 .display()
                 .to_ascii_lowercase();
-            let element = detached_node_object(Node::Element(Element {
-                tag,
-                attrs: HashMap::new(),
-                children: Vec::new(),
-            }));
-            let tag = node_name(&js_value_to_node(&element));
-            custom_host::construct_created(&tag, &element)?;
-            Ok(element)
+            detached_element_object(tag)
         }),
     );
 
@@ -2563,19 +2681,50 @@ fn node_object(handle: DomHandle) -> JsValue {
     JsValue::Object(object)
 }
 
-fn refresh_text_properties(obj: &Rc<RefCell<HashMap<String, JsValue>>>, handle: &DomHandle) {
-    if let Some(node) = handle.node() {
-        let mut obj = obj.borrow_mut();
+fn install_node_text_getters(obj: &mut HashMap<String, JsValue>, handle: &DomHandle) {
+    for prop in ["textContent", "innerText", "innerHTML", "outerHTML"] {
+        let h = handle.clone();
         obj.insert(
-            "textContent".into(),
-            JsValue::String(text_content_raw(&node)),
+            format!("__get:{prop}"),
+            native(&format!("get_{prop}"), Some(0), move |_| {
+                Ok(JsValue::String(node_text_property(&h, prop)))
+            }),
         );
-        obj.insert(
-            "innerText".into(),
-            JsValue::String(browser::text_content(&node)),
-        );
-        obj.insert("innerHTML".into(), JsValue::String(inner_html(&node)));
     }
+}
+
+fn install_offset_getters(obj: &mut HashMap<String, JsValue>, handle: &DomHandle) {
+    for prop in ["offsetWidth", "offsetHeight"] {
+        let h = handle.clone();
+        obj.insert(
+            format!("__get:{prop}"),
+            native(&format!("get_{prop}"), Some(0), move |_| {
+                let (width, height) = element_offset_size(&h);
+                Ok(JsValue::Number(if prop == "offsetWidth" {
+                    width as f64
+                } else {
+                    height as f64
+                }))
+            }),
+        );
+    }
+}
+
+fn node_text_property(handle: &DomHandle, prop: &str) -> String {
+    let Some(node) = handle.node() else {
+        return String::new();
+    };
+    match prop {
+        "textContent" => text_content_raw(&node),
+        "innerText" => browser::text_content(&node),
+        "innerHTML" => inner_html(&node),
+        "outerHTML" => outer_html(&node),
+        _ => String::new(),
+    }
+}
+
+fn refresh_text_properties(obj: &Rc<RefCell<HashMap<String, JsValue>>>, handle: &DomHandle) {
+    install_node_text_getters(&mut obj.borrow_mut(), handle);
 }
 
 fn refresh_node_properties(obj: &Rc<RefCell<HashMap<String, JsValue>>>, handle: &DomHandle) {
@@ -2619,15 +2768,7 @@ fn refresh_node_properties(obj: &Rc<RefCell<HashMap<String, JsValue>>>, handle: 
                 document_reference_object(handle.root.clone()),
             );
         }
-        obj.insert(
-            "textContent".into(),
-            JsValue::String(text_content_raw(&node)),
-        );
-        obj.insert(
-            "innerText".into(),
-            JsValue::String(browser::text_content(&node)),
-        );
-        obj.insert("innerHTML".into(), JsValue::String(inner_html(&node)));
+        install_node_text_getters(&mut obj, handle);
     }
 }
 
@@ -4519,17 +4660,75 @@ fn children_collection(handle: &DomHandle, node: &Node, kind: &'static str) -> J
         Node::Element(el) => el.children.len(),
         Node::Text(_) => 0,
     };
-    let children = (0..len)
+    let handles = (0..len)
         .map(|index| {
             let mut path = handle.path.clone();
             path.push(index);
-            node_object(DomHandle {
+            DomHandle {
                 root: handle.root.clone(),
                 path,
-            })
+            }
         })
         .collect();
-    dom_collection(kind, children)
+    lazy_dom_collection(kind, handles)
+}
+
+fn lazy_dom_collection(kind: &'static str, handles: Vec<DomHandle>) -> JsValue {
+    let mut obj = HashMap::new();
+    obj.insert("length".into(), JsValue::Number(handles.len() as f64));
+    for (index, handle) in handles.iter().cloned().enumerate() {
+        obj.insert(
+            format!("__get:{index}"),
+            native(&format!("{kind}.{index}"), Some(0), move |_| {
+                Ok(node_object(handle.clone()))
+            }),
+        );
+    }
+    let object = Rc::new(RefCell::new(obj));
+    let collection = JsValue::Object(object.clone());
+    let item_handles = handles.clone();
+    object.borrow_mut().insert(
+        "item".into(),
+        native(&format!("{kind}.item"), Some(1), move |args| {
+            Ok(item_handles
+                .get(collection_index(args.first()))
+                .cloned()
+                .map(node_object)
+                .unwrap_or(JsValue::Null))
+        }),
+    );
+    let weak = Rc::downgrade(&object);
+    let each_handles = handles.clone();
+    object.borrow_mut().insert(
+        "forEach".into(),
+        native(&format!("{kind}.forEach"), None, move |args| {
+            let callback = args
+                .first()
+                .cloned()
+                .ok_or_else(|| format!("{kind}.forEach: expected callback"))?;
+            let this_arg = args.get(1).cloned().unwrap_or(JsValue::Undefined);
+            let collection = weak
+                .upgrade()
+                .map(JsValue::Object)
+                .unwrap_or(JsValue::Undefined);
+            for (index, handle) in each_handles.iter().cloned().enumerate() {
+                js::call_function_with_this(
+                    callback.clone(),
+                    this_arg.clone(),
+                    &[
+                        node_object(handle),
+                        JsValue::Number(index as f64),
+                        collection.clone(),
+                    ],
+                )?;
+            }
+            Ok(JsValue::Undefined)
+        }),
+    );
+    if kind == "HTMLCollection" {
+        install_lazy_html_collection_named_items(&object, &handles, kind);
+    }
+    collection
 }
 
 fn dom_collection(kind: &'static str, values: Vec<JsValue>) -> JsValue {
@@ -4578,6 +4777,44 @@ fn dom_collection(kind: &'static str, values: Vec<JsValue>) -> JsValue {
         install_html_collection_named_items(&object, &values, kind);
     }
     collection
+}
+
+fn install_lazy_html_collection_named_items(
+    object: &Rc<RefCell<HashMap<String, JsValue>>>,
+    handles: &[DomHandle],
+    kind: &'static str,
+) {
+    let named_handles = handles.to_vec();
+    object.borrow_mut().insert(
+        "namedItem".into(),
+        native(&format!("{kind}.namedItem"), Some(1), move |args| {
+            let name = args.first().unwrap_or(&JsValue::Undefined).display();
+            Ok(named_handles
+                .iter()
+                .find(|handle| html_collection_handle_name_matches(handle, &name))
+                .cloned()
+                .map(node_object)
+                .unwrap_or(JsValue::Null))
+        }),
+    );
+}
+
+fn html_collection_handle_name_matches(handle: &DomHandle, name: &str) -> bool {
+    html_collection_names_from_handle(handle)
+        .iter()
+        .any(|item| item == name)
+}
+
+fn html_collection_names_from_handle(handle: &DomHandle) -> Vec<String> {
+    let Some(Node::Element(el)) = handle.node() else {
+        return Vec::new();
+    };
+    ["id", "name"]
+        .iter()
+        .filter_map(|attr| el.attrs.get(*attr))
+        .filter(|name| !name.is_empty())
+        .cloned()
+        .collect()
 }
 
 fn install_html_collection_named_items(
@@ -4654,10 +4891,7 @@ fn node_reference_object(handle: DomHandle) -> JsValue {
         }),
     );
     obj.insert("nodeName".into(), JsValue::String(node_name(&node)));
-    obj.insert(
-        "textContent".into(),
-        JsValue::String(text_content_raw(&node)),
-    );
+    install_node_text_getters(&mut obj, &handle);
     if let Node::Element(el) = &node {
         obj.insert(
             "id".into(),
@@ -4688,7 +4922,129 @@ fn document_reference_object(root: Rc<RefCell<Node>>) -> JsValue {
     obj.insert("__domPath".into(), JsValue::String(String::new()));
     obj.insert("nodeType".into(), JsValue::Number(9.0));
     obj.insert("nodeName".into(), JsValue::String("#document".into()));
+    obj.insert(
+        "createElement".into(),
+        native("document.createElement", Some(1), move |args| {
+            let tag = args
+                .first()
+                .unwrap_or(&JsValue::Undefined)
+                .display()
+                .to_ascii_lowercase();
+            detached_element_object(tag)
+        }),
+    );
+    obj.insert(
+        "createElementNS".into(),
+        native("document.createElementNS", Some(2), move |args| {
+            let namespace = namespace_value(args.first());
+            let qualified = args.get(1).unwrap_or(&JsValue::Undefined).display();
+            detached_namespaced_element(namespace, qualified)
+        }),
+    );
+    obj.insert(
+        "createTextNode".into(),
+        native("document.createTextNode", Some(1), move |args| {
+            let text = args.first().unwrap_or(&JsValue::Undefined).display();
+            Ok(detached_node_object(Node::Text(text)))
+        }),
+    );
+    obj.insert(
+        "execCommand".into(),
+        native("document.execCommand", None, |_| Ok(JsValue::Bool(false))),
+    );
+    obj.insert(
+        "queryCommandSupported".into(),
+        native("document.queryCommandSupported", None, |_| {
+            Ok(JsValue::Bool(false))
+        }),
+    );
+    obj.insert(
+        "queryCommandEnabled".into(),
+        native("document.queryCommandEnabled", None, |_| {
+            Ok(JsValue::Bool(false))
+        }),
+    );
+    let h = handle.clone();
+    obj.insert(
+        "addEventListener".into(),
+        native("document.addEventListener", None, move |args| {
+            let event_type = args.first().unwrap_or(&JsValue::Undefined).display();
+            let listener = args.get(1).cloned().unwrap_or(JsValue::Undefined);
+            let (capture, once) = event_listener_options(args.get(2));
+            h.add_event_listener(&event_type, listener, capture, once);
+            Ok(JsValue::Undefined)
+        }),
+    );
+    let h = handle.clone();
+    obj.insert(
+        "removeEventListener".into(),
+        native("document.removeEventListener", None, move |args| {
+            let event_type = args.first().unwrap_or(&JsValue::Undefined).display();
+            let listener = args.get(1).cloned().unwrap_or(JsValue::Undefined);
+            let (capture, _) = event_listener_options(args.get(2));
+            h.remove_event_listener(&event_type, &listener, capture);
+            Ok(JsValue::Undefined)
+        }),
+    );
+    obj.insert(
+        "dispatchEvent".into(),
+        native("document.dispatchEvent", Some(1), move |args| {
+            handle.dispatch_event(args.first().cloned().unwrap_or(JsValue::Undefined))
+        }),
+    );
     JsValue::Object(Rc::new(RefCell::new(obj)))
+}
+
+fn detached_element_object(tag: String) -> Result<JsValue, String> {
+    let element = detached_node_object(Node::Element(Element {
+        tag,
+        attrs: HashMap::new(),
+        children: Vec::new(),
+    }));
+    let tag = node_name(&js_value_to_node(&element));
+    custom_host::construct_created(&tag, &element)?;
+    Ok(element)
+}
+
+fn detached_namespaced_element(namespace: JsValue, qualified: String) -> Result<JsValue, String> {
+    let (prefix, local) = split_qualified_name(&qualified);
+    let element = detached_element_object(qualified.clone())?;
+    let JsValue::Object(obj) = &element else {
+        return Ok(element);
+    };
+    let node_name = namespaced_node_name(&namespace, &qualified);
+    let mut obj = obj.borrow_mut();
+    obj.insert("namespaceURI".into(), namespace);
+    obj.insert("localName".into(), JsValue::String(local));
+    obj.insert(
+        "prefix".into(),
+        prefix.map(JsValue::String).unwrap_or(JsValue::Null),
+    );
+    obj.insert("nodeName".into(), JsValue::String(node_name.clone()));
+    obj.insert("tagName".into(), JsValue::String(node_name));
+    drop(obj);
+    Ok(element)
+}
+
+fn namespace_value(value: Option<&JsValue>) -> JsValue {
+    match value.unwrap_or(&JsValue::Undefined) {
+        JsValue::Null | JsValue::Undefined => JsValue::Null,
+        other => JsValue::String(other.display()),
+    }
+}
+
+fn split_qualified_name(name: &str) -> (Option<String>, String) {
+    name.split_once(':')
+        .map(|(prefix, local)| (Some(prefix.into()), local.into()))
+        .unwrap_or_else(|| (None, name.into()))
+}
+
+fn namespaced_node_name(namespace: &JsValue, name: &str) -> String {
+    if matches!(namespace, JsValue::String(ns) if ns == "http://www.w3.org/1999/xhtml") {
+        name.to_ascii_uppercase()
+    } else {
+        name.into()
+    }
 }
 
 fn selection_for_handle(handle: &DomHandle) -> (usize, usize) {
@@ -4793,6 +5149,28 @@ pub fn browser_run_scripts_to_value(args: &[Value]) -> Result<Value, String> {
     result_to_value(run_html_scripts(html)?)
 }
 
+pub fn browser_run_scripts_at_to_value(args: &[Value]) -> Result<Value, String> {
+    if args.len() != 2 {
+        return Err(format!(
+            "browser_run_scripts_at: expected 2 args, got {}",
+            args.len()
+        ));
+    }
+    let Value::Str(url) = &args[0] else {
+        return Err(format!(
+            "browser_run_scripts_at: url must be str, got {}",
+            args[0].type_name()
+        ));
+    };
+    let Value::Str(html) = &args[1] else {
+        return Err(format!(
+            "browser_run_scripts_at: html must be str, got {}",
+            args[1].type_name()
+        ));
+    };
+    result_to_value(run_html_scripts_at_url(html, url)?)
+}
+
 pub fn browser_eval_js_to_value(args: &[Value]) -> Result<Value, String> {
     if args.len() != 2 {
         return Err(format!(
@@ -4819,6 +5197,17 @@ fn result_to_value(result: BrowserJsResult) -> Result<Value, String> {
     let mut map = HashMap::new();
     map.insert("dom".into(), document_value(&result.document));
     map.insert("value".into(), js::js_to_tether(&result.value));
+    map.insert("url".into(), Value::Str(Rc::new(result.state.url.clone())));
+    map.insert(
+        "network".into(),
+        Value::List(Rc::new(RefCell::new(
+            result
+                .network
+                .into_iter()
+                .map(network_event_value)
+                .collect(),
+        ))),
+    );
     map.insert(
         "console".into(),
         Value::List(Rc::new(RefCell::new(
@@ -4830,6 +5219,27 @@ fn result_to_value(result: BrowserJsResult) -> Result<Value, String> {
         ))),
     );
     Ok(Value::Map(Rc::new(RefCell::new(map))))
+}
+
+fn network_event_value(event: BrowserJsNetworkEvent) -> Value {
+    let mut map = HashMap::new();
+    map.insert("method".into(), Value::Str(Rc::new(event.method)));
+    map.insert("url".into(), Value::Str(Rc::new(event.url)));
+    map.insert(
+        "status".into(),
+        event
+            .status
+            .map(|status| Value::Int(status as i64))
+            .unwrap_or(Value::Nil),
+    );
+    map.insert(
+        "route_result".into(),
+        event
+            .route_result
+            .map(|result| Value::Str(Rc::new(result)))
+            .unwrap_or(Value::Nil),
+    );
+    Value::Map(Rc::new(RefCell::new(map)))
 }
 
 fn document_value(document: &browser::Document) -> Value {
@@ -4894,11 +5304,13 @@ fn install_fetch_binding(
     window: &mut HashMap<String, JsValue>,
     timers: Rc<RefCell<TimerQueue>>,
     route_handler: SharedBrowserJsRouteHandler,
+    location: Rc<RefCell<HashMap<String, JsValue>>>,
 ) {
     window.insert(
         "fetch".into(),
         native("fetch", None, move |args| {
-            let request = request_from_fetch_args(args);
+            let mut request = request_from_fetch_args(args);
+            resolve_request_url(&mut request, &location);
             if request.aborted {
                 return Ok(make_rejected_fetch_promise("AbortError", timers.clone()));
             }
@@ -4961,6 +5373,13 @@ fn install_fetch_binding(
             Ok(JsValue::Object(Rc::new(RefCell::new(promise_obj))))
         }),
     );
+}
+
+fn resolve_request_url(
+    request: &mut FetchRequest,
+    location: &Rc<RefCell<HashMap<String, JsValue>>>,
+) {
+    request.url = resolve_url(&request.url, Some(&location_href(location)));
 }
 
 fn promise_obj_clone(value: &JsValue) -> HashMap<String, JsValue> {
@@ -5312,10 +5731,11 @@ fn fetch_response_parts(
     route_handler: &SharedBrowserJsRouteHandler,
 ) -> Result<FetchResponseParts, String> {
     match route_action_for(request, route_handler) {
-        None | Some(BrowserJsRouteAction::PassThrough) => Ok(default_response_parts(request, None)),
-        Some(BrowserJsRouteAction::Continue) => {
-            Ok(default_response_parts(request, Some("continue")))
+        None | Some(BrowserJsRouteAction::PassThrough) => {
+            live_response_parts(request).or_else(|_| Ok(default_response_parts(request, None)))
         }
+        Some(BrowserJsRouteAction::Continue) => live_response_parts(request)
+            .or_else(|_| Ok(default_response_parts(request, Some("continue")))),
         Some(BrowserJsRouteAction::Abort(reason)) => {
             record_network_event(&request.method, &request.url, None, Some("abort".into()));
             Err(reason)
@@ -5332,6 +5752,62 @@ fn fetch_response_parts(
             route_result: Some("fulfill".into()),
         }),
     }
+}
+
+fn live_response_parts(request: &FetchRequest) -> Result<FetchResponseParts, String> {
+    if !should_live_fetch(&request.url) {
+        return Err("synthetic fetch target".into());
+    }
+    let response = crate::http::client_request(
+        &request.method,
+        &request.url,
+        request.body.as_deref(),
+        &request.headers,
+    )?;
+    response_value_parts(response)
+}
+
+fn should_live_fetch(url: &str) -> bool {
+    (url.starts_with("https://") || url.starts_with("http://"))
+        && !url.contains("://localhost")
+        && !url.contains("://127.0.0.1")
+}
+
+fn response_value_parts(value: Value) -> Result<FetchResponseParts, String> {
+    let Value::Map(response) = value else {
+        return Err("http response must be a map".into());
+    };
+    let response = response.borrow();
+    let status = match response.get("status") {
+        Some(Value::Int(status)) => *status as u16,
+        _ => 200,
+    };
+    let status_text = match response.get("reason") {
+        Some(Value::Str(reason)) => reason.to_string(),
+        _ => status_text(status).into(),
+    };
+    let headers = match response.get("headers") {
+        Some(Value::Map(headers)) => headers
+            .borrow()
+            .iter()
+            .filter_map(|(name, value)| match value {
+                Value::Str(value) => Some((name.clone(), value.to_string())),
+                _ => None,
+            })
+            .collect(),
+        _ => Vec::new(),
+    };
+    let body = match response.get("body") {
+        Some(Value::Str(body)) => body.to_string(),
+        _ => String::new(),
+    };
+    Ok(FetchResponseParts {
+        status,
+        status_text,
+        headers,
+        body,
+        route_result: Some("live".into()),
+    })
 }
 
 fn default_response_parts(
@@ -5428,6 +5904,7 @@ fn install_xml_http_request(
     window: &mut HashMap<String, JsValue>,
     timers: Rc<RefCell<TimerQueue>>,
     route_handler: SharedBrowserJsRouteHandler,
+    location: Rc<RefCell<HashMap<String, JsValue>>>,
 ) {
     window.insert(
         "XMLHttpRequest".into(),
@@ -5443,14 +5920,24 @@ fn install_xml_http_request(
                 obj.insert("readyState".into(), JsValue::Number(0.0));
                 obj.insert("status".into(), JsValue::Number(0.0));
                 obj.insert("statusText".into(), JsValue::String(String::new()));
+                obj.insert("response".into(), JsValue::String(String::new()));
                 obj.insert("responseText".into(), JsValue::String(String::new()));
+                obj.insert("responseType".into(), JsValue::String(String::new()));
                 obj.insert("responseURL".into(), JsValue::String(String::new()));
+                obj.insert("timeout".into(), JsValue::Number(0.0));
+                obj.insert("withCredentials".into(), JsValue::Bool(false));
+                obj.insert("onabort".into(), JsValue::Null);
                 obj.insert("onreadystatechange".into(), JsValue::Null);
+                obj.insert("onloadstart".into(), JsValue::Null);
                 obj.insert("onload".into(), JsValue::Null);
+                obj.insert("onloadend".into(), JsValue::Null);
                 obj.insert("onerror".into(), JsValue::Null);
+                obj.insert("ontimeout".into(), JsValue::Null);
+                obj.insert("onprogress".into(), JsValue::Null);
             }
 
             let open_xhr = xhr.clone();
+            let open_location = location.clone();
             xhr.borrow_mut().insert(
                 "open".into(),
                 native("XMLHttpRequest.open", None, move |args| {
@@ -5459,7 +5946,8 @@ fn install_xml_http_request(
                         .map(JsValue::display)
                         .unwrap_or_else(|| "GET".into())
                         .to_ascii_uppercase();
-                    let url = args.get(1).map(JsValue::display).unwrap_or_default();
+                    let raw_url = args.get(1).map(JsValue::display).unwrap_or_default();
+                    let url = resolve_url(&raw_url, Some(&location_href(&open_location)));
                     {
                         let mut xhr = open_xhr.borrow_mut();
                         xhr.insert("__method".into(), JsValue::String(method));
@@ -5523,17 +6011,21 @@ fn install_xml_http_request(
                         );
                         {
                             let mut xhr = xhr_for_task.borrow_mut();
+                            let response = xhr_response_value(&xhr, &parts.body, &parts.headers);
                             xhr.insert("readyState".into(), JsValue::Number(4.0));
                             xhr.insert("status".into(), JsValue::Number(parts.status as f64));
                             xhr.insert("statusText".into(), JsValue::String(parts.status_text));
-                            xhr.insert("responseText".into(), JsValue::String(parts.body));
+                            xhr.insert("response".into(), response);
+                            xhr.insert("responseText".into(), JsValue::String(parts.body.clone()));
                             xhr.insert("responseURL".into(), JsValue::String(request.url));
                             xhr.insert("__responseHeaders".into(), headers_array(parts.headers));
                         }
                         fire_xhr_event(&xhr_for_task, "readystatechange")?;
                         fire_xhr_event(&xhr_for_task, "load")?;
+                        fire_xhr_event(&xhr_for_task, "loadend")?;
                         Ok(JsValue::Undefined)
                     });
+                    fire_xhr_event(&send_xhr, "loadstart")?;
                     send_timers
                         .borrow_mut()
                         .microtasks
@@ -5579,9 +6071,12 @@ fn install_xml_http_request(
                         xhr.insert("readyState".into(), JsValue::Number(0.0));
                         xhr.insert("status".into(), JsValue::Number(0.0));
                         xhr.insert("statusText".into(), JsValue::String(String::new()));
+                        xhr.insert("response".into(), JsValue::String(String::new()));
                         xhr.insert("responseText".into(), JsValue::String(String::new()));
                     }
                     fire_xhr_event(&abort_xhr, "readystatechange")?;
+                    fire_xhr_event(&abort_xhr, "abort")?;
+                    fire_xhr_event(&abort_xhr, "loadend")?;
                     Ok(JsValue::Undefined)
                 }),
             );
@@ -5643,11 +6138,31 @@ fn xhr_fail(
         xhr.insert("readyState".into(), JsValue::Number(4.0));
         xhr.insert("status".into(), JsValue::Number(0.0));
         xhr.insert("statusText".into(), JsValue::String(reason.into()));
+        xhr.insert("response".into(), JsValue::String(String::new()));
         xhr.insert("responseText".into(), JsValue::String(String::new()));
         xhr.insert("responseURL".into(), JsValue::String(url.into()));
     }
     fire_xhr_event(xhr, "readystatechange")?;
-    fire_xhr_event(xhr, "error")
+    fire_xhr_event(xhr, "error")?;
+    fire_xhr_event(xhr, "loadend")
+}
+
+fn xhr_response_value(
+    xhr: &HashMap<String, JsValue>,
+    body: &str,
+    headers: &[(String, String)],
+) -> JsValue {
+    match xhr
+        .get("responseType")
+        .map(JsValue::display)
+        .unwrap_or_default()
+        .as_str()
+    {
+        "arraybuffer" => byte_array_from_text(body),
+        "blob" => blob_from_text_body(body, body_mime_type(headers)),
+        "json" => parse_simple_json(body),
+        _ => JsValue::String(body.into()),
+    }
 }
 
 fn headers_array(headers: Vec<(String, String)>) -> JsValue {
@@ -6276,9 +6791,13 @@ fn json_body_from_value(value: &JsValue) -> String {
         JsValue::Number(value) if value.is_finite() => JsValue::Number(*value).display(),
         JsValue::Number(_) => "null".into(),
         JsValue::String(value) => json_string(value),
+        JsValue::Symbol(_) => "null".into(),
         JsValue::Array(items) => json_array_body(&items.borrow()),
         JsValue::Object(obj) => json_object_body(&obj.borrow()),
-        JsValue::Function(_) | JsValue::BoundFunction(_) | JsValue::Native(_) => "null".into(),
+        JsValue::Function(_)
+        | JsValue::BoundFunction(_)
+        | JsValue::Class(_)
+        | JsValue::Native(_) => "null".into(),
     }
 }
 
@@ -8110,6 +8629,18 @@ mod tests {
     }
 
     #[test]
+    fn script_text_content_is_readable_without_eager_dom_strings() {
+        let source = "let x=1;".repeat(4096);
+        let html = format!("<script id='bundle'>{source}</script><main></main>");
+        let result = eval_with_dom(
+            &html,
+            "document.getElementById('bundle').textContent.length;",
+        )
+        .unwrap();
+        assert_eq!(result.value, JsValue::Number(source.len() as f64));
+    }
+
+    #[test]
     fn eval_with_dom_exposes_selectors_and_attributes() {
         let result = eval_with_dom("<p class='note' id='x'>Hi</p>", "let p=document.querySelector('.note'); p.setAttribute('data-ok','yes'); p.getAttribute('id') + ':' + p.textContent;").unwrap();
         assert_eq!(result.value, JsValue::String("x:Hi".into()));
@@ -8333,6 +8864,7 @@ mod tests {
                 set_cookies: Vec::new(),
                 local_storage: vec![("token".into(), "old-token".into())],
                 session_storage: vec![("tab".into(), "first".into())],
+                ..BrowserJsState::default()
             },
         )
         .unwrap();
@@ -8364,13 +8896,13 @@ mod tests {
             vec![
                 BrowserJsNetworkEvent {
                     method: "GET".into(),
-                    url: "/api/state".into(),
+                    url: "http://localhost/api/state".into(),
                     status: Some(200),
                     route_result: None,
                 },
                 BrowserJsNetworkEvent {
                     method: "POST".into(),
-                    url: "/api/xhr".into(),
+                    url: "http://localhost/api/xhr".into(),
                     status: Some(200),
                     route_result: None,
                 },
@@ -8464,7 +8996,7 @@ mod tests {
         assert_eq!(result.value, JsValue::String("sync".into()));
         assert_eq!(
             result.console,
-            vec!["/api/data:200:true:/api/data".to_string()]
+            vec!["http://localhost/api/data:200:true:http://localhost/api/data".to_string()]
         );
 
         let result = eval_with_dom(
@@ -8655,7 +9187,7 @@ mod tests {
             vec![
                 "resize:12:12".to_string(),
                 "rs:200".to_string(),
-                "load:/api/x:application/json".to_string(),
+                "load:http://localhost/api/x:application/json".to_string(),
             ]
         );
     }

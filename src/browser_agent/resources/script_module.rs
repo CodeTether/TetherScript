@@ -2,7 +2,10 @@
 
 use std::collections::HashSet;
 
-use super::{script_arrow, script_dynamic, script_import, script_resolve, url, ResourceRegistry};
+use super::{
+    script_arrow, script_dynamic, script_import, script_import_bindings, script_resolve, url,
+    ResourceRegistry,
+};
 
 pub(crate) fn source(
     registry: &ResourceRegistry,
@@ -35,18 +38,10 @@ pub(crate) fn expand(
             .ok_or_else(|| script_resolve::missing(current_url, &import.url))?;
         let module_url = url::resolve(current_url, &url);
         out.push_str(&expand(registry, &module_url, source, seen)?);
-        out.push_str(&alias_source(&import.aliases));
+        out.push_str(&script_import_bindings::source(&import.aliases));
     }
     let body = script_dynamic::rewrite(registry, current_url, &body, seen, &mut out)?;
     out.push_str(&script_arrow::rewrite(&body));
     out.push('\n');
     Ok(out)
-}
-
-fn alias_source(aliases: &[(String, String)]) -> String {
-    aliases
-        .iter()
-        .filter(|(imported, local)| imported != local)
-        .map(|(imported, local)| format!("let {} = {};\n", local, imported))
-        .collect()
 }

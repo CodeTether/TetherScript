@@ -17,8 +17,13 @@ pub(crate) fn resolve(base: &str, reference: &str) -> String {
     }
 }
 
-pub(crate) fn candidates(base: &str, reference: &str) -> [String; 2] {
-    [reference.into(), resolve(base, reference)]
+pub(crate) fn candidates(base: &str, reference: &str) -> Vec<String> {
+    let resolved = resolve(base, reference);
+    let mut out = vec![reference.into(), resolved.clone()];
+    if let Some(path) = path_only(&resolved) {
+        out.push(path.into());
+    }
+    out
 }
 
 fn has_scheme(value: &str) -> bool {
@@ -32,4 +37,11 @@ fn origin(url: &str) -> Option<&str> {
     let rest = &url[scheme_end..];
     let host_len = rest.find('/').unwrap_or(rest.len());
     Some(&url[..scheme_end + host_len])
+}
+
+fn path_only(url: &str) -> Option<&str> {
+    let scheme_end = url.find("://")? + 3;
+    let rest = &url[scheme_end..];
+    let path = rest.find('/')?;
+    Some(&rest[path..])
 }

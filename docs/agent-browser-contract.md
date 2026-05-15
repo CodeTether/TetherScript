@@ -11,16 +11,16 @@ It has two stable entry points:
 - `tetherscript::browser_agent::BrowserPage` for embedded observe, act, assert,
   screenshot, event-log, trace, and deterministic resource-validation workflows.
 
-Browser control remains capability-gated through `BrowserAuthority` and the
-native tetherscript browser host. Scripts must be granted origins and scopes
-before navigation, interaction, network inspection, storage mutation, visual
-lookup, or screenshot actions can cross that boundary.
+Browser control remains capability-gated through `BrowserAuthority` and
+tetherscript browser action endpoints. Scripts must be granted origins and
+scopes before navigation, interaction, network inspection, storage mutation,
+visual lookup, or screenshot actions can cross that boundary.
 
 Promotion rule: every agent-browser behavior that is recommended in docs needs
 a local contract test. CLI behavior belongs in `tests/agent_browser_cli.rs`.
-Embedded page behavior belongs in `tests/agent_browser_page.rs`. Host-envelope
-behavior belongs in `tests/browser_cap_contract.rs`, and live native-host smoke
-tests remain opt-in through `TETHERSCRIPT_BROWSERCTL_ENDPOINT`.
+Embedded page behavior belongs in `tests/agent_browser_page.rs`. Action-envelope
+behavior belongs in `tests/browser_cap_contract.rs`, and endpoint smoke tests
+remain opt-in through `TETHERSCRIPT_BROWSERCTL_ENDPOINT`.
 
 The browser track must not depend on external browser engines or automation
 adapters. Production UI validation is done by closing gaps in tetherscript's
@@ -37,10 +37,11 @@ cargo test --test agent_browser_cli --test agent_browser_page \
   --test browser_cli_grant --test browser_trace_contract \
   --test agent_browser_resources --test agent_browser_modules \
   --test agent_browser_bundle_exports --test agent_browser_dynamic_import \
-  --test agent_browser_native_contract
+  --test agent_browser_native_contract \
+  --test browser_js_promise_await --test browser_js_xhr_parity
 ```
 
-Run the live native-host smoke test only when a tetherscript browser endpoint is
+Run the endpoint smoke test only when a tetherscript browser endpoint is
 available:
 
 ```bash

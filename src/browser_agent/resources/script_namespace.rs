@@ -17,7 +17,13 @@ pub(crate) fn name(url: &str) -> String {
 pub(crate) fn binding(url: &str, source: &str) -> String {
     let entries = script_export_names::collect(source)
         .into_iter()
-        .map(|name| format!("\"{}\": {}", name, name))
+        .map(|name| {
+            format!(
+                "\"{}\": {}",
+                name,
+                super::script_export_binding::local(&name)
+            )
+        })
         .collect::<Vec<_>>()
         .join(", ");
     format!("let {} = {{{}}};\n", name(url), entries)

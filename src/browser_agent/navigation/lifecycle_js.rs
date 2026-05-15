@@ -12,9 +12,11 @@ pub(crate) enum JsNavigationEvent<'a> {
 pub(crate) fn dispatch(page: &mut BrowserPage, event: JsNavigationEvent<'_>) {
     let checkpoint = page.event_checkpoint();
     let action = action(&event).to_string();
+    let state = page.session.browser_js_state();
     let Some(runtime) = page.runtime.as_mut() else {
         return;
     };
+    runtime.apply_state(state);
     let result = match event {
         JsNavigationEvent::BeforeUnload => runtime.dispatch_beforeunload(),
         JsNavigationEvent::Unload => runtime.dispatch_unload(),

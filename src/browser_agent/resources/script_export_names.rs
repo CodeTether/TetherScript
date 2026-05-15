@@ -13,6 +13,8 @@ pub(crate) fn collect(source: &str) -> Vec<String> {
             out.push(name);
         } else if let Some(name) = declared_name(line, "export var ") {
             out.push(name);
+        } else if line.starts_with("export default ") {
+            out.push("default".into());
         }
     }
     out
