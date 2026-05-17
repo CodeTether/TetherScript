@@ -27,6 +27,12 @@ adapters. Production UI validation is done by closing gaps in tetherscript's
 native DOM, CSS, JavaScript, networking, storage, accessibility, screenshot, and
 trace implementation.
 
+`BrowserPage::production_debug_report()` is the preferred one-shot native
+debug artifact for production React-style pages. It now includes visual element
+evidence that joins selector candidates, computed styles, visibility, and
+layout bounds so an agent can distinguish "React mounted" from "React mounted
+but the UI is hidden, zero-sized, or styled incorrectly."
+
 ## Readiness Suite
 
 Run the deterministic and bridge-contract browser tests with:

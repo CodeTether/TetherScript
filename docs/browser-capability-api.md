@@ -110,7 +110,9 @@ Native page diagnostics:
 agent-side bundled UI debugging: console errors, page errors, failed requests,
 HAR-style network entries, source-map registration status, source-mapped
 page-error locations and generated stack frames, framework markers, React roots,
-hydration warnings, and classified runtime exceptions. This is the native
+hydration warnings, classified runtime exceptions, and native visual element
+evidence with selector candidates, computed styles, visibility, and layout
+bounds. This is the native
 full-parity track's production-debug surface; it does not depend on an external
 browser engine or remote-control driver.
 

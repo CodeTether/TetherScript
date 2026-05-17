@@ -28,6 +28,12 @@ mod react;
 mod report;
 mod source_maps;
 mod types;
+mod visual;
+mod visual_bounds;
+mod visual_selectors;
+mod visual_text;
+mod visual_types;
+mod visual_walk;
 
 pub use exception_kind::RuntimeExceptionKind;
 pub use exception_types::RuntimeException;
@@ -36,3 +42,4 @@ pub use mapped_types::{
     GeneratedSourceLocation, OriginalSourceLocation, SourceMappedPageError, SourceMappedStackFrame,
 };
 pub use types::{BrowserDebugReport, BrowserParityTarget, ReactDebugSummary, SourceMapStatus};
+pub use visual_types::VisualElementEvidence;
