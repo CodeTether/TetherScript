@@ -116,6 +116,11 @@ bounds. This is the native
 full-parity track's production-debug surface; it does not depend on an external
 browser engine or remote-control driver.
 
+Native page actions are expected to exercise production form code paths:
+`fill` updates live form values and dispatches input/change, `click` uses a
+user-like pointer/mouse/focus/click sequence, prevented submits do not navigate,
+and Enter on an input submits its containing form.
+
 Network:
 `network_log`, `network_har`, `failed_requests`, `request`, `response`, `replay_request`, `wait_for_request`, `wait_for_response`.
 

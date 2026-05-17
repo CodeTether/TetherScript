@@ -33,6 +33,12 @@ evidence that joins selector candidates, computed styles, visibility, and
 layout bounds so an agent can distinguish "React mounted" from "React mounted
 but the UI is hidden, zero-sized, or styled incorrectly."
 
+Agent actions must behave like user input for production form workflows:
+controlled inputs read live DOM values from captured element handles, click
+actions dispatch pointer/mouse/focus/click ordering, submit prevention blocks
+native navigation, and Enter on an input submits the containing form through the
+native runtime.
+
 ## Readiness Suite
 
 Run the deterministic and bridge-contract browser tests with:
