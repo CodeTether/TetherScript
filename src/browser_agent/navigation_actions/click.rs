@@ -1,13 +1,8 @@
 //! Click-result navigation dispatch.
 
-use crate::browser_agent::keyboard_escape::node;
 use crate::browser_agent::page::BrowserPage;
 use crate::browser_agent::resolve::Resolved;
 use crate::js::JsValue;
-
-pub(crate) fn click_script(path: &[usize]) -> String {
-    format!("let n={}; n.click()", node(path))
-}
 
 pub(crate) fn after_click(
     page: &mut BrowserPage,

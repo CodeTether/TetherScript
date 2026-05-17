@@ -6,6 +6,7 @@
 mod action;
 mod anchor;
 mod click;
+mod click_user;
 mod commit;
 mod control;
 mod dom;

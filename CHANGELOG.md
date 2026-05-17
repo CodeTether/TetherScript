@@ -9,6 +9,9 @@ All notable changes to this project will be documented in this file.
 - Added native visual element evidence to `BrowserPage::production_debug_report()`,
   including selector candidates, computed styles, visibility, and layout bounds
   for React-style production UI debugging.
+- Added React-style controlled form interaction coverage for native agent
+  actions: live `value`/`checked` reads, user-like click event ordering,
+  prevented submit handling, Enter-to-submit, and HAR-visible POST bodies.
 
 ## [0.1.0-alpha.15] - 2026-05-17
 

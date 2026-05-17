@@ -15,7 +15,7 @@ impl BrowserPage {
         let script = if is_download {
             downloads::click_script(&resolved.dom.path)
         } else {
-            super::click::click_script(&resolved.dom.path)
+            super::click_user::script(&resolved.dom.path, resolved.bounds)
         };
         let result = self.eval_js(&script)?;
         if is_download {

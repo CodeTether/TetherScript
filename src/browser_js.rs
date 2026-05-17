@@ -41,6 +41,8 @@ mod fullscreen_host;
 mod inline_preflight;
 #[path = "browser_js_lifecycle.rs"]
 mod lifecycle_host;
+#[path = "browser_js_dom/live_form.rs"]
+mod live_form_host;
 #[path = "browser_js_media/mod.rs"]
 mod media_host;
 #[path = "browser_js_metadata.rs"]
@@ -2086,21 +2088,13 @@ fn node_object(handle: DomHandle) -> JsValue {
         if matches!(el.tag.as_str(), "audio" | "video") {
             media_host::install_element(&mut obj, &handle, &el.tag, self_object.clone());
         }
-        obj.insert(
-            "value".into(),
-            JsValue::String(el.attrs.get("value").cloned().unwrap_or_default()),
-        );
+        live_form_host::install(&mut obj, &handle);
         if matches!(el.tag.as_str(), "input" | "textarea") {
             let (start, end) = selection_for_handle(&handle);
             obj.insert("selectionStart".into(), JsValue::Number(start as f64));
             obj.insert("selectionEnd".into(), JsValue::Number(end as f64));
             obj.insert("selectionDirection".into(), JsValue::String("none".into()));
         }
-        obj.insert(
-            "checked".into(),
-            JsValue::Bool(el.attrs.contains_key("checked")),
-        );
-
         install_offset_getters(&mut obj, &handle);
 
         if el.tag == "form" {
@@ -3244,10 +3238,7 @@ impl DomHandle {
                 .is_some_and(JsValue::truthy),
             _ => false,
         };
-        let allowed = !default_prevented;
-        if allowed {
-            self.run_default_action(&event_type)?;
-        }
+        let allowed = !default_prevented && self.run_default_action(&event_type)?;
         Ok(JsValue::Bool(allowed))
     }
 
@@ -3289,12 +3280,12 @@ impl DomHandle {
         out
     }
 
-    fn run_default_action(&self, event_type: &str) -> Result<(), String> {
+    fn run_default_action(&self, event_type: &str) -> Result<bool, String> {
         if event_type != "click" {
-            return Ok(());
+            return Ok(true);
         }
         let Some(Node::Element(el)) = self.node() else {
-            return Ok(());
+            return Ok(true);
         };
         if el.tag == "input" {
             let input_type = el
@@ -3312,7 +3303,7 @@ impl DomHandle {
                 self.dispatch_event(JsValue::String("change".into()))?;
             } else if input_type == "submit" {
                 if let Some(form) = self.closest_form() {
-                    submit_form(&form, true)?;
+                    return Ok(submit_form(&form, true)?.truthy());
                 }
             }
         } else if el.tag == "button"
@@ -3323,10 +3314,10 @@ impl DomHandle {
                 .unwrap_or(true)
         {
             if let Some(form) = self.closest_form() {
-                submit_form(&form, true)?;
+                return Ok(submit_form(&form, true)?.truthy());
             }
         }
-        Ok(())
+        Ok(true)
     }
 
     fn set_checked_state(&self, checked: bool) {
