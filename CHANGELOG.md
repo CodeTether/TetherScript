@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- Added native visual element evidence to `BrowserPage::production_debug_report()`,
+  including selector candidates, computed styles, visibility, and layout bounds
+  for React-style production UI debugging.
+
 ## [0.1.0-alpha.15] - 2026-05-17
 
 ### Added

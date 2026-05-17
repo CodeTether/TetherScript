@@ -50,8 +50,9 @@ tetherscript currently includes:
   `import()` resolution, DOM assertions, screenshots/traces, production debug
   reports, HAR-style network exports, source-mapped runtime error locations and
   generated stack frames, React root/render/hydration diagnostics, classified
-  runtime exceptions, and explicit tests that reject external browser engines
-  and remote-control drivers as required browser backends.
+  runtime exceptions, computed-style plus layout evidence for rendered elements,
+  and explicit tests that reject external browser engines and remote-control
+  drivers as required browser backends.
 - SMTP sending support.
 - Standard tools for filesystem, process, environment, path, time, Base64,
   SHA-256, and URL parsing.

@@ -36,12 +36,12 @@ pub use super::network::{
     NetworkLogEntry, NetworkRoute, RouteAction, RouteFulfillment, RouteId, RoutePattern,
     RouteRequest, RouteRule, RouteTable,
 };
-pub use super::page::diagnostics::*;
 pub use super::page::resources::{
     BrowserResource, ImageResourceMetadata, ResourceKind, ResourcePayload,
 };
 pub use super::page::viewport::{DeviceScale, Viewport};
 pub use super::page::BrowserPage;
+pub use super::page::{cssom::ComputedStyle, diagnostics::*};
 pub use super::screenshot::ElementScreenshot;
 pub use super::trace::{ActionSnapshot, ActionTraceEntry, PageTrace};
 pub use super::wait_options::WaitOptions;

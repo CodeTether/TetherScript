@@ -25,6 +25,7 @@ pub fn build(page: &BrowserPage) -> BrowserDebugReport {
         runtime_exceptions: super::exceptions::collect(page, &page_errors),
         failed_requests: failed_requests(page),
         network_har: super::har::entries(page),
+        visual_elements: super::visual::collect(page),
         source_maps: super::source_maps::statuses(page),
         frameworks: super::react::frameworks(page),
         react: super::react::summary(page),

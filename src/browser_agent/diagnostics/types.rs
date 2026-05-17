@@ -5,6 +5,7 @@ use crate::browser_agent::events::PageErrorEvent;
 use super::exception_types::RuntimeException;
 use super::har_types::BrowserHarEntry;
 use super::mapped_types::SourceMappedPageError;
+use super::visual_types::VisualElementEvidence;
 
 /// One-shot production-debug report for a native browser page.
 ///
@@ -34,6 +35,8 @@ pub struct BrowserDebugReport {
     pub failed_requests: Vec<String>,
     /// HAR-style network entries for production request debugging.
     pub network_har: Vec<BrowserHarEntry>,
+    /// Native style and layout evidence for rendered elements.
+    pub visual_elements: Vec<VisualElementEvidence>,
     /// Source-map references found in registered script resources.
     pub source_maps: Vec<SourceMapStatus>,
     /// Framework markers detected from the page.

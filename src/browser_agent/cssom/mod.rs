@@ -13,7 +13,22 @@ mod lookup;
 mod model;
 mod page;
 
+use crate::browser::Document;
+use crate::browser_agent::MediaEmulation;
+
 pub use model::ComputedStyle;
+
+pub(crate) fn active_css_for(source: &str, width: i64, media: MediaEmulation) -> String {
+    active_css::active_css(source, width, media)
+}
+
+pub(crate) fn computed_style_at_path(
+    document: &Document,
+    css: &str,
+    path: &[usize],
+) -> Option<ComputedStyle> {
+    lookup::at_path(document, css, path)
+}
 
 #[cfg(test)]
 mod cascade_tests;
