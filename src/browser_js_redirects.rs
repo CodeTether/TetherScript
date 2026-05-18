@@ -1,12 +1,14 @@
 //! Redirect following for native fetch and XMLHttpRequest.
 
+#[path = "browser_js_redirects_cors.rs"]
+mod cors;
 #[path = "browser_js_redirects_next.rs"]
 mod next;
 #[path = "browser_js_redirects_response.rs"]
 mod response;
 
 use super::{
-    network_cookie_host, record_network_event, FetchRequest, FetchResponseParts,
+    network_cookie_host, record_network_event, request_host, FetchRequest, FetchResponseParts,
     SharedBrowserJsRouteHandler,
 };
 
@@ -18,14 +20,18 @@ pub(super) fn fetch_response_parts(
 ) -> Result<FetchResponseParts, String> {
     let mut request = request.clone();
     for redirects in 0..=MAX_REDIRECTS {
+        cors::preflight(&request, route_handler)?;
         let parts = response::once(&request, route_handler)?;
-        network_cookie_host::apply_response_headers(&request.url, &parts.headers);
         record_network_event(
             &request.method,
             &request.url,
             Some(parts.status),
             parts.route_result.clone(),
         );
+        cors::actual(&request, &parts)?;
+        if request_host::allows_credentials(&request) {
+            network_cookie_host::apply_response_headers(&request.url, &parts.headers);
+        }
         let Some(location) = next::location(&parts.headers) else {
             return Ok(parts);
         };

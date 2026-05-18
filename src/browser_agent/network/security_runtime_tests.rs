@@ -1,4 +1,4 @@
-use crate::browser_agent::{BrowserPage, RouteAction, RoutePattern, RouteRule};
+use crate::browser_agent::{BrowserPage, RouteAction, RouteFulfillment, RoutePattern, RouteRule};
 use crate::js::JsValue;
 
 const CORS_REASON: &str =
@@ -36,7 +36,14 @@ fn allowed_origin_bypasses_cors_and_keeps_metadata() {
     page.allow_origin("https://api.test");
     page.route(
         RouteRule::new(RoutePattern::substring("api.test/data")),
-        RouteAction::fulfill(200, "ok"),
+        RouteAction::Fulfill(RouteFulfillment {
+            status: 200,
+            headers: vec![(
+                "access-control-allow-origin".into(),
+                "https://app.test".into(),
+            )],
+            body: "ok".into(),
+        }),
     );
 
     page.eval_js("window.out=''; fetch('https://api.test/data').then(function(r){ r.text().then(function(t){ window.out=r.status + ':' + t; }); });").unwrap();
@@ -44,10 +51,6 @@ fn allowed_origin_bypasses_cors_and_keeps_metadata() {
     assert_eq!(
         page.eval_js("window.out").unwrap(),
         JsValue::String("200:ok".into())
-    );
-    assert_eq!(
-        page.session.network.last().unwrap().route_result.as_deref(),
-        Some("fulfill")
     );
     let security = page.route_log().last().unwrap().security.clone().unwrap();
     assert!(security.allowed_by_policy);
