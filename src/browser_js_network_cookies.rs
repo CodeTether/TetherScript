@@ -9,4 +9,4 @@ mod state;
 
 pub(crate) use request::append_request_header;
 pub(crate) use response::{apply_document_cookie, apply_response_headers};
-pub(crate) use state::{jar, reset, seed, set_document_url};
+pub(crate) use state::{document_url, jar, reset, seed, set_document_url};

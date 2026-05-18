@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added native fetch/XHR redirect following for `301`, `302`, `303`, `307`,
+  and `308`, including relative `Location` resolution, browser-style method
+  rewriting, cookie propagation across hops, final response URLs, and HAR
+  entries for the redirect chain.
+
 ## [0.1.0-alpha.16] - 2026-05-18
 
 ### Added
