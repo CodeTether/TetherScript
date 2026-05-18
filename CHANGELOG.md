@@ -12,6 +12,9 @@ All notable changes to this project will be documented in this file.
 - Added React-style controlled form interaction coverage for native agent
   actions: live `value`/`checked` reads, user-like click event ordering,
   prevented submit handling, Enter-to-submit, and HAR-visible POST bodies.
+- Added native fetch/XHR server-cookie propagation so `Set-Cookie` login
+  responses update the session jar, keep `HttpOnly` hidden from
+  `document.cookie`, and authenticate later routed requests with `Cookie`.
 
 ## [0.1.0-alpha.15] - 2026-05-17
 

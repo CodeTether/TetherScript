@@ -39,6 +39,11 @@ actions dispatch pointer/mouse/focus/click ordering, submit prevention blocks
 native navigation, and Enter on an input submits the containing form through the
 native runtime.
 
+Auth-bearing network flows must preserve browser cookie semantics across the
+native route layer. `fetch` and XHR responses that include `Set-Cookie` update
+the page session jar, `HttpOnly` cookies stay hidden from `document.cookie`, and
+later same-session requests receive a generated `Cookie` header.
+
 ## Readiness Suite
 
 Run the deterministic and bridge-contract browser tests with:
@@ -50,6 +55,7 @@ cargo test --test agent_browser_cli --test agent_browser_page \
   --test agent_browser_resources --test agent_browser_modules \
   --test agent_browser_bundle_exports --test agent_browser_dynamic_import \
   --test agent_browser_native_contract \
+  --test agent_browser_auth_cookies \
   --test browser_js_promise_await --test browser_js_xhr_parity
 ```
 

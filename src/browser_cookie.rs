@@ -29,12 +29,15 @@ mod scope;
 #[path = "browser_cookie/url.rs"]
 mod url;
 
+#[allow(unused_imports)]
 pub use model::{Cookie, SameSite};
 
+#[allow(unused_imports)]
 pub(crate) use jar::{
     apply_document_cookies, cookie_header, document_cookie_pairs, persistent_cookies,
     request_cookie_header, set_server_cookie,
 };
+#[allow(unused_imports)]
 pub(crate) use url::storage_origin;
 
 #[cfg(test)]

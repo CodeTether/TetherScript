@@ -14,11 +14,11 @@ use crate::browser::{
 };
 use crate::browser_cookie;
 pub use crate::browser_cookie::{Cookie, SameSite};
-use crate::browser_js::{
-    eval_with_dom_state, run_html_scripts_with_state, BrowserJsResult, BrowserJsState,
-};
+use crate::browser_js::{eval_with_dom_state, run_html_scripts_with_state, BrowserJsResult};
 #[path = "browser_session_console.rs"]
 mod browser_session_console;
+#[path = "browser_session_js_state.rs"]
+mod browser_session_js_state;
 
 const BLANK_URL: &str = "about:blank";
 
@@ -364,17 +364,6 @@ impl BrowserSession {
         self.history_entries.truncate(self.history_index + 1);
     }
 
-    pub(crate) fn browser_js_state(&self) -> BrowserJsState {
-        let origin = browser_cookie::storage_origin(&self.url);
-        BrowserJsState {
-            url: self.url.clone(),
-            cookies: browser_cookie::document_cookie_pairs(&self.cookies, &self.url),
-            set_cookies: Vec::new(),
-            local_storage: storage_pairs(self.local_storage.get(&origin)),
-            session_storage: storage_pairs(self.session_storage.get(&origin)),
-        }
-    }
-
     pub(crate) fn apply_browser_js_result(
         &mut self,
         result: BrowserJsResult,
@@ -414,18 +403,6 @@ impl BrowserSession {
         Ok(value)
     }
 
-    fn apply_browser_js_state(&mut self, state: BrowserJsState) {
-        if !state.url.is_empty() {
-            self.url = state.url;
-        }
-        let origin = browser_cookie::storage_origin(&self.url);
-        browser_cookie::apply_document_cookies(&mut self.cookies, state.set_cookies, &self.url);
-        self.local_storage
-            .insert(origin.clone(), pairs_to_storage_map(state.local_storage));
-        self.session_storage
-            .insert(origin, pairs_to_storage_map(state.session_storage));
-    }
-
     fn external_css(&self) -> String {
         let embedded = extract_embedded_css(&self.document);
         if embedded.trim().is_empty() {
@@ -450,21 +427,6 @@ impl ConsoleEvent {
             timestamp_ms: now_ms(),
         }
     }
-}
-
-fn storage_pairs(items: Option<&HashMap<String, String>>) -> Vec<(String, String)> {
-    items
-        .map(|items| {
-            items
-                .iter()
-                .map(|(key, value)| (key.clone(), value.clone()))
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn pairs_to_storage_map(pairs: Vec<(String, String)>) -> HashMap<String, String> {
-    pairs.into_iter().collect()
 }
 
 fn combine_embedded_and_external_css(document: &Document, external_css: &str) -> String {
