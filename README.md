@@ -63,6 +63,8 @@ tetherscript currently includes:
   bubble through the host chain with inspectable `composedPath()` output.
 - Element child collections now behave live for `children` and `childNodes`
   after DOM mutation.
+- Document-wide collections now behave live for `getElementsBy*` calls and
+  named HTMLCollections such as `document.forms`.
 - SMTP sending support.
 - Standard tools for filesystem, process, environment, path, time, Base64,
   SHA-256, and URL parsing.

@@ -4642,7 +4642,8 @@ fn own_object_keys(obj: &HashMap<String, JsValue>) -> Vec<String> {
             .strip_prefix("__get:")
             .or_else(|| key.strip_prefix("__set:"))
             .unwrap_or(key);
-        if (!is_internal_property(key) || visible != key)
+        if visible != "*"
+            && (!is_internal_property(key) || visible != key)
             && !out.iter().any(|existing| existing == visible)
         {
             out.push(visible.to_string());
@@ -4753,7 +4754,14 @@ fn own_property_value(
             if let Some(getter) = getter {
                 return call_with_this(getter, receiver.clone(), &[]).map(Some);
             }
-            Ok(obj.borrow().get(prop).cloned())
+            if let Some(value) = obj.borrow().get(prop).cloned() {
+                return Ok(Some(value));
+            }
+            if let Some(getter) = obj.borrow().get("__get:*").cloned() {
+                return call_with_this(getter, receiver.clone(), &[JsValue::String(prop.into())])
+                    .map(Some);
+            }
+            Ok(None)
         }
         JsValue::Array(items) => {
             let getter = array_extra_property(items, &accessor_key("get", prop));
