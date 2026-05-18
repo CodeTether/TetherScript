@@ -21,6 +21,8 @@ a local contract test. CLI behavior belongs in `tests/agent_browser_cli.rs`.
 Embedded page behavior belongs in `tests/agent_browser_page.rs`. Action-envelope
 behavior belongs in `tests/browser_cap_contract.rs`, and endpoint smoke tests
 remain opt-in through `TETHERSCRIPT_BROWSERCTL_ENDPOINT`.
+Current parity work is tracked in `docs/browser-parity-checklist.md`; use that
+checklist before choosing the next browser task.
 
 The browser track must not depend on external browser engines or automation
 adapters. Production UI validation is done by closing gaps in tetherscript's

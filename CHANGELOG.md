@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a browser parity checklist that grounds follow-up work in current
+  contract tests, known gaps, and explicit readiness tests.
 - Added native fetch/XHR redirect following for `301`, `302`, `303`, `307`,
   and `308`, including relative `Location` resolution, browser-style method
   rewriting, cookie propagation across hops, final response URLs, and HAR
