@@ -61,6 +61,8 @@ tetherscript currently includes:
   browser engines and remote-control drivers as required browser backends.
 - DOM/event parity coverage now includes composed shadow-root event paths that
   bubble through the host chain with inspectable `composedPath()` output.
+- Element child collections now behave live for `children` and `childNodes`
+  after DOM mutation.
 - SMTP sending support.
 - Standard tools for filesystem, process, environment, path, time, Base64,
   SHA-256, and URL parsing.
