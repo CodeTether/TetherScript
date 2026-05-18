@@ -3244,13 +3244,7 @@ impl DomHandle {
         }
 
         set_event_position(&event, JsValue::Null, 0);
-        let default_prevented = match &event {
-            JsValue::Object(obj) => obj
-                .borrow()
-                .get("defaultPrevented")
-                .is_some_and(JsValue::truthy),
-            _ => false,
-        };
+        let default_prevented = event_flag(&event, "defaultPrevented");
         let allowed = !default_prevented && self.run_default_action(&event_type)?;
         Ok(JsValue::Bool(allowed))
     }
@@ -3283,14 +3277,19 @@ impl DomHandle {
     }
 
     fn event_path(&self) -> Vec<DomHandle> {
-        let mut out = Vec::new();
-        for index in 0..=self.path.len() {
-            out.push(DomHandle {
+        let local = (0..=self.path.len())
+            .map(|index| DomHandle {
                 root: self.root.clone(),
                 path: self.path[..index].to_vec(),
-            });
+            })
+            .collect::<Vec<_>>();
+        if let Some(host) = custom_host::shadow::host(&self.root) {
+            let mut out = host.event_path();
+            out.extend(local);
+            out
+        } else {
+            local
         }
-        out
     }
 
     fn run_default_action(&self, event_type: &str) -> Result<bool, String> {

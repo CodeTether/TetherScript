@@ -93,12 +93,19 @@ Completed tests:
 
 React-style apps depend on DOM/event details beyond the current smoke surface.
 
+Status: in progress. Composed events dispatched inside an open shadow root now
+bubble through the host chain and expose a composed path that includes the
+shadow target, shadow root, host, and document.
+
 Required tests:
 
 - capture, bubble, `stopPropagation`, and `preventDefault` ordering;
-- composed path across shadow DOM and nested targets;
 - live collections update after mutation;
 - default actions for labels, buttons, forms, and anchors stay coherent.
+
+Completed tests:
+
+- composed path across shadow DOM and nested targets.
 
 ### P5: CSS/Layout/Rendering Inspection
 
@@ -127,5 +134,5 @@ Required tests:
 ## Immediate Next Item
 
 Implement P4: close DOM and event parity gaps that production frameworks rely
-on, starting with composed event-path and propagation contracts before moving
-to live collections and default actions.
+on, continuing with live collections after mutation and default actions for
+labels, buttons, forms, and anchors.
