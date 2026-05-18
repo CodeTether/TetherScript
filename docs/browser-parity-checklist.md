@@ -77,10 +77,12 @@ Completed tests:
 
 ### P3: Runtime Error And Async Diagnostics
 
-Production debugging needs browser-shaped rejection/error reporting and async
-stack evidence, not just successful render output.
+Status: complete for browser-shaped unhandled promise rejection page errors,
+production debug report projection, async generated script URL stack evidence,
+CORS versus route-abort exception classification, and source-map lookup across
+async and module stack frames.
 
-Required tests:
+Completed tests:
 
 - unhandled promise rejection appears in page errors and debug report;
 - async `await` stack includes the generated script URL;
@@ -124,6 +126,6 @@ Required tests:
 
 ## Immediate Next Item
 
-Implement P3: improve runtime error and async diagnostics so unhandled promise
-rejections, async/module stack evidence, CORS rejection classification, and
-source-map lookup are contract-tested in production debug reports.
+Implement P4: close DOM and event parity gaps that production frameworks rely
+on, starting with composed event-path and propagation contracts before moving
+to live collections and default actions.

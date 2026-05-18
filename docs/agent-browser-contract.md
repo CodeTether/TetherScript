@@ -35,6 +35,11 @@ evidence that joins selector candidates, computed styles, visibility, and
 layout bounds so an agent can distinguish "React mounted" from "React mounted
 but the UI is hidden, zero-sized, or styled incorrectly."
 
+Runtime diagnostics must preserve browser-shaped failure evidence. Unhandled
+promise rejections are recorded as page errors, async and module stack frames
+retain generated script URLs for source-map lookup, and CORS blocks are
+classified separately from route aborts in production debug reports.
+
 Agent actions must behave like user input for production form workflows:
 controlled inputs read live DOM values from captured element handles, click
 actions dispatch pointer/mouse/focus/click ordering, submit prevention blocks
@@ -91,6 +96,7 @@ cargo test --test agent_browser_cli --test agent_browser_page \
   --test agent_browser_network_redirects \
   --test agent_browser_navigation_network \
   --test agent_browser_resource_network \
+  --test agent_browser_production_debug \
   --test browser_js_promise_await --test browser_js_xhr_parity
 ```
 

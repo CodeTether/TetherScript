@@ -112,7 +112,9 @@ HAR-style network entries, source-map registration status, source-mapped
 page-error locations and generated stack frames, framework markers, React roots,
 hydration warnings, classified runtime exceptions, and native visual element
 evidence with selector candidates, computed styles, visibility, and layout
-bounds. This is the native
+bounds. Unhandled promise rejections are promoted into page errors, async and
+module frames retain generated script URLs for source-map lookup, and CORS
+blocks are classified separately from route aborts. This is the native
 full-parity track's production-debug surface; it does not depend on an external
 browser engine or remote-control driver.
 

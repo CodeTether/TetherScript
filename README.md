@@ -50,8 +50,10 @@ tetherscript currently includes:
   rewriting, dynamic `import()` resolution/rejection, DOM assertions,
   screenshots/traces, production debug reports, HAR-style network exports,
   source-mapped runtime error locations and
-  generated stack frames, React root/render/hydration diagnostics, classified
-  runtime exceptions, computed-style plus layout evidence for rendered elements,
+  generated async/module stack frames, unhandled promise rejection reporting,
+  React root/render/hydration diagnostics, classified runtime exceptions with
+  separate CORS and route-abort categories, computed-style plus layout evidence
+  for rendered elements,
   React-style controlled form interaction coverage, fetch/XHR server-cookie
   propagation, redirect following, CORS preflight validation, credential modes,
   routed page-resource loading for auth flows, routed top-level navigation for

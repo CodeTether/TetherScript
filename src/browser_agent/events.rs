@@ -4,6 +4,8 @@
 mod events_capture;
 #[path = "events_page.rs"]
 mod events_page;
+#[path = "events_promise.rs"]
+mod events_promise;
 #[path = "events_push.rs"]
 mod events_push;
 

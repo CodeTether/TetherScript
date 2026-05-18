@@ -20,6 +20,9 @@ impl BrowserPage {
         match value {
             Ok(value) => {
                 self.record_event_deltas(checkpoint);
+                if let Some(message) = super::events_promise::unhandled_rejection(&value) {
+                    self.record_page_error("window.unhandledrejection", message);
+                }
                 Ok(value)
             }
             Err(message) => Err(self.record_page_error(action, message)),
