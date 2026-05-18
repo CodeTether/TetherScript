@@ -52,9 +52,10 @@ tetherscript currently includes:
   generated stack frames, React root/render/hydration diagnostics, classified
   runtime exceptions, computed-style plus layout evidence for rendered elements,
   React-style controlled form interaction coverage, fetch/XHR server-cookie
-  propagation, redirect following, CORS preflight validation, and credential
-  modes for auth flows, and explicit tests that reject external browser engines
-  and remote-control drivers as required browser backends.
+  propagation, redirect following, CORS preflight validation, credential modes,
+  and routed page-resource loading for auth flows, and explicit tests that
+  reject external browser engines and remote-control drivers as required
+  browser backends.
 - SMTP sending support.
 - Standard tools for filesystem, process, environment, path, time, Base64,
   SHA-256, and URL parsing.
