@@ -12,7 +12,7 @@ application.
 
 ## Status
 
-tetherscript `0.1.0-alpha.15` is the current release candidate for crates.io.
+tetherscript `0.1.0-alpha.16` is the current release candidate for crates.io.
 
 tetherscript currently includes:
 
@@ -67,7 +67,7 @@ responsible for trust, capabilities, auditing, and resource budgets.
 ## Quick start
 
 ```bash
-cargo install tetherscript --version 0.1.0-alpha.15
+cargo install tetherscript --version 0.1.0-alpha.16
 
 cargo build --release
 
