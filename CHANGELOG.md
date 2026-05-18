@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added routed external page-resource loading so missing scripts, module entry
+  scripts, stylesheets, images, and source maps can be fulfilled through the
+  browser route table with cookies, redirects, CORS validation, route logs, and
+  HAR-visible network events.
 - Added a browser parity checklist that grounds follow-up work in current
   contract tests, known gaps, and explicit readiness tests.
 - Added native fetch/XHR redirect following for `301`, `302`, `303`, `307`,

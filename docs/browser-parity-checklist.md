@@ -23,18 +23,24 @@ preferred agent browser. Do not answer "what next" from memory; use this file,
 | Fetch/XHR auth cookies | `tests/agent_browser_auth_cookies.rs` |
 | Fetch/XHR redirects | `tests/agent_browser_network_redirects.rs` |
 | Fetch/XHR CORS credentials | `tests/agent_browser_cors_credentials.rs` |
+| Routed page subresources | `tests/agent_browser_resource_network.rs` |
 | Browser capability contract | `tests/browser_cap_contract.rs`, `tests/browser_cap_live.rs` |
 
 ## Blocking Checklist
 
-### P0: One Network Pipeline For All Page Loads
+### P0: One Network Pipeline For External Page Resources
+
+Status: complete for external script entries, module script entries,
+stylesheets, images, source maps, same-origin cookies, redirects, CORS-checked
+allowed cross-origin resources, route logs, and HAR output. Top-level document
+navigation remains separate and is tracked in P1.
 
 Fetch/XHR now have cookies, redirects, CORS, credentials, and HAR. External
-scripts, module scripts, CSS, images, source maps, and document loads still use
-resource registration or navigation paths that are not proven to share that
-same network pipeline.
+scripts, module script entries, CSS, images, and source maps use the same
+route-visible network model before deterministic resource registration and
+inlining.
 
-Required tests:
+Completed tests:
 
 - module script loaded through a routed redirect chain records every HAR hop;
 - module script request sends cookies only when browser rules allow it;
@@ -114,5 +120,5 @@ Required tests:
 
 ## Immediate Next Item
 
-Implement P0: route external page resources through the same native network
-pipeline used by fetch/XHR, then add the four P0 tests above.
+Implement P1: route top-level navigation and default navigation actions through
+native browser network semantics, then add the four P1 tests above.

@@ -58,6 +58,12 @@ validate `Access-Control-Allow-*` response headers, suppress cross-origin
 cookies by default, and send credentialed cookies only for `credentials:
 "include"` or `withCredentials = true`.
 
+External page resources must use the native route-visible network path before
+the deterministic registry/inlining path runs. Missing script, module entry,
+stylesheet, image, and source-map resources can be fulfilled by routes, follow
+redirects, apply same-origin cookies, enforce CORS for allowed cross-origin
+resources, and appear in HAR output.
+
 ## Readiness Suite
 
 Run the deterministic and bridge-contract browser tests with:
@@ -72,6 +78,7 @@ cargo test --test agent_browser_cli --test agent_browser_page \
   --test agent_browser_auth_cookies \
   --test agent_browser_cors_credentials \
   --test agent_browser_network_redirects \
+  --test agent_browser_resource_network \
   --test browser_js_promise_await --test browser_js_xhr_parity
 ```
 

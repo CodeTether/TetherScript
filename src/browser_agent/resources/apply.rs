@@ -3,7 +3,7 @@
 use crate::browser::parse_html;
 use crate::browser_agent::page::BrowserPage;
 
-use super::{discover, script, style};
+use super::{discover, network, script, style};
 
 impl BrowserPage {
     pub(crate) fn prepare_external_resources(&mut self) -> Result<(), String> {
@@ -11,6 +11,7 @@ impl BrowserPage {
         if refs.is_empty() {
             return Ok(());
         }
+        network::load_missing(self, &refs)?;
         self.apply_external_styles(&refs)?;
         self.inline_external_scripts(&refs)
     }

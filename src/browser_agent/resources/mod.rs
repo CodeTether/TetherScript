@@ -8,6 +8,7 @@ mod apply;
 mod discover;
 mod images;
 mod inline;
+mod network;
 mod page;
 mod preload;
 mod registry;
