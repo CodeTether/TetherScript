@@ -19,7 +19,7 @@ preferred agent browser. Do not answer "what next" from memory; use this file,
 | React-style module mount | `tests/agent_browser_react_render.rs` |
 | Controlled form interaction | `tests/agent_browser_react_interaction.rs` |
 | Production debug report | `tests/agent_browser_production_debug.rs` |
-| Static and dynamic module resources | `tests/agent_browser_modules.rs`, `tests/agent_browser_dynamic_import.rs` |
+| Route-backed module loader | `tests/agent_browser_modules.rs`, `tests/agent_browser_dynamic_import.rs` |
 | Fetch/XHR auth cookies | `tests/agent_browser_auth_cookies.rs` |
 | Fetch/XHR redirects | `tests/agent_browser_network_redirects.rs` |
 | Fetch/XHR CORS credentials | `tests/agent_browser_cors_credentials.rs` |
@@ -64,10 +64,11 @@ Completed tests:
 
 ### P2: Module Loader Semantics
 
-The current module support is registry-backed and enough for React smoke tests,
-but not a full browser module loader.
+Status: complete for route-backed static imports, nested dependency-first
+evaluation, modulepreload request deduplication, and browser-shaped rejection
+for missing literal dynamic import chunks.
 
-Required tests:
+Completed tests:
 
 - static imports fetch through the shared network pipeline;
 - dynamic `import()` rejects with a browser-shaped error for missing chunks;
@@ -123,7 +124,6 @@ Required tests:
 
 ## Immediate Next Item
 
-Implement P2: expand module loader semantics so static imports fetch through the
-shared route-visible network path, `modulepreload` is requested and deduplicated,
-missing dynamic chunks reject with a browser-shaped error, and nested module
-evaluation order is contract-tested.
+Implement P3: improve runtime error and async diagnostics so unhandled promise
+rejections, async/module stack evidence, CORS rejection classification, and
+source-map lookup are contract-tested in production debug reports.

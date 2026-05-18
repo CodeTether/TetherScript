@@ -2,7 +2,10 @@
 
 use std::collections::HashSet;
 
-use super::{script_dynamic_ref, script_namespace, script_resolve, url, ResourceRegistry};
+use super::{
+    script_dynamic_missing, script_dynamic_ref, script_namespace, script_resolve, url,
+    ResourceRegistry,
+};
 
 pub(crate) fn rewrite(
     registry: &ResourceRegistry,
@@ -15,8 +18,12 @@ pub(crate) fn rewrite(
     let mut rewritten = String::new();
     let mut cursor = 0;
     for item in refs {
-        let (url, source) = script_resolve::text(registry, current_url, &item.url)
-            .ok_or_else(|| script_resolve::missing(current_url, &item.url))?;
+        let Some((url, source)) = script_resolve::text(registry, current_url, &item.url) else {
+            rewritten.push_str(&body[cursor..item.start]);
+            rewritten.push_str(&script_dynamic_missing::rejection(current_url, &item.url));
+            cursor = item.end;
+            continue;
+        };
         let module_url = url::resolve(current_url, &url);
         out.push_str(&super::script_module::expand(
             registry,

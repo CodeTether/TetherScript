@@ -14,6 +14,9 @@ All notable changes to this project will be documented in this file.
   anchor clicks, and GET/POST form submits, including redirect following,
   cookie propagation, POST body preservation, final-URL history commits, and
   HAR-visible navigation entries.
+- Added route-backed module-loader coverage for static imports, nested module
+  dependency order, modulepreload deduplication, and browser-shaped rejected
+  promises for missing dynamic import chunks.
 - Added a browser parity checklist that grounds follow-up work in current
   contract tests, known gaps, and explicit readiness tests.
 - Added native fetch/XHR redirect following for `301`, `302`, `303`, `307`,

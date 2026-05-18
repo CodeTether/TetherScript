@@ -12,5 +12,6 @@ pub(crate) fn missing(page: &BrowserPage) -> Vec<String> {
                 .map(|_| ())
                 .err()
         })
+        .chain(super::validate_dynamic::missing(page))
         .collect()
 }

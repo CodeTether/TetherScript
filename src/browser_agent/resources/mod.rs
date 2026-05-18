@@ -18,6 +18,7 @@ mod script_arrow_body;
 mod script_arrow_params;
 mod script_dom;
 mod script_dynamic;
+mod script_dynamic_missing;
 mod script_dynamic_ref;
 mod script_export;
 mod script_export_binding;
@@ -37,6 +38,7 @@ mod types;
 mod url;
 mod url_norm;
 mod validate;
+mod validate_dynamic;
 mod validate_modules;
 mod walk;
 
