@@ -47,6 +47,8 @@ mod live_form_host;
 mod media_host;
 #[path = "browser_js_metadata.rs"]
 mod metadata_host;
+#[path = "browser_js_network_cookies.rs"]
+mod network_cookie_host;
 #[path = "browser_js_performance.rs"]
 mod performance_host;
 #[path = "browser_js_realtime_model.rs"]
@@ -187,6 +189,7 @@ struct MutationObserverOptions {
 pub struct BrowserJsState {
     pub url: String,
     pub cookies: Vec<(String, String)>,
+    pub cookie_jar: Vec<crate::browser_cookie::Cookie>,
     pub set_cookies: Vec<String>,
     pub local_storage: Vec<(String, String)>,
     pub session_storage: Vec<(String, String)>,
@@ -615,6 +618,7 @@ fn reset_browser_js_state() {
     FOCUSED_ELEMENT.with(|focused| *focused.borrow_mut() = None);
     INPUT_SELECTIONS.with(|selections| selections.borrow_mut().clear());
     cookie_host::reset();
+    network_cookie_host::reset();
     performance_host::reset();
     NETWORK_EVENTS.with(|events| events.borrow_mut().clear());
     canvas_host::reset_all();
@@ -654,6 +658,7 @@ fn eval_browser_script_with_drain(
 
 fn seed_browser_js_state(state: &BrowserJsState) {
     cookie_host::seed(state.cookies.clone());
+    network_cookie_host::seed(state.cookie_jar.clone(), state.url.clone());
 }
 
 fn set_runtime_location(window: &JsValue, url: &str) {
@@ -704,6 +709,7 @@ fn browser_js_result_with_network(
         state: BrowserJsState {
             url: window_location_href(&runtime.window),
             cookies: cookie_host::visible_pairs(),
+            cookie_jar: network_cookie_host::jar(),
             set_cookies: cookie_host::mutations(),
             local_storage: runtime.local_storage.borrow().entries.clone(),
             session_storage: runtime.session_storage.borrow().entries.clone(),
@@ -5370,7 +5376,10 @@ fn resolve_request_url(
     request: &mut FetchRequest,
     location: &Rc<RefCell<HashMap<String, JsValue>>>,
 ) {
-    request.url = resolve_url(&request.url, Some(&location_href(location)));
+    let initiator = location_href(location);
+    network_cookie_host::set_document_url(&initiator);
+    request.url = resolve_url(&request.url, Some(&initiator));
+    network_cookie_host::append_request_header(&mut request.headers, &request.url, &initiator);
 }
 
 fn promise_obj_clone(value: &JsValue) -> HashMap<String, JsValue> {
@@ -5721,7 +5730,7 @@ fn fetch_response_parts(
     request: &FetchRequest,
     route_handler: &SharedBrowserJsRouteHandler,
 ) -> Result<FetchResponseParts, String> {
-    match route_action_for(request, route_handler) {
+    let parts = match route_action_for(request, route_handler) {
         None | Some(BrowserJsRouteAction::PassThrough) => {
             live_response_parts(request).or_else(|_| Ok(default_response_parts(request, None)))
         }
@@ -5742,7 +5751,9 @@ fn fetch_response_parts(
             body: response.body,
             route_result: Some("fulfill".into()),
         }),
-    }
+    }?;
+    network_cookie_host::apply_response_headers(&request.url, &parts.headers);
+    Ok(parts)
 }
 
 fn live_response_parts(request: &FetchRequest) -> Result<FetchResponseParts, String> {
@@ -5979,14 +5990,20 @@ fn install_xml_http_request(
             let send_xhr = xhr.clone();
             let send_timers = timers.clone();
             let send_routes = route_handler.clone();
+            let send_location = location.clone();
             xhr.borrow_mut().insert(
                 "send".into(),
                 native("XMLHttpRequest.send", None, move |args| {
                     let body = args.first().map(JsValue::display);
                     let xhr_for_task = send_xhr.clone();
                     let routes_for_task = send_routes.clone();
+                    let location_for_task = send_location.clone();
                     let callback = native("XMLHttpRequest.complete", Some(0), move |_| {
-                        let request = xhr_request(&xhr_for_task, body.clone());
+                        let request = xhr_request(
+                            &xhr_for_task,
+                            body.clone(),
+                            &location_href(&location_for_task),
+                        );
                         let parts = match fetch_response_parts(&request, &routes_for_task) {
                             Ok(parts) => parts,
                             Err(reason) => {
@@ -6095,9 +6112,13 @@ fn install_xml_http_request(
     );
 }
 
-fn xhr_request(xhr: &Rc<RefCell<HashMap<String, JsValue>>>, body: Option<String>) -> FetchRequest {
+fn xhr_request(
+    xhr: &Rc<RefCell<HashMap<String, JsValue>>>,
+    body: Option<String>,
+    initiator_url: &str,
+) -> FetchRequest {
     let xhr = xhr.borrow();
-    FetchRequest {
+    let mut request = FetchRequest {
         url: xhr.get("__url").map(JsValue::display).unwrap_or_default(),
         method: xhr
             .get("__method")
@@ -6109,7 +6130,10 @@ fn xhr_request(xhr: &Rc<RefCell<HashMap<String, JsValue>>>, body: Option<String>
             .unwrap_or_default(),
         body,
         aborted: false,
-    }
+    };
+    network_cookie_host::set_document_url(initiator_url);
+    network_cookie_host::append_request_header(&mut request.headers, &request.url, initiator_url);
+    request
 }
 
 fn xhr_status(xhr: &Rc<RefCell<HashMap<String, JsValue>>>) -> i64 {
