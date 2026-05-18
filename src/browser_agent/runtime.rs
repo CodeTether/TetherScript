@@ -5,13 +5,13 @@ mod runtime_init;
 #[path = "runtime_routes.rs"]
 mod runtime_routes;
 
-use crate::browser_agent::page::BrowserPage;
-use crate::browser_agent::PageLoadState;
+use crate::browser_agent::{page::BrowserPage, PageLoadState};
 
 impl BrowserPage {
     /// Execute inline scripts in the page's persistent JavaScript context.
     pub fn run_scripts(&mut self) -> Result<(), String> {
         self.enforce_resource_limits("page.run_scripts")?;
+        let from = self.session.url.clone();
         self.sync_context_state_into_session();
         self.prepare_external_resources()?;
         self.install_agent_bridges()?;
@@ -27,6 +27,7 @@ impl BrowserPage {
         self.apply_runtime_result(checkpoint, "page.run_scripts", result)?;
         self.collect_agent_bridges()?;
         self.sync_context_state_from_session();
+        super::navigation::commit_script_url(self.session.html.clone(), self, &from)?;
         self.mark_load_state(PageLoadState::NetworkIdle);
         Ok(())
     }
@@ -34,6 +35,7 @@ impl BrowserPage {
     /// Evaluate JavaScript in the page's persistent JavaScript context.
     pub fn eval_js(&mut self, script: &str) -> Result<crate::js::JsValue, String> {
         self.enforce_resource_limits("page.eval_js")?;
+        let from = self.session.url.clone();
         self.sync_context_state_into_session();
         self.install_agent_bridges()?;
         let checkpoint = self.event_checkpoint();
@@ -48,6 +50,7 @@ impl BrowserPage {
         let value = self.apply_runtime_result(checkpoint, "page.eval_js", result)?;
         self.collect_agent_bridges()?;
         self.sync_context_state_from_session();
+        super::navigation::commit_script_url(script.to_string(), self, &from)?;
         self.mark_load_state(PageLoadState::NetworkIdle);
         Ok(value)
     }

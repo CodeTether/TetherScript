@@ -13,6 +13,7 @@ mod dom;
 mod encode;
 mod entries;
 mod form;
+mod form_request;
 mod query;
 mod select;
 mod submit;

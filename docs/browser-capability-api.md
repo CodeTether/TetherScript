@@ -127,6 +127,9 @@ Native fetch/XHR networking follows redirects, emits CORS preflights, validates
 `Access-Control-Allow-*` headers, and models credential modes for cross-origin
 cookies. External page resources use the same route-visible network model for
 script, stylesheet, image, and source-map loads before deterministic inlining.
+Top-level `location`, anchor, and form navigations also use the native route
+model, including redirects, cookies, POST bodies, final URL commits, history,
+and HAR entries.
 
 Storage:
 `cookies`, `local_storage`, `session_storage`, `indexed_db_summary`, `set_cookie`, `set_local_storage`, `clear_storage`.

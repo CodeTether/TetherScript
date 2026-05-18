@@ -1,5 +1,6 @@
 //! Click-result navigation dispatch.
 
+use crate::browser_agent::navigation::DocumentRequest;
 use crate::browser_agent::page::BrowserPage;
 use crate::browser_agent::resolve::Resolved;
 use crate::js::JsValue;
@@ -13,17 +14,21 @@ pub(crate) fn after_click(
         return Ok(());
     }
     let action = navigation_target(page, &resolved.dom.path);
-    if let Some((url, action)) = action {
-        super::commit::document(page, url, action);
+    if let Some((request, action)) = action {
+        super::commit::document(page, request, action)?;
     }
     Ok(())
 }
 
-fn navigation_target(page: &BrowserPage, path: &[usize]) -> Option<(String, &'static str)> {
+fn navigation_target(
+    page: &BrowserPage,
+    path: &[usize],
+) -> Option<(DocumentRequest, &'static str)> {
     let current = page.session.url.as_str();
     let document = &page.session.document;
     if let Some(href) = super::anchor::href(document, path) {
-        return Some((super::url::resolve(current, &href), "anchor_click"));
+        let url = super::url::resolve(current, &href);
+        return Some((DocumentRequest::get(url), "anchor_click"));
     }
-    super::form::submit_target(document, path, current).map(|url| (url, "form_submit"))
+    super::form::submit_target(document, path, current).map(|request| (request, "form_submit"))
 }
