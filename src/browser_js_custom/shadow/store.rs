@@ -27,6 +27,16 @@ pub(super) fn entry(host: &DomHandle, mode: String, delegates_focus: bool) -> Sh
     })
 }
 
+pub(super) fn host(root: &Rc<RefCell<Node>>) -> Option<DomHandle> {
+    ROOTS.with(|roots| {
+        roots
+            .borrow()
+            .values()
+            .find(|entry| Rc::ptr_eq(&entry.root, root))
+            .map(|entry| entry.host.clone())
+    })
+}
+
 fn fragment_root() -> Rc<RefCell<Node>> {
     Rc::new(RefCell::new(Node::Element(Element {
         tag: "#document-fragment".into(),

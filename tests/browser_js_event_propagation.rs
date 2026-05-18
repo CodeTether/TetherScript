@@ -48,3 +48,20 @@ fn stop_propagation_preserves_same_bubble_target_listeners() {
 
     assert_eq!(value, JsValue::String("targetab".into()));
 }
+
+#[test]
+fn composed_shadow_events_reach_host_with_path() {
+    let result = eval_with_dom(
+        "<div id='host'></div>",
+        "let host=document.getElementById('host');\
+         let root=host.attachShadow({mode:'open'});let button=document.createElement('button');\
+         button.setAttribute('id','inside');root.appendChild(button);let seen='';\
+         host.addEventListener('click',function(e){let p=e.composedPath();\
+         seen=p[0].id+':'+p[2].id+':'+e.currentTarget.id+':'+e.eventPhase;});\
+         button.dispatchEvent({type:'click',bubbles:true,composed:true});seen;",
+    )
+    .unwrap()
+    .value;
+
+    assert_eq!(result, JsValue::String("inside:host:host:3".into()));
+}

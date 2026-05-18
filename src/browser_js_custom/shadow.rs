@@ -34,3 +34,7 @@ pub(super) fn open_object(host: &DomHandle) -> JsValue {
         .map(object::from_entry)
         .unwrap_or(JsValue::Null)
 }
+
+pub(in crate::browser_js) fn host(root: &Rc<RefCell<Node>>) -> Option<DomHandle> {
+    store::host(root)
+}

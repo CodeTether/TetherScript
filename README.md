@@ -59,6 +59,8 @@ tetherscript currently includes:
   routed page-resource loading for auth flows, routed top-level navigation for
   `location`, anchor, and form commits, and explicit tests that reject external
   browser engines and remote-control drivers as required browser backends.
+- DOM/event parity coverage now includes composed shadow-root event paths that
+  bubble through the host chain with inspectable `composedPath()` output.
 - SMTP sending support.
 - Standard tools for filesystem, process, environment, path, time, Base64,
   SHA-256, and URL parsing.

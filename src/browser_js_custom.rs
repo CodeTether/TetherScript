@@ -9,7 +9,7 @@ mod lifecycle;
 #[path = "browser_js_custom/registry.rs"]
 mod registry;
 #[path = "browser_js_custom/shadow.rs"]
-mod shadow;
+pub(super) mod shadow;
 #[path = "browser_js_custom/upgrade.rs"]
 mod upgrade;
 #[path = "browser_js_custom/util.rs"]

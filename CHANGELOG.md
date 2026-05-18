@@ -20,6 +20,9 @@ All notable changes to this project will be documented in this file.
 - Added production-debug diagnostics for unhandled promise rejections,
   async/module source-mapped stack evidence, and separate CORS versus route
   abort exception classification.
+- Added shadow-boundary composed event-path coverage so events dispatched inside
+  open shadow roots bubble through their host chain with browser-shaped
+  `composedPath()` evidence.
 - Added a browser parity checklist that grounds follow-up work in current
   contract tests, known gaps, and explicit readiness tests.
 - Added native fetch/XHR redirect following for `301`, `302`, `303`, `307`,
