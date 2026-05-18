@@ -27,7 +27,7 @@ pub(crate) fn set_document_url(url: &str) {
     DOCUMENT_URL.with(|stored| *stored.borrow_mut() = url.to_string());
 }
 
-pub(super) fn document_url() -> String {
+pub(crate) fn document_url() -> String {
     DOCUMENT_URL.with(|stored| stored.borrow().clone())
 }
 

@@ -37,6 +37,8 @@ mod dom_compat_host;
 mod event_path_host;
 #[path = "browser_js_fullscreen.rs"]
 mod fullscreen_host;
+#[path = "browser_js_http_status.rs"]
+mod http_status_host;
 #[path = "browser_js_inline_preflight.rs"]
 mod inline_preflight;
 #[path = "browser_js_lifecycle.rs"]
@@ -55,6 +57,8 @@ mod performance_host;
 mod realtime_model;
 #[allow(unused_imports)]
 pub(crate) use realtime_model::{BrowserJsRealtimeEvent, BrowserJsRealtimeEventKind};
+#[path = "browser_js_redirects.rs"]
+mod redirect_host;
 #[path = "browser_js_script_budget.rs"]
 mod script_budget;
 #[path = "browser_js_selection/mod.rs"]
@@ -67,6 +71,7 @@ mod trace_host;
 mod viewport_host;
 #[path = "browser_js_window/mod.rs"]
 mod window_host;
+use http_status_host::status_text;
 use timers_host::TimerQueue;
 
 const DOM_API_VERSION: &str = "tetherscript-dom-0.3";
@@ -5533,11 +5538,36 @@ fn make_rejected_fetch_promise(reason: &str, timers: Rc<RefCell<TimerQueue>>) ->
 }
 
 struct FetchResponseParts {
+    url: String,
+    method: String,
     status: u16,
     status_text: String,
     headers: Vec<(String, String)>,
     body: String,
+    request_body_used: bool,
     route_result: Option<String>,
+}
+
+impl FetchResponseParts {
+    fn new(
+        request: &FetchRequest,
+        status: u16,
+        status_text: String,
+        headers: Vec<(String, String)>,
+        body: String,
+        route_result: Option<String>,
+    ) -> Self {
+        Self {
+            url: request.url.clone(),
+            method: request.method.clone(),
+            status,
+            status_text,
+            headers,
+            body,
+            request_body_used: request.body.as_ref().is_some_and(|body| !body.is_empty()),
+            route_result,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -5557,20 +5587,14 @@ fn make_response(
     route_handler: &SharedBrowserJsRouteHandler,
 ) -> Result<JsValue, String> {
     let parts = fetch_response_parts(request, route_handler)?;
-    record_network_event(
-        &request.method,
-        &request.url,
-        Some(parts.status),
-        parts.route_result.clone(),
-    );
     Ok(response_object(ResponseFields {
         status: parts.status,
         status_text: parts.status_text,
         headers: headers_with_default(parts.headers),
         body: parts.body,
-        url: request.url.clone(),
-        method: Some(request.method.clone()),
-        body_used: request.body.as_ref().is_some_and(|body| !body.is_empty()),
+        url: parts.url,
+        method: Some(parts.method),
+        body_used: parts.request_body_used,
         response_type: None,
     }))
 }
@@ -5730,30 +5754,7 @@ fn fetch_response_parts(
     request: &FetchRequest,
     route_handler: &SharedBrowserJsRouteHandler,
 ) -> Result<FetchResponseParts, String> {
-    let parts = match route_action_for(request, route_handler) {
-        None | Some(BrowserJsRouteAction::PassThrough) => {
-            live_response_parts(request).or_else(|_| Ok(default_response_parts(request, None)))
-        }
-        Some(BrowserJsRouteAction::Continue) => live_response_parts(request)
-            .or_else(|_| Ok(default_response_parts(request, Some("continue")))),
-        Some(BrowserJsRouteAction::Abort(reason)) => {
-            record_network_event(&request.method, &request.url, None, Some("abort".into()));
-            Err(reason)
-        }
-        Some(BrowserJsRouteAction::Blocked(reason)) => {
-            record_network_event(&request.method, &request.url, None, Some("blocked".into()));
-            Err(reason)
-        }
-        Some(BrowserJsRouteAction::Fulfill(response)) => Ok(FetchResponseParts {
-            status: response.status,
-            status_text: status_text(response.status).into(),
-            headers: response.headers,
-            body: response.body,
-            route_result: Some("fulfill".into()),
-        }),
-    }?;
-    network_cookie_host::apply_response_headers(&request.url, &parts.headers);
-    Ok(parts)
+    redirect_host::fetch_response_parts(request, route_handler)
 }
 
 fn live_response_parts(request: &FetchRequest) -> Result<FetchResponseParts, String> {
@@ -5766,7 +5767,7 @@ fn live_response_parts(request: &FetchRequest) -> Result<FetchResponseParts, Str
         request.body.as_deref(),
         &request.headers,
     )?;
-    response_value_parts(response)
+    response_value_parts(response, request)
 }
 
 fn should_live_fetch(url: &str) -> bool {
@@ -5775,7 +5776,10 @@ fn should_live_fetch(url: &str) -> bool {
         && !url.contains("://127.0.0.1")
 }
 
-fn response_value_parts(value: Value) -> Result<FetchResponseParts, String> {
+fn response_value_parts(
+    value: Value,
+    request: &FetchRequest,
+) -> Result<FetchResponseParts, String> {
     let Value::Map(response) = value else {
         return Err("http response must be a map".into());
     };
@@ -5803,13 +5807,14 @@ fn response_value_parts(value: Value) -> Result<FetchResponseParts, String> {
         Some(Value::Str(body)) => body.to_string(),
         _ => String::new(),
     };
-    Ok(FetchResponseParts {
+    Ok(FetchResponseParts::new(
+        request,
         status,
         status_text,
         headers,
         body,
-        route_result: Some("live".into()),
-    })
+        Some("live".into()),
+    ))
 }
 
 fn default_response_parts(
@@ -5817,13 +5822,14 @@ fn default_response_parts(
     route_result: Option<&str>,
 ) -> FetchResponseParts {
     let (status, status_text, body) = response_parts(&request.url);
-    FetchResponseParts {
+    FetchResponseParts::new(
+        request,
         status,
-        status_text: status_text.into(),
-        headers: request.headers.clone(),
+        status_text.into(),
+        request.headers.clone(),
         body,
-        route_result: route_result.map(str::to_string),
-    }
+        route_result.map(str::to_string),
+    )
 }
 
 fn route_action_for(
@@ -5848,18 +5854,6 @@ fn headers_with_default(mut headers: Vec<(String, String)>) -> Vec<(String, Stri
         headers.push(("content-type".into(), "application/json".into()));
     }
     headers
-}
-
-fn status_text(status: u16) -> &'static str {
-    match status {
-        200..=299 => "OK",
-        400 => "Bad Request",
-        401 => "Unauthorized",
-        403 => "Forbidden",
-        404 => "Not Found",
-        500..=599 => "Internal Server Error",
-        _ => "",
-    }
 }
 
 fn response_parts(url: &str) -> (u16, &'static str, String) {
@@ -6011,12 +6005,6 @@ fn install_xml_http_request(
                                 return Ok(JsValue::Undefined);
                             }
                         };
-                        record_network_event(
-                            &request.method,
-                            &request.url,
-                            Some(parts.status),
-                            parts.route_result.clone(),
-                        );
                         {
                             let mut xhr = xhr_for_task.borrow_mut();
                             let response = xhr_response_value(&xhr, &parts.body, &parts.headers);
@@ -6025,7 +6013,7 @@ fn install_xml_http_request(
                             xhr.insert("statusText".into(), JsValue::String(parts.status_text));
                             xhr.insert("response".into(), response);
                             xhr.insert("responseText".into(), JsValue::String(parts.body.clone()));
-                            xhr.insert("responseURL".into(), JsValue::String(request.url));
+                            xhr.insert("responseURL".into(), JsValue::String(parts.url));
                             xhr.insert("__responseHeaders".into(), headers_array(parts.headers));
                         }
                         fire_xhr_event(&xhr_for_task, "readystatechange")?;
