@@ -10,6 +10,10 @@ All notable changes to this project will be documented in this file.
   and `308`, including relative `Location` resolution, browser-style method
   rewriting, cookie propagation across hops, final response URLs, and HAR
   entries for the redirect chain.
+- Added native CORS handling for fetch/XHR, including cross-origin `Origin`
+  headers, credential modes, preflight `OPTIONS` requests, response header
+  validation, cross-origin cookie suppression by default, and credentialed
+  cookie forwarding when `credentials: "include"` or `withCredentials` is set.
 
 ## [0.1.0-alpha.16] - 2026-05-18
 

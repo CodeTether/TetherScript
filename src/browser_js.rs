@@ -59,6 +59,8 @@ mod realtime_model;
 pub(crate) use realtime_model::{BrowserJsRealtimeEvent, BrowserJsRealtimeEventKind};
 #[path = "browser_js_redirects.rs"]
 mod redirect_host;
+#[path = "browser_js_request.rs"]
+mod request_host;
 #[path = "browser_js_script_budget.rs"]
 mod script_budget;
 #[path = "browser_js_selection/mod.rs"]
@@ -5300,6 +5302,9 @@ struct FetchRequest {
     headers: Vec<(String, String)>,
     body: Option<String>,
     aborted: bool,
+    credentials: String,
+    mode: String,
+    initiator_url: String,
 }
 
 fn install_fetch_binding(
@@ -5311,8 +5316,8 @@ fn install_fetch_binding(
     window.insert(
         "fetch".into(),
         native("fetch", None, move |args| {
-            let mut request = request_from_fetch_args(args);
-            resolve_request_url(&mut request, &location);
+            let mut request = request_host::from_fetch_args(args);
+            request_host::resolve(&mut request, &location);
             if request.aborted {
                 return Ok(make_rejected_fetch_promise("AbortError", timers.clone()));
             }
@@ -5377,16 +5382,6 @@ fn install_fetch_binding(
     );
 }
 
-fn resolve_request_url(
-    request: &mut FetchRequest,
-    location: &Rc<RefCell<HashMap<String, JsValue>>>,
-) {
-    let initiator = location_href(location);
-    network_cookie_host::set_document_url(&initiator);
-    request.url = resolve_url(&request.url, Some(&initiator));
-    network_cookie_host::append_request_header(&mut request.headers, &request.url, &initiator);
-}
-
 fn promise_obj_clone(value: &JsValue) -> HashMap<String, JsValue> {
     let mut next = HashMap::new();
     next.insert(
@@ -5432,68 +5427,6 @@ fn install_then_catch_simple(obj: &mut HashMap<String, JsValue>, fulfilled_value
             )))))
         }),
     );
-}
-
-fn request_from_fetch_args(args: &[JsValue]) -> FetchRequest {
-    let input = args.first().unwrap_or(&JsValue::Undefined);
-    let init = args.get(1).unwrap_or(&JsValue::Undefined);
-    let mut request = request_from_value(input);
-    apply_request_init(&mut request, init);
-    request
-}
-
-fn request_from_value(value: &JsValue) -> FetchRequest {
-    match value {
-        JsValue::Object(obj) => {
-            let obj = obj.borrow();
-            let url = obj
-                .get("url")
-                .or_else(|| obj.get("href"))
-                .map(JsValue::display)
-                .unwrap_or_else(|| value.display());
-            FetchRequest {
-                url,
-                method: obj
-                    .get("method")
-                    .map(JsValue::display)
-                    .unwrap_or_else(|| "GET".into())
-                    .to_ascii_uppercase(),
-                headers: obj
-                    .get("headers")
-                    .map(headers_from_value)
-                    .or_else(|| obj.get("__requestHeaders").map(headers_from_value))
-                    .unwrap_or_default(),
-                body: obj.get("body").and_then(request_body_from_value),
-                aborted: obj.get("signal").is_some_and(signal_aborted),
-            }
-        }
-        _ => FetchRequest {
-            url: value.display(),
-            method: "GET".into(),
-            headers: Vec::new(),
-            body: None,
-            aborted: false,
-        },
-    }
-}
-
-fn apply_request_init(request: &mut FetchRequest, init: &JsValue) {
-    let JsValue::Object(obj) = init else {
-        return;
-    };
-    let obj = obj.borrow();
-    if let Some(method) = obj.get("method") {
-        request.method = method.display().to_ascii_uppercase();
-    }
-    if let Some(headers) = obj.get("headers") {
-        request.headers = headers_from_value(headers);
-    }
-    if let Some(body) = obj.get("body") {
-        request.body = Some(body.display());
-    }
-    if let Some(signal) = obj.get("signal") {
-        request.aborted = signal_aborted(signal);
-    }
 }
 
 fn signal_aborted(value: &JsValue) -> bool {
@@ -5993,7 +5926,7 @@ fn install_xml_http_request(
                     let routes_for_task = send_routes.clone();
                     let location_for_task = send_location.clone();
                     let callback = native("XMLHttpRequest.complete", Some(0), move |_| {
-                        let request = xhr_request(
+                        let request = request_host::from_xhr(
                             &xhr_for_task,
                             body.clone(),
                             &location_href(&location_for_task),
@@ -6098,30 +6031,6 @@ fn install_xml_http_request(
             Ok(JsValue::Object(xhr))
         }),
     );
-}
-
-fn xhr_request(
-    xhr: &Rc<RefCell<HashMap<String, JsValue>>>,
-    body: Option<String>,
-    initiator_url: &str,
-) -> FetchRequest {
-    let xhr = xhr.borrow();
-    let mut request = FetchRequest {
-        url: xhr.get("__url").map(JsValue::display).unwrap_or_default(),
-        method: xhr
-            .get("__method")
-            .map(JsValue::display)
-            .unwrap_or_else(|| "GET".into()),
-        headers: xhr
-            .get("__requestHeaders")
-            .map(headers_from_value)
-            .unwrap_or_default(),
-        body,
-        aborted: false,
-    };
-    network_cookie_host::set_document_url(initiator_url);
-    network_cookie_host::append_request_header(&mut request.headers, &request.url, initiator_url);
-    request
 }
 
 fn xhr_status(xhr: &Rc<RefCell<HashMap<String, JsValue>>>) -> i64 {
@@ -7397,7 +7306,7 @@ fn install_web_api_bindings(window: &mut HashMap<String, JsValue>) {
     window.insert(
         "Request".into(),
         native("Request", None, move |args| {
-            Ok(request_object(&request_from_fetch_args(args)))
+            Ok(request_object(&request_host::from_fetch_args(args)))
         }),
     );
     window.insert("Response".into(), response_constructor());
@@ -7650,6 +7559,11 @@ fn request_object(request: &FetchRequest) -> JsValue {
         let mut obj = object.borrow_mut();
         obj.insert("url".into(), JsValue::String(request.url.clone()));
         obj.insert("method".into(), JsValue::String(request.method.clone()));
+        obj.insert("mode".into(), JsValue::String(request.mode.clone()));
+        obj.insert(
+            "credentials".into(),
+            JsValue::String(request.credentials.clone()),
+        );
         obj.insert("headers".into(), headers.clone());
         obj.insert("bodyUsed".into(), JsValue::Bool(false));
         obj.insert(
@@ -7724,7 +7638,7 @@ fn request_object(request: &FetchRequest) -> JsValue {
     object.borrow_mut().insert(
         "clone".into(),
         native("Request.clone", Some(0), move |_| {
-            Ok(request_object(&request_from_object_fields(
+            Ok(request_object(&request_host::from_object_fields(
                 &clone_object.borrow(),
             )))
         }),
@@ -7736,23 +7650,6 @@ fn mark_request_body_used(object: &Rc<RefCell<HashMap<String, JsValue>>>) {
     object
         .borrow_mut()
         .insert("bodyUsed".into(), JsValue::Bool(true));
-}
-
-fn request_from_object_fields(obj: &HashMap<String, JsValue>) -> FetchRequest {
-    FetchRequest {
-        url: obj.get("url").map(JsValue::display).unwrap_or_default(),
-        method: obj
-            .get("method")
-            .map(JsValue::display)
-            .unwrap_or_else(|| "GET".into())
-            .to_ascii_uppercase(),
-        headers: obj
-            .get("headers")
-            .map(headers_from_value)
-            .unwrap_or_default(),
-        body: obj.get("body").and_then(request_body_from_value),
-        aborted: obj.get("signal").is_some_and(signal_aborted),
-    }
 }
 
 fn request_body_from_value(value: &JsValue) -> Option<String> {

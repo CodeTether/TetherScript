@@ -123,6 +123,9 @@ and Enter on an input submits its containing form.
 
 Network:
 `network_log`, `network_har`, `failed_requests`, `request`, `response`, `replay_request`, `wait_for_request`, `wait_for_response`.
+Native fetch/XHR networking follows redirects, emits CORS preflights, validates
+`Access-Control-Allow-*` headers, and models credential modes for cross-origin
+cookies.
 
 Storage:
 `cookies`, `local_storage`, `session_storage`, `indexed_db_summary`, `set_cookie`, `set_local_storage`, `clear_storage`.

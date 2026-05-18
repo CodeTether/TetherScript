@@ -49,6 +49,13 @@ Redirecting network flows must follow normal browser request semantics. Native
 relative `Location` headers against the current hop, refresh cookies on each
 hop, expose the final response URL, and preserve each hop in HAR output.
 
+Cross-origin network flows must enforce browser CORS behavior after the host
+capability policy permits the target origin. Native `fetch` and XHR add
+`Origin`, run preflight `OPTIONS` requests for non-simple methods or headers,
+validate `Access-Control-Allow-*` response headers, suppress cross-origin
+cookies by default, and send credentialed cookies only for `credentials:
+"include"` or `withCredentials = true`.
+
 ## Readiness Suite
 
 Run the deterministic and bridge-contract browser tests with:
@@ -61,6 +68,7 @@ cargo test --test agent_browser_cli --test agent_browser_page \
   --test agent_browser_bundle_exports --test agent_browser_dynamic_import \
   --test agent_browser_native_contract \
   --test agent_browser_auth_cookies \
+  --test agent_browser_cors_credentials \
   --test agent_browser_network_redirects \
   --test browser_js_promise_await --test browser_js_xhr_parity
 ```
