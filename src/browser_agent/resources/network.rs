@@ -6,6 +6,8 @@ mod fetch;
 mod headers;
 #[path = "network_kind.rs"]
 mod kind;
+#[path = "network_modules.rs"]
+mod modules;
 #[path = "network_request.rs"]
 mod request;
 #[path = "network_request_build.rs"]
@@ -30,6 +32,7 @@ pub(crate) fn load_missing(
     for reference in refs {
         load_one(page, &reference)?;
     }
+    modules::load_missing(page)?;
     source_maps::load_missing(page)
 }
 

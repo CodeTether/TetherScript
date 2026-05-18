@@ -173,15 +173,18 @@ production bundles before executing app code or taking screenshots.
 When `BrowserPage::run_scripts()` is called, registered `<script src="...">`
 resources, including `type="module"` entries, are inlined at their original
 script element and executed by the in-tree JavaScript runtime in document order.
-Static module imports are resolved from the registered resource set and executed
-before the importing module. Relative imports can match registered page paths or
-fully resolved URLs. Default imports, named import aliases, `export default`,
+Static module imports are fetched through the route-visible page-resource path
+when missing from the registry and executed before the importing module.
+Passive `modulepreload` fetches are deduplicated with later imports. Relative
+imports can match registered page paths or fully resolved URLs. Default imports,
+named import aliases, `export default`,
 and bundle-style `export { local as Name }` lists are rewritten into runtime
 bindings for the existing JavaScript engine. Literal dynamic imports such as
 `import("./chunk.js")` are resolved through the same registry and rewritten to a
-fulfilled namespace promise. Common arrow functions in module resources are
-rewritten to function expressions before evaluation. Passive preload links are
-validated but do not execute by themselves.
+fulfilled namespace promise; missing dynamic chunks return a rejected promise
+with a browser-shaped `TypeError`. Common arrow functions in module resources
+are rewritten to function expressions before evaluation. Passive preload links
+are validated but do not execute by themselves.
 
 ## Page snapshot schema target
 

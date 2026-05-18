@@ -69,6 +69,12 @@ JavaScript `location` changes, anchor default actions, and GET/POST form
 submits follow redirects, apply response cookies, preserve POST bodies across
 `307`/`308`, commit the final URL into page history, and appear in HAR output.
 
+Module loading must also stay route-visible. Static imports discovered from
+module scripts are fetched through the native page-resource route path, passive
+`modulepreload` fetches are deduplicated with later imports, nested static
+dependencies evaluate before importers, and missing literal dynamic import
+chunks reject with a browser-shaped `TypeError`.
+
 ## Readiness Suite
 
 Run the deterministic and bridge-contract browser tests with:
