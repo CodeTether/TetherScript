@@ -43,6 +43,8 @@ mod http_status_host;
 mod inline_preflight;
 #[path = "browser_js_lifecycle.rs"]
 mod lifecycle_host;
+#[path = "browser_js_dom/live_collection.rs"]
+mod live_collection_host;
 #[path = "browser_js_dom/live_form.rs"]
 mod live_form_host;
 #[path = "browser_js_media/mod.rs"]
@@ -4659,79 +4661,10 @@ fn node_name(node: &Node) -> String {
 }
 
 fn children_collection(handle: &DomHandle, node: &Node, kind: &'static str) -> JsValue {
-    let len = match node {
-        Node::Element(el) => el.children.len(),
-        Node::Text(_) => 0,
-    };
-    let handles = (0..len)
-        .map(|index| {
-            let mut path = handle.path.clone();
-            path.push(index);
-            DomHandle {
-                root: handle.root.clone(),
-                path,
-            }
-        })
-        .collect();
-    lazy_dom_collection(kind, handles)
-}
-
-fn lazy_dom_collection(kind: &'static str, handles: Vec<DomHandle>) -> JsValue {
-    let mut obj = HashMap::new();
-    obj.insert("length".into(), JsValue::Number(handles.len() as f64));
-    for (index, handle) in handles.iter().cloned().enumerate() {
-        obj.insert(
-            format!("__get:{index}"),
-            native(&format!("{kind}.{index}"), Some(0), move |_| {
-                Ok(node_object(handle.clone()))
-            }),
-        );
+    if matches!(node, Node::Text(_)) {
+        return dom_collection(kind, Vec::new());
     }
-    let object = Rc::new(RefCell::new(obj));
-    let collection = JsValue::Object(object.clone());
-    let item_handles = handles.clone();
-    object.borrow_mut().insert(
-        "item".into(),
-        native(&format!("{kind}.item"), Some(1), move |args| {
-            Ok(item_handles
-                .get(collection_index(args.first()))
-                .cloned()
-                .map(node_object)
-                .unwrap_or(JsValue::Null))
-        }),
-    );
-    let weak = Rc::downgrade(&object);
-    let each_handles = handles.clone();
-    object.borrow_mut().insert(
-        "forEach".into(),
-        native(&format!("{kind}.forEach"), None, move |args| {
-            let callback = args
-                .first()
-                .cloned()
-                .ok_or_else(|| format!("{kind}.forEach: expected callback"))?;
-            let this_arg = args.get(1).cloned().unwrap_or(JsValue::Undefined);
-            let collection = weak
-                .upgrade()
-                .map(JsValue::Object)
-                .unwrap_or(JsValue::Undefined);
-            for (index, handle) in each_handles.iter().cloned().enumerate() {
-                js::call_function_with_this(
-                    callback.clone(),
-                    this_arg.clone(),
-                    &[
-                        node_object(handle),
-                        JsValue::Number(index as f64),
-                        collection.clone(),
-                    ],
-                )?;
-            }
-            Ok(JsValue::Undefined)
-        }),
-    );
-    if kind == "HTMLCollection" {
-        install_lazy_html_collection_named_items(&object, &handles, kind);
-    }
-    collection
+    live_collection_host::children(handle, kind)
 }
 
 fn dom_collection(kind: &'static str, values: Vec<JsValue>) -> JsValue {
@@ -4780,44 +4713,6 @@ fn dom_collection(kind: &'static str, values: Vec<JsValue>) -> JsValue {
         install_html_collection_named_items(&object, &values, kind);
     }
     collection
-}
-
-fn install_lazy_html_collection_named_items(
-    object: &Rc<RefCell<HashMap<String, JsValue>>>,
-    handles: &[DomHandle],
-    kind: &'static str,
-) {
-    let named_handles = handles.to_vec();
-    object.borrow_mut().insert(
-        "namedItem".into(),
-        native(&format!("{kind}.namedItem"), Some(1), move |args| {
-            let name = args.first().unwrap_or(&JsValue::Undefined).display();
-            Ok(named_handles
-                .iter()
-                .find(|handle| html_collection_handle_name_matches(handle, &name))
-                .cloned()
-                .map(node_object)
-                .unwrap_or(JsValue::Null))
-        }),
-    );
-}
-
-fn html_collection_handle_name_matches(handle: &DomHandle, name: &str) -> bool {
-    html_collection_names_from_handle(handle)
-        .iter()
-        .any(|item| item == name)
-}
-
-fn html_collection_names_from_handle(handle: &DomHandle) -> Vec<String> {
-    let Some(Node::Element(el)) = handle.node() else {
-        return Vec::new();
-    };
-    ["id", "name"]
-        .iter()
-        .filter_map(|attr| el.attrs.get(*attr))
-        .filter(|name| !name.is_empty())
-        .cloned()
-        .collect()
 }
 
 fn install_html_collection_named_items(

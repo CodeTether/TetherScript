@@ -23,6 +23,9 @@ All notable changes to this project will be documented in this file.
 - Added shadow-boundary composed event-path coverage so events dispatched inside
   open shadow roots bubble through their host chain with browser-shaped
   `composedPath()` evidence.
+- Added live `children` and `childNodes` collections so indexed access,
+  `length`, `item()`, and `forEach()` reflect DOM mutations after the
+  collection object is created.
 - Added a browser parity checklist that grounds follow-up work in current
   contract tests, known gaps, and explicit readiness tests.
 - Added native fetch/XHR redirect following for `301`, `302`, `303`, `307`,
