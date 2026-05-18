@@ -17,6 +17,9 @@ All notable changes to this project will be documented in this file.
 - Added route-backed module-loader coverage for static imports, nested module
   dependency order, modulepreload deduplication, and browser-shaped rejected
   promises for missing dynamic import chunks.
+- Added production-debug diagnostics for unhandled promise rejections,
+  async/module source-mapped stack evidence, and separate CORS versus route
+  abort exception classification.
 - Added a browser parity checklist that grounds follow-up work in current
   contract tests, known gaps, and explicit readiness tests.
 - Added native fetch/XHR redirect following for `301`, `302`, `303`, `307`,

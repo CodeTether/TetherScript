@@ -3,6 +3,9 @@
 use super::exception_kind::RuntimeExceptionKind;
 
 pub fn kind(message: &str) -> RuntimeExceptionKind {
+    let message = message
+        .strip_prefix("UnhandledPromiseRejection: ")
+        .unwrap_or(message);
     let lower = message.to_ascii_lowercase();
     if message.starts_with("ReferenceError:") {
         RuntimeExceptionKind::Reference
@@ -12,6 +15,10 @@ pub fn kind(message: &str) -> RuntimeExceptionKind {
         RuntimeExceptionKind::Syntax
     } else if permission(&lower) {
         RuntimeExceptionKind::Permission
+    } else if cors(&lower) {
+        RuntimeExceptionKind::Cors
+    } else if abort(&lower) {
+        RuntimeExceptionKind::Abort
     } else if network(&lower) {
         RuntimeExceptionKind::Network
     } else {
@@ -34,8 +41,13 @@ fn permission(lower: &str) -> bool {
 }
 
 fn network(lower: &str) -> bool {
-    lower.contains("aborterror")
-        || lower.contains("cors blocked")
-        || lower.contains("network")
-        || lower.contains("offline")
+    lower.contains("network") || lower.contains("offline")
+}
+
+fn cors(lower: &str) -> bool {
+    lower.contains("cors blocked")
+}
+
+fn abort(lower: &str) -> bool {
+    lower.contains("aborterror") || lower.contains(" aborted")
 }

@@ -103,6 +103,44 @@ fn report_classifies_runtime_exceptions_for_agent_triage() {
 }
 
 #[test]
+fn report_records_unhandled_promise_rejections() {
+    let mut page = BrowserPage::from_html("https://app.test/index.html", "<main></main>");
+
+    page.eval_js("Promise.reject(TypeError('chunk failed'))")
+        .unwrap();
+
+    let report = page.production_debug_report();
+    assert!(report.page_errors.iter().any(|event| {
+        event.action == "window.unhandledrejection"
+            && event.message.contains("TypeError: chunk failed")
+    }));
+    assert!(report
+        .runtime_exceptions
+        .iter()
+        .any(|item| item.kind == RuntimeExceptionKind::Type));
+}
+
+#[test]
+fn report_classifies_cors_separately_from_route_abort() {
+    let mut page = BrowserPage::from_html("https://app.test/index.html", "<main></main>");
+    page.eval_js("fetch('https://api.test/data')").unwrap();
+    page.route(
+        RouteRule::new(RoutePattern::substring("/offline")),
+        RouteAction::abort("offline"),
+    );
+    page.eval_js("fetch('/offline')").unwrap();
+
+    let report = page.production_debug_report();
+    let kinds = report
+        .runtime_exceptions
+        .iter()
+        .map(|item| item.kind)
+        .collect::<Vec<_>>();
+    assert!(kinds.contains(&RuntimeExceptionKind::Cors));
+    assert!(kinds.contains(&RuntimeExceptionKind::Abort));
+}
+
+#[test]
 fn report_accepts_registered_source_maps() {
     let html = "<div id='root'></div><script src='/assets/app.js'></script>";
     let mut page = BrowserPage::from_html("https://app.test/index.html", html);
@@ -138,6 +176,65 @@ fn report_remaps_runtime_errors_with_registered_source_maps() {
     let original = mapped.original.as_ref().unwrap();
     assert_eq!(original.source_url, "src/App.tsx");
     assert_eq!((original.line, original.column), (10, 5));
+}
+
+#[test]
+fn report_maps_async_await_stack_to_generated_script_url() {
+    let html = "<script src='/assets/app.js'></script>";
+    let mut page = BrowserPage::from_html("https://app.test/index.html", html);
+    page.register_script_resource(
+        "/assets/app.js",
+        "async function load(){ await Promise.resolve(1); missing_call(); } load();\n\
+         //# sourceMappingURL=app.js.map",
+    );
+    page.register_source_map_resource(
+        "/assets/app.js.map",
+        r#"{"version":3,"sources":["src/App.tsx"],"mappings":"AAAA","names":[]}"#,
+    );
+
+    page.run_scripts().unwrap_err();
+
+    let report = page.production_debug_report();
+    let mapped = &report.mapped_page_errors[0];
+    assert_eq!(mapped.generated.script_url, "/assets/app.js");
+    assert!(mapped.stack.iter().any(|frame| {
+        frame.function_name.as_deref() == Some("load")
+            && frame.generated.script_url == "/assets/app.js"
+            && frame
+                .original
+                .as_ref()
+                .is_some_and(|loc| loc.source_url == "src/App.tsx")
+    }));
+}
+
+#[test]
+fn report_maps_module_stack_frames_with_registered_source_maps() {
+    let html = "<script type='module' src='/assets/app.js'></script>";
+    let mut page = BrowserPage::from_html("https://app.test/index.html", html);
+    page.register_script_resource("/assets/app.js", "import './chunk.js';");
+    page.register_script_resource(
+        "/assets/chunk.js",
+        "function renderChunk(){ missing_call(); } renderChunk();\n\
+         //# sourceMappingURL=chunk.js.map",
+    );
+    page.register_source_map_resource(
+        "/assets/chunk.js.map",
+        r#"{"version":3,"sources":["src/chunk.ts"],"mappings":"AAAA","names":[]}"#,
+    );
+
+    page.run_scripts().unwrap_err();
+
+    let report = page.production_debug_report();
+    let mapped = &report.mapped_page_errors[0];
+    assert_eq!(mapped.generated.script_url, "/assets/chunk.js");
+    assert!(mapped.stack.iter().any(|frame| {
+        frame.function_name.as_deref() == Some("renderChunk")
+            && frame.generated.script_url == "/assets/chunk.js"
+            && frame
+                .original
+                .as_ref()
+                .is_some_and(|loc| loc.source_url == "src/chunk.ts")
+    }));
 }
 
 #[test]

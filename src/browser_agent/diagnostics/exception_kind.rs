@@ -20,6 +20,10 @@ pub enum RuntimeExceptionKind {
     Syntax,
     /// Failed request, blocked request, or network abort.
     Network,
+    /// Cross-origin browser security policy blocked a request.
+    Cors,
+    /// Route table or abort signal cancelled a request.
+    Abort,
     /// Browser permission denial.
     Permission,
     /// Failure that does not fit a known category yet.

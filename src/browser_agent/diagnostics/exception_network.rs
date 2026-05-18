@@ -13,7 +13,7 @@ pub fn collect(page: &BrowserPage) -> Vec<RuntimeException> {
         .map(|event| RuntimeException {
             action: "network".into(),
             message: message(event),
-            kind: RuntimeExceptionKind::Network,
+            kind: kind(event),
         })
         .collect()
 }
@@ -34,5 +34,13 @@ fn message(event: &NetworkEvent) -> String {
         (Some(status), None) => format!("{} {} {}", event.method, event.url, status),
         (None, Some(route)) => format!("{} {} {}", event.method, event.url, route),
         (None, None) => format!("{} {}", event.method, event.url),
+    }
+}
+
+fn kind(event: &NetworkEvent) -> RuntimeExceptionKind {
+    match event.route_result.as_deref() {
+        Some("blocked") => RuntimeExceptionKind::Cors,
+        Some("abort") => RuntimeExceptionKind::Abort,
+        _ => RuntimeExceptionKind::Network,
     }
 }
