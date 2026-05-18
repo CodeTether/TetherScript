@@ -64,6 +64,11 @@ stylesheet, image, and source-map resources can be fulfilled by routes, follow
 redirects, apply same-origin cookies, enforce CORS for allowed cross-origin
 resources, and appear in HAR output.
 
+Top-level document navigation must use the native route-visible network path.
+JavaScript `location` changes, anchor default actions, and GET/POST form
+submits follow redirects, apply response cookies, preserve POST bodies across
+`307`/`308`, commit the final URL into page history, and appear in HAR output.
+
 ## Readiness Suite
 
 Run the deterministic and bridge-contract browser tests with:
@@ -78,6 +83,7 @@ cargo test --test agent_browser_cli --test agent_browser_page \
   --test agent_browser_auth_cookies \
   --test agent_browser_cors_credentials \
   --test agent_browser_network_redirects \
+  --test agent_browser_navigation_network \
   --test agent_browser_resource_network \
   --test browser_js_promise_await --test browser_js_xhr_parity
 ```

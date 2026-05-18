@@ -1,37 +1,34 @@
 //! Page navigation lifecycle helpers.
 
-#[path = "navigation/commit_api.rs"]
 mod commit_api;
-#[path = "navigation/entry.rs"]
+mod commit_network;
 mod entry;
-#[path = "navigation/history_api.rs"]
 mod history_api;
-#[path = "navigation/history_list.rs"]
 mod history_list;
-#[path = "navigation/lifecycle.rs"]
 mod lifecycle;
-#[path = "navigation/lifecycle_hash.rs"]
 mod lifecycle_hash;
-#[path = "navigation/lifecycle_js.rs"]
 mod lifecycle_js;
-#[path = "navigation/lifecycle_log.rs"]
 mod lifecycle_log;
-#[path = "navigation/load_api.rs"]
 mod load_api;
-#[path = "navigation/load_methods.rs"]
 mod load_methods;
-#[path = "navigation/result.rs"]
+mod network_event;
+mod network_fetch;
+mod network_headers;
+mod network_redirect;
+mod network_request;
+mod network_request_build;
+mod request;
 mod result;
-#[path = "navigation/state_api.rs"]
+mod script_url;
 mod state_api;
-#[path = "navigation/store.rs"]
 mod store;
-#[path = "navigation/stored.rs"]
 mod stored;
-#[path = "navigation/url_kind.rs"]
+mod url;
 mod url_kind;
 
 pub(crate) use commit_api::commit_document;
 pub use entry::PageHistoryEntry;
+pub(crate) use request::DocumentRequest;
 pub use result::{NavigationKind, NavigationResult, NavigationStatus};
+pub(crate) use script_url::commit_if_changed as commit_script_url;
 pub(crate) use store::PageHistory;

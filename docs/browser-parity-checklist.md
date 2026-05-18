@@ -24,6 +24,7 @@ preferred agent browser. Do not answer "what next" from memory; use this file,
 | Fetch/XHR redirects | `tests/agent_browser_network_redirects.rs` |
 | Fetch/XHR CORS credentials | `tests/agent_browser_cors_credentials.rs` |
 | Routed page subresources | `tests/agent_browser_resource_network.rs` |
+| Routed document navigation | `tests/agent_browser_navigation_network.rs` |
 | Browser capability contract | `tests/browser_cap_contract.rs`, `tests/browser_cap_live.rs` |
 
 ## Blocking Checklist
@@ -49,10 +50,12 @@ Completed tests:
 
 ### P1: Navigation Uses Browser Network Semantics
 
-Top-level navigation and default actions need the same redirect, cookie, CORS,
-history, and lifecycle behavior as fetch/XHR where the platform requires it.
+Status: complete for JavaScript `location` changes, anchor clicks, GET/POST
+form submissions, redirects, response cookies, POST body preservation across
+`307`/`308`, final-URL history commits, lifecycle events, route logs, and HAR
+navigation entries.
 
-Required tests:
+Completed tests:
 
 - `location.href` follows a routed redirect and commits the final URL;
 - anchor click records unload/load lifecycle and HAR navigation entries;
@@ -120,5 +123,7 @@ Required tests:
 
 ## Immediate Next Item
 
-Implement P1: route top-level navigation and default navigation actions through
-native browser network semantics, then add the four P1 tests above.
+Implement P2: expand module loader semantics so static imports fetch through the
+shared route-visible network path, `modulepreload` is requested and deduplicated,
+missing dynamic chunks reject with a browser-shaped error, and nested module
+evaluation order is contract-tested.

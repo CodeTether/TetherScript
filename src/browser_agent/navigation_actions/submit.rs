@@ -42,12 +42,12 @@ impl BrowserPage {
             node(&resolved.dom.path)
         ))?;
         if result != JsValue::Bool(false) {
-            if let Some(url) = super::form::form_target(
+            if let Some(request) = super::form::form_target(
                 &self.session.document,
                 &resolved.dom.path,
                 &self.session.url,
             ) {
-                super::commit::document(self, url, "request_submit");
+                super::commit::document(self, request, "request_submit")?;
             }
         }
         Ok(ActionReport::new(
