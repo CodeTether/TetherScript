@@ -26,6 +26,9 @@ All notable changes to this project will be documented in this file.
 - Added live `children` and `childNodes` collections so indexed access,
   `length`, `item()`, and `forEach()` reflect DOM mutations after the
   collection object is created.
+- Added live document-wide HTMLCollections for `getElementsByTagName`,
+  `getElementsByClassName`, `getElementsByName`, and named document collections
+  such as `document.forms`, including dynamic named property lookup.
 - Added a browser parity checklist that grounds follow-up work in current
   contract tests, known gaps, and explicit readiness tests.
 - Added native fetch/XHR redirect following for `301`, `302`, `303`, `307`,

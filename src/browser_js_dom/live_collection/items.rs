@@ -4,28 +4,28 @@ use super::*;
 
 pub(super) fn install(
     object: &Rc<RefCell<HashMap<String, JsValue>>>,
-    parent: DomHandle,
+    source: Source,
     kind: &'static str,
 ) {
-    let item_parent = parent.clone();
+    let item_source = source.clone();
     object.borrow_mut().insert(
         "item".into(),
         native(&format!("{kind}.item"), Some(1), move |args| {
-            Ok(super::at(&item_parent, collection_index(args.first())))
+            Ok(super::at(&item_source, collection_index(args.first())))
         }),
     );
     let weak = Rc::downgrade(object);
     object.borrow_mut().insert(
         "forEach".into(),
         native(&format!("{kind}.forEach"), None, move |args| {
-            iterate(args, &parent, &weak)
+            iterate(args, &source, &weak)
         }),
     );
 }
 
 fn iterate(
     args: &[JsValue],
-    parent: &DomHandle,
+    source: &Source,
     weak: &Weak<RefCell<HashMap<String, JsValue>>>,
 ) -> Result<JsValue, String> {
     let callback = args
@@ -37,7 +37,7 @@ fn iterate(
         .upgrade()
         .map(JsValue::Object)
         .unwrap_or(JsValue::Undefined);
-    for (index, handle) in super::handles(parent).into_iter().enumerate() {
+    for (index, handle) in super::handles(source).into_iter().enumerate() {
         js::call_function_with_this(
             callback.clone(),
             this_arg.clone(),

@@ -12,6 +12,8 @@ mod implementation;
 mod import;
 #[path = "document/legacy.rs"]
 mod legacy;
+#[path = "document/live_query.rs"]
+mod live_query;
 #[path = "document/lookup.rs"]
 mod lookup;
 #[path = "document/metadata.rs"]

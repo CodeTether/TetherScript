@@ -97,19 +97,21 @@ Status: in progress. Composed events dispatched inside an open shadow root now
 bubble through the host chain and expose a composed path that includes the
 shadow target, shadow root, host, and document. Element `children` and
 `childNodes` collections now update after mutation for `length`, indexed access,
-`item()`, and `forEach()`.
+`item()`, and `forEach()`. Document-wide `getElementsBy*` queries and named
+HTMLCollections such as `document.forms` now update after DOM and attribute
+mutation, including dynamic named property lookup.
 
 Required tests:
 
 - capture, bubble, `stopPropagation`, and `preventDefault` ordering;
-- document-wide live `getElementsBy*` and named HTMLCollections update after
-  mutation;
 - default actions for labels, buttons, forms, and anchors stay coherent.
 
 Completed tests:
 
 - composed path across shadow DOM and nested targets.
 - element `children` and `childNodes` update after mutation.
+- document-wide live `getElementsBy*` and named HTMLCollections update after
+  mutation.
 
 ### P5: CSS/Layout/Rendering Inspection
 
@@ -138,5 +140,4 @@ Required tests:
 ## Immediate Next Item
 
 Implement P4: close DOM and event parity gaps that production frameworks rely
-on, continuing with document-wide live collections and default actions for
-labels, buttons, forms, and anchors.
+on, continuing with default actions for labels, buttons, forms, and anchors.

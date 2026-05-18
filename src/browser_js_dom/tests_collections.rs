@@ -3,6 +3,8 @@ use crate::js::JsValue;
 
 #[path = "tests_html_collection_named.rs"]
 mod tests_html_collection_named;
+#[path = "tests_live_document_collections.rs"]
+mod tests_live_document_collections;
 
 fn eval(html: &str, script: &str) -> JsValue {
     eval_with_dom(html, script).unwrap().value
