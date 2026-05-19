@@ -40,3 +40,23 @@ fn storage_fixture_subset() {
 fn html_tree_fixture_subset() {
     fixtures::html_tree::run();
 }
+
+#[test]
+fn selectors_error_fixture_subset() {
+    fixtures::selectors_errors::run();
+}
+
+#[test]
+fn fetch_cors_error_fixture_subset() {
+    fixtures::fetch_cors_errors::run();
+}
+
+#[test]
+fn modules_error_fixture_subset() {
+    fixtures::modules_errors::run();
+}
+
+#[test]
+fn html_tree_unsupported_fixture_subset() {
+    fixtures::html_tree_unsupported::run();
+}

@@ -148,8 +148,8 @@ Status: complete for an initial executable fixture harness. The targeted suite
 now lives in `tests/browser_wpt_like/` and runs with
 `cargo test --test browser_wpt_like` in CI. It covers DOM events, Selectors API,
 Fetch/CORS, module scripts, CSS/layout, timers/microtasks, Web Storage, and
-HTML tree construction with WPT-area metadata and unsupported behavior notes in
-`docs/browser-wpt-fixtures.md`.
+HTML tree construction, including negative/error cases, with WPT-area metadata
+and unsupported behavior notes in `docs/browser-wpt-fixtures.md`.
 
 Completed tests:
 
@@ -161,8 +161,12 @@ Completed tests:
 - Timers/microtasks deterministic drain ordering.
 - Web Storage set/get/remove/clear length and key behavior.
 - HTML tree construction for element order and entity text.
+- Invalid selector behavior is locked as an unsupported no-match gap.
+- Blocked CORS responses reject with missing-header diagnostics.
+- Missing static module imports report the resolved chunk URL.
+- HTML parser gaps include missing implicit `tbody` insertion.
 
 ## Immediate Next Item
 
-Add WPT-like negative/error fixtures for invalid selectors, blocked CORS
-responses, missing module chunks, and unsupported HTML parser cases.
+Add WPT-like fixtures for form controls/default actions, navigation/history,
+and cookie/storage context isolation.
