@@ -29,6 +29,9 @@ The runner lives under `tests/browser_wpt_like/`. Each fixture records:
 | Forms/default actions | `tests/browser_wpt_like/forms.rs` | constraint validation, form-associated custom elements |
 | Navigation/history | `tests/browser_wpt_like/navigation_history.rs` | full session history traversal algorithm |
 | Context storage/cookies | `tests/browser_wpt_like/storage_context.rs` | quota, storage partitioning by top-level site |
+| Keyboard/pointer interaction | `tests/browser_wpt_like/keyboard_pointer.rs` | IME composition, complete PointerEvent coordinate model |
+| Focus navigation | `tests/browser_wpt_like/focus.rs` | shadow-root focus delegation, platform-specific tab stops |
+| File upload/download | `tests/browser_wpt_like/file_transfer.rs` | real filesystem file picker, streamed download bodies |
 
 ## Current Negative/Error Fixtures
 

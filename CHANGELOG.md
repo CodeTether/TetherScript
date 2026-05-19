@@ -27,6 +27,9 @@ All notable changes to this project will be documented in this file.
 - Added WPT-like browser fixtures for form reset/requestSubmit defaults,
   same-document navigation history, and browser-context cookie/storage
   isolation.
+- Added WPT-like browser fixtures for keyboard text insertion, pointer hover
+  event ordering, focus-order Tab traversal, file input metadata, and anchor
+  download recording.
 
 - Added routed external page-resource loading so missing scripts, module entry
   scripts, stylesheets, images, and source maps can be fulfilled through the

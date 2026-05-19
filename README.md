@@ -69,8 +69,9 @@ tetherscript currently includes:
   updates, browser-shaped `form.submit()` versus `requestSubmit()` behavior,
   and submitter-specific `requestSubmit(submitter)` form data.
 - WPT-like browser fixtures now cover DOM events, Selectors API, Fetch/CORS,
-  module scripts, CSS/layout, timers/microtasks, Web Storage, and HTML tree
-  construction, form defaults, navigation history, and context storage/cookies,
+  module scripts, CSS/layout, timers/microtasks, Web Storage, HTML tree
+  construction, form defaults, navigation history, context storage/cookies,
+  keyboard/pointer interaction, focus order, and file upload/download behavior,
   including negative/error cases, through `cargo test --test browser_wpt_like`.
 - SMTP sending support.
 - Standard tools for filesystem, process, environment, path, time, Base64,
