@@ -32,6 +32,9 @@ The runner lives under `tests/browser_wpt_like/`. Each fixture records:
 | Keyboard/pointer interaction | `tests/browser_wpt_like/keyboard_pointer.rs` | IME composition, complete PointerEvent coordinate model |
 | Focus navigation | `tests/browser_wpt_like/focus.rs` | shadow-root focus delegation, platform-specific tab stops |
 | File upload/download | `tests/browser_wpt_like/file_transfer.rs` | real filesystem file picker, streamed download bodies |
+| Realtime channels | `tests/browser_wpt_like/realtime.rs` | real socket transport, binary frames and EventSource reconnection timing |
+| Permissions/media APIs | `tests/browser_wpt_like/permissions_media.rs` | real device capture, constraint solving and live MediaStream tracks |
+| Dialogs/clipboard | `tests/browser_wpt_like/dialog_clipboard.rs` | modal event-loop blocking, system clipboard and user activation gating |
 
 ## Current Negative/Error Fixtures
 

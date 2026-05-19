@@ -1,6 +1,7 @@
 mod case;
 
 pub mod css_layout;
+pub mod dialog_clipboard;
 pub mod dom_events;
 pub mod fetch_cors;
 pub mod fetch_cors_errors;
@@ -13,6 +14,8 @@ pub mod keyboard_pointer;
 pub mod modules;
 pub mod modules_errors;
 pub mod navigation_history;
+pub mod permissions_media;
+pub mod realtime;
 pub mod selectors;
 pub mod selectors_errors;
 pub mod storage;
