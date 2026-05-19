@@ -46,9 +46,11 @@ cargo test --test browser_wpt_like
 
 The first fixture families cover DOM events, Selectors API, Fetch/CORS, module
 scripts, CSS/layout, timers/microtasks, Web Storage, and HTML tree
-construction. Negative/error fixtures lock invalid selector, blocked CORS,
-missing module chunk, and unsupported HTML parser behavior. Unsupported behavior
-for each family is documented in `docs/browser-wpt-fixtures.md`.
+construction. Form defaults, same-document history, and context
+storage/cookies now have fixture coverage too. Negative/error fixtures lock
+invalid selector, blocked CORS, missing module chunk, and unsupported HTML
+parser behavior. Unsupported behavior for each family is documented in
+`docs/browser-wpt-fixtures.md`.
 
 Future fixture families can add cases without importing WPT itself:
 

@@ -26,6 +26,9 @@ The runner lives under `tests/browser_wpt_like/`. Each fixture records:
 | Timers/microtasks | `tests/browser_wpt_like/timers_microtasks.rs` | wall-clock scheduling, task-source prioritization matrix |
 | Web Storage | `tests/browser_wpt_like/storage.rs` | quota errors, cross-document storage events |
 | HTML tree construction | `tests/browser_wpt_like/html_tree.rs` | HTML5 error recovery matrix, doctype and namespace handling |
+| Forms/default actions | `tests/browser_wpt_like/forms.rs` | constraint validation, form-associated custom elements |
+| Navigation/history | `tests/browser_wpt_like/navigation_history.rs` | full session history traversal algorithm |
+| Context storage/cookies | `tests/browser_wpt_like/storage_context.rs` | quota, storage partitioning by top-level site |
 
 ## Current Negative/Error Fixtures
 

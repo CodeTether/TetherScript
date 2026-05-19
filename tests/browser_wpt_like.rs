@@ -1,62 +1,27 @@
 #[path = "browser_wpt_like/mod.rs"]
 mod fixtures;
 
-#[test]
-fn dom_events_fixture_subset() {
-    fixtures::dom_events::run();
+macro_rules! fixture_test {
+    ($name:ident, $module:ident) => {
+        #[test]
+        fn $name() {
+            fixtures::$module::run();
+        }
+    };
 }
 
-#[test]
-fn selectors_fixture_subset() {
-    fixtures::selectors::run();
-}
-
-#[test]
-fn fetch_cors_fixture_subset() {
-    fixtures::fetch_cors::run();
-}
-
-#[test]
-fn modules_fixture_subset() {
-    fixtures::modules::run();
-}
-
-#[test]
-fn css_layout_fixture_subset() {
-    fixtures::css_layout::run();
-}
-
-#[test]
-fn timers_microtasks_fixture_subset() {
-    fixtures::timers_microtasks::run();
-}
-
-#[test]
-fn storage_fixture_subset() {
-    fixtures::storage::run();
-}
-
-#[test]
-fn html_tree_fixture_subset() {
-    fixtures::html_tree::run();
-}
-
-#[test]
-fn selectors_error_fixture_subset() {
-    fixtures::selectors_errors::run();
-}
-
-#[test]
-fn fetch_cors_error_fixture_subset() {
-    fixtures::fetch_cors_errors::run();
-}
-
-#[test]
-fn modules_error_fixture_subset() {
-    fixtures::modules_errors::run();
-}
-
-#[test]
-fn html_tree_unsupported_fixture_subset() {
-    fixtures::html_tree_unsupported::run();
-}
+fixture_test!(dom_events_fixture_subset, dom_events);
+fixture_test!(selectors_fixture_subset, selectors);
+fixture_test!(fetch_cors_fixture_subset, fetch_cors);
+fixture_test!(modules_fixture_subset, modules);
+fixture_test!(css_layout_fixture_subset, css_layout);
+fixture_test!(timers_microtasks_fixture_subset, timers_microtasks);
+fixture_test!(storage_fixture_subset, storage);
+fixture_test!(html_tree_fixture_subset, html_tree);
+fixture_test!(forms_fixture_subset, forms);
+fixture_test!(navigation_history_fixture_subset, navigation_history);
+fixture_test!(storage_context_fixture_subset, storage_context);
+fixture_test!(selectors_error_fixture_subset, selectors_errors);
+fixture_test!(fetch_cors_error_fixture_subset, fetch_cors_errors);
+fixture_test!(modules_error_fixture_subset, modules_errors);
+fixture_test!(html_tree_unsupported_fixture_subset, html_tree_unsupported);
