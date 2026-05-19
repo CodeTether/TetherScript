@@ -2643,9 +2643,10 @@ fn node_object(handle: DomHandle) -> JsValue {
     let object_ref = self_object.clone();
     obj.insert(
         "requestSubmit".into(),
-        native("requestSubmit", Some(0), move |_| {
+        native("requestSubmit", Some(0), move |args| {
             let h = current_dom_handle(&object_ref, &h);
-            submit_form(&h, true)
+            let submitter = args.first().and_then(dom_handle_from_value);
+            submit_form(&h, true, submitter.as_ref())
         }),
     );
 
@@ -2655,7 +2656,7 @@ fn node_object(handle: DomHandle) -> JsValue {
         "submit".into(),
         native("submit", Some(0), move |_| {
             let h = current_dom_handle(&object_ref, &h);
-            submit_form(&h, false)
+            submit_form(&h, false, None)
         }),
     );
 
@@ -4320,7 +4321,18 @@ fn a11y_node_object(node: browser::A11yNode) -> JsValue {
 }
 
 fn form_data_object(handle: &DomHandle) -> JsValue {
-    let entries = collect_form_entries(handle);
+    form_data_object_from_entries(collect_form_entries(handle, None))
+}
+
+fn form_data_object_with_submitter(handle: &DomHandle, submitter: Option<&DomHandle>) -> JsValue {
+    let submitter = submitter.and_then(|handle| match handle.node() {
+        Some(Node::Element(el)) => Some(el),
+        Some(Node::Text(_)) | None => None,
+    });
+    form_data_object_from_entries(collect_form_entries(handle, submitter.as_ref()))
+}
+
+fn form_data_object_from_entries(entries: Vec<(String, String)>) -> JsValue {
     let object = Rc::new(RefCell::new(HashMap::new()));
     for (name, value) in &entries {
         object
@@ -4356,10 +4368,13 @@ fn form_data_object(handle: &DomHandle) -> JsValue {
     JsValue::Object(object)
 }
 
-fn collect_form_entries(handle: &DomHandle) -> Vec<(String, String)> {
+fn collect_form_entries(handle: &DomHandle, submitter: Option<&Element>) -> Vec<(String, String)> {
     let mut entries = Vec::new();
     if let Some(node) = handle.node() {
         collect_form_entries_from_node(&node, &mut entries);
+    }
+    if let Some(entry) = submitter.and_then(submitter_entry) {
+        entries.push(entry);
     }
     entries
 }
@@ -4404,6 +4419,15 @@ fn collect_input_entry(el: &Element, name: &str, entries: &mut Vec<(String, Stri
         });
         entries.push((name.to_string(), value));
     }
+}
+
+fn submitter_entry(el: &Element) -> Option<(String, String)> {
+    if el.attrs.contains_key("disabled") {
+        return None;
+    }
+    let name = el.attrs.get("name")?.clone();
+    let value = el.attrs.get("value").cloned().unwrap_or_default();
+    Some((name, value))
 }
 
 fn collect_select_entries(select: &Element, name: &str, entries: &mut Vec<(String, String)>) {
@@ -4452,7 +4476,11 @@ fn option_form_value(option: &Element) -> String {
     })
 }
 
-fn submit_form(handle: &DomHandle, dispatch_submit: bool) -> Result<JsValue, String> {
+fn submit_form(
+    handle: &DomHandle,
+    dispatch_submit: bool,
+    submitter: Option<&DomHandle>,
+) -> Result<JsValue, String> {
     if dispatch_submit
         && !handle
             .dispatch_event(JsValue::String("submit".into()))?
@@ -4476,7 +4504,10 @@ fn submit_form(handle: &DomHandle, dispatch_submit: bool) -> Result<JsValue, Str
             ),
         );
     }
-    obj.insert("data".into(), form_data_object(handle));
+    obj.insert(
+        "data".into(),
+        form_data_object_with_submitter(handle, submitter),
+    );
     Ok(JsValue::Object(Rc::new(RefCell::new(obj))))
 }
 
@@ -8698,26 +8729,6 @@ mod tests {
             result.value,
             JsValue::String("main:button:Save:true:link:Logo".into())
         );
-    }
-
-    #[test]
-    fn forms_collect_values_and_submit_events_can_cancel() {
-        let result = eval_with_dom(
-            "<form id='f' action='/save' method='post'><input name='q' value='rust'><input type='checkbox' name='ok' checked><input type='checkbox' name='skip'><textarea name='body'>Hi</textarea></form>",
-            "let form=document.getElementById('f'); let data=form.collectFormData(); let submitted=form.requestSubmit(); form.method + ':' + submitted.action + ':' + submitted.method + ':' + data.get('q') + ':' + data.get('ok') + ':' + data.get('skip') + ':' + submitted.data.get('body');",
-        )
-        .unwrap();
-        assert_eq!(
-            result.value,
-            JsValue::String("post:/save:post:rust:on:null:Hi".into())
-        );
-
-        let result = eval_with_dom(
-            "<form id='f'><input name='q' value='rust'></form>",
-            "let form=document.getElementById('f'); let seen=''; form.addEventListener('submit', function(e){ seen=e.type; e.preventDefault(); }); let submitted=form.requestSubmit(); seen + ':' + submitted;",
-        )
-        .unwrap();
-        assert_eq!(result.value, JsValue::String("submit:false".into()));
     }
 
     #[test]

@@ -66,7 +66,8 @@ tetherscript currently includes:
 - Document-wide collections now behave live for `getElementsBy*` calls and
   named HTMLCollections such as `document.forms`.
 - DOM click defaults now include label activation, native anchor `location`
-  updates, and browser-shaped `form.submit()` versus `requestSubmit()` behavior.
+  updates, browser-shaped `form.submit()` versus `requestSubmit()` behavior,
+  and submitter-specific `requestSubmit(submitter)` form data.
 - SMTP sending support.
 - Standard tools for filesystem, process, environment, path, time, Base64,
   SHA-256, and URL parsing.

@@ -93,7 +93,7 @@ Completed tests:
 
 React-style apps depend on DOM/event details beyond the current smoke surface.
 
-Status: in progress. Composed events dispatched inside an open shadow root now
+Status: complete. Composed events dispatched inside an open shadow root now
 bubble through the host chain and expose a composed path that includes the
 shadow target, shadow root, host, and document. Element `children` and
 `childNodes` collections now update after mutation for `length`, indexed access,
@@ -101,13 +101,12 @@ shadow target, shadow root, host, and document. Element `children` and
 HTMLCollections such as `document.forms` now update after DOM and attribute
 mutation, including dynamic named property lookup. Label clicks now activate
 associated controls, native anchor clicks update `location.href`, and
-`form.submit()` no longer dispatches a submit event while `requestSubmit()` does.
-
-Required tests:
-
-- capture, bubble, `stopPropagation`, and `preventDefault` ordering;
-- button reset defaults and submitter-specific `requestSubmit(submitter)` form
-  data stay coherent.
+`form.submit()` no longer dispatches a submit event while `requestSubmit()`
+does. `requestSubmit(submitter)` now preserves the submitter's name/value pair
+in collected form data. Capture, bubble, `stopPropagation`, and
+`preventDefault` ordering matches browser behavior. Button and input reset
+defaults restore form control values to their initial state, dispatching a
+cancelable `reset` event first.
 
 Completed tests:
 
@@ -117,6 +116,9 @@ Completed tests:
   mutation.
 - label activation, anchor `location.href` updates, and `form.submit()` versus
   `requestSubmit()` behavior.
+- `requestSubmit(submitter)` includes submitter-specific form data.
+- capture, bubble, `stopPropagation`, and `preventDefault` ordering.
+- button reset restores text input, checkbox, and event cancelability.
 
 ### P5: CSS/Layout/Rendering Inspection
 
@@ -144,6 +146,5 @@ Required tests:
 
 ## Immediate Next Item
 
-Implement P4: close DOM and event parity gaps that production frameworks rely
-on, continuing with button reset defaults and
-`requestSubmit(submitter)` submitter-specific form data.
+Implement P5: CSS/layout/rendering inspection for agent-visible evidence of
+hidden, clipped, disabled, or overlapped controls.

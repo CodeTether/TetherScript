@@ -6,11 +6,25 @@ use super::*;
 mod anchor;
 #[path = "browser_js_default_action/form.rs"]
 mod form;
+#[path = "browser_js_default_action/reset.rs"]
+mod form_reset;
 #[path = "browser_js_default_action/label.rs"]
 mod label;
 
+#[cfg(test)]
+#[path = "browser_js_dom/tests_form_reset.rs"]
+mod tests_form_reset;
+#[cfg(test)]
+#[path = "browser_js_dom/tests_form_submit.rs"]
+mod tests_form_submit;
+
 pub(super) fn reset() {
     anchor::reset();
+    form_reset::reset();
+}
+
+pub(super) fn snapshot_form(handle: &DomHandle) {
+    form_reset::ensure_snapshot_public(handle);
 }
 
 pub(super) fn register_location(

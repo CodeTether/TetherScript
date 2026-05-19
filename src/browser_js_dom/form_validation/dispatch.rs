@@ -20,6 +20,7 @@ fn install_form(obj: &Rc<RefCell<HashMap<String, JsValue>>>, handle: &DomHandle)
     select::sync_tree(handle);
     form_props::install(obj, handle);
     form_methods::install(obj, handle);
+    super::super::super::default_action_host::snapshot_form(handle);
 }
 
 fn install_control(obj: &Rc<RefCell<HashMap<String, JsValue>>>, handle: &DomHandle, el: &Element) {

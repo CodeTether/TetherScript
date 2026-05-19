@@ -11,6 +11,9 @@ mod object;
 #[path = "events/tests.rs"]
 mod tests;
 #[cfg(test)]
+#[path = "events/tests_dispatch_order.rs"]
+mod tests_dispatch_order;
+#[cfg(test)]
 #[path = "events/tests_path.rs"]
 mod tests_path;
 
