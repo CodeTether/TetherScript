@@ -99,12 +99,15 @@ shadow target, shadow root, host, and document. Element `children` and
 `childNodes` collections now update after mutation for `length`, indexed access,
 `item()`, and `forEach()`. Document-wide `getElementsBy*` queries and named
 HTMLCollections such as `document.forms` now update after DOM and attribute
-mutation, including dynamic named property lookup.
+mutation, including dynamic named property lookup. Label clicks now activate
+associated controls, native anchor clicks update `location.href`, and
+`form.submit()` no longer dispatches a submit event while `requestSubmit()` does.
 
 Required tests:
 
 - capture, bubble, `stopPropagation`, and `preventDefault` ordering;
-- default actions for labels, buttons, forms, and anchors stay coherent.
+- button reset defaults and submitter-specific `requestSubmit(submitter)` form
+  data stay coherent.
 
 Completed tests:
 
@@ -112,6 +115,8 @@ Completed tests:
 - element `children` and `childNodes` update after mutation.
 - document-wide live `getElementsBy*` and named HTMLCollections update after
   mutation.
+- label activation, anchor `location.href` updates, and `form.submit()` versus
+  `requestSubmit()` behavior.
 
 ### P5: CSS/Layout/Rendering Inspection
 
@@ -140,4 +145,5 @@ Required tests:
 ## Immediate Next Item
 
 Implement P4: close DOM and event parity gaps that production frameworks rely
-on, continuing with default actions for labels, buttons, forms, and anchors.
+on, continuing with button reset defaults and
+`requestSubmit(submitter)` submitter-specific form data.

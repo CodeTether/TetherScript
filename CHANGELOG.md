@@ -29,6 +29,9 @@ All notable changes to this project will be documented in this file.
 - Added live document-wide HTMLCollections for `getElementsByTagName`,
   `getElementsByClassName`, `getElementsByName`, and named document collections
   such as `document.forms`, including dynamic named property lookup.
+- Added DOM default-action coverage for label activation, native anchor
+  `location.href` updates, and the browser distinction between `form.submit()`
+  and `form.requestSubmit()`.
 - Added a browser parity checklist that grounds follow-up work in current
   contract tests, known gaps, and explicit readiness tests.
 - Added native fetch/XHR redirect following for `301`, `302`, `303`, `307`,
