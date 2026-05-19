@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Event dispatch ordering: capture, target, and bubble phases now fire listeners
+  in the correct order with `stopPropagation` blocking later phases and
+  `preventDefault` suppressing default actions while allowing continued propagation.
+- Form reset default action: `<button type="reset">` and `<input type="reset">`
+  now dispatch a cancelable `reset` event on the enclosing form and restore all
+  form controls to their initial values (text inputs, checkboxes, radio buttons).
+- P4 DOM and event parity checklist is now complete.
+
+### Added
+
 - Added routed external page-resource loading so missing scripts, module entry
   scripts, stylesheets, images, and source maps can be fulfilled through the
   browser route table with cookies, redirects, CORS validation, route logs, and
@@ -31,7 +41,8 @@ All notable changes to this project will be documented in this file.
   such as `document.forms`, including dynamic named property lookup.
 - Added DOM default-action coverage for label activation, native anchor
   `location.href` updates, and the browser distinction between `form.submit()`
-  and `form.requestSubmit()`.
+  and `form.requestSubmit()`, including submitter name/value data for
+  `requestSubmit(submitter)`.
 - Added a browser parity checklist that grounds follow-up work in current
   contract tests, known gaps, and explicit readiness tests.
 - Added native fetch/XHR redirect following for `301`, `302`, `303`, `307`,

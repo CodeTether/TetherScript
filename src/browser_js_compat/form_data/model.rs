@@ -15,7 +15,7 @@ pub(super) fn from_arg(value: Option<&JsValue>) -> Vec<FormEntry> {
     let Some(handle) = dom_handle_from_value(value) else {
         return Vec::new();
     };
-    collect_form_entries(&handle)
+    collect_form_entries(&handle, None)
         .into_iter()
         .map(|(name, value)| FormEntry {
             name,

@@ -13,22 +13,24 @@ pub(super) fn input(handle: &DomHandle, el: &Element) -> Result<bool, String> {
             dispatch_input_change(handle)?;
         }
         "submit" => return submit_closest(handle),
+        "reset" => return reset_closest(handle),
         _ => {}
     }
     Ok(true)
 }
 
 pub(super) fn button(handle: &DomHandle, el: &Element) -> Result<bool, String> {
-    if control_type(el, "submit") == "submit" {
-        return submit_closest(handle);
+    match control_type(el, "submit").as_str() {
+        "submit" => submit_closest(handle),
+        "reset" => reset_closest(handle),
+        _ => Ok(true),
     }
-    Ok(true)
 }
 
 fn control_type(el: &Element, default: &str) -> String {
     el.attrs
         .get("type")
-        .map(|ty| ty.to_ascii_lowercase())
+        .map(|t| t.to_ascii_lowercase())
         .unwrap_or_else(|| default.into())
 }
 
@@ -36,7 +38,20 @@ fn submit_closest(handle: &DomHandle) -> Result<bool, String> {
     let Some(form) = handle.closest_form() else {
         return Ok(true);
     };
-    Ok(submit_form(&form, true)?.truthy())
+    Ok(submit_form(&form, true, Some(handle))?.truthy())
+}
+
+fn reset_closest(handle: &DomHandle) -> Result<bool, String> {
+    let Some(form) = handle.closest_form() else {
+        return Ok(true);
+    };
+    if form
+        .dispatch_event(JsValue::String("reset".into()))?
+        .truthy()
+    {
+        super::form_reset::perform(&form)?;
+    }
+    Ok(true)
 }
 
 fn dispatch_input_change(handle: &DomHandle) -> Result<(), String> {
