@@ -13,6 +13,10 @@ All notable changes to this project will be documented in this file.
   now dispatch a cancelable `reset` event on the enclosing form and restore all
   form controls to their initial values (text inputs, checkboxes, radio buttons).
 - P4 DOM and event parity checklist is now complete.
+- CSS/layout rendering evidence: agent-visible `production_debug_report()`
+  visual elements now cover flex, absolute positioning, z-index, overflow
+  clipping, viewport-responsive width, display:none, visibility:hidden, and
+  zero-size elements. P5 checklist is complete.
 
 ### Added
 

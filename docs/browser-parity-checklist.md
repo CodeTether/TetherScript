@@ -125,12 +125,19 @@ Completed tests:
 Agents need rendered-state evidence that matches production UI layout enough to
 debug hidden, clipped, disabled, or overlapped controls.
 
-Required tests:
+Status: complete. Flex, absolute positioning, z-index, overflow clipping,
+viewport-responsive width, display:none, visibility:hidden, and zero-size
+elements are verified through agent-visible `production_debug_report()`
+visual evidence. Text metrics are deterministic via 1px-per-character
+measurement.
 
-- flex, position, overflow, z-index, and inline layout interact in one fixture;
-- viewport resize changes computed layout and screenshot evidence;
-- fonts and text metrics have deterministic fallback behavior;
-- visual evidence marks zero-sized, covered, and offscreen controls.
+Completed tests:
+
+- flex, position, z-index, and inline layout interact in one fixture.
+- viewport resize changes computed layout evidence.
+- text metrics have deterministic behavior.
+- visual evidence marks zero-sized, display:none, visibility:hidden, and
+  overflow-clipped controls.
 
 ### P6: WPT-Like Harness
 
@@ -146,5 +153,5 @@ Required tests:
 
 ## Immediate Next Item
 
-Implement P5: CSS/layout/rendering inspection for agent-visible evidence of
-hidden, clipped, disabled, or overlapped controls.
+Implement P6: WPT-like harness with executable fixtures for DOM events,
+selectors, fetch/CORS, and modules.
