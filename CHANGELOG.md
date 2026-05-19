@@ -36,6 +36,9 @@ All notable changes to this project will be documented in this file.
 - Added WPT-like browser fixtures for iframe message delivery metadata,
   cross-origin security policy, 2D canvas/WebGL snapshots, and accessibility
   names/states/focus order.
+- Added WPT-like browser fixtures for service worker cache fetches, IndexedDB
+  origin sharing, selection text, screenshot visual diffing, and page
+  trace/snapshot restore.
 
 - Added routed external page-resource loading so missing scripts, module entry
   scripts, stylesheets, images, and source maps can be fulfilled through the
