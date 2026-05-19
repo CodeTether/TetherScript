@@ -148,8 +148,9 @@ Status: complete for an initial executable fixture harness. The targeted suite
 now lives in `tests/browser_wpt_like/` and runs with
 `cargo test --test browser_wpt_like` in CI. It covers DOM events, Selectors API,
 Fetch/CORS, module scripts, CSS/layout, timers/microtasks, Web Storage, and
-HTML tree construction, including negative/error cases, with WPT-area metadata
-and unsupported behavior notes in `docs/browser-wpt-fixtures.md`.
+HTML tree construction, form controls/default actions, navigation/history, and
+cookie/storage context isolation, including negative/error cases, with WPT-area
+metadata and unsupported behavior notes in `docs/browser-wpt-fixtures.md`.
 
 Completed tests:
 
@@ -165,8 +166,12 @@ Completed tests:
 - Blocked CORS responses reject with missing-header diagnostics.
 - Missing static module imports report the resolved chunk URL.
 - HTML parser gaps include missing implicit `tbody` insertion.
+- Form reset defaults and `requestSubmit(submitter)` form data.
+- Same-document hash navigation appends traversable history.
+- Same-context pages share cookies/localStorage while sessionStorage stays
+  page-local.
 
 ## Immediate Next Item
 
-Add WPT-like fixtures for form controls/default actions, navigation/history,
-and cookie/storage context isolation.
+Add WPT-like fixtures for keyboard/pointer interaction, focus order, and file
+upload/download behavior.
