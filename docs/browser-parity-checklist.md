@@ -152,8 +152,10 @@ HTML tree construction, form controls/default actions, navigation/history,
 cookie/storage context isolation, keyboard/pointer interaction, focus order, and
 file upload/download behavior, realtime channels, permissions/media APIs, and
 dialog/clipboard behavior, frames/window messaging, security policy,
-canvas/WebGL, and accessibility snapshots, including negative/error cases, with
-WPT-area metadata and unsupported behavior notes in `docs/browser-wpt-fixtures.md`.
+canvas/WebGL, accessibility snapshots, service workers/cache storage,
+IndexedDB, selection, screenshots/visual diff, and page trace/persistence
+behavior, including negative/error cases, with WPT-area metadata and unsupported
+behavior notes in `docs/browser-wpt-fixtures.md`.
 
 Completed tests:
 
@@ -183,8 +185,14 @@ Completed tests:
 - Same-origin and cross-origin allowlist security metadata is explicit.
 - 2D canvas command logs and WebGL metadata snapshots are observable.
 - Accessibility names, states, hidden filtering, and focus order are visible.
+- Active service workers can fulfill pass-through fetches from CacheStorage.
+- Same-origin pages share IndexedDB records while separate contexts do not.
+- Element selection and focused input ranges expose selected text.
+- Screenshots and visual diff reflect deterministic DOM mutation.
+- Page action traces and snapshot restore preserve observable state.
 
 ## Immediate Next Item
 
-Add WPT-like fixtures for service workers/cache storage, IndexedDB, selection,
-screenshots/visual diff, and page trace/persistence behavior.
+Add WPT-like negative/error fixtures for realtime failures, denied
+permissions/media, blocked frame messages, missing persisted records, and invalid
+visual/selection locators.

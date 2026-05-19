@@ -51,7 +51,9 @@ keyboard/pointer interaction, focus navigation, and file upload/download now
 have fixture coverage too. Realtime channels, permissions/media APIs, and
 dialog/clipboard behavior are now locked in the same runner. Frames/window
 messaging, security policy, canvas/WebGL, and accessibility snapshots now have
-fixture coverage too. Negative/error fixtures lock invalid selector, blocked
+fixture coverage too. Service workers/cache storage, IndexedDB, selection,
+screenshots/visual diff, and page trace/persistence behavior are now covered in
+the same fixture runner. Negative/error fixtures lock invalid selector, blocked
 CORS, missing module chunk, and unsupported HTML parser behavior. Unsupported
 behavior for each family is documented in `docs/browser-wpt-fixtures.md`.
 
