@@ -73,7 +73,9 @@ tetherscript currently includes:
   construction, form defaults, navigation history, context storage/cookies,
   keyboard/pointer interaction, focus order, and file upload/download behavior,
   realtime channels, permissions/media APIs, and dialog/clipboard behavior,
-  including negative/error cases, through `cargo test --test browser_wpt_like`.
+  frames/window messaging, security policy, canvas/WebGL, and accessibility
+  snapshots, including negative/error cases, through
+  `cargo test --test browser_wpt_like`.
 - SMTP sending support.
 - Standard tools for filesystem, process, environment, path, time, Base64,
   SHA-256, and URL parsing.

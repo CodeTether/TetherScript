@@ -151,8 +151,9 @@ Fetch/CORS, module scripts, CSS/layout, timers/microtasks, Web Storage, and
 HTML tree construction, form controls/default actions, navigation/history,
 cookie/storage context isolation, keyboard/pointer interaction, focus order, and
 file upload/download behavior, realtime channels, permissions/media APIs, and
-dialog/clipboard behavior, including negative/error cases, with WPT-area
-metadata and unsupported behavior notes in `docs/browser-wpt-fixtures.md`.
+dialog/clipboard behavior, frames/window messaging, security policy,
+canvas/WebGL, and accessibility snapshots, including negative/error cases, with
+WPT-area metadata and unsupported behavior notes in `docs/browser-wpt-fixtures.md`.
 
 Completed tests:
 
@@ -178,8 +179,12 @@ Completed tests:
 - WebSocket send plus WebSocket/EventSource message delivery.
 - Permission grants expose media labels and allow `getUserMedia`.
 - Dialog decisions and clipboard text APIs update page state.
+- Iframe `postMessage` delivery follows target-origin metadata.
+- Same-origin and cross-origin allowlist security metadata is explicit.
+- 2D canvas command logs and WebGL metadata snapshots are observable.
+- Accessibility names, states, hidden filtering, and focus order are visible.
 
 ## Immediate Next Item
 
-Add WPT-like fixtures for frames/window messaging, security policy, canvas/WebGL,
-and accessibility snapshot behavior.
+Add WPT-like fixtures for service workers/cache storage, IndexedDB, selection,
+screenshots/visual diff, and page trace/persistence behavior.
