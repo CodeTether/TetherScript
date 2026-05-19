@@ -144,14 +144,20 @@ Completed tests:
 The map in `docs/browser-wpt-map.md` needs executable fixtures so parity claims
 are mechanically checked.
 
-Required tests:
+Status: complete for an initial executable fixture harness. The targeted suite
+now lives in `tests/browser_wpt_like/` and runs with
+`cargo test --test browser_wpt_like` in CI. It covers DOM events, Selectors API,
+Fetch/CORS, and module scripts with WPT-area metadata and unsupported behavior
+notes in `docs/browser-wpt-fixtures.md`.
 
-- add `tests/browser_wpt_like/` fixture runner;
-- add first fixture set for DOM events, selectors, fetch/CORS, and modules;
-- document unsupported behavior per fixture family;
-- run the targeted fixture subset in CI.
+Completed tests:
+
+- DOM event capture/target/bubble order and default prevention.
+- Selectors API class and attribute matching through `querySelector*`.
+- Fetch/CORS cross-origin POST preflight and response validation.
+- Module-script static import graph loading and dependency-first evaluation.
 
 ## Immediate Next Item
 
-Implement P6: WPT-like harness with executable fixtures for DOM events,
-selectors, fetch/CORS, and modules.
+Expand the WPT-like harness with CSS/layout, timers/microtasks, storage, and
+HTML tree-construction fixture families.

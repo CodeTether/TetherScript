@@ -22,6 +22,7 @@ jobs:
       - run: bash ./check_file_limits.sh
       - run: cargo fmt --check
       - run: cargo clippy -- -D warnings
+      - run: cargo test --test browser_wpt_like
       - run: cargo test
       - run: cargo test --doc
       - run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
