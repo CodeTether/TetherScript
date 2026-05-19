@@ -54,8 +54,10 @@ messaging, security policy, canvas/WebGL, and accessibility snapshots now have
 fixture coverage too. Service workers/cache storage, IndexedDB, selection,
 screenshots/visual diff, and page trace/persistence behavior are now covered in
 the same fixture runner. Negative/error fixtures lock invalid selector, blocked
-CORS, missing module chunk, and unsupported HTML parser behavior. Unsupported
-behavior for each family is documented in `docs/browser-wpt-fixtures.md`.
+CORS, missing module chunk, unsupported HTML parser behavior, failed realtime
+connections, denied media permissions, blocked frame messages, missing persisted
+records, and invalid visual/selection locators. Unsupported behavior for each
+family is documented in `docs/browser-wpt-fixtures.md`.
 
 Future fixture families can add cases without importing WPT itself:
 

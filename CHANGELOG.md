@@ -39,6 +39,9 @@ All notable changes to this project will be documented in this file.
 - Added WPT-like browser fixtures for service worker cache fetches, IndexedDB
   origin sharing, selection text, screenshot visual diffing, and page
   trace/snapshot restore.
+- Added WPT-like negative/error fixtures for failed realtime connections,
+  denied media permissions, blocked frame messages, missing persisted records,
+  and invalid visual/selection locators.
 
 - Added routed external page-resource loading so missing scripts, module entry
   scripts, stylesheets, images, and source maps can be fulfilled through the

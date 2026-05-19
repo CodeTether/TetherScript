@@ -40,3 +40,17 @@ fixture_test!(selectors_error_fixture_subset, selectors_errors);
 fixture_test!(fetch_cors_error_fixture_subset, fetch_cors_errors);
 fixture_test!(modules_error_fixture_subset, modules_errors);
 fixture_test!(html_tree_unsupported_fixture_subset, html_tree_unsupported);
+fixture_test!(realtime_error_fixture_subset, realtime_errors);
+fixture_test!(
+    permissions_media_error_fixture_subset,
+    permissions_media_errors
+);
+fixture_test!(frames_error_fixture_subset, frames_errors);
+fixture_test!(
+    persisted_records_error_fixture_subset,
+    persisted_records_errors
+);
+fixture_test!(
+    visual_selection_error_fixture_subset,
+    visual_selection_errors
+);

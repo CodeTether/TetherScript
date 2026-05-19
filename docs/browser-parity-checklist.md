@@ -190,9 +190,13 @@ Completed tests:
 - Element selection and focused input ranges expose selected text.
 - Screenshots and visual diff reflect deterministic DOM mutation.
 - Page action traces and snapshot restore preserve observable state.
+- Failed realtime connections dispatch error/close metadata.
+- Denied camera permissions reject `getUserMedia` with `NotAllowedError`.
+- Cross-origin frame messages stay blocked until policy allows the origin.
+- Missing CacheStorage and IndexedDB records return empty origin-scoped results.
+- Missing visual and selection targets return strict locator diagnostics.
 
 ## Immediate Next Item
 
-Add WPT-like negative/error fixtures for realtime failures, denied
-permissions/media, blocked frame messages, missing persisted records, and invalid
-visual/selection locators.
+Add WPT-like fixtures for locator/actionability, drag and pointer capture, wheel
+scrolling, viewport/media emulation, and browser resource-limit guard behavior.
