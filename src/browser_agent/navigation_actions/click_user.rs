@@ -13,7 +13,7 @@ pub(crate) fn script(path: &[usize], bounds: BoundingBox) -> String {
          if(n.focus){{n.focus();}}\
          n.dispatchEvent({{type:'pointerup',{}}});\
          n.dispatchEvent({{type:'mouseup',{}}});\
-         n.dispatchEvent({{type:'click',{}}})",
+         n.dispatchEvent({{type:'click',__agentClick:true,{}}})",
         fields::pointer(1, bounds),
         fields::mouse(1, 1, bounds),
         fields::pointer(0, bounds),

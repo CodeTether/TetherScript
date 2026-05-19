@@ -47,5 +47,8 @@ pub(super) fn install(obj: &mut HashMap<String, JsValue>, handle: &DomHandle, no
 }
 
 #[cfg(test)]
+#[path = "tests_default_actions.rs"]
+mod tests_default_actions;
+#[cfg(test)]
 #[path = "tests_replace_children.rs"]
 mod tests_replace_children;

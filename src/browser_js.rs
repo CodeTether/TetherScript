@@ -31,6 +31,8 @@ mod cookie_host;
 mod cssom_host;
 #[path = "browser_js_custom.rs"]
 mod custom_host;
+#[path = "browser_js_default_action.rs"]
+mod default_action_host;
 #[path = "browser_js_dom.rs"]
 mod dom_compat_host;
 #[path = "browser_js_event_path.rs"]
@@ -636,6 +638,7 @@ fn reset_browser_js_state() {
     fullscreen_host::reset();
     media_host::reset_all();
     selection_host::reset();
+    default_action_host::reset();
     dom_compat_host::form_validation::reset();
     compat_host::promise::reset();
     MUTATION_OBSERVERS.with(|observers| observers.borrow_mut().clear());
@@ -775,6 +778,7 @@ fn install_dom_globals(
     };
     let location_map = Rc::new(RefCell::new(parse_location(location_url)));
     install_location_methods(&location_map);
+    default_action_host::register_location(&root, location_map.clone());
     let location = JsValue::Object(location_map.clone());
     let navigator = navigator_object();
     let storage_event_window = Rc::new(RefCell::new(None));
@@ -2651,7 +2655,7 @@ fn node_object(handle: DomHandle) -> JsValue {
         "submit".into(),
         native("submit", Some(0), move |_| {
             let h = current_dom_handle(&object_ref, &h);
-            submit_form(&h, true)
+            submit_form(&h, false)
         }),
     );
 
@@ -3247,7 +3251,7 @@ impl DomHandle {
 
         set_event_position(&event, JsValue::Null, 0);
         let default_prevented = event_flag(&event, "defaultPrevented");
-        let allowed = !default_prevented && self.run_default_action(&event_type)?;
+        let allowed = !default_prevented && self.run_default_action(&event_type, &event)?;
         Ok(JsValue::Bool(allowed))
     }
 
@@ -3294,44 +3298,8 @@ impl DomHandle {
         }
     }
 
-    fn run_default_action(&self, event_type: &str) -> Result<bool, String> {
-        if event_type != "click" {
-            return Ok(true);
-        }
-        let Some(Node::Element(el)) = self.node() else {
-            return Ok(true);
-        };
-        if el.tag == "input" {
-            let input_type = el
-                .attrs
-                .get("type")
-                .map(|ty| ty.to_ascii_lowercase())
-                .unwrap_or_else(|| "text".into());
-            if input_type == "checkbox" {
-                self.set_checked_state(!el.attrs.contains_key("checked"));
-                self.dispatch_event(JsValue::String("input".into()))?;
-                self.dispatch_event(JsValue::String("change".into()))?;
-            } else if input_type == "radio" {
-                self.set_checked_state(true);
-                self.dispatch_event(JsValue::String("input".into()))?;
-                self.dispatch_event(JsValue::String("change".into()))?;
-            } else if input_type == "submit" {
-                if let Some(form) = self.closest_form() {
-                    return Ok(submit_form(&form, true)?.truthy());
-                }
-            }
-        } else if el.tag == "button"
-            && el
-                .attrs
-                .get("type")
-                .map(|ty| ty.eq_ignore_ascii_case("submit"))
-                .unwrap_or(true)
-        {
-            if let Some(form) = self.closest_form() {
-                return Ok(submit_form(&form, true)?.truthy());
-            }
-        }
-        Ok(true)
+    fn run_default_action(&self, event_type: &str, event: &JsValue) -> Result<bool, String> {
+        default_action_host::run(self, event_type, event)
     }
 
     fn set_checked_state(&self, checked: bool) {
@@ -7774,6 +7742,10 @@ fn resolve_url(input: &str, base: Option<&str>) -> String {
         return input.to_string();
     }
     if let Some(base) = base {
+        if input.starts_with('#') {
+            let current = base.split_once('#').map_or(base, |(path, _)| path);
+            return format!("{current}{input}");
+        }
         if let Some((origin, _)) = base.split_once("://") {
             let rest = &base[origin.len() + 3..];
             let host_end = rest.find('/').unwrap_or(rest.len());
