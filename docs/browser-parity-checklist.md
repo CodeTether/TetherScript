@@ -150,7 +150,8 @@ now lives in `tests/browser_wpt_like/` and runs with
 Fetch/CORS, module scripts, CSS/layout, timers/microtasks, Web Storage, and
 HTML tree construction, form controls/default actions, navigation/history,
 cookie/storage context isolation, keyboard/pointer interaction, focus order, and
-file upload/download behavior, including negative/error cases, with WPT-area
+file upload/download behavior, realtime channels, permissions/media APIs, and
+dialog/clipboard behavior, including negative/error cases, with WPT-area
 metadata and unsupported behavior notes in `docs/browser-wpt-fixtures.md`.
 
 Completed tests:
@@ -174,8 +175,11 @@ Completed tests:
 - Keyboard text insertion and pointer hover event ordering.
 - Focus order skips disabled controls and Tab advances the active element.
 - File input upload metadata and anchor download recording.
+- WebSocket send plus WebSocket/EventSource message delivery.
+- Permission grants expose media labels and allow `getUserMedia`.
+- Dialog decisions and clipboard text APIs update page state.
 
 ## Immediate Next Item
 
-Add WPT-like fixtures for realtime channels, permissions/media APIs, and
-dialog/clipboard behavior.
+Add WPT-like fixtures for frames/window messaging, security policy, canvas/WebGL,
+and accessibility snapshot behavior.

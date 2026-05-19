@@ -30,6 +30,9 @@ All notable changes to this project will be documented in this file.
 - Added WPT-like browser fixtures for keyboard text insertion, pointer hover
   event ordering, focus-order Tab traversal, file input metadata, and anchor
   download recording.
+- Added WPT-like browser fixtures for WebSocket/EventSource message delivery,
+  media permission grants, media device exposure, dialog decisions, and
+  clipboard read/write behavior.
 
 - Added routed external page-resource loading so missing scripts, module entry
   scripts, stylesheets, images, and source maps can be fulfilled through the
