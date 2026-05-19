@@ -20,6 +20,8 @@ All notable changes to this project will be documented in this file.
 - Added a WPT-like browser fixture runner with executable DOM event,
   Selectors API, Fetch/CORS, and module-script fixtures, plus unsupported
   behavior notes for each family.
+- Expanded the WPT-like browser fixture runner with CSS/layout,
+  timers/microtasks, Web Storage, and HTML tree-construction fixture families.
 
 - Added routed external page-resource loading so missing scripts, module entry
   scripts, stylesheets, images, and source maps can be fulfilled through the

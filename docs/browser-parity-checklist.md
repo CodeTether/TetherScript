@@ -147,8 +147,9 @@ are mechanically checked.
 Status: complete for an initial executable fixture harness. The targeted suite
 now lives in `tests/browser_wpt_like/` and runs with
 `cargo test --test browser_wpt_like` in CI. It covers DOM events, Selectors API,
-Fetch/CORS, and module scripts with WPT-area metadata and unsupported behavior
-notes in `docs/browser-wpt-fixtures.md`.
+Fetch/CORS, module scripts, CSS/layout, timers/microtasks, Web Storage, and
+HTML tree construction with WPT-area metadata and unsupported behavior notes in
+`docs/browser-wpt-fixtures.md`.
 
 Completed tests:
 
@@ -156,8 +157,12 @@ Completed tests:
 - Selectors API class and attribute matching through `querySelector*`.
 - Fetch/CORS cross-origin POST preflight and response validation.
 - Module-script static import graph loading and dependency-first evaluation.
+- CSS/layout flex evidence through agent-visible visual diagnostics.
+- Timers/microtasks deterministic drain ordering.
+- Web Storage set/get/remove/clear length and key behavior.
+- HTML tree construction for element order and entity text.
 
 ## Immediate Next Item
 
-Expand the WPT-like harness with CSS/layout, timers/microtasks, storage, and
-HTML tree-construction fixture families.
+Add WPT-like negative/error fixtures for invalid selectors, blocked CORS
+responses, missing module chunks, and unsupported HTML parser cases.
