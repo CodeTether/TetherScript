@@ -35,9 +35,20 @@ local unit tests and fixtures into WPT-like compliance cases.
 | Runtime builtins | `browser_parse_html`, `browser_parse_css`, `browser_styles`, `browser_query_selector`, `browser_text_content`, `browser_snapshot`, `browser_display_list`, `browser_render`, `browser_layout`, `browser_run_scripts`, `browser_eval_js`, compatibility report | Project API contract; WPT harness adapter candidates | `src/browser.rs::browser_builtins_return_values`, `browser_variadics_reject_extra_args`; `src/browser_js.rs::compatibility_report_lists_storage_apis` | Local API covered | Need stable JSON fixture format and harness glue before importing external WPT data |
 | Production diagnostics | Console/page errors, HAR-style network entries, source-mapped error locations and generated stack frames, failed requests, source-map references, classified runtime exceptions, React roots and hydration warnings | `console`, `fetch`, source maps, framework integration smoke | `tests/agent_browser_production_debug.rs` | Agent-debug subset | Needs async stack frames and framework component stack reconstruction |
 
-## Suggested WPT-like fixture layout
+## Executable WPT-like fixture layout
 
-A future docs/tests-only step can add fixture cases without importing WPT itself:
+The initial executable fixture suite lives under `tests/browser_wpt_like/` and
+runs with:
+
+```bash
+cargo test --test browser_wpt_like
+```
+
+The first fixture families cover DOM events, Selectors API, Fetch/CORS, and
+module scripts. Unsupported behavior for each family is documented in
+`docs/browser-wpt-fixtures.md`.
+
+Future fixture families can add cases without importing WPT itself:
 
 ```text
 tests/browser_wpt_like/

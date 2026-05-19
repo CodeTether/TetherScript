@@ -17,8 +17,9 @@ All notable changes to this project will be documented in this file.
   visual elements now cover flex, absolute positioning, z-index, overflow
   clipping, viewport-responsive width, display:none, visibility:hidden, and
   zero-size elements. P5 checklist is complete.
-
-### Added
+- Added a WPT-like browser fixture runner with executable DOM event,
+  Selectors API, Fetch/CORS, and module-script fixtures, plus unsupported
+  behavior notes for each family.
 
 - Added routed external page-resource loading so missing scripts, module entry
   scripts, stylesheets, images, and source maps can be fulfilled through the
