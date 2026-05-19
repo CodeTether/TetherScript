@@ -148,8 +148,9 @@ Status: complete for an initial executable fixture harness. The targeted suite
 now lives in `tests/browser_wpt_like/` and runs with
 `cargo test --test browser_wpt_like` in CI. It covers DOM events, Selectors API,
 Fetch/CORS, module scripts, CSS/layout, timers/microtasks, Web Storage, and
-HTML tree construction, form controls/default actions, navigation/history, and
-cookie/storage context isolation, including negative/error cases, with WPT-area
+HTML tree construction, form controls/default actions, navigation/history,
+cookie/storage context isolation, keyboard/pointer interaction, focus order, and
+file upload/download behavior, including negative/error cases, with WPT-area
 metadata and unsupported behavior notes in `docs/browser-wpt-fixtures.md`.
 
 Completed tests:
@@ -170,8 +171,11 @@ Completed tests:
 - Same-document hash navigation appends traversable history.
 - Same-context pages share cookies/localStorage while sessionStorage stays
   page-local.
+- Keyboard text insertion and pointer hover event ordering.
+- Focus order skips disabled controls and Tab advances the active element.
+- File input upload metadata and anchor download recording.
 
 ## Immediate Next Item
 
-Add WPT-like fixtures for keyboard/pointer interaction, focus order, and file
-upload/download behavior.
+Add WPT-like fixtures for realtime channels, permissions/media APIs, and
+dialog/clipboard behavior.
