@@ -22,6 +22,8 @@ All notable changes to this project will be documented in this file.
   behavior notes for each family.
 - Expanded the WPT-like browser fixture runner with CSS/layout,
   timers/microtasks, Web Storage, and HTML tree-construction fixture families.
+- Added WPT-like negative/error fixtures for invalid selectors, blocked CORS
+  responses, missing module chunks, and unsupported HTML parser behavior.
 
 - Added routed external page-resource loading so missing scripts, module entry
   scripts, stylesheets, images, and source maps can be fulfilled through the

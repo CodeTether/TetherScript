@@ -27,6 +27,15 @@ The runner lives under `tests/browser_wpt_like/`. Each fixture records:
 | Web Storage | `tests/browser_wpt_like/storage.rs` | quota errors, cross-document storage events |
 | HTML tree construction | `tests/browser_wpt_like/html_tree.rs` | HTML5 error recovery matrix, doctype and namespace handling |
 
+## Current Negative/Error Fixtures
+
+| Family | Local fixture | Locked behavior |
+| --- | --- | --- |
+| Selectors API | `tests/browser_wpt_like/selectors_errors.rs` | invalid selectors currently return no matches instead of `SyntaxError` |
+| Fetch/CORS | `tests/browser_wpt_like/fetch_cors_errors.rs` | missing `access-control-allow-origin` rejects fetch |
+| Module scripts | `tests/browser_wpt_like/modules_errors.rs` | missing static import reports the resolved chunk URL |
+| HTML tree construction | `tests/browser_wpt_like/html_tree_unsupported.rs` | table rows parse without implicit `tbody` insertion |
+
 ## Promotion Rule
 
 Do not mark a browser surface as WPT-like unless it has a fixture here, a local
