@@ -49,10 +49,11 @@ scripts, CSS/layout, timers/microtasks, Web Storage, and HTML tree
 construction. Form defaults, same-document history, context storage/cookies,
 keyboard/pointer interaction, focus navigation, and file upload/download now
 have fixture coverage too. Realtime channels, permissions/media APIs, and
-dialog/clipboard behavior are now locked in the same runner. Negative/error
-fixtures lock invalid selector, blocked CORS, missing module chunk, and
-unsupported HTML parser behavior. Unsupported behavior for each family is
-documented in `docs/browser-wpt-fixtures.md`.
+dialog/clipboard behavior are now locked in the same runner. Frames/window
+messaging, security policy, canvas/WebGL, and accessibility snapshots now have
+fixture coverage too. Negative/error fixtures lock invalid selector, blocked
+CORS, missing module chunk, and unsupported HTML parser behavior. Unsupported
+behavior for each family is documented in `docs/browser-wpt-fixtures.md`.
 
 Future fixture families can add cases without importing WPT itself:
 

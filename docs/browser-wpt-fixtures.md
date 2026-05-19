@@ -35,6 +35,10 @@ The runner lives under `tests/browser_wpt_like/`. Each fixture records:
 | Realtime channels | `tests/browser_wpt_like/realtime.rs` | real socket transport, binary frames and EventSource reconnection timing |
 | Permissions/media APIs | `tests/browser_wpt_like/permissions_media.rs` | real device capture, constraint solving and live MediaStream tracks |
 | Dialogs/clipboard | `tests/browser_wpt_like/dialog_clipboard.rs` | modal event-loop blocking, system clipboard and user activation gating |
+| Frames/window messaging | `tests/browser_wpt_like/frames.rs` | script-visible WindowProxy objects, nested event-loop dispatch timing |
+| Security policy | `tests/browser_wpt_like/security_policy.rs` | full CSP parser, COOP/COEP and mixed-content enforcement |
+| Canvas/WebGL | `tests/browser_wpt_like/canvas_webgl.rs` | GPU rendering, complete CanvasRenderingContext2D and WebGL APIs |
+| Accessibility snapshots | `tests/browser_wpt_like/accessibility.rs` | platform accessibility tree adapters, complete ARIA role mapping |
 
 ## Current Negative/Error Fixtures
 
