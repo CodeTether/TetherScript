@@ -209,3 +209,5 @@ Completed tests:
 Expand WPT-like browser parity toward remaining rendering/input edge cases: more
 complete actionability stability checks, DataTransfer drag payloads, matchMedia
 listener dispatch, and quota/memory-pressure style resource guards.
+
+**Tracking issue:** <https://github.com/CodeTether/TetherScript/issues/12>
