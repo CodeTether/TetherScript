@@ -11,6 +11,7 @@ macro_rules! fixture_test {
 }
 
 fixture_test!(dom_events_fixture_subset, dom_events);
+fixture_test!(drag_pointer_capture_fixture_subset, drag_pointer_capture);
 fixture_test!(selectors_fixture_subset, selectors);
 fixture_test!(fetch_cors_fixture_subset, fetch_cors);
 fixture_test!(modules_fixture_subset, modules);
@@ -31,6 +32,7 @@ fixture_test!(frames_fixture_subset, frames);
 fixture_test!(security_policy_fixture_subset, security_policy);
 fixture_test!(canvas_webgl_fixture_subset, canvas_webgl);
 fixture_test!(accessibility_fixture_subset, accessibility);
+fixture_test!(actionability_fixture_subset, actionability);
 fixture_test!(service_worker_cache_fixture_subset, service_worker_cache);
 fixture_test!(indexed_db_fixture_subset, indexed_db);
 fixture_test!(selection_fixture_subset, selection);
@@ -41,6 +43,7 @@ fixture_test!(fetch_cors_error_fixture_subset, fetch_cors_errors);
 fixture_test!(modules_error_fixture_subset, modules_errors);
 fixture_test!(html_tree_unsupported_fixture_subset, html_tree_unsupported);
 fixture_test!(realtime_error_fixture_subset, realtime_errors);
+fixture_test!(resource_guard_fixture_subset, resource_guard);
 fixture_test!(
     permissions_media_error_fixture_subset,
     permissions_media_errors
@@ -54,3 +57,5 @@ fixture_test!(
     visual_selection_error_fixture_subset,
     visual_selection_errors
 );
+fixture_test!(viewport_media_fixture_subset, viewport_media);
+fixture_test!(wheel_scroll_fixture_subset, wheel_scroll);

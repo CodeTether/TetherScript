@@ -425,7 +425,7 @@ fn write_json_map(
     }
     let child_pretty = pretty.map(|indent| indent + 2);
     let mut entries: Vec<_> = values.iter().collect();
-    entries.sort_by(|(left, _), (right, _)| left.cmp(right));
+    entries.sort_by_key(|(key, _)| *key);
     for (index, (key, value)) in entries.into_iter().enumerate() {
         if index > 0 {
             out.push(',');

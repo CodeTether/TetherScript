@@ -1,20 +1,15 @@
 //! Cookie data model.
 
 /// SameSite metadata for deterministic request-cookie decisions.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum SameSite {
     /// Send the cookie only for same-site modeled requests.
+    #[default]
     Lax,
     /// Send the cookie only for strict same-site modeled requests.
     Strict,
     /// Send the cookie without same-site filtering.
     None,
-}
-
-impl Default for SameSite {
-    fn default() -> Self {
-        Self::Lax
-    }
 }
 
 impl SameSite {

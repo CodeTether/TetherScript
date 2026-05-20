@@ -6628,7 +6628,7 @@ fn json_object_body(obj: &HashMap<String, JsValue>) -> String {
                 )
         })
         .collect::<Vec<_>>();
-    rows.sort_by(|(left, _), (right, _)| left.cmp(right));
+    rows.sort_by_key(|(key, _)| *key);
     format!(
         "{{{}}}",
         rows.into_iter()

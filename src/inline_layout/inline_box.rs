@@ -1,18 +1,13 @@
 //! Inline-level box and text run types.
 
 /// Vertical alignment for inline boxes inside a line box.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum VerticalAlign {
     Top,
     Middle,
     Bottom,
+    #[default]
     Baseline,
-}
-
-impl Default for VerticalAlign {
-    fn default() -> Self {
-        Self::Baseline
-    }
 }
 
 /// A contiguous run of text with a single style.

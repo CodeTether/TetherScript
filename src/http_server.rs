@@ -135,10 +135,7 @@ fn parse_request(reader: &mut BufReader<TcpStream>) -> Result<Value, String> {
     let mut headers: HashMap<String, Value> = HashMap::new();
     let mut content_length: usize = 0;
     let mut header_bytes: usize = 0;
-    loop {
-        let Some(h) = read_line_limited(reader, MAX_HEADER_LINE_BYTES, "header")? else {
-            break;
-        };
+    while let Some(h) = read_line_limited(reader, MAX_HEADER_LINE_BYTES, "header")? {
         header_bytes += h.len();
         if header_bytes > MAX_HEADER_BYTES {
             return Err(format!("headers exceed {} bytes", MAX_HEADER_BYTES));

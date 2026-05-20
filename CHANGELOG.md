@@ -42,6 +42,9 @@ All notable changes to this project will be documented in this file.
 - Added WPT-like negative/error fixtures for failed realtime connections,
   denied media permissions, blocked frame messages, missing persisted records,
   and invalid visual/selection locators.
+- Added WPT-like browser fixtures for locator/actionability checks,
+  drag/drop plus pointer capture, wheel scrolling, viewport/media emulation, and
+  browser resource-limit guard behavior.
 
 - Added routed external page-resource loading so missing scripts, module entry
   scripts, stylesheets, images, and source maps can be fulfilled through the
