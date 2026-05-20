@@ -8,7 +8,7 @@ use super::url::is_https;
 
 pub(crate) fn visible_pairs(jar: &[Cookie], url: &str, http: bool, source: Option<&str>) -> String {
     let mut cookies = matching(jar, url, http, source);
-    cookies.sort_by(|left, right| right.path.len().cmp(&left.path.len()));
+    cookies.sort_by_key(|cookie| std::cmp::Reverse(cookie.path.len()));
     cookies
         .into_iter()
         .map(|cookie| format!("{}={}", cookie.name, cookie.value))

@@ -850,7 +850,7 @@ impl VM {
                 let scope = Env::child(&f.closure);
                 {
                     let mut env = scope.borrow_mut();
-                    for (name, val) in f.proto.params.iter().zip(args.into_iter()) {
+                    for (name, val) in f.proto.params.iter().zip(args) {
                         env.define(name, val, true);
                     }
                 }
