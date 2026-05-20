@@ -1,10 +1,12 @@
 mod case;
 
 pub mod accessibility;
+pub mod actionability;
 pub mod canvas_webgl;
 pub mod css_layout;
 pub mod dialog_clipboard;
 pub mod dom_events;
+pub mod drag_pointer_capture;
 pub mod fetch_cors;
 pub mod fetch_cors_errors;
 pub mod file_transfer;
@@ -24,6 +26,7 @@ pub mod permissions_media_errors;
 pub mod persisted_records_errors;
 pub mod realtime;
 pub mod realtime_errors;
+pub mod resource_guard;
 pub mod security_policy;
 pub mod selection;
 pub mod selectors;
@@ -33,5 +36,7 @@ pub mod storage;
 pub mod storage_context;
 pub mod timers_microtasks;
 pub mod trace_persistence;
+pub mod viewport_media;
 pub mod visual_diff;
 pub mod visual_selection_errors;
+pub mod wheel_scroll;

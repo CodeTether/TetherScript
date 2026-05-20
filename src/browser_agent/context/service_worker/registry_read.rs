@@ -30,7 +30,7 @@ impl ServiceWorkerStore {
             .filter(|item| url.starts_with(&item.scope))
             .cloned()
             .collect();
-        registrations.sort_by(|left, right| right.scope.len().cmp(&left.scope.len()));
+        registrations.sort_by_key(|registration| std::cmp::Reverse(registration.scope.len()));
         registrations.into_iter().next()
     }
 }

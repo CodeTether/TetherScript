@@ -13,13 +13,14 @@ mod media_page;
 /// let scheme = ColorScheme::Dark;
 /// assert_eq!(scheme, ColorScheme::Dark);
 /// ```
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ColorScheme {
     /// Emulate a light color scheme.
     Light,
     /// Emulate a dark color scheme.
     Dark,
     /// Do not express a color-scheme preference.
+    #[default]
     NoPreference,
 }
 
@@ -32,9 +33,10 @@ pub enum ColorScheme {
 ///
 /// assert_eq!(ReducedMotion::default(), ReducedMotion::NoPreference);
 /// ```
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ReducedMotion {
     /// Do not express a motion preference.
+    #[default]
     NoPreference,
     /// Prefer reduced motion.
     Reduce,
@@ -49,9 +51,10 @@ pub enum ReducedMotion {
 ///
 /// assert_eq!(ForcedColors::default(), ForcedColors::None);
 /// ```
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ForcedColors {
     /// Forced colors are not active.
+    #[default]
     None,
     /// Forced colors are active.
     Active,
@@ -75,22 +78,4 @@ pub struct MediaEmulation {
     pub reduced_motion: ReducedMotion,
     /// Emulated forced-colors state.
     pub forced_colors: ForcedColors,
-}
-
-impl Default for ColorScheme {
-    fn default() -> Self {
-        Self::NoPreference
-    }
-}
-
-impl Default for ReducedMotion {
-    fn default() -> Self {
-        Self::NoPreference
-    }
-}
-
-impl Default for ForcedColors {
-    fn default() -> Self {
-        Self::None
-    }
 }

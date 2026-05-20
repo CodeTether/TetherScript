@@ -154,8 +154,10 @@ file upload/download behavior, realtime channels, permissions/media APIs, and
 dialog/clipboard behavior, frames/window messaging, security policy,
 canvas/WebGL, accessibility snapshots, service workers/cache storage,
 IndexedDB, selection, screenshots/visual diff, and page trace/persistence
-behavior, including negative/error cases, with WPT-area metadata and unsupported
-behavior notes in `docs/browser-wpt-fixtures.md`.
+behavior, locator/actionability checks, drag and pointer capture, wheel
+scrolling, viewport/media emulation, and resource-limit guard behavior,
+including negative/error cases, with WPT-area metadata and unsupported behavior
+notes in `docs/browser-wpt-fixtures.md`.
 
 Completed tests:
 
@@ -195,8 +197,15 @@ Completed tests:
 - Cross-origin frame messages stay blocked until policy allows the origin.
 - Missing CacheStorage and IndexedDB records return empty origin-scoped results.
 - Missing visual and selection targets return strict locator diagnostics.
+- Locator/actionability checks distinguish visible enabled controls from hidden
+  or disabled controls.
+- Drag/drop events and pointer-capture ownership are observable.
+- Wheel input updates page scroll offsets.
+- Viewport resize and media emulation expose page-visible state.
+- Resource-limit guard metadata and oversized-DOM rejection are covered.
 
 ## Immediate Next Item
 
-Add WPT-like fixtures for locator/actionability, drag and pointer capture, wheel
-scrolling, viewport/media emulation, and browser resource-limit guard behavior.
+Expand WPT-like browser parity toward remaining rendering/input edge cases: more
+complete actionability stability checks, DataTransfer drag payloads, matchMedia
+listener dispatch, and quota/memory-pressure style resource guards.

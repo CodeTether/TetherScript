@@ -164,11 +164,7 @@ fn read_response_headers(
 ) -> Result<HashMap<String, String>, String> {
     let mut headers = HashMap::new();
     let mut header_bytes = 0;
-    loop {
-        let Some(line) = read_line_limited(reader, MAX_HEADER_LINE_BYTES, "response header")?
-        else {
-            break;
-        };
+    while let Some(line) = read_line_limited(reader, MAX_HEADER_LINE_BYTES, "response header")? {
         header_bytes += line.len();
         if header_bytes > MAX_HEADER_BYTES {
             return Err(format!(
