@@ -1,10 +1,13 @@
 //! Deterministic touch action support.
 
-use crate::browser_agent::action::{ActionReport, BoundingBox};
+use crate::browser_agent::action::ActionReport;
 use crate::browser_agent::locator::Locator;
 use crate::browser_agent::page::BrowserPage;
 use crate::browser_agent::{prepare, retry};
 use crate::browser_session::TraceEvent;
+
+#[path = "pointer_touch_script.rs"]
+mod pointer_touch_script;
 
 impl BrowserPage {
     /// Dispatch a deterministic touchstart/touchend tap sequence.
@@ -25,7 +28,7 @@ impl BrowserPage {
     ) -> Result<ActionReport, String> {
         let (resolved, checks) =
             retry::run(self, action, locator, |page| prepare::click(page, locator))?;
-        self.eval_js(&touch_script(
+        self.eval_js(&pointer_touch_script::touch_script(
             &resolved.dom.path,
             resolved.bounds,
             include_move,
@@ -40,26 +43,4 @@ impl BrowserPage {
             checks,
         ))
     }
-}
-
-fn touch_script(path: &[usize], bounds: BoundingBox, include_move: bool) -> String {
-    let move_event = if include_move {
-        format!(
-            "n.dispatchEvent({{type:'touchmove',touches:t.touches,targetTouches:t.targetTouches,changedTouches:[{{{}}}]}});",
-            super::pointer_event_fields::touch(bounds)
-        )
-    } else {
-        String::new()
-    };
-    format!(
-        "let n={};let t={{type:'touchstart',touches:[{{{}}}],\
-         targetTouches:[{{{}}}],changedTouches:[{{{}}}]}};\
-         n.dispatchEvent(t);{}n.dispatchEvent({{type:'touchend',touches:[],\
-         targetTouches:[],changedTouches:t.changedTouches}});",
-        crate::browser_agent::keyboard_escape::node(path),
-        super::pointer_event_fields::touch(bounds),
-        super::pointer_event_fields::touch(bounds),
-        super::pointer_event_fields::touch(bounds),
-        move_event
-    )
 }
