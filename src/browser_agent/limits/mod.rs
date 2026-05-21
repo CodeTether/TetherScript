@@ -8,6 +8,8 @@ mod checks;
 mod metadata;
 mod model;
 mod page;
+mod pressure;
 
 pub use metadata::BrowserGuardMetadata;
 pub use model::BrowserResourceLimits;
+pub use pressure::MemoryPressureStatus;
