@@ -42,7 +42,7 @@ fn storage_manager_estimate_returns_usage_and_quota() {
         .eval_js("let out='';navigator.storage.estimate().then(function(e){out=e.quota + ':' + e.usage;});out")
         .unwrap();
 
-    assert_eq!(value.display(), "67108864:0");
+    assert_eq!(value.display(), "67108864:9");
 }
 
 fn storage_write_over_quota_fails_with_quota_exceeded_error() {

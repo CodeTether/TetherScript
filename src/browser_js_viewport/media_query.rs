@@ -1,19 +1,17 @@
-use super::constants::DEFAULT_VIEWPORT_WIDTH;
-
-pub(super) fn matches(query: &str) -> bool {
-    query.split(',').any(matches_part)
+pub(super) fn matches(query: &str, width: i64) -> bool {
+    query.split(',').any(|part| matches_part(part, width))
 }
 
-fn matches_part(part: &str) -> bool {
+fn matches_part(part: &str, width: i64) -> bool {
     let raw = part.trim().to_ascii_lowercase();
     let raw = raw.strip_prefix("only ").unwrap_or(&raw);
     if let Some(rest) = raw.strip_prefix("not ") {
-        return !matches_part(rest);
+        return !matches_part(rest, width);
     }
-    raw.split("and").all(matches_one)
+    raw.split("and").all(|item| matches_one(item, width))
 }
 
-fn matches_one(raw: &str) -> bool {
+fn matches_one(raw: &str, width: i64) -> bool {
     let item = raw
         .trim()
         .trim_start_matches('(')
@@ -26,9 +24,9 @@ fn matches_one(raw: &str) -> bool {
         return false;
     };
     match name.trim() {
-        "width" => px(value).is_some_and(|limit| DEFAULT_VIEWPORT_WIDTH == limit),
-        "min-width" => px(value).is_some_and(|limit| DEFAULT_VIEWPORT_WIDTH >= limit),
-        "max-width" => px(value).is_some_and(|limit| DEFAULT_VIEWPORT_WIDTH <= limit),
+        "width" => px(value).is_some_and(|limit| width == limit),
+        "min-width" => px(value).is_some_and(|limit| width >= limit),
+        "max-width" => px(value).is_some_and(|limit| width <= limit),
         "prefers-color-scheme" => value.trim() == "light",
         "prefers-reduced-motion" => value.trim() == "no-preference",
         "forced-colors" => value.trim() == "none",

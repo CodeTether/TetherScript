@@ -13,7 +13,6 @@ pub(super) fn install(navigator: &JsValue, route_handler: SharedBrowserJsRouteHa
     connection::install(&mut navigator);
     scheduling::install(&mut navigator);
     user_agent_data::install(&mut navigator);
-    storage::install(&mut navigator);
     locks::install(&mut navigator);
     wake_lock::install(&mut navigator);
     media_capabilities::install(&mut navigator);

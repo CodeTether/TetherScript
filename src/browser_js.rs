@@ -145,6 +145,12 @@ struct BrowserRuntime {
     local_storage: Rc<RefCell<StorageArea>>,
     session_storage: Rc<RefCell<StorageArea>>,
     realtime: Rc<RefCell<RealtimeHost>>,
+    media_queries: Rc<RefCell<Vec<MediaQueryHandle>>>,
+}
+
+struct MediaQueryHandle {
+    query: String,
+    object: Rc<RefCell<HashMap<String, JsValue>>>,
 }
 
 struct RealtimeHost {
@@ -288,6 +294,7 @@ struct DomGlobalInstall {
     session_storage_entries: Vec<(String, String)>,
     url: String,
     route_handler: SharedBrowserJsRouteHandler,
+    media_queries: Rc<RefCell<Vec<MediaQueryHandle>>>,
 }
 
 /// Persistent JavaScript runtime for one deterministic browser page.
@@ -357,6 +364,18 @@ impl BrowserJsRuntime {
     /// Install or clear the host request route handler used by fetch and XHR.
     pub(crate) fn set_route_handler(&mut self, handler: Option<BrowserJsRouteHandler>) {
         *self.route_handler.borrow_mut() = handler;
+    }
+
+    pub(crate) fn set_viewport_width(&mut self, width: i64) -> Result<BrowserJsResult, String> {
+        let queries = self.runtime.media_queries.borrow();
+        for query in queries.iter() {
+            let changed = viewport_host::update_media_query(&query.object, &query.query, width)?;
+            if changed {
+                viewport_host::dispatch_media_change(&query.object)?;
+            }
+        }
+        drop(queries);
+        self.settle(JsValue::Undefined)
     }
 
     pub(crate) fn realtime_connections(&self) -> Vec<BrowserJsRealtimeConnection> {
@@ -865,7 +884,7 @@ fn install_dom_globals(
     install_resize_observer(&mut window);
     install_web_api_bindings(&mut window);
     cssom_host::install_window(&mut window);
-    viewport_host::install_window(&mut window);
+    viewport_host::install_window(&mut window, install.media_queries.clone());
     dom_compat_host::install_window(&mut window);
     channels_host::install(&mut window, timers.clone());
     compat_host::install(&mut window);
@@ -1028,6 +1047,7 @@ fn install_dom_globals(
         local_storage: local_storage_area,
         session_storage: session_storage_area,
         realtime,
+        media_queries: install.media_queries,
     })
 }
 

@@ -49,9 +49,12 @@ fn match_media_returns_media_query_list_shape() {
 
 fn match_media_change_listeners_and_removal() {
     let mut page = BrowserPage::from_html("mem://match-media-change", "<main>V</main>");
-    let value = page
-        .eval_js("let m=matchMedia('(min-width: 600px)');let out='';let keep=function(e){out+='K'+e.matches+';';};let gone=function(){out+='G';};m.addEventListener('change',keep);m.addEventListener('change',gone);m.removeEventListener('change',gone);m.dispatchEvent({type:'change'});out")
+    page.eval_js("let m=matchMedia('(min-width: 600px)');window.out='';let keep=function(e){out+='K'+e.matches+';';};let gone=function(){out+='G';};m.addEventListener('change',keep);m.addEventListener('change',gone);m.removeEventListener('change',gone);")
         .unwrap();
+    page.set_viewport_size(640, 480).unwrap();
+    page.set_viewport_size(320, 480).unwrap();
 
-    assert_eq!(value.display(), "Kfalse;");
+    let value = page.eval_js("out").unwrap();
+
+    assert_eq!(value.display(), "Ktrue;Kfalse;");
 }

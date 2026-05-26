@@ -92,6 +92,10 @@ impl BrowserPage {
         }
         self.viewport_width = width;
         self.viewport_height = height;
+        if let Some(runtime) = self.runtime.as_mut() {
+            let result = runtime.set_viewport_width(width);
+            self.apply_runtime_result(self.event_checkpoint(), "page.set_viewport_size", result)?;
+        }
         Ok(())
     }
 

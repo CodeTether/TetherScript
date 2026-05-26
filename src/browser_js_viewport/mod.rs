@@ -41,11 +41,28 @@ pub(super) fn install_document(document: &JsValue, root: Rc<RefCell<Node>>) {
     document::install(document, root);
 }
 
-pub(super) fn install_window(window: &mut HashMap<String, JsValue>) {
+pub(super) fn install_window(
+    window: &mut HashMap<String, JsValue>,
+    queries: Rc<RefCell<Vec<MediaQueryHandle>>>,
+) {
     screen::install(window);
     metrics::install(window);
     visual_viewport::install(window);
-    media_window::install(window);
+    media_window::install(window, queries);
+}
+
+pub(super) fn update_media_query(
+    object: &Rc<RefCell<HashMap<String, JsValue>>>,
+    query: &str,
+    width: i64,
+) -> Result<bool, String> {
+    media_object::update(object, query, width)
+}
+
+pub(super) fn dispatch_media_change(
+    object: &Rc<RefCell<HashMap<String, JsValue>>>,
+) -> Result<(), String> {
+    media_object::dispatch_change(object)
 }
 
 #[cfg(test)]
