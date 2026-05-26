@@ -84,9 +84,8 @@ fn data_transfer_readonly_drop_vs_writable_dragstart() {
     page.drag_to(&Locator::css("#src"), &Locator::css("#dst"))
         .unwrap();
 
-    let log = page.eval_js("window.log").unwrap().display();
-    assert!(
-        log == "start:writable>drop:writable" || log == "start:writable>drop:blocked",
-        "drop must preserve a readable DataTransfer payload; got {log}"
+    assert_eq!(
+        page.eval_js("window.log").unwrap().display(),
+        "start:writable>drop:writable"
     );
 }
