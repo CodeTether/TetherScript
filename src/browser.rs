@@ -67,6 +67,65 @@ pub struct SimpleSelector {
     pub classes: Vec<String>,
     pub attrs: Vec<AttributeSelector>,
     pub not: Vec<SimpleSelector>,
+    pub pseudos: Vec<PseudoClass>,
+}
+
+/// CSS structural pseudo-class selectors.
+#[derive(Debug, Clone, PartialEq)]
+pub enum PseudoClass {
+    FirstChild,
+    LastChild,
+    OnlyChild,
+    Root,
+    Empty,
+    NthChild(i32, i32),
+    NthOfType(i32, i32),
+}
+
+fn parse_nth_args(raw: &str) -> Option<(i32, i32)> {
+    let s = raw.trim().to_ascii_lowercase();
+    if s == "odd" {
+        return Some((2, 1));
+    }
+    if s == "even" {
+        return Some((2, 0));
+    }
+    let s = s.trim_start_matches('+').trim();
+    if let Some(rest) = s.strip_prefix("n") {
+        let a: i32 = 1;
+        let b: i32 = rest.trim().parse().ok().unwrap_or(0);
+        return Some((a, b));
+    }
+    if let Some(rest) = s.strip_prefix("-n") {
+        let b: i32 = rest.trim().parse().ok().unwrap_or(0);
+        return Some((-1, b));
+    }
+    if let Some(rest) = s.strip_prefix("-") {
+        if let Some(after_n) = rest.strip_prefix("n") {
+            let coeff: i32 = -1;
+            let b: i32 = after_n.trim().parse().ok().unwrap_or(0);
+            return Some((coeff, b));
+        }
+    }
+    if let Some(pos) = s.find('n') {
+        let coeff_str = &s[..pos];
+        let a: i32 = if coeff_str.is_empty() || coeff_str == "+" {
+            1
+        } else if coeff_str == "-" {
+            -1
+        } else {
+            coeff_str.parse().ok()?
+        };
+        let rest = &s[pos + 1..];
+        let b: i32 = if rest.trim().is_empty() {
+            0
+        } else {
+            rest.trim().parse().ok()?
+        };
+        return Some((a, b));
+    }
+    let n: i32 = s.parse().ok()?;
+    Some((0, n))
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -739,29 +798,42 @@ fn parse_selector(source: &str) -> Option<Selector> {
     let mut pending_combinator = None;
     let mut in_attr = false;
     let mut in_not = 0usize;
+    let mut in_fn_pseudo = 0usize;
 
     for ch in source.chars().chain(std::iter::once(' ')) {
-        if ch == '[' && in_not == 0 {
+        if ch == '[' && in_not == 0 && in_fn_pseudo == 0 {
             in_attr = true;
             current.push(ch);
             continue;
         }
-        if ch == ']' && in_not == 0 {
+        if ch == ']' && in_not == 0 && in_fn_pseudo == 0 {
             in_attr = false;
             current.push(ch);
             continue;
         }
-        if ch == '(' && current.ends_with(":not") && !in_attr {
+        if ch == '(' && current.ends_with(":not") && !in_attr && in_fn_pseudo == 0 {
             in_not += 1;
             current.push(ch);
             continue;
         }
-        if ch == ')' && in_not > 0 && !in_attr {
+        if ch == ')' && in_not > 0 && !in_attr && in_fn_pseudo == 0 {
             in_not -= 1;
             current.push(ch);
             continue;
         }
-        if !in_attr && in_not == 0 && matches!(ch, '>' | '+' | '~' | ' ' | '\t' | '\n' | '\r') {
+        if ch == '(' && !in_attr && in_not == 0 && in_fn_pseudo == 0 {
+            in_fn_pseudo += 1;
+            current.push(ch);
+            continue;
+        }
+        if ch == ')' && in_fn_pseudo > 0 && !in_attr && in_not == 0 {
+            in_fn_pseudo -= 1;
+            current.push(ch);
+            continue;
+        }
+        if !in_attr && in_not == 0 && in_fn_pseudo == 0
+            && matches!(ch, '>' | '+' | '~' | ' ' | '\t' | '\n' | '\r')
+        {
             if !current.trim().is_empty() {
                 parts.push(SelectorPart {
                     combinator: if parts.is_empty() {
@@ -803,6 +875,7 @@ fn parse_simple_selector(raw: &str) -> Option<SimpleSelector> {
             classes: Vec::new(),
             attrs: Vec::new(),
             not: Vec::new(),
+            pseudos: Vec::new(),
         });
     }
     let mut tag = None;
@@ -810,6 +883,7 @@ fn parse_simple_selector(raw: &str) -> Option<SimpleSelector> {
     let mut classes = Vec::new();
     let mut attrs = Vec::new();
     let mut not = Vec::new();
+    let mut pseudos = Vec::new();
     let mut current = String::new();
     let mut mode = 't';
     let chars: Vec<char> = raw.chars().collect();
@@ -821,6 +895,15 @@ fn parse_simple_selector(raw: &str) -> Option<SimpleSelector> {
             mode = ch;
             index += 1;
             continue;
+        }
+        if ch == ':' && !in_attr_bracket(raw, index) {
+            flush_simple_selector_piece(&mut tag, &mut id, &mut classes, mode, &mut current);
+            let consumed = parse_pseudo_class(raw, index, &mut pseudos);
+            if consumed > 0 {
+                index += consumed;
+                continue;
+            }
+            // unrecognized :ident — skip char, let rest of loop handle it
         }
         if raw[index..].starts_with(":not(") {
             flush_simple_selector_piece(&mut tag, &mut id, &mut classes, mode, &mut current);
@@ -885,7 +968,118 @@ fn parse_simple_selector(raw: &str) -> Option<SimpleSelector> {
         classes,
         attrs,
         not,
+        pseudos,
     })
+}
+
+fn in_attr_bracket(raw: &str, colon_pos: usize) -> bool {
+    let before = &raw[..colon_pos];
+    let opens = before.chars().filter(|c| *c == '[').count();
+    let closes = before.chars().filter(|c| *c == ']').count();
+    opens > closes
+}
+
+fn parse_pseudo_class(raw: &str, start: usize, pseudos: &mut Vec<PseudoClass>) -> usize {
+    let rest = &raw[start + 1..];
+    let simple = [
+        ("first-child", PseudoClass::FirstChild),
+        ("last-child", PseudoClass::LastChild),
+        ("only-child", PseudoClass::OnlyChild),
+        ("root", PseudoClass::Root),
+        ("empty", PseudoClass::Empty),
+    ];
+    for (name, variant) in &simple {
+        if rest.starts_with(name) {
+            let end = name.len();
+            if rest.len() == end || !rest.as_bytes()[end].is_ascii_alphanumeric() {
+                pseudos.push(variant.clone());
+                return 1 + end;
+            }
+        }
+    }
+    let functional: &[(&str, fn(i32, i32) -> PseudoClass)] = &[
+        (":nth-child(", PseudoClass::NthChild),
+        (":nth-of-type(", PseudoClass::NthOfType),
+    ];
+    for (prefix, constructor) in functional {
+        let full = &raw[start..];
+        if let Some(open) = full.find(*prefix) {
+            let args_start = open + prefix.len();
+            if let Some(close) = full[args_start..].find(')') {
+                let args = &full[args_start..args_start + close];
+                if let Some((a, b)) = parse_nth_args(args) {
+                    pseudos.push(constructor(a, b));
+                    return args_start + close + 1;
+                }
+            }
+        }
+    }
+    0
+}
+
+fn element_child_index(siblings: &[Node], index: usize) -> usize {
+    siblings[..index]
+        .iter()
+        .filter(|n| matches!(n, Node::Element(_)))
+        .count()
+}
+
+fn element_child_count(siblings: &[Node]) -> usize {
+    siblings
+        .iter()
+        .filter(|n| matches!(n, Node::Element(_)))
+        .count()
+}
+
+fn element_type_index(siblings: &[Node], index: usize, tag: &str) -> usize {
+    let target = tag.to_ascii_lowercase();
+    siblings[..index]
+        .iter()
+        .filter(|n| {
+            if let Node::Element(e) = n {
+                e.tag == target
+            } else {
+                false
+            }
+        })
+        .count()
+}
+
+fn nth_matches(a: i32, b: i32, n: i32) -> bool {
+    if a == 0 {
+        n == b
+    } else {
+        let diff = n - b;
+        diff % a == 0 && diff / a >= 0
+    }
+}
+
+fn pseudo_class_matches(
+    pseudo: &PseudoClass,
+    element: &Element,
+    ancestors: &[ElementFrame],
+    siblings: &[Node],
+    index: usize,
+) -> bool {
+    match pseudo {
+        PseudoClass::FirstChild => element_child_index(siblings, index) == 0,
+        PseudoClass::LastChild => {
+            let current = element_child_index(siblings, index);
+            let total = element_child_count(siblings);
+            current == total - 1
+        }
+        PseudoClass::OnlyChild => element_child_count(siblings) == 1,
+        PseudoClass::Root => ancestors.is_empty(),
+        PseudoClass::Empty => element.children.is_empty(),
+        PseudoClass::NthChild(a, b) => {
+            let n = (element_child_index(siblings, index) + 1) as i32;
+            nth_matches(*a, *b, n)
+        }
+        PseudoClass::NthOfType(a, b) => {
+            let n = (element_type_index(siblings, index, &element.tag) + 1) as i32;
+            nth_matches(*a, *b, n)
+        }
+    }
 }
 
 fn flush_simple_selector_piece(
@@ -957,6 +1151,11 @@ fn selector_matches(
         return false;
     };
     if !simple_selector_matches(&last.simple, element) {
+        return false;
+    }
+    if !last.simple.pseudos.iter().all(|p| {
+        pseudo_class_matches(p, element, ancestors, siblings, index)
+    }) {
         return false;
     }
     selector_matches_at(
@@ -3477,5 +3676,88 @@ mod tests {
         assert!(layout_to_runtime_value(&args)
             .unwrap_err()
             .contains("expected 1 to 3 args"));
+    }
+
+    #[test]
+    fn pseudo_first_child_selects_first_element_child() {
+        let doc = parse_html("<ul><li>A</li><li>B</li><li>C</li></ul>");
+        assert_eq!(query_selector(&doc, "li:first-child").len(), 1);
+        assert_eq!(
+            text_content(&query_selector(&doc, "li:first-child")[0]),
+            "A"
+        );
+    }
+
+    #[test]
+    fn pseudo_last_child_selects_last_element_child() {
+        let doc = parse_html("<ul><li>A</li><li>B</li><li>C</li></ul>");
+        assert_eq!(query_selector(&doc, "li:last-child").len(), 1);
+        assert_eq!(
+            text_content(&query_selector(&doc, "li:last-child")[0]),
+            "C"
+        );
+    }
+
+    #[test]
+    fn pseudo_only_child_matches_single_element() {
+        let doc = parse_html("<div><span>only</span></div><div><span>a</span><span>b</span></div>");
+        let matches = query_selector(&doc, "span:only-child");
+        assert_eq!(matches.len(), 1);
+        assert_eq!(text_content(&matches[0]), "only");
+    }
+
+    #[test]
+    fn pseudo_root_matches_top_level_elements() {
+        let doc = parse_html("<main><p>child</p></main>");
+        let roots = query_selector(&doc, ":root");
+        assert_eq!(roots.len(), 1);
+    }
+
+    #[test]
+    fn pseudo_empty_matches_childless_elements() {
+        let doc = parse_html("<div><span></span><span>text</span></div>");
+        let empty = query_selector(&doc, "span:empty");
+        assert_eq!(empty.len(), 1);
+    }
+
+    #[test]
+    fn pseudo_nth_child_selects_by_position() {
+        let doc = parse_html("<ul><li>1</li><li>2</li><li>3</li><li>4</li></ul>");
+        assert_eq!(query_selector(&doc, "li:nth-child(2)").len(), 1);
+        assert_eq!(
+            text_content(&query_selector(&doc, "li:nth-child(2)")[0]),
+            "2"
+        );
+        let odd_count = query_selector(&doc, "li:nth-child(odd)").len();
+        assert_eq!(odd_count, 2, "odd matched {odd_count} elements");
+        assert_eq!(query_selector(&doc, "li:nth-child(even)").len(), 2);
+        assert_eq!(query_selector(&doc, "li:nth-child(2n+1)").len(), 2);
+    }
+
+    #[test]
+    fn pseudo_nth_of_type_selects_by_tag_position() {
+        let doc = parse_html(
+            "<div><p>first</p><span>s1</span><p>second</p><span>s2</span></div>",
+        );
+        assert_eq!(query_selector(&doc, "p:nth-of-type(1)").len(), 1);
+        assert_eq!(
+            text_content(&query_selector(&doc, "p:nth-of-type(1)")[0]),
+            "first"
+        );
+        assert_eq!(query_selector(&doc, "p:nth-of-type(2)").len(), 1);
+        assert_eq!(
+            text_content(&query_selector(&doc, "p:nth-of-type(2)")[0]),
+            "second"
+        );
+    }
+
+    #[test]
+    fn pseudo_classes_apply_styles() {
+        let doc = parse_html("<ul><li>A</li><li>B</li><li>C</li></ul>");
+        let styled = computed_styles(&doc, "li:first-child { color: red } li:last-child { color: blue }");
+        let Node::Element(_ul) = &styled[0].node else { panic!("expected ul") };
+        assert_eq!(styled[0].children[0].styles.get("color"), Some(&"red".into()));
+        assert_eq!(styled[0].children[2].styles.get("color"), Some(&"blue".into()));
+        assert!(styled[0].children[1].styles.get("color").is_none());
     }
 }
