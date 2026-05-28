@@ -456,10 +456,16 @@ fn parse_declarations(source: &str) -> HashMap<String, String> {
         let Some((name, value)) = decl.split_once(':') else {
             continue;
         };
-        let name = name.trim().to_ascii_lowercase();
+        let trimmed = name.trim();
+        // CSS custom properties (--*) are case-sensitive; others are lowercase.
+        let key = if trimmed.starts_with("--") {
+            trimmed.to_string()
+        } else {
+            trimmed.to_ascii_lowercase()
+        };
         let value = value.trim().to_string();
-        if !name.is_empty() && !value.is_empty() {
-            declarations.insert(name, value);
+        if !key.is_empty() && !value.is_empty() {
+            declarations.insert(key, value);
         }
     }
     declarations
@@ -693,6 +699,8 @@ fn style_node(
                 styles.insert(name, value);
             }
         }
+        // Resolve var() references using custom properties.
+        resolve_custom_properties(&mut styles);
         // Carry relevant DOM attributes into styles so the layout/display pipeline can
         // reference them (e.g. <img src="..."> produces a non-empty DisplayCommand::Image.src).
         if element.tag.eq_ignore_ascii_case("img") {
@@ -736,12 +744,95 @@ fn style_node(
 
 fn inherited_styles(styles: &HashMap<String, String>) -> HashMap<String, String> {
     let mut inherited = HashMap::new();
-    for key in ["color", "font-size", "font-family"] {
-        if let Some(value) = styles.get(key) {
-            inherited.insert(key.to_string(), value.clone());
+    for (key, value) in styles {
+        // Custom properties (--*) inherit by default per CSS spec.
+        if key.starts_with("--") || matches!(key.as_str(), "color" | "font-size" | "font-family") {
+            inherited.insert(key.clone(), value.clone());
         }
     }
     inherited
+}
+
+/// Resolve all `var(--name)` and `var(--name, default)` references in a
+/// style map using the available custom properties.
+fn resolve_custom_properties(styles: &mut HashMap<String, String>) {
+    // Collect custom properties (they can reference each other).
+    let custom: HashMap<String, String> = styles
+        .iter()
+        .filter(|(k, _)| k.starts_with("--"))
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+    // Resolve non-custom properties that contain var() references.
+    let keys: Vec<String> = styles
+        .iter()
+        .filter(|(k, v)| !k.starts_with("--") && v.contains("var("))
+        .map(|(k, _)| k.clone())
+        .collect();
+    for key in keys {
+        if let Some(value) = styles.get(&key).cloned() {
+            let resolved = resolve_var_refs(&value, &custom);
+            if resolved != value {
+                if resolved.is_empty() {
+                    styles.remove(&key);
+                } else {
+                    styles.insert(key, resolved);
+                }
+            }
+        }
+    }
+}
+
+/// Replace all `var(--name)` and `var(--name, default)` in a value string.
+fn resolve_var_refs(value: &str, custom: &HashMap<String, String>) -> String {
+    let mut result = String::with_capacity(value.len());
+    let mut pos = 0;
+    let bytes = value.as_bytes();
+    while pos < bytes.len() {
+        if bytes[pos..].starts_with(b"var(") {
+            let open = pos + 3; // position of '('
+            if let Some(close) = find_matching_paren(value, open) {
+                let inner = value[open + 1..close].trim();
+                let (var_name, default_value) = if let Some(comma) = inner.find(',') {
+                    let name = inner[..comma].trim();
+                    let dv = inner[comma + 1..].trim();
+                    (name, Some(dv))
+                } else {
+                    (inner, None)
+                };
+                if let Some(resolved) = custom.get(var_name) {
+                    result.push_str(resolved);
+                } else if let Some(dv) = default_value {
+                    result.push_str(dv);
+                }
+                pos = close + 1;
+            } else {
+                result.push(bytes[pos] as char);
+                pos += 1;
+            }
+        } else {
+            result.push(bytes[pos] as char);
+            pos += 1;
+        }
+    }
+    result
+}
+
+/// Find the closing ')' matching the '(' at `open_pos`.
+fn find_matching_paren(value: &str, open_pos: usize) -> Option<usize> {
+    let mut depth = 0;
+    for (i, ch) in value[open_pos..].char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(open_pos + i);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 pub fn styled_node_to_value(styled: &StyledNode) -> Value {
@@ -831,7 +922,9 @@ fn parse_selector(source: &str) -> Option<Selector> {
             current.push(ch);
             continue;
         }
-        if !in_attr && in_not == 0 && in_fn_pseudo == 0
+        if !in_attr
+            && in_not == 0
+            && in_fn_pseudo == 0
             && matches!(ch, '>' | '+' | '~' | ' ' | '\t' | '\n' | '\r')
         {
             if !current.trim().is_empty() {
@@ -997,6 +1090,7 @@ fn parse_pseudo_class(raw: &str, start: usize, pseudos: &mut Vec<PseudoClass>) -
             }
         }
     }
+    #[allow(clippy::type_complexity)]
     let functional: &[(&str, fn(i32, i32) -> PseudoClass)] = &[
         (":nth-child(", PseudoClass::NthChild),
         (":nth-of-type(", PseudoClass::NthOfType),
@@ -1153,9 +1247,12 @@ fn selector_matches(
     if !simple_selector_matches(&last.simple, element) {
         return false;
     }
-    if !last.simple.pseudos.iter().all(|p| {
-        pseudo_class_matches(p, element, ancestors, siblings, index)
-    }) {
+    if !last
+        .simple
+        .pseudos
+        .iter()
+        .all(|p| pseudo_class_matches(p, element, ancestors, siblings, index))
+    {
         return false;
     }
     selector_matches_at(
@@ -3692,10 +3789,7 @@ mod tests {
     fn pseudo_last_child_selects_last_element_child() {
         let doc = parse_html("<ul><li>A</li><li>B</li><li>C</li></ul>");
         assert_eq!(query_selector(&doc, "li:last-child").len(), 1);
-        assert_eq!(
-            text_content(&query_selector(&doc, "li:last-child")[0]),
-            "C"
-        );
+        assert_eq!(text_content(&query_selector(&doc, "li:last-child")[0]), "C");
     }
 
     #[test]
@@ -3736,9 +3830,7 @@ mod tests {
 
     #[test]
     fn pseudo_nth_of_type_selects_by_tag_position() {
-        let doc = parse_html(
-            "<div><p>first</p><span>s1</span><p>second</p><span>s2</span></div>",
-        );
+        let doc = parse_html("<div><p>first</p><span>s1</span><p>second</p><span>s2</span></div>");
         assert_eq!(query_selector(&doc, "p:nth-of-type(1)").len(), 1);
         assert_eq!(
             text_content(&query_selector(&doc, "p:nth-of-type(1)")[0]),
@@ -3754,10 +3846,101 @@ mod tests {
     #[test]
     fn pseudo_classes_apply_styles() {
         let doc = parse_html("<ul><li>A</li><li>B</li><li>C</li></ul>");
-        let styled = computed_styles(&doc, "li:first-child { color: red } li:last-child { color: blue }");
-        let Node::Element(_ul) = &styled[0].node else { panic!("expected ul") };
-        assert_eq!(styled[0].children[0].styles.get("color"), Some(&"red".into()));
-        assert_eq!(styled[0].children[2].styles.get("color"), Some(&"blue".into()));
+        let styled = computed_styles(
+            &doc,
+            "li:first-child { color: red } li:last-child { color: blue }",
+        );
+        let Node::Element(_ul) = &styled[0].node else {
+            panic!("expected ul")
+        };
+        assert_eq!(
+            styled[0].children[0].styles.get("color"),
+            Some(&"red".into())
+        );
+        assert_eq!(
+            styled[0].children[2].styles.get("color"),
+            Some(&"blue".into())
+        );
         assert!(styled[0].children[1].styles.get("color").is_none());
+    }
+
+    #[test]
+    fn custom_property_basic_resolution() {
+        let doc = parse_html("<div><p>Hello</p></div>");
+        let styled = computed_styles(
+            &doc,
+            ":root { --main-color: blue } div { color: var(--main-color) }",
+        );
+        assert_eq!(
+            styled[0].children[0].styles.get("color"),
+            Some(&"blue".into())
+        );
+    }
+
+    #[test]
+    fn custom_property_default_value() {
+        let doc = parse_html("<div><p>Hello</p></div>");
+        let styled = computed_styles(&doc, "div { color: var(--undefined-color, red) }");
+        assert_eq!(
+            styled[0].children[0].styles.get("color"),
+            Some(&"red".into())
+        );
+    }
+
+    #[test]
+    fn custom_property_inheritance() {
+        let doc = parse_html("<div><section><p>Hello</p></section></div>");
+        let styled = computed_styles(
+            &doc,
+            "div { --accent: green } div section { color: var(--accent) }",
+        );
+        assert_eq!(
+            styled[0].children[0].children[0].styles.get("color"),
+            Some(&"green".into())
+        );
+    }
+
+    #[test]
+    fn custom_property_multiple_vars_in_one_value() {
+        let doc = parse_html("<div><p>Hello</p></div>");
+        let styled = computed_styles(
+            &doc,
+            "div { --x: 10px; --y: 20px } div p { margin: var(--x) var(--y) }",
+        );
+        assert_eq!(
+            styled[0].children[0].styles.get("margin"),
+            Some(&"10px 20px".into())
+        );
+    }
+
+    #[test]
+    fn custom_property_unresolved_no_default_omitted() {
+        let doc = parse_html("<div><p>Hello</p></div>");
+        let styled = computed_styles(&doc, "div p { color: var(--missing) }");
+        assert!(styled[0].children[0]
+            .styles
+            .get("color")
+            .is_none_or(|v| v.is_empty()));
+    }
+
+    #[test]
+    fn custom_property_case_sensitive() {
+        let doc = parse_html("<div><p>Hello</p></div>");
+        let styled = computed_styles(
+            &doc,
+            "div { --MyColor: red } div p { color: var(--MyColor) }",
+        );
+        assert_eq!(
+            styled[0].children[0].styles.get("color"),
+            Some(&"red".into())
+        );
+        let styled2 = computed_styles(
+            &doc,
+            "div { --MyColor: red } div p { color: var(--mycolor, blue) }",
+        );
+        assert_eq!(
+            styled2[0].children[0].styles.get("color"),
+            Some(&"blue".into())
+        );
     }
 }
