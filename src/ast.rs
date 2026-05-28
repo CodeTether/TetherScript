@@ -5,6 +5,15 @@
 
 use std::rc::Rc;
 
+/// A part of a string interpolation literal.
+#[derive(Debug, Clone)]
+pub enum InterpPart {
+    /// Literal text segment.
+    Lit(String),
+    /// Expression to evaluate and interpolate.
+    Expr(Box<Expr>),
+}
+
 #[derive(Debug, Clone)]
 pub enum Expr {
     // Literals
@@ -95,6 +104,9 @@ pub enum Expr {
     // `expr?` — if expr is Err(e), short-circuit out of the enclosing fn
     // by returning Err(e); if Ok(v), evaluate to v. See interp for semantics.
     Try(Box<Expr>),
+
+    // String interpolation: `"hello, {name}"`
+    StringInterp(Vec<InterpPart>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
