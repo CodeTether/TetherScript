@@ -1,0 +1,20 @@
+// String interpolation examples
+
+let lang = "tetherscript"
+let version = "0.1"
+println("{lang} v{version}")
+
+// Expressions inside interpolation
+let x = 10
+let y = 20
+println("{x} + {y} = {x + y}")
+
+// Method calls
+let items = ["alpha", "beta", "gamma"]
+println("items has {items.len()} elements: {items.join(", ")}")
+
+// Escaped braces
+println("use \{braces\} for literal braces")
+
+// Plain strings still work
+println("no interpolation here")

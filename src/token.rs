@@ -2,12 +2,23 @@
 
 use std::fmt;
 
+/// A segment inside an interpolated string literal.
+#[derive(Debug, Clone, PartialEq)]
+pub enum InterpSegment {
+    /// Raw text between `{}` holes.
+    Lit(String),
+    /// Source text of an expression inside `{}`.
+    Expr(String),
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
     // Literals
     Int(i64),
     Float(f64),
     Str(String),
+    /// Interpolated string: `"hello, {name}"`.
+    StrInterp(Vec<InterpSegment>),
     Bytes(Vec<u8>),
     Bool(bool),
     Ident(String),

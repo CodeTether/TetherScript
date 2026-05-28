@@ -239,6 +239,10 @@ impl Parser {
                 self.bump();
                 Ok(Expr::Str(s))
             }
+            Token::StrInterp(segments) => {
+                self.bump();
+                self.parse_string_interp(segments)
+            }
             Token::Bytes(bytes) => {
                 self.bump();
                 Ok(Expr::Bytes(bytes))
@@ -547,6 +551,45 @@ impl Parser {
         self.bump(); // `panic`
         let msg = self.parse_expr()?;
         Ok(Expr::Panic(Box::new(msg)))
+    }
+
+    /// Parse interpolated string segments from the lexer into AST parts.
+    /// Each `InterpSegment::Expr(src)` is re-lexed and parsed as a full expression.
+    fn parse_string_interp(
+        &mut self,
+        segments: Vec<crate::token::InterpSegment>,
+    ) -> Result<Expr, ParseError> {
+        use crate::token::InterpSegment;
+        let mut parts = Vec::with_capacity(segments.len());
+        for seg in segments {
+            match seg {
+                InterpSegment::Lit(text) => parts.push(InterpPart::Lit(text)),
+                InterpSegment::Expr(src) => {
+                    let tokens =
+                        crate::lexer::Lexer::new(&src)
+                            .tokenize()
+                            .map_err(|e| ParseError {
+                                msg: format!("in string interpolation: {}", e.msg),
+                                line: e.line,
+                                col: e.col,
+                            })?;
+                    let mut sub = Parser::new(tokens);
+                    let expr = sub.parse_expr()?;
+                    if !matches!(sub.peek(), Token::Eof) {
+                        return Err(ParseError {
+                            msg: format!(
+                                "unexpected token after interpolation expression: {:?}",
+                                sub.peek()
+                            ),
+                            line: sub.peek_spanned().line,
+                            col: sub.peek_spanned().col,
+                        });
+                    }
+                    parts.push(InterpPart::Expr(Box::new(expr)));
+                }
+            }
+        }
+        Ok(Expr::StringInterp(parts))
     }
 }
 

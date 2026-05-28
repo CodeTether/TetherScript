@@ -6,7 +6,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::{BinOp, Block, Expr, Program, Stmt};
+use crate::ast::{BinOp, Block, Expr, InterpPart, Program, Stmt};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diagnostic {
@@ -219,6 +219,13 @@ impl Analyzer {
             | Expr::Bytes(_)
             | Expr::Bool(_)
             | Expr::Nil => {}
+            Expr::StringInterp(parts) => {
+                for part in parts {
+                    if let InterpPart::Expr(e) = part {
+                        self.expr(e);
+                    }
+                }
+            }
         }
     }
 
