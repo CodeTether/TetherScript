@@ -82,6 +82,7 @@ use timers_host::TimerQueue;
 
 const DOM_API_VERSION: &str = "tetherscript-dom-0.3";
 const MAX_TIMER_DRAIN: usize = 10_000;
+const DEFAULT_STORAGE_QUOTA_BYTES: usize = 64;
 
 thread_local! {
     static EVENT_REGISTRY: RefCell<HashMap<String, EventEntry>> = RefCell::new(HashMap::new());
@@ -136,6 +137,7 @@ struct ScheduledCallback {
 #[derive(Default)]
 struct StorageArea {
     entries: Vec<(String, String)>,
+    quota_bytes: usize,
 }
 
 struct BrowserRuntime {
@@ -791,6 +793,11 @@ fn install_dom_globals(
     // cross-document storage events for it.
     let (session_storage, session_storage_area) =
         storage_object("sessionStorage", session_storage_entries, None);
+    install_storage_manager(
+        &navigator,
+        local_storage_area.clone(),
+        session_storage_area.clone(),
+    );
     let cookie_store = cookie_host::store_object(&document);
     let history = history_object(location_map.clone());
     window.insert("location".into(), location.clone());
@@ -1772,7 +1779,10 @@ fn storage_object(
     entries: Vec<(String, String)>,
     event_window: Option<StorageEventWindow>,
 ) -> (JsValue, Rc<RefCell<StorageArea>>) {
-    let area = Rc::new(RefCell::new(StorageArea { entries }));
+    let area = Rc::new(RefCell::new(StorageArea {
+        entries,
+        quota_bytes: DEFAULT_STORAGE_QUOTA_BYTES,
+    }));
     let object = Rc::new(RefCell::new(HashMap::new()));
 
     object
@@ -1806,7 +1816,7 @@ fn storage_object(
             if old_value.as_deref() == Some(value.as_str()) {
                 return Ok(JsValue::Undefined);
             }
-            area.borrow_mut().set(key.clone(), value.clone());
+            area.borrow_mut().try_set(key.clone(), value.clone())?;
             sync_storage_length(&object_for_closure, &area);
             if let Some(window) = &event_window {
                 dispatch_storage_event(
@@ -1884,6 +1894,35 @@ fn storage_object(
     (JsValue::Object(object), area)
 }
 
+fn install_storage_manager(
+    navigator: &JsValue,
+    local: Rc<RefCell<StorageArea>>,
+    session: Rc<RefCell<StorageArea>>,
+) {
+    let JsValue::Object(navigator) = navigator else {
+        return;
+    };
+    let storage = Rc::new(RefCell::new(HashMap::new()));
+    storage.borrow_mut().insert(
+        "estimate".into(),
+        native("StorageManager.estimate", Some(0), move |_| {
+            let usage = local.borrow().usage_bytes() + session.borrow().usage_bytes();
+            let quota = local.borrow().quota_bytes + session.borrow().quota_bytes;
+            let result = Rc::new(RefCell::new(HashMap::new()));
+            result
+                .borrow_mut()
+                .insert("usage".into(), JsValue::Number(usage as f64));
+            result
+                .borrow_mut()
+                .insert("quota".into(), JsValue::Number(quota as f64));
+            Ok(JsValue::Object(result))
+        }),
+    );
+    navigator
+        .borrow_mut()
+        .insert("storage".into(), JsValue::Object(storage));
+}
+
 fn dispatch_storage_event(
     window: &StorageEventWindow,
     storage: &Rc<RefCell<HashMap<String, JsValue>>>,
@@ -1948,7 +1987,14 @@ impl StorageArea {
             .find(|(existing, _)| existing == key)
             .map(|(_, value)| value.clone())
     }
-    fn set(&mut self, key: String, value: String) {
+    fn try_set(&mut self, key: String, value: String) -> Result<(), String> {
+        let projected = self.projected_usage(&key, &value);
+        if projected > self.quota_bytes {
+            return Err(format!(
+                "QuotaExceededError: storage quota exceeded: usage {projected} > quota {}",
+                self.quota_bytes
+            ));
+        }
         if let Some((_, existing)) = self
             .entries
             .iter_mut()
@@ -1958,6 +2004,27 @@ impl StorageArea {
         } else {
             self.entries.push((key, value));
         }
+        Ok(())
+    }
+    fn usage_bytes(&self) -> usize {
+        self.entries.iter().map(|(k, v)| k.len() + v.len()).sum()
+    }
+    fn projected_usage(&self, key: &str, value: &str) -> usize {
+        self.entries
+            .iter()
+            .map(|(existing, current)| {
+                if existing == key {
+                    existing.len() + value.len()
+                } else {
+                    existing.len() + current.len()
+                }
+            })
+            .sum::<usize>()
+            + if self.entries.iter().any(|(existing, _)| existing == key) {
+                0
+            } else {
+                key.len() + value.len()
+            }
     }
     fn remove(&mut self, key: &str) -> Option<String> {
         let index = self

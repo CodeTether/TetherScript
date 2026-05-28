@@ -16,7 +16,7 @@ pub(crate) fn drag(
         "let s={};let t={};{}{}__pe(s,'pointerover',0);__pe(s,'pointerdown',1);\
          s.dispatchEvent({{type:'mousedown',{}}});\
          let started=s.dispatchEvent({{type:'dragstart',dataTransfer:dt,{}}});\
-         if(started){{__pe(__pt(t),'pointermove',1);t.dispatchEvent({{type:'dragenter',\
+         __readonly=true;if(started){{__pe(__pt(t),'pointermove',1);t.dispatchEvent({{type:'dragenter',\
          dataTransfer:dt,{}}});t.dispatchEvent({{type:'dragover',\
          dataTransfer:dt,{}}});let ok=t.dispatchEvent({{type:'drop',\
          dataTransfer:dt,{}}});if(ok){{__dropDefault(t,dt);}}}}\

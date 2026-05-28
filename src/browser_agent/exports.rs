@@ -28,7 +28,7 @@ pub use super::events::{PageErrorEvent, PageEventKind, PageEventSummary};
 pub use super::frames::{BrowserFrame, FrameId, FrameTree};
 pub use super::interact::focus::FocusTarget;
 pub use super::keyboard::KeyboardKey;
-pub use super::limits::{BrowserGuardMetadata, BrowserResourceLimits};
+pub use super::limits::{BrowserGuardMetadata, BrowserResourceLimits, MemoryPressureStatus};
 pub use super::locator::{Locator, LocatorKind};
 pub use super::navigation::{NavigationKind, NavigationResult, NavigationStatus, PageHistoryEntry};
 pub use super::navigation_state::{PageLoadState, PageNavigation};
