@@ -4,7 +4,7 @@ use super::*;
 ///
 /// Provides helper functions that compute common properties of DOM ranges,
 /// such as the nearest shared ancestor node between two boundary points.
-
+///
 /// Computes the nearest common ancestor [`DomHandle`] for a DOM range.
 ///
 /// Walks the path segments of the range's start and end handles in lockstep,

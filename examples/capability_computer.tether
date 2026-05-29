@@ -1,0 +1,10 @@
+// Demonstrates the harness-granted computer capability.
+//
+// A host must grant `computer` with ComputerAuthority before running this.
+
+fn inspect_desktop() {
+    let info = computer.describe()
+    println("computer bridge:", info.endpoint)
+    println("computer mDNS:", info.mdns_service_type)
+    return computer.snapshot()
+}
