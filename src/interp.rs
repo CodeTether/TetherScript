@@ -400,7 +400,7 @@ impl Interpreter {
                 let mut out = String::new();
                 for part in parts {
                     match part {
-                        InterpPart::Lit(text) => out.push_str(&text),
+                        InterpPart::Lit(text) => out.push_str(text),
                         InterpPart::Expr(expr) => {
                             let v = self.eval(expr, env)?;
                             out.push_str(&v.to_string());
