@@ -441,7 +441,7 @@ mod tests {
 
     #[test]
     fn plugin_can_call_host_capability() {
-        let source = r#"
+        let source = r##"
 fn plugin() {
     let m = map()
     m.name = "self-validator"
@@ -449,13 +449,13 @@ fn plugin() {
 }
 
 fn validate() {
-    let d = tetherscript.diagnose("fn main() { println(\"ok\") }")?
+    let d = tetherscript.diagnose("fn main() \{ println(\"ok\") \}")?
     if d.ok {
         return Ok("valid")
     }
     return Err(d.message)
 }
-"#;
+"##;
         let mut host = PluginHost::new();
         host.grant("tetherscript", TetherScriptAuthority::new());
         let mut plugin = host.load_source("self-validator", source).unwrap();
