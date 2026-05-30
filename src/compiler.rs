@@ -404,6 +404,25 @@ impl Compiler {
                 }
                 self.emit(Instr::BuildList(handles.len() as u16));
             }
+
+            Expr::StringInterp(parts) => {
+                // Compile as: push empty string, then for each part,
+                // push part + concat.
+                let empty = self.add_const(Value::Str(Rc::new(String::new())));
+                self.emit(Instr::Const(empty));
+                for part in parts {
+                    match part {
+                        InterpPart::Lit(text) => {
+                            let c = self.add_const(Value::Str(Rc::new(text.clone())));
+                            self.emit(Instr::Const(c));
+                        }
+                        InterpPart::Expr(expr) => {
+                            self.compile_expr(expr);
+                        }
+                    }
+                    self.emit(Instr::Add);
+                }
+            }
         }
     }
 

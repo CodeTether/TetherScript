@@ -288,8 +288,10 @@ impl<'a> Lexer<'a> {
     }
 
     fn string(&mut self, line: usize, col: usize) -> Result<Spanned, LexError> {
+        use crate::token::InterpSegment;
         self.bump(); // consume opening "
-        let mut s = String::new();
+        let mut lit = String::new();
+        let mut segments: Vec<InterpSegment> = Vec::new();
         loop {
             match self.peek() {
                 None => {
@@ -303,14 +305,122 @@ impl<'a> Lexer<'a> {
                     self.bump();
                     break;
                 }
+                Some(b'{') => {
+                    // Start of interpolation hole.
+                    if !lit.is_empty() {
+                        segments.push(InterpSegment::Lit(std::mem::take(&mut lit)));
+                    }
+                    self.bump(); // consume {
+                    let mut expr_src = String::new();
+                    let mut depth = 1u32;
+                    while depth > 0 {
+                        match self.peek() {
+                            None => {
+                                return Err(LexError {
+                                    msg: "unterminated interpolation in string".into(),
+                                    line,
+                                    col,
+                                })
+                            }
+                            Some(b'{') => {
+                                depth += 1;
+                                expr_src.push('{');
+                                self.bump();
+                            }
+                            Some(b'}') => {
+                                depth -= 1;
+                                if depth > 0 {
+                                    expr_src.push('}');
+                                }
+                                self.bump();
+                            }
+                            Some(b'"') => {
+                                // Nested string literal inside interpolation.
+                                // Capture it verbatim so the sub-parser can lex it.
+                                expr_src.push('"');
+                                self.bump();
+                                loop {
+                                    match self.peek() {
+                                        None => {
+                                            return Err(LexError {
+                                                msg: "unterminated string inside interpolation"
+                                                    .into(),
+                                                line,
+                                                col,
+                                            })
+                                        }
+                                        Some(b'"') => {
+                                            expr_src.push('"');
+                                            self.bump();
+                                            break;
+                                        }
+                                        Some(b'\\') => {
+                                            expr_src.push('\\');
+                                            self.bump();
+                                            if let Some(c) = self.peek() {
+                                                expr_src.push(c as char);
+                                                self.bump();
+                                            }
+                                        }
+                                        Some(c) => {
+                                            expr_src.push(c as char);
+                                            self.bump();
+                                        }
+                                    }
+                                }
+                            }
+                            Some(c) => {
+                                if c < 0x80 {
+                                    expr_src.push(c as char);
+                                } else {
+                                    let start = self.pos;
+                                    let width = utf8_width(self.src[start]);
+                                    if start + width > self.src.len() {
+                                        return Err(LexError {
+                                            msg: "invalid UTF-8 in string literal".into(),
+                                            line: self.line,
+                                            col: self.col,
+                                        });
+                                    }
+                                    let bytes = &self.src[start..start + width];
+                                    let ch = std::str::from_utf8(bytes)
+                                        .map_err(|_| LexError {
+                                            msg: "invalid UTF-8 in string literal".into(),
+                                            line: self.line,
+                                            col: self.col,
+                                        })?
+                                        .chars()
+                                        .next()
+                                        .unwrap();
+                                    expr_src.push(ch);
+                                    self.pos += width;
+                                    self.col += 1;
+                                    continue; // skip bump at end
+                                }
+                                self.bump();
+                            }
+                        }
+                    }
+                    let trimmed = expr_src.trim().to_string();
+                    if trimmed.is_empty() {
+                        return Err(LexError {
+                            msg: "empty interpolation {}".into(),
+                            line,
+                            col,
+                        });
+                    }
+                    segments.push(InterpSegment::Expr(trimmed));
+                }
                 Some(b'\\') => {
                     self.bump();
                     match self.bump() {
-                        Some(b'n') => s.push('\n'),
-                        Some(b't') => s.push('\t'),
-                        Some(b'r') => s.push('\r'),
-                        Some(b'\\') => s.push('\\'),
-                        Some(b'"') => s.push('"'),
+                        Some(b'n') => lit.push('\n'),
+                        Some(b't') => lit.push('\t'),
+                        Some(b'r') => lit.push('\r'),
+                        Some(b'\\') => lit.push('\\'),
+                        Some(b'"') => lit.push('"'),
+                        Some(b'{') => lit.push('{'),
+                        Some(b'}') => lit.push('}'),
                         Some(other) => {
                             return Err(LexError {
                                 msg: format!("bad escape: \\{}", other as char),
@@ -328,13 +438,10 @@ impl<'a> Lexer<'a> {
                     }
                 }
                 Some(c) if c < 0x80 => {
-                    s.push(c as char);
+                    lit.push(c as char);
                     self.bump();
                 }
                 Some(_) => {
-                    // UTF-8 multi-byte sequence: consume the full codepoint
-                    // so we don't split it into Latin-1 chars (which would
-                    // double-encode on re-serialization).
                     let start = self.pos;
                     let width = utf8_width(self.src[start]);
                     if start + width > self.src.len() {
@@ -354,15 +461,20 @@ impl<'a> Lexer<'a> {
                         .chars()
                         .next()
                         .unwrap();
-                    s.push(ch);
-                    // Advance position + column manually; multi-byte chars
-                    // count as one column and never contain a newline.
+                    lit.push(ch);
                     self.pos += width;
                     self.col += 1;
                 }
             }
         }
-        Ok(self.make(Token::Str(s), line, col))
+        if segments.is_empty() {
+            Ok(self.make(Token::Str(lit), line, col))
+        } else {
+            if !lit.is_empty() {
+                segments.push(InterpSegment::Lit(lit));
+            }
+            Ok(self.make(Token::StrInterp(segments), line, col))
+        }
     }
 
     fn bytes_string(&mut self, line: usize, col: usize) -> Result<Spanned, LexError> {
