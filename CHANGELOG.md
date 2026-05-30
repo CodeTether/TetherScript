@@ -84,6 +84,23 @@ All notable changes to this project will be documented in this file.
   validation, cross-origin cookie suppression by default, and credentialed
   cookie forwarding when `credentials: "include"` or `withCredentials` is set.
 
+## [0.1.0-alpha.17] - 2026-05-29
+
+### Added
+
+- Added an origin-bound `computer` capability so hosts can expose existing
+  CodeTether `computer_use` desktop automation as scriptable TetherScript
+  actions through explicit `grant_computer`, `computer_scope`, and
+  `computer_origin` grants.
+- Added contract coverage proving TetherScript plugin scripts can call
+  `computer.snapshot()` through a host-granted bridge.
+
+### Fixed
+
+- Fixed plugin test source strings that used literal braces after string
+  interpolation support was added.
+- Fixed clippy warnings in selection docs and string interpolation rendering.
+
 ## [0.1.0-alpha.16] - 2026-05-18
 
 ### Added

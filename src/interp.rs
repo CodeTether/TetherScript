@@ -395,6 +395,20 @@ impl Interpreter {
                     ))),
                 }
             }
+
+            Expr::StringInterp(parts) => {
+                let mut out = String::new();
+                for part in parts {
+                    match part {
+                        InterpPart::Lit(text) => out.push_str(text),
+                        InterpPart::Expr(expr) => {
+                            let v = self.eval(expr, env)?;
+                            out.push_str(&v.to_string());
+                        }
+                    }
+                }
+                Ok(Value::Str(Rc::new(out)))
+            }
         }
     }
 
@@ -1891,6 +1905,44 @@ fn main() {
         growing.push(99)
     }
     assert(seen.join(",") == "1,2", "for loop should snapshot iterable")
+}
+"#;
+        let program = parse(source);
+
+        let mut interp = Interpreter::new();
+        interp.run(&program).unwrap();
+
+        let chunk = Compiler::compile_program(&program);
+        let mut vm = VM::new();
+        vm.run(chunk).unwrap();
+    }
+
+    #[test]
+    fn string_interpolation_in_interpreter_and_vm() {
+        let source = r#"
+fn main() {
+    let lang = "tetherscript"
+    let v = "0.1"
+    assert("{lang} v{v}" == "tetherscript v0.1", "basic interp failed")
+
+    let x = 10
+    let y = 20
+    assert("{x + y}" == "30", "expr interp failed")
+
+    let items = [1, 2, 3]
+    assert("len={items.len()}" == "len=3", "method interp failed")
+
+    // Escaped braces produce literal braces (no interpolation)
+    let literal = "\{ok\}"
+    assert(literal == "\{ok\}", "escaped braces failed")
+
+    // Plain string unchanged
+    assert("no holes" == "no holes", "plain string changed")
+
+    // Multiple holes
+    let a = "A"
+    let b = "B"
+    assert("{a}-{b}" == "A-B", "multi-hole interp failed")
 }
 "#;
         let program = parse(source);
