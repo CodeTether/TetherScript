@@ -38,11 +38,13 @@ mod js;
 mod json;
 mod lexer;
 mod lsp;
+mod main_caps;
 mod main_usage;
 mod output;
 mod ownership;
 mod parser;
 mod provider_cap;
+mod provider_vault;
 mod rpc_cap;
 mod scheduler;
 mod smtp;
@@ -61,6 +63,7 @@ use std::process;
 use compiler::Compiler;
 use interp::Interpreter;
 use lexer::Lexer;
+use main_caps::RunCaps;
 use main_usage::print_usage;
 use parser::Parser;
 use vm::VM;
@@ -130,6 +133,7 @@ fn cmd_run(args: &[String]) {
     let mut fs_grant: Option<String> = None;
     let mut provider_grant: Option<String> = None;
     let mut provider_key: Option<String> = None;
+    let mut provider_vault: Option<String> = None;
     let mut rpc_grant: Option<String> = None;
     let mut browser_grant: Option<String> = None;
     let mut browser_origins: Vec<String> = Vec::new();
@@ -197,6 +201,15 @@ fn cmd_run(args: &[String]) {
                     process::exit(2);
                 }
                 provider_key = Some(args[i].clone());
+                i += 1;
+            }
+            "--grant-provider-vault" => {
+                i += 1;
+                if i >= args.len() {
+                    eprintln!("tetherscript run: --grant-provider-vault requires a provider id");
+                    process::exit(2);
+                }
+                provider_vault = Some(args[i].clone());
                 i += 1;
             }
             "--grant-rpc" => {
@@ -280,6 +293,7 @@ fn cmd_run(args: &[String]) {
         &fs_grant,
         &provider_grant,
         &provider_key,
+        &provider_vault,
         &rpc_grant,
         &browser_grant,
         &browser_origins,
@@ -624,6 +638,7 @@ fn cmd_run_legacy(args: &[String]) {
     let mut fs_grant: Option<String> = None;
     let mut provider_grant: Option<String> = None;
     let mut provider_key: Option<String> = None;
+    let mut provider_vault: Option<String> = None;
     let mut rpc_grant: Option<String> = None;
     let mut browser_grant: Option<String> = None;
     let mut browser_origins: Vec<String> = Vec::new();
@@ -685,6 +700,15 @@ fn cmd_run_legacy(args: &[String]) {
                     process::exit(2);
                 }
                 provider_key = Some(args[i].clone());
+                i += 1;
+            }
+            "--grant-provider-vault" => {
+                i += 1;
+                if i >= args.len() {
+                    eprintln!("tetherscript: --grant-provider-vault requires a provider id");
+                    process::exit(2);
+                }
+                provider_vault = Some(args[i].clone());
                 i += 1;
             }
             "--grant-rpc" => {
@@ -771,6 +795,7 @@ fn cmd_run_legacy(args: &[String]) {
         &fs_grant,
         &provider_grant,
         &provider_key,
+        &provider_vault,
         &rpc_grant,
         &browser_grant,
         &browser_origins,
@@ -810,6 +835,7 @@ fn execute_file(
     fs_grant: &Option<String>,
     provider_grant: &Option<String>,
     provider_key: &Option<String>,
+    provider_vault: &Option<String>,
     rpc_grant: &Option<String>,
     browser_grant: &Option<String>,
     browser_origins: &[String],
@@ -847,16 +873,20 @@ fn execute_file(
         let chunk = Compiler::compile_program(&program);
         let mut vm = VM::new();
         vm.set_instruction_budget(step_budget);
-        grant_capabilities_vm(
-            &mut vm,
+        let caps = RunCaps {
             fs_grant,
             provider_grant,
             provider_key,
+            provider_vault,
             rpc_grant,
             browser_grant,
             browser_origins,
             browser_scopes,
-        );
+        };
+        if let Err(e) = main_caps::grant_vm(&mut vm, &caps) {
+            eprintln!("tetherscript: {}", e);
+            process::exit(1);
+        }
         let result = vm.run(chunk);
         if let Err(e) = result {
             eprintln!("tetherscript: {}", e);
@@ -864,16 +894,20 @@ fn execute_file(
         }
     } else {
         let mut interp = Interpreter::new();
-        grant_capabilities_interp(
-            &mut interp,
+        let caps = RunCaps {
             fs_grant,
             provider_grant,
             provider_key,
+            provider_vault,
             rpc_grant,
             browser_grant,
             browser_origins,
             browser_scopes,
-        );
+        };
+        if let Err(e) = main_caps::grant_interp(&mut interp, &caps) {
+            eprintln!("tetherscript: {}", e);
+            process::exit(1);
+        }
         let result = if let Some(budget) = step_budget {
             interp::with_step_budget(budget, || interp.run(&program))
         } else {
@@ -883,104 +917,6 @@ fn execute_file(
             eprintln!("tetherscript: {}", e);
             process::exit(1);
         }
-    }
-}
-
-fn grant_capabilities_vm(
-    vm: &mut VM,
-    fs_grant: &Option<String>,
-    provider_grant: &Option<String>,
-    provider_key: &Option<String>,
-    rpc_grant: &Option<String>,
-    browser_grant: &Option<String>,
-    browser_origins: &[String],
-    browser_scopes: &[String],
-) {
-    if let Some(root) = fs_grant {
-        vm.grant("fs", fs_cap::FsAuthority::new(root));
-    }
-    if let Some(endpoint) = provider_grant {
-        let auth = provider_cap::ProviderAuthority::new(endpoint);
-        let auth = if let Some(key) = provider_key {
-            provider_cap::ProviderAuthority::with_bound_header(
-                auth,
-                "Authorization",
-                &format!("Bearer {}", key),
-            )
-        } else {
-            auth
-        };
-        vm.grant("provider", auth);
-    }
-    if let Some(endpoint) = rpc_grant {
-        vm.grant("rpc", rpc_cap::RpcAuthority::new(endpoint));
-    }
-    if let Some(endpoint) = browser_grant {
-        let scopes = if browser_scopes.is_empty() {
-            vec![
-                "browser.navigate".into(),
-                "browser.interact".into(),
-                "browser.inspect.dom".into(),
-                "browser.inspect.console".into(),
-                "browser.inspect.network".into(),
-                "browser.screenshot".into(),
-            ]
-        } else {
-            browser_scopes.to_vec()
-        };
-        vm.grant(
-            "browser",
-            browser_cap::BrowserAuthority::new(endpoint, browser_origins.to_vec(), scopes),
-        );
-    }
-}
-
-fn grant_capabilities_interp(
-    interp: &mut Interpreter,
-    fs_grant: &Option<String>,
-    provider_grant: &Option<String>,
-    provider_key: &Option<String>,
-    rpc_grant: &Option<String>,
-    browser_grant: &Option<String>,
-    browser_origins: &[String],
-    browser_scopes: &[String],
-) {
-    if let Some(root) = fs_grant {
-        interp.grant("fs", fs_cap::FsAuthority::new(root));
-    }
-    if let Some(endpoint) = provider_grant {
-        let auth = provider_cap::ProviderAuthority::new(endpoint);
-        let auth = if let Some(key) = provider_key {
-            provider_cap::ProviderAuthority::with_bound_header(
-                auth,
-                "Authorization",
-                &format!("Bearer {}", key),
-            )
-        } else {
-            auth
-        };
-        interp.grant("provider", auth);
-    }
-    if let Some(endpoint) = rpc_grant {
-        interp.grant("rpc", rpc_cap::RpcAuthority::new(endpoint));
-    }
-    if let Some(endpoint) = browser_grant {
-        let scopes = if browser_scopes.is_empty() {
-            vec![
-                "browser.navigate".into(),
-                "browser.interact".into(),
-                "browser.inspect.dom".into(),
-                "browser.inspect.console".into(),
-                "browser.inspect.network".into(),
-                "browser.screenshot".into(),
-            ]
-        } else {
-            browser_scopes.to_vec()
-        };
-        interp.grant(
-            "browser",
-            browser_cap::BrowserAuthority::new(endpoint, browser_origins.to_vec(), scopes),
-        );
     }
 }
 
@@ -1021,6 +957,7 @@ fn print_help() {
     println!("    tetherscript run --interp fib.tether");
     println!("    tetherscript run --grant-fs . policy.tether");
     println!("    tetherscript run --grant-provider http://localhost:11434 chat.tether");
+    println!("    tetherscript run --grant-provider-vault openai chat.tether");
     println!("    tetherscript run --grant-provider https://api.cerebras.ai glm_chat.tether");
     println!("    tetherscript run --grant-provider https://api.cerebras.ai glm_chat.tether");
     println!("    tetherscript run --grant-rpc http://127.0.0.1:36627 agent.tether");
@@ -1055,6 +992,7 @@ fn print_run_help() {
         "    --grant-provider <url>  Grant LLM provider capability (http:// or https://host:port)"
     );
     println!("    --grant-provider-key <k> API key for the provider (sent as Bearer token)");
+    println!("    --grant-provider-vault <id> Load provider grant from Vault KV v2");
     println!("    --grant-rpc <url>       Grant JSON-RPC capability (http://host:port)");
     println!("    -h, --help              Print this help message");
     println!();
@@ -1063,6 +1001,7 @@ fn print_run_help() {
     println!("    tetherscript run --step-budget 100000 fib.tether");
     println!("    tetherscript run --grant-fs . policy.tether");
     println!("    tetherscript run --grant-provider http://localhost:11434 chat.tether");
+    println!("    tetherscript run --grant-provider-vault openai chat.tether");
     println!("    tetherscript run --grant-rpc http://127.0.0.1:36627 agent.tether");
 }
 

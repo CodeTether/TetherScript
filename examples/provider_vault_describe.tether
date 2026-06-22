@@ -1,0 +1,13 @@
+// Provider capability loaded from CodeTether-style Vault secrets.
+//
+// Run with:
+//   VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=... \
+//     tetherscript run --grant-provider-vault openai \
+//     examples/provider_vault_describe.tether
+
+fn main() {
+    let info = provider.describe().unwrap()
+    println(info.endpoint)
+    println(info.path)
+    println(info.bound_header_names.join(","))
+}

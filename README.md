@@ -183,13 +183,18 @@ including:
   `fs_remove`, `fs_rename`, `fs_copy`
 - `process_run`, `process_args`, `process_pid`, `process_platform`,
   `process_arch`
+- `tui_size`, `tui_render`, `tui_present`, `tui_read_event`,
+  `tui_clear`, `tui_cursor`, `tui_alt_screen`, `tui_move_to`
 - `env_get`, `cwd`, `chdir`
 - `path_join`, `path_dirname`, `path_basename`, `path_extname`,
   `path_normalize`, `path_resolve`, `path_sep`
 - `time_now_ms`, `sleep_ms`
 - `sha256_hex`, `base64_encode`, `base64_decode`, `url_parse`
 
-See [`docs/standard-tools.md`](docs/standard-tools.md) for more detail.
+See [`docs/standard-tools.md`](docs/standard-tools.md) for more detail. See
+[`docs/agent-tui.md`](docs/agent-tui.md) for the user-land agent TUI pattern.
+Provider grants can also be bootstrapped from CodeTether-style Vault KV v2
+secrets with `--grant-provider-vault <provider-id>`.
 
 ## Plugin embedding
 

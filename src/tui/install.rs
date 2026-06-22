@@ -1,0 +1,30 @@
+//! Built-in registration for terminal UI helpers.
+
+use std::rc::Rc;
+
+use crate::value::{Env, NativeFn, NativeFunc, Value};
+
+type Native = fn(&[Value]) -> Result<Value, String>;
+
+pub(super) fn install(env: &mut Env) {
+    define(env, "tui_size", Some(0), super::size::builtin);
+    define(env, "tui_clear", Some(0), super::ansi::clear);
+    define(env, "tui_cursor", Some(1), super::ansi::cursor);
+    define(env, "tui_alt_screen", Some(1), super::ansi::alt_screen);
+    define(env, "tui_move_to", Some(2), super::ansi::move_to);
+    define(env, "tui_render", Some(1), super::render::render);
+    define(env, "tui_present", Some(1), super::render::present);
+    define(env, "tui_read_event", None, super::input::read_event);
+}
+
+fn define(env: &mut Env, name: &str, arity: Option<usize>, func: Native) {
+    env.define(
+        name,
+        Value::Native(Rc::new(NativeFn {
+            name: name.into(),
+            arity,
+            func: NativeFunc::Pure(Box::new(func)),
+        })),
+        false,
+    );
+}

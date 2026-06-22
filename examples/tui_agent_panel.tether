@@ -1,0 +1,22 @@
+fn event(kind, name, text) {
+    let item = map()
+    item["kind"] = kind
+    item["name"] = name
+    item["text"] = text
+    return item
+}
+
+fn main() {
+    let view = map()
+    view["title"] = "agent bus"
+    view["width"] = 48
+    view["height"] = 7
+    view["status"] = "ready"
+    view["items"] = [
+        event("user", "riley", "ship terminal UI"),
+        event("agent", "planner", "mapped work into a frame"),
+        event("tool", "tetherscript", "rendered without libraries"),
+        event("agent", "reviewer", "waiting for input")
+    ]
+    print(tui_render(view))
+}

@@ -1,0 +1,95 @@
+fn item(kind, name, text) {
+    let row = map()
+    row["kind"] = kind
+    row["name"] = name
+    row["text"] = text
+    return row
+}
+
+fn push(log, kind, name, text) {
+    log.push(item(kind, name, text))
+}
+
+fn render(log, status) {
+    let size = tui_size()
+    let view = map()
+    view["title"] = "tetherscript agent tui"
+    view["width"] = size.cols
+    view["height"] = size.rows
+    view["status"] = status
+    view["items"] = log
+    tui_present(view)
+}
+
+fn shell(command) {
+    if process_platform() == "windows" {
+        return process_run("powershell", ["-NoProfile", "-Command", command], nil, 30000)?
+    }
+    return process_run("sh", ["-lc", command], nil, 30000)?
+}
+
+fn tool_call(command) {
+    if command == "cwd" {
+        return cwd()?
+    }
+    if command.starts_with("ls ") {
+        return json_encode(fs_list(command.replace("ls ", ""))?)
+    }
+    if command.starts_with("read ") {
+        return fs_read(command.replace("read ", ""))?
+    }
+    if command.starts_with("run ") {
+        return json_encode(shell(command.replace("run ", "")))
+    }
+    return "tools: cwd, ls <path>, read <path>, run <command>"
+}
+
+fn agent_call(prompt) {
+    let messages = []
+    let sys = map()
+    sys.role = "system"
+    sys.content = "You are a concise terminal coding agent. Return short actionable answers."
+    messages.push(sys)
+    let user = map()
+    user.role = "user"
+    user.content = prompt
+    messages.push(user)
+    let opts = map()
+    opts.model = env_get("TETHERSCRIPT_AGENT_MODEL").unwrap_or("llama3")
+    let result = provider.chat(messages, opts)
+    if result.is_ok() {
+        return result.unwrap()
+    }
+    return "agent error: " + result.err()
+}
+
+fn handle(log, line) {
+    if line == "/quit" {
+        return false
+    }
+    if line.starts_with("/tool ") {
+        let command = line.replace("/tool ", "")
+        push(log, "tool", command, tool_call(command))
+        return true
+    }
+    if line.starts_with("/ask ") {
+        let prompt = line.replace("/ask ", "")
+        push(log, "user", "you", prompt)
+        push(log, "agent", "provider", agent_call(prompt))
+        return true
+    }
+    push(log, "system", "help", "use /ask <prompt>, /tool <cmd>, or /quit")
+    return true
+}
+
+fn main() {
+    let log = []
+    push(log, "system", "ready", "use /ask with a provider grant, /tool cwd, or /quit")
+    let mut running = true
+    while running {
+        render(log, "waiting")
+        let event = tui_read_event("> ")?
+        running = handle(log, event.text)
+    }
+    render(log, "done")
+}

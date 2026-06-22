@@ -16,12 +16,13 @@ use crate::browser_js;
 use crate::http;
 use crate::js;
 use crate::json;
-use crate::lexer::Lexer;
 use crate::output;
-use crate::parser::Parser;
-use crate::smtp;
-use crate::system;
 use crate::value::{Env, FnObj, NativeFn, NativeFunc, Runtime, Slot, Value};
+use crate::{lexer::Lexer, parser::Parser};
+use crate::{smtp, system};
+
+#[path = "tui/mod.rs"]
+mod tui;
 
 /// Non-local control flow. Wrapped in Result::Err so we can `?` it through
 /// the evaluator without polluting the happy path.
@@ -1441,6 +1442,7 @@ pub(crate) fn install_builtins(env: &Rc<RefCell<Env>>) {
         pure_native("js_eval", Some(1), js::eval_to_value),
         false,
     );
+    tui::install(&mut e);
 }
 
 /// Subset of built-ins safe to expose to untrusted source running inside
