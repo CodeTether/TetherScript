@@ -58,6 +58,12 @@ The secret is read from `<mount>/data/<path>/<provider-id>`. The loader accepts
 `api_key`, `base_url`, `organization`, and `headers`. `api_key` becomes a hidden
 `Authorization: Bearer ...` bound header and is not visible to tetherscript code.
 
+`--access-mode full` is a convenience for local agent runs. It grants filesystem
+authority to the current directory and, when Vault is configured, lists
+`<mount>/metadata/<path>` and loads the first supported provider as `provider`.
+Set `TETHERSCRIPT_PROVIDER` or `TETHERSCRIPT_AGENT_PROVIDER` to choose a
+specific provider id.
+
 ## Safety Defaults
 
 - Fallible host tools return TetherScript `Result` values so scripts can use `?`, `.unwrap()`, `.is_ok()`, and `.err()`.

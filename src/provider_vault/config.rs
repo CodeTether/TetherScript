@@ -3,10 +3,10 @@
 use std::env;
 
 pub(super) struct VaultConfig {
-    address: String,
+    pub address: String,
     pub token: String,
-    mount: String,
-    path: String,
+    pub mount: String,
+    pub path: String,
 }
 
 impl VaultConfig {
@@ -17,16 +17,6 @@ impl VaultConfig {
             mount: optional("VAULT_MOUNT", "secret"),
             path: optional("VAULT_SECRETS_PATH", "codetether/providers"),
         })
-    }
-
-    pub fn secret_url(&self, provider_id: &str) -> String {
-        format!(
-            "{}/v1/{}/data/{}/{}",
-            self.address,
-            clean(&self.mount),
-            clean(&self.path),
-            clean(provider_id)
-        )
     }
 }
 
@@ -45,8 +35,4 @@ fn required(name: &str) -> Result<String, String> {
 
 fn optional(name: &str, default: &str) -> String {
     env::var(name).unwrap_or_else(|_| default.into())
-}
-
-fn clean(value: &str) -> &str {
-    value.trim_matches('/')
 }
