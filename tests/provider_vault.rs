@@ -69,6 +69,32 @@ fn access_mode_full_loads_default_provider_from_vault() {
     );
 }
 
+#[test]
+fn access_mode_full_loads_provider_from_environment() {
+    let out = Command::new(env!("CARGO_BIN_EXE_tetherscript"))
+        .args([
+            "run",
+            "--access-mode",
+            "full",
+            "examples/provider_vault_describe.tether",
+        ])
+        .env("OPENAI_API_KEY", "sk-env")
+        .env("OPENAI_BASE_URL", "https://api.openai.com/v1")
+        .env_remove("VAULT_ADDR")
+        .env_remove("VAULT_TOKEN")
+        .output()
+        .expect("tetherscript should run");
+    assert!(
+        out.status.success(),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "https://api.openai.com\n/v1/chat/completions\nAuthorization\n"
+    );
+}
+
 fn spawn_vault() -> (String, thread::JoinHandle<String>) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap().to_string();
