@@ -11,8 +11,8 @@ mod list;
 mod request;
 mod response;
 mod secret;
-mod url;
-mod url_endpoint;
+pub(crate) mod url;
+pub(crate) mod url_endpoint;
 mod url_scheme;
 
 use std::rc::Rc;

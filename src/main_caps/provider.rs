@@ -3,7 +3,7 @@
 use std::rc::Rc;
 
 use crate::capability::Authority;
-use crate::{provider_cap, provider_vault};
+use crate::{provider_cap, provider_env, provider_vault};
 
 pub(super) fn authority(
     endpoint: &Option<String>,
@@ -20,8 +20,15 @@ pub(super) fn authority(
         }
         (None, Some(id)) => provider_vault::load(id).map(Some),
         (Some(endpoint), None) => Ok(Some(direct(endpoint, key))),
-        (None, None) if full_access => provider_vault::load_default(),
+        (None, None) if full_access => full_access_authority(),
         (None, None) => Ok(None),
+    }
+}
+
+fn full_access_authority() -> Result<Option<Rc<dyn Authority>>, String> {
+    match provider_env::load_default()? {
+        Some(auth) => Ok(Some(auth)),
+        None => provider_vault::load_default(),
     }
 }
 

@@ -44,6 +44,7 @@ mod output;
 mod ownership;
 mod parser;
 mod provider_cap;
+mod provider_env;
 mod provider_vault;
 mod rpc_cap;
 mod scheduler;

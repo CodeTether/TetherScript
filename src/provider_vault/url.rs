@@ -3,19 +3,19 @@
 use super::url_scheme;
 
 #[derive(Clone, PartialEq)]
-pub(super) enum Scheme {
+pub(crate) enum Scheme {
     Http,
     Https,
 }
 
-pub(super) struct Url {
+pub(crate) struct Url {
     pub scheme: Scheme,
     pub host: String,
     pub port: u16,
     pub path: String,
 }
 
-pub(super) fn parse(input: &str) -> Result<Url, String> {
+pub(crate) fn parse(input: &str) -> Result<Url, String> {
     let (scheme, rest) = url_scheme::strip(input)?;
     let (authority, raw_path) = rest.split_once('/').unwrap_or((rest, ""));
     if authority.is_empty() {
@@ -42,7 +42,7 @@ fn parse_port_text(raw: &str) -> Result<u16, String> {
         .map_err(|_| format!("url: invalid port {raw:?}"))
 }
 
-pub(super) fn default_port(scheme: &Scheme) -> u16 {
+pub(crate) fn default_port(scheme: &Scheme) -> u16 {
     match scheme {
         Scheme::Https => 443,
         Scheme::Http => 80,
