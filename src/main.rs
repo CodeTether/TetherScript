@@ -131,6 +131,7 @@ fn cmd_run(args: &[String]) {
     let mut vm_mode = true;
     let mut step_budget: Option<u64> = None;
     let mut fs_grant: Option<String> = None;
+    let mut full_access = false;
     let mut provider_grant: Option<String> = None;
     let mut provider_key: Option<String> = None;
     let mut provider_vault: Option<String> = None;
@@ -177,6 +178,15 @@ fn cmd_run(args: &[String]) {
                     process::exit(2);
                 }
                 fs_grant = Some(args[i].clone());
+                i += 1;
+            }
+            "--access-mode" => {
+                i += 1;
+                if i >= args.len() {
+                    eprintln!("tetherscript run: --access-mode requires restricted or full");
+                    process::exit(2);
+                }
+                full_access = parse_access_mode(&args[i], "tetherscript run");
                 i += 1;
             }
             "--grant-provider" => {
@@ -291,6 +301,7 @@ fn cmd_run(args: &[String]) {
         vm_mode,
         step_budget,
         &fs_grant,
+        full_access,
         &provider_grant,
         &provider_key,
         &provider_vault,
@@ -636,6 +647,7 @@ fn cmd_run_legacy(args: &[String]) {
     let mut vm_mode = true;
     let mut step_budget: Option<u64> = None;
     let mut fs_grant: Option<String> = None;
+    let mut full_access = false;
     let mut provider_grant: Option<String> = None;
     let mut provider_key: Option<String> = None;
     let mut provider_vault: Option<String> = None;
@@ -678,6 +690,15 @@ fn cmd_run_legacy(args: &[String]) {
                     process::exit(2);
                 }
                 fs_grant = Some(args[i].clone());
+                i += 1;
+            }
+            "--access-mode" => {
+                i += 1;
+                if i >= args.len() {
+                    eprintln!("tetherscript: --access-mode requires restricted or full");
+                    process::exit(2);
+                }
+                full_access = parse_access_mode(&args[i], "tetherscript");
                 i += 1;
             }
             "--grant-provider" => {
@@ -793,6 +814,7 @@ fn cmd_run_legacy(args: &[String]) {
         vm_mode,
         step_budget,
         &fs_grant,
+        full_access,
         &provider_grant,
         &provider_key,
         &provider_vault,
@@ -833,6 +855,7 @@ fn execute_file(
     vm_mode: bool,
     step_budget: Option<u64>,
     fs_grant: &Option<String>,
+    full_access: bool,
     provider_grant: &Option<String>,
     provider_key: &Option<String>,
     provider_vault: &Option<String>,
@@ -875,6 +898,7 @@ fn execute_file(
         vm.set_instruction_budget(step_budget);
         let caps = RunCaps {
             fs_grant,
+            full_access,
             provider_grant,
             provider_key,
             provider_vault,
@@ -896,6 +920,7 @@ fn execute_file(
         let mut interp = Interpreter::new();
         let caps = RunCaps {
             fs_grant,
+            full_access,
             provider_grant,
             provider_key,
             provider_vault,
@@ -916,6 +941,17 @@ fn execute_file(
         if let Err(e) = result {
             eprintln!("tetherscript: {}", e);
             process::exit(1);
+        }
+    }
+}
+
+fn parse_access_mode(value: &str, label: &str) -> bool {
+    match value {
+        "restricted" => false,
+        "full" => true,
+        _ => {
+            eprintln!("{label}: --access-mode must be restricted or full");
+            process::exit(2);
         }
     }
 }
@@ -955,6 +991,7 @@ fn print_help() {
     println!("EXAMPLES:");
     println!("    tetherscript run hello.tether");
     println!("    tetherscript run --interp fib.tether");
+    println!("    tetherscript run --access-mode full examples/agent_tui.tether");
     println!("    tetherscript run --grant-fs . policy.tether");
     println!("    tetherscript run --grant-provider http://localhost:11434 chat.tether");
     println!("    tetherscript run --grant-provider-vault openai chat.tether");
@@ -987,6 +1024,7 @@ fn print_run_help() {
     --interp, --tree-walk    Use tree-walking interpreter for debugging"
     );
     println!("    --step-budget <n>       Set max execution steps (default: unlimited)");
+    println!("    --access-mode <mode>    restricted (default) or full");
     println!("    --grant-fs <dir>        Grant filesystem capability scoped to <dir>");
     println!(
         "    --grant-provider <url>  Grant LLM provider capability (http:// or https://host:port)"
@@ -998,6 +1036,7 @@ fn print_run_help() {
     println!();
     println!("EXAMPLES:");
     println!("    tetherscript run hello.tether");
+    println!("    tetherscript run --access-mode full examples/agent_tui.tether");
     println!("    tetherscript run --step-budget 100000 fib.tether");
     println!("    tetherscript run --grant-fs . policy.tether");
     println!("    tetherscript run --grant-provider http://localhost:11434 chat.tether");

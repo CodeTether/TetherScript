@@ -23,5 +23,11 @@ read terminal event -> update script state -> call provider/tool capability -> r
 
 Use `provider.chat(...)` for model calls when the host grants `--grant-provider`
 or `--grant-provider-vault`.
+
+For a CodeTether-like local run, use:
+
+```bash
+tetherscript run --access-mode full examples/agent_tui.tether
+```
 Use standard tools such as `process_run`, `fs_read`, `fs_list`, and `cwd` for
 local tool calls. The reference example is `examples/agent_tui.tether`.
