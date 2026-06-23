@@ -1,16 +1,21 @@
 {
   "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-  "name": "TetherScript",
+  "name": "tetherscript",
   "scopeName": "source.tetherscript",
   "patterns": [
     { "include": "#comments" },
+    { "include": "#bytes" },
     { "include": "#strings" },
+    { "include": "#fn-decl" },
+    { "include": "#methods" },
+    { "include": "#fields" },
     { "include": "#keywords" },
+    { "include": "#builtins" },
     { "include": "#constants" },
     { "include": "#numbers" },
-    { "include": "#fn-decl" },
     { "include": "#fn-call" },
     { "include": "#operators" },
+    { "include": "#punctuation" },
     { "include": "#identifiers" }
   ],
   "repository": {
@@ -22,6 +27,17 @@
         }
       ]
     },
+    "bytes": {
+      "name": "string.quoted.double.bytes.tetherscript",
+      "begin": "\\bb\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.tetherscript",
+          "match": "\\\\(n|t|r|\\\\|\"|0|x[0-9A-Fa-f]{2})"
+        }
+      ]
+    },
     "strings": {
       "name": "string.quoted.double.tetherscript",
       "begin": "\"",
@@ -29,7 +45,21 @@
       "patterns": [
         {
           "name": "constant.character.escape.tetherscript",
-          "match": "\\\\(n|t|r|\\\\|\"|0)"
+          "match": "\\\\(n|t|r|\\\\|\"|0|\\{|\\})"
+        },
+        {
+          "name": "meta.interpolation.tetherscript",
+          "begin": "\\{",
+          "end": "\\}",
+          "beginCaptures": {
+            "0": { "name": "punctuation.section.interpolation.begin.tetherscript" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.section.interpolation.end.tetherscript" }
+          },
+          "patterns": [
+            { "include": "source.tetherscript" }
+          ]
         }
       ]
     },
@@ -37,7 +67,7 @@
       "patterns": [
         {
           "name": "keyword.control.tetherscript",
-          "match": "\\b(if|else|while|for|in|return|panic|move)\\b"
+          "match": "\\b(if|else|while|for|in|return|panic|move|async|await|spawn|join)\\b"
         },
         {
           "name": "storage.type.tetherscript",
@@ -46,6 +76,14 @@
         {
           "name": "storage.modifier.tetherscript",
           "match": "\\b(mut)\\b"
+        }
+      ]
+    },
+    "builtins": {
+      "patterns": [
+        {
+          "name": "support.function.builtin.tetherscript",
+          "match": "\\b(Ok|Err|assert|base64_decode|base64_encode|browser_compatibility_report|browser_display_list|browser_eval_js|browser_layout|browser_parse_css|browser_parse_html|browser_query_selector|browser_raster|browser_render|browser_render_ppm|browser_run_scripts|browser_run_scripts_at|browser_snapshot|browser_styles|browser_text_content|bytes|chdir|cwd|env_get|eval|fs_copy|fs_exists|fs_list|fs_mkdir|fs_read|fs_remove|fs_rename|fs_stat|fs_write|http_get|http_head|http_post|http_request|http_serve|http_serve_static|js_eval|json_encode|json_encode_pretty|json_parse|jsonrpc_error|jsonrpc_notify|jsonrpc_request|jsonrpc_response|len|map|os_arch|os_eol|os_homedir|os_platform|os_tmpdir|parse_float|parse_int|path_basename|path_dirname|path_extname|path_join|path_normalize|path_resolve|path_sep|print|println|process_arch|process_args|process_pid|process_platform|process_run|sha256_hex|sleep_ms|smtp_send|stdio_read|stdio_write|stdio_write_err|str|time_now_ms|tui_alt_screen|tui_clear|tui_cursor|tui_move_to|tui_present|tui_read_event|tui_render|tui_size|type_of|url_parse)\\b(?=\\s*\\()"
         }
       ]
     },
@@ -69,6 +107,30 @@
         }
       ]
     },
+    "methods": {
+      "patterns": [
+        {
+          "name": "meta.method-call.tetherscript",
+          "match": "(\\.)([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+          "captures": {
+            "1": { "name": "punctuation.accessor.tetherscript" },
+            "2": { "name": "entity.name.function.member.tetherscript" }
+          }
+        }
+      ]
+    },
+    "fields": {
+      "patterns": [
+        {
+          "name": "meta.field-access.tetherscript",
+          "match": "(\\.)([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "punctuation.accessor.tetherscript" },
+            "2": { "name": "variable.other.member.tetherscript" }
+          }
+        }
+      ]
+    },
     "fn-decl": {
       "match": "\\b(fn)\\s+([A-Za-z_][A-Za-z0-9_]*)",
       "captures": {
@@ -87,6 +149,18 @@
         {
           "name": "keyword.operator.tetherscript",
           "match": "==|!=|<=|>=|&&|\\|\\||->|=>|[+\\-*/%<>=!&?]"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.separator.tetherscript",
+          "match": "[,;:]"
+        },
+        {
+          "name": "punctuation.bracket.tetherscript",
+          "match": "[(){}\\[\\]]"
         }
       ]
     },
