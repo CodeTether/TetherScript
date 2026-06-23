@@ -25,6 +25,8 @@ mod sse_event;
 #[cfg(test)]
 #[path = "provider_responses/tests.rs"]
 mod tests;
+#[path = "provider_responses/trace.rs"]
+mod trace;
 
 pub(crate) fn is_path(path: &str) -> bool {
     path.ends_with("/responses")

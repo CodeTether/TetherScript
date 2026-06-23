@@ -39,3 +39,14 @@ fn sse_function_call_becomes_chat_tool_call() {
     assert!(encoded.contains("\"name\":\"cwd\""));
     assert!(encoded.contains("\"arguments\":\"{}\""));
 }
+
+#[test]
+fn sse_completed_empty_output_keeps_stream_text() {
+    let text = concat!(
+        "data: {\"type\":\"response.output_text.delta\",\"delta\":\"Hello\"}\n\n",
+        "data: {\"type\":\"response.completed\",\"response\":{\"output\":[]}}\n\n",
+    );
+    let out = chat_json(text).unwrap();
+    let encoded = crate::json::encode_to_string(&out).unwrap();
+    assert!(encoded.contains("\"content\":\"Hello\""));
+}
