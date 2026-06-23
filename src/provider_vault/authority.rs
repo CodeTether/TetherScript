@@ -14,7 +14,9 @@ pub(super) fn build(
     let (endpoint, path) = base_url::endpoint_path(provider_id, secret.base_url.as_deref())?;
     let mut auth = ProviderAuthority::new(&endpoint);
     auth = ProviderAuthority::with_path(auth, &path);
-    if let Some(key) = secret.api_key {
+    if provider_id == "openai-codex" {
+        auth = bind_codex(auth, &secret)?;
+    } else if let Some(key) = secret.api_key {
         auth =
             ProviderAuthority::with_bound_header(auth, "Authorization", &format!("Bearer {key}"));
     }
@@ -23,6 +25,26 @@ pub(super) fn build(
     }
     for (name, value) in secret.headers {
         auth = ProviderAuthority::with_bound_header(auth, &name, &value);
+    }
+    Ok(auth)
+}
+
+fn bind_codex(
+    mut auth: Rc<dyn Authority>,
+    secret: &ProviderSecret,
+) -> Result<Rc<dyn Authority>, String> {
+    let token = secret
+        .access_token
+        .as_ref()
+        .or(secret.api_key.as_ref())
+        .ok_or("vault: openai-codex requires access_token")?;
+    auth = ProviderAuthority::with_bound_header(auth, "Authorization", &format!("Bearer {token}"));
+    if let Some(id) = secret
+        .chatgpt_account_id
+        .as_ref()
+        .or(secret.organization.as_ref())
+    {
+        auth = ProviderAuthority::with_bound_header(auth, "chatgpt-account-id", id);
     }
     Ok(auth)
 }

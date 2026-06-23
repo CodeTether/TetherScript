@@ -58,6 +58,9 @@ bootstrap environment names as CodeTether-agent:
 The secret is read from `<mount>/data/<path>/<provider-id>`. The loader accepts
 `api_key`, `base_url`, `organization`, and `headers`. `api_key` becomes a hidden
 `Authorization: Bearer ...` bound header and is not visible to tetherscript code.
+CodeTether `openai-codex` OAuth secrets from `codetether auth codex` are also
+accepted; tetherscript binds the access token and ChatGPT account id and uses
+the ChatGPT Codex Responses endpoint for streamed text responses.
 
 `--access-mode full` is a convenience for local agent runs. It grants filesystem
 authority to the current directory and loads provider secrets from Vault first.
