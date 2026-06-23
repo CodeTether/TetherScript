@@ -31,10 +31,26 @@ fn env_provider() -> Option<String> {
 }
 
 fn preferred(ids: &[String]) -> Option<&str> {
+    if let Some(default) = default_provider() {
+        if let Some(found) = ids.iter().find(|id| id.as_str() == default) {
+            return Some(found);
+        }
+    }
     let order = ["openai", "openrouter", "cerebras", "zai", "zhipuai"];
     order
         .iter()
         .find(|id| ids.iter().any(|candidate| candidate == **id))
         .copied()
         .or_else(|| ids.first().map(String::as_str))
+}
+
+fn default_provider() -> Option<String> {
+    std::env::var("CODETETHER_DEFAULT_MODEL")
+        .ok()
+        .and_then(|value| {
+            value
+                .split_once('/')
+                .map(|(provider, _)| provider.trim().to_string())
+        })
+        .filter(|provider| !provider.is_empty())
 }

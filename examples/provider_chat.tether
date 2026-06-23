@@ -1,16 +1,37 @@
 // Provider capability: call an LLM via OpenAI-compatible API.
 //
-// Run with (e.g. against local Ollama):
-//   tetherscript --grant-provider http://localhost:11434 examples/provider_chat.tether
-//   tetherscript --vm --grant-provider http://localhost:11434 examples/provider_chat.tether
+// Run with a granted OpenAI-compatible provider:
+//   tetherscript run --access-mode full examples/provider_chat.tether
 //
-// Requires a running LLM backend on the endpoint, e.g.:
-//   ollama serve
-//   ollama pull llama3
+fn default_model() {
+    let mut model = env_text("TETHERSCRIPT_AGENT_MODEL")
+    if model == "" { model = env_text("CODETETHER_DEFAULT_MODEL") }
+    if model == "" { model = "zai/glm-5" }
+    let info = provider.describe().unwrap()
+    if info.endpoint.contains("openrouter.ai") { return openrouter_model(model) }
+    if model.starts_with("openai/") { return model.replace("openai/", "") }
+    if model.starts_with("openrouter/") { return model.replace("openrouter/", "") }
+    if model.starts_with("cerebras/") { return model.replace("cerebras/", "") }
+    if model.starts_with("zai/") { return model.replace("zai/", "") }
+    if model.starts_with("zhipuai/") { return model.replace("zhipuai/", "") }
+    return model
+}
+
+fn env_text(name) {
+    let value = env_get(name).unwrap_or(nil)
+    if value == nil { return "" }
+    return value
+}
+
+fn openrouter_model(model) {
+    if model.starts_with("openrouter/") { return model.replace("openrouter/", "") }
+    if model.starts_with("zai/") { return model.replace("zai/", "z-ai/") }
+    return model
+}
 
 fn main() {
     // Check what we're connected to
-    let info = provider.describe()
+    let info = provider.describe().unwrap()
     println("Provider endpoint: " + info.endpoint)
     println("Provider path: " + info.path)
 
@@ -28,13 +49,13 @@ fn main() {
 
     // Non-streaming: get the full response at once
     let opts = map()
-    opts.model = "llama3"
+    opts.model = default_model()
 
     println("")
     println("Sending chat request...")
     let result = provider.chat(messages, opts)
-    if result.ok {
-        println("Response: " + result.value)
+    if result.is_ok() {
+        println("Response: " + result.unwrap())
     } else {
         println("Error: " + str(result))
     }

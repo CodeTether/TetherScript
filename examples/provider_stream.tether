@@ -1,13 +1,39 @@
 // Provider streaming: receive tokens as they arrive via SSE.
 //
-// Run with (e.g. against local Ollama):
-//   tetherscript --grant-provider http://localhost:11434 examples/provider_stream.tether
+// Run with a granted OpenAI-compatible provider:
+//   tetherscript run --access-mode full examples/provider_stream.tether
 //
 // The stream() method calls a handler function for each token delta,
 // printing output in real-time as the model generates it.
 
 fn on_token(accumulated, delta) {
     print(delta)
+}
+
+fn default_model() {
+    let mut model = env_text("TETHERSCRIPT_AGENT_MODEL")
+    if model == "" { model = env_text("CODETETHER_DEFAULT_MODEL") }
+    if model == "" { model = "zai/glm-5" }
+    let info = provider.describe().unwrap()
+    if info.endpoint.contains("openrouter.ai") { return openrouter_model(model) }
+    if model.starts_with("openai/") { return model.replace("openai/", "") }
+    if model.starts_with("openrouter/") { return model.replace("openrouter/", "") }
+    if model.starts_with("cerebras/") { return model.replace("cerebras/", "") }
+    if model.starts_with("zai/") { return model.replace("zai/", "") }
+    if model.starts_with("zhipuai/") { return model.replace("zhipuai/", "") }
+    return model
+}
+
+fn env_text(name) {
+    let value = env_get(name).unwrap_or(nil)
+    if value == nil { return "" }
+    return value
+}
+
+fn openrouter_model(model) {
+    if model.starts_with("openrouter/") { return model.replace("openrouter/", "") }
+    if model.starts_with("zai/") { return model.replace("zai/", "z-ai/") }
+    return model
 }
 
 fn main() {
@@ -18,12 +44,12 @@ fn main() {
     messages.push(user)
 
     let opts = map()
-    opts.model = "llama3"
+    opts.model = default_model()
 
     println("Streaming response:")
     let result = provider.stream(messages, on_token, opts)
     println("")
-    if result.ok {
+    if result.is_ok() {
         println("(stream complete)")
     } else {
         println("Stream error: " + str(result))

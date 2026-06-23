@@ -71,6 +71,36 @@ fn access_mode_full_loads_default_provider_from_vault() {
 }
 
 #[test]
+fn access_mode_full_prefers_codetether_default_model_provider() {
+    let (addr, handle) = spawn_model_vault();
+    let out = Command::new(env!("CARGO_BIN_EXE_tetherscript"))
+        .args([
+            "run",
+            "--access-mode",
+            "full",
+            "examples/provider_vault_describe.tether",
+        ])
+        .env("VAULT_ADDR", format!("http://{addr}"))
+        .env("VAULT_TOKEN", "root-token")
+        .env("VAULT_MOUNT", "secret")
+        .env("VAULT_SECRETS_PATH", "codetether/providers")
+        .env("CODETETHER_DEFAULT_MODEL", "zai/glm-5.1")
+        .output()
+        .expect("tetherscript should run");
+    let requests = handle.join().expect("vault thread should finish");
+    assert!(requests[1].contains("GET /v1/secret/data/codetether/providers/zai "));
+    assert!(
+        out.status.success(),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "https://open.bigmodel.cn\n/api/paas/v4/chat/completions\nAuthorization\n"
+    );
+}
+
+#[test]
 fn access_mode_full_falls_back_to_provider_from_environment() {
     let out = Command::new(env!("CARGO_BIN_EXE_tetherscript"))
         .args([
@@ -121,6 +151,27 @@ fn access_mode_full_can_disable_environment_fallback() {
         "stderr:\n{}",
         String::from_utf8_lossy(&out.stderr)
     );
+}
+
+fn spawn_model_vault() -> (String, thread::JoinHandle<Vec<String>>) {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap().to_string();
+    let handle = thread::spawn(move || {
+        let mut requests = Vec::new();
+        for _ in 0..2 {
+            let (mut stream, _) = listener.accept().unwrap();
+            let request = read_request(&mut stream);
+            let body = if request.contains("/metadata/") {
+                r#"{"data":{"keys":["openrouter","zai"]}}"#
+            } else {
+                r#"{"data":{"data":{"api_key":"sk-test"}}}"#
+            };
+            write_response(&mut stream, body);
+            requests.push(request);
+        }
+        requests
+    });
+    (addr, handle)
 }
 
 fn spawn_vault() -> (String, thread::JoinHandle<String>) {
