@@ -13,6 +13,7 @@
 //! tetherscript inspect --tokens <file>        dump tokens
 //! tetherscript inspect --ast <file>           dump AST
 //! tetherscript inspect --bytecode <file>      dump compiled bytecode
+//! tetherscript inspect --bytecode-visual <file> render annotated bytecode
 //! tetherscript lsp                            serve LSP over stdio
 //! tetherscript repl                           interactive REPL
 //! tetherscript --help                         show help
@@ -28,6 +29,7 @@ mod browser_cap;
 mod browser_cookie;
 mod browser_js;
 mod bytecode;
+mod bytecode_visual;
 mod capability;
 mod compiler;
 mod fs_cap;
@@ -39,6 +41,7 @@ mod json;
 mod lexer;
 mod lsp;
 mod main_caps;
+mod main_inspect_help;
 mod main_usage;
 mod output;
 mod ownership;
@@ -322,7 +325,7 @@ fn cmd_inspect(args: &[String]) {
     while i < args.len() {
         match args[i].as_str() {
             "--help" | "-h" => {
-                print_inspect_help();
+                main_inspect_help::print();
                 return;
             }
             "--tokens" => {
@@ -335,6 +338,10 @@ fn cmd_inspect(args: &[String]) {
             }
             "--bytecode" => {
                 mode = "bytecode";
+                i += 1;
+            }
+            "--bytecode-visual" | "--bytecode-viz" | "--visual" => {
+                mode = "bytecode-visual";
                 i += 1;
             }
             other => {
@@ -394,7 +401,7 @@ fn cmd_inspect(args: &[String]) {
             };
             println!("{:#?}", program);
         }
-        "bytecode" => {
+        "bytecode" | "bytecode-visual" => {
             let program = match Parser::new(tokens).parse_program() {
                 Ok(p) => p,
                 Err(e) => {
@@ -406,7 +413,11 @@ fn cmd_inspect(args: &[String]) {
                 }
             };
             let chunk = Compiler::compile_program(&program);
-            println!("{:#?}", chunk);
+            if mode == "bytecode-visual" {
+                println!("{}", bytecode_visual::render(&chunk));
+            } else {
+                println!("{:#?}", chunk);
+            }
         }
         _ => unreachable!(),
     }
@@ -1044,21 +1055,4 @@ fn print_run_help() {
     println!("    tetherscript run --grant-provider http://localhost:11434 chat.tether");
     println!("    tetherscript run --grant-provider-vault openai chat.tether");
     println!("    tetherscript run --grant-rpc http://127.0.0.1:36627 agent.tether");
-}
-
-fn print_inspect_help() {
-    println!("tetherscript inspect -- Inspect TetherScript source code");
-    println!();
-    println!("USAGE:");
-    println!("    tetherscript inspect <mode> <file.tether>");
-    println!();
-    println!("MODES:");
-    println!("    --tokens       Dump lexer tokens");
-    println!("    --ast          Dump abstract syntax tree");
-    println!("    --bytecode     Dump compiled bytecode");
-    println!();
-    println!("EXAMPLES:");
-    println!("    tetherscript inspect --tokens hello.tether");
-    println!("    tetherscript inspect --ast hello.tether");
-    println!("    tetherscript inspect --bytecode hello.tether");
 }
