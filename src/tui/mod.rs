@@ -34,6 +34,7 @@ mod style_span;
 mod val;
 mod view;
 mod view_extra;
+mod view_input;
 
 pub(super) fn install(env: &mut crate::value::Env) {
     install::install(env);

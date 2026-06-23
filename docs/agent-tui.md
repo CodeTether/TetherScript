@@ -43,6 +43,9 @@ Inside the TUI, type prompts directly. Tool calls are sent to the model by
 default. Manual tool checks are available with `/tool cwd`, `/tool ls <path>`,
 `/tool read <path>`, and `/tool run <command>`.
 
+If no `provider` capability is granted, prompts stay inside the TUI and render
+a provider-missing message instead of crashing the process.
+
 For a host that needs JSON-RPC over stdio, set explicit RPC mode:
 
 ```bash

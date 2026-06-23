@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use crate::value::Value;
 
-use super::{input_state, panel_state, status_bar};
+use super::{panel_state, status_bar, view_input};
 
 pub(super) fn status(map: &HashMap<String, Value>) -> Result<String, String> {
     let status = status_bar::parse(map)?;
@@ -23,7 +23,7 @@ pub(super) fn merge(
     map: &HashMap<String, Value>,
 ) -> Result<Vec<String>, String> {
     rows.extend(panel_lines(map)?);
-    rows.extend(input_lines(map)?);
+    rows.extend(view_input::lines(map)?);
     Ok(rows)
 }
 
@@ -40,20 +40,4 @@ fn panel_lines(map: &HashMap<String, Value>) -> Result<Vec<String>, String> {
         }
     }
     Ok(out)
-}
-
-fn input_lines(map: &HashMap<String, Value>) -> Result<Vec<String>, String> {
-    let Some(input) = input_state::parse(map)? else {
-        return Ok(Vec::new());
-    };
-    let focus = if input.focused { "*" } else { " " };
-    let text = if input.text.is_empty() {
-        input.placeholder
-    } else {
-        input.text
-    };
-    Ok(vec![format!(
-        "{focus} {}{} @{}",
-        input.prompt, text, input.cursor
-    )])
 }

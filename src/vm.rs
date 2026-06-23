@@ -991,4 +991,8 @@ impl Runtime for VM {
         }
         Ok(self.stack.pop().unwrap_or(Value::Nil))
     }
+
+    fn global_defined(&self, name: &str) -> bool {
+        self.globals.borrow().contains(name)
+    }
 }

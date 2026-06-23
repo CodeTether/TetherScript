@@ -112,6 +112,14 @@ fn openrouter_model(model) {
     return model
 }
 
+fn provider_ready() {
+    return global_defined("provider")
+}
+
+fn provider_missing() {
+    return "provider capability missing; restart with --access-mode full or grant a provider"
+}
+
 fn arg(args, key, fallback) {
     if type_of(args) == "map" && args.contains(key) { return args[key] }
     return fallback
@@ -244,6 +252,7 @@ fn agent_step(log, messages, state) {
 }
 
 fn agent_turn(log, prompt) {
+    if !provider_ready() { return provider_missing() }
     let messages = base_messages()
     let user = map()
     user.role = "user"
@@ -270,6 +279,11 @@ fn prompt(params) {
 fn agent_message(log, id, params) {
     let question = prompt(params)
     log.push(item("user", "jsonrpc", question))
+    if !provider_ready() {
+        let answer = provider_missing()
+        log.push(item("agent", "provider", answer))
+        return write_result(id, answer, true)
+    }
     let answer = agent_turn(log, question)
     log.push(item("agent", "provider", answer))
     write_result(id, answer, false)

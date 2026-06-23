@@ -93,6 +93,11 @@ pub trait Runtime {
     /// Synchronously call `callee` with `args` and return its result.
     /// Errors and panics bubble up as `Err(String)`.
     fn invoke(&mut self, callee: &Value, args: &[Value]) -> Result<Value, String>;
+
+    /// Return true when a global binding exists in this runtime.
+    fn global_defined(&self, _name: &str) -> bool {
+        false
+    }
 }
 
 impl Value {
@@ -273,6 +278,15 @@ impl Env {
     pub fn define(&mut self, name: &str, value: Value, mutable: bool) {
         self.slots
             .insert(name.to_string(), Slot::Live { value, mutable });
+    }
+
+    /// Return true if this environment or a parent has `name`.
+    pub fn contains(&self, name: &str) -> bool {
+        self.slots.contains_key(name)
+            || self
+                .parent
+                .as_ref()
+                .is_some_and(|parent| parent.borrow().contains(name))
     }
 
     /// Read (borrow) a binding. For copy values this clones; for heap values
