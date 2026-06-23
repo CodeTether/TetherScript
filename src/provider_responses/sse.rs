@@ -19,7 +19,9 @@ pub(super) fn chat_json(text: &str) -> Result<Value, String> {
     }
     if let Some(response) = state.response {
         let (text, calls) = output_items::collect(&response)?;
-        return Ok(output_shape::chat(text, calls));
+        if !text.is_empty() || !calls.is_empty() {
+            return Ok(output_shape::chat(text, calls));
+        }
     }
     Ok(output_shape::chat(state.text, state.calls))
 }
