@@ -2,22 +2,29 @@
 
 use std::io::Read;
 
+use super::body;
+
 pub(super) fn read(stream: &mut dyn Read) -> Result<String, String> {
     let mut bytes = Vec::new();
     stream
         .take(2 * 1024 * 1024)
         .read_to_end(&mut bytes)
         .map_err(|error| format!("vault: read response failed: {error}"))?;
-    let text = String::from_utf8(bytes)
-        .map_err(|error| format!("vault: response was not UTF-8: {error}"))?;
-    let (head, body) = text
-        .split_once("\r\n\r\n")
-        .ok_or_else(|| "vault: malformed HTTP response".to_string())?;
+    let head_end = header_end(&bytes).ok_or("vault: malformed HTTP response")?;
+    let head = std::str::from_utf8(&bytes[..head_end])
+        .map_err(|error| format!("vault: response headers were not UTF-8: {error}"))?;
     let status = status_code(head)?;
+    let body = body::decode(head, &bytes[head_end + 4..])?;
+    let body = String::from_utf8(body)
+        .map_err(|error| format!("vault: response body was not UTF-8: {error}"))?;
     if !(200..300).contains(&status) {
         return Err(format!("vault: HTTP {status}: {}", body.trim()));
     }
-    Ok(body.to_string())
+    Ok(body)
+}
+
+fn header_end(bytes: &[u8]) -> Option<usize> {
+    bytes.windows(4).position(|window| window == b"\r\n\r\n")
 }
 
 fn status_code(head: &str) -> Result<u16, String> {

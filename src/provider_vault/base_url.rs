@@ -14,6 +14,12 @@ pub(super) fn endpoint_path(
         })?;
     let parsed = url::parse(base.trim_end_matches('/'))?;
     let endpoint = url_endpoint::from_url(&parsed);
+    if provider_id == "openai-codex" {
+        return Ok((
+            endpoint,
+            format!("{}/responses", parsed.path.trim_end_matches('/')),
+        ));
+    }
     Ok((endpoint, chat_path(&parsed.path)))
 }
 
@@ -21,6 +27,7 @@ fn inferred_base(provider_id: &str) -> Option<&'static str> {
     match provider_id {
         "openai" => Some("https://api.openai.com/v1"),
         "openrouter" => Some("https://openrouter.ai/api/v1"),
+        "openai-codex" => Some("https://chatgpt.com/backend-api/codex"),
         "cerebras" => Some("https://api.cerebras.ai/v1"),
         "zai" | "zhipuai" => Some("https://open.bigmodel.cn/api/paas/v4"),
         _ => None,

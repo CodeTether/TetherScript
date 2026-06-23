@@ -2,6 +2,7 @@
 
 mod authority;
 mod base_url;
+mod body;
 mod config;
 mod config_url;
 mod default;
@@ -31,5 +32,7 @@ pub(crate) fn load_default() -> Result<Option<Rc<dyn Authority>>, String> {
     default::load()
 }
 
+#[cfg(test)]
+mod body_tests;
 #[cfg(test)]
 mod tests;

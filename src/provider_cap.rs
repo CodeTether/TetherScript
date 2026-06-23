@@ -66,6 +66,8 @@ use crate::value::{Runtime, Value};
 
 #[path = "provider_options.rs"]
 mod provider_options;
+#[path = "provider_responses.rs"]
+mod provider_responses;
 
 const PROVIDER_TIMEOUT: Duration = Duration::from_secs(120);
 const PROVIDER_USER_AGENT: &str = "tetherscript-provider/0.2";
@@ -206,6 +208,9 @@ impl ProviderAuthority {
 
     /// Build a chat request body in TetherScript value form, then encode to JSON.
     fn build_request_body(&self, args: &[Value]) -> Result<String, String> {
+        if provider_responses::is_path(&self.path) {
+            return provider_responses::body(args, self.max_tokens);
+        }
         // Expected args: messages (list of maps), optional overrides map
         let messages_val = args
             .first()
@@ -232,6 +237,9 @@ impl ProviderAuthority {
     fn do_chat(&self, body: &str) -> Result<Value, String> {
         let response_bytes = self.http_post(body)?;
         let response_text = String::from_utf8_lossy(&response_bytes).into_owned();
+        if provider_responses::is_path(&self.path) {
+            return extract_chat_content(&provider_responses::chat_json(&response_text)?);
+        }
 
         // Parse the JSON response
         let parsed = json::parse_str(&response_text)?;
@@ -244,6 +252,9 @@ impl ProviderAuthority {
     fn do_chat_json(&self, body: &str) -> Result<Value, String> {
         let response_bytes = self.http_post(body)?;
         let response_text = String::from_utf8_lossy(&response_bytes).into_owned();
+        if provider_responses::is_path(&self.path) {
+            return provider_responses::chat_json(&response_text);
+        }
         json::parse_str(&response_text)
     }
 
