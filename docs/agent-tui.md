@@ -31,3 +31,8 @@ tetherscript run --access-mode full examples/agent_tui.tether
 ```
 Use standard tools such as `process_run`, `fs_read`, `fs_list`, and `cwd` for
 local tool calls. The reference example is `examples/agent_tui.tether`.
+
+For agent-driven tool calls over stdio, use `examples/stdio_mcp_tui.tether`.
+That script is not a human chat prompt. It reads newline-delimited JSON-RPC on
+stdin, writes protocol responses on stdout, and writes its TUI/status frame on
+stderr so an external agent can safely parse stdout.
