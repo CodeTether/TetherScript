@@ -2,7 +2,7 @@
 
 use crate::value::Value;
 
-use super::{line, val};
+use super::{line, val, view_extra};
 
 pub(super) struct View {
     pub width: usize,
@@ -20,8 +20,8 @@ pub(super) fn parse(value: &Value) -> Result<View, String> {
         width,
         height,
         title: str_field(&map, "title"),
-        status: str_field(&map, "status"),
-        lines: lines(&map)?,
+        status: view_extra::status(&map)?,
+        lines: view_extra::merge(lines(&map)?, &map)?,
     })
 }
 

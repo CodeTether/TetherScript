@@ -3,6 +3,11 @@ fn item(kind, name, text) {
     row.kind = kind
     row.name = name
     row.text = text
+    if kind == "system" { row.fg = "cyan"; row.bold = true }
+    if kind == "user" { row.fg = "bright_white" }
+    if kind == "agent" { row.fg = "green" }
+    if kind == "tool" { row.fg = "yellow" }
+    if kind == "rpc" { row.fg = "magenta" }
     return row
 }
 
@@ -14,6 +19,17 @@ fn show(log, status) {
     view.status = status
     view.items = log
     stdio_write_err(tui_render(view))
+}
+
+fn present(log, status) {
+    let size = tui_size()
+    let view = map()
+    view.title = "tetherscript agent tui"
+    view.width = size.cols
+    view.height = size.rows
+    view.status = status
+    view.items = log
+    tui_present(view)
 }
 
 fn prop(desc) {
@@ -271,7 +287,64 @@ fn handle(log, msg) {
     }
 }
 
-fn main() {
+fn manual_tool(command) {
+    let trimmed = command.trim()
+    if trimmed == "cwd" { return run_tool("cwd", map()) }
+    if trimmed.starts_with("ls ") {
+        let args = map()
+        args.path = trimmed.replace("ls ", "")
+        return run_tool("ls", args)
+    }
+    if trimmed.starts_with("read ") {
+        let args = map()
+        args.path = trimmed.replace("read ", "")
+        return run_tool("read", args)
+    }
+    if trimmed.starts_with("run ") {
+        let args = map()
+        args.command = trimmed.replace("run ", "")
+        return run_tool("run", args)
+    }
+    return "tools: cwd, ls <path>, read <path>, run <command>"
+}
+
+fn interactive_handle(log, line) {
+    if line == "" { return true }
+    if line == "/quit" { return false }
+    if line == "/tools" {
+        log.push(item("system", "tools", "cwd, ls <path>, read <path>, run <command>"))
+        return true
+    }
+    if line.starts_with("/tool ") {
+        let command = line.replace("/tool ", "")
+        log.push(item("tool", command, manual_tool(command)))
+        return true
+    }
+    log.push(item("user", "you", line))
+    let answer = agent_turn(log, line)
+    log.push(item("agent", "provider", answer))
+    return true
+}
+
+fn interactive_main() {
+    let log = [item("system", "ready", "type a prompt; tools run automatically; /quit exits")]
+    let mut running = true
+    print(tui_enter())
+    while running {
+        present(log, "waiting")
+        let event = tui_read_event("> ")
+        if event.is_err() {
+            log.push(item("system", "input", event.err()))
+            running = false
+        } else {
+            running = interactive_handle(log, event.unwrap().text)
+        }
+    }
+    present(log, "done")
+    print(tui_leave())
+}
+
+fn rpc_main() {
     let log = [item("system", "ready", "JSON-RPC on stdin/stdout; TUI on stderr")]
     let mut running = true
     while running {
@@ -285,4 +358,10 @@ fn main() {
         }
     }
     show(log, "done")
+}
+
+fn main() {
+    if env_text("TETHERSCRIPT_AGENT_MODE") == "rpc" { return rpc_main() }
+    if env_text("TETHERSCRIPT_AGENT_STDIO_RPC") == "1" { return rpc_main() }
+    interactive_main()
 }

@@ -8,6 +8,14 @@ pub(super) fn clear(_: &[Value]) -> Result<Value, String> {
     Ok(val::strv("\x1b[2J\x1b[H"))
 }
 
+pub(super) fn enter(_: &[Value]) -> Result<Value, String> {
+    Ok(val::strv("\x1b[?1049h\x1b[?25l\x1b[2J\x1b[H"))
+}
+
+pub(super) fn leave(_: &[Value]) -> Result<Value, String> {
+    Ok(val::strv("\x1b[0m\x1b[?25h\x1b[?1049l"))
+}
+
 pub(super) fn cursor(args: &[Value]) -> Result<Value, String> {
     if val::bool_arg(&args[0], "tui_cursor: visible")? {
         Ok(val::strv("\x1b[?25h"))
