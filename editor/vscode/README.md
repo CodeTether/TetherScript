@@ -37,7 +37,7 @@ syntax highlighting plus live diagnostics from the built-in LSP server.
 
    ```bash
    npx vsce package
-   code --install-extension tetherscript-0.0.5.vsix
+   code --install-extension tetherscript-0.0.6.vsix
    ```
 
 ## Settings
