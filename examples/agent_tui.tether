@@ -299,8 +299,18 @@ fn reload_now_rpc(log, session, state) {
 }
 
 fn parse_args(raw) {
+    if type_of(raw) == "map" { return raw }
     if type_of(raw) != "str" || raw == "" { return map() }
     return json_parse(raw)
+}
+
+fn valid_tool(name) {
+    if name == "cwd" { return true }
+    if name == "ls" { return true }
+    if name == "read" { return true }
+    if name == "write" { return true }
+    if name == "run" { return true }
+    return false
 }
 
 fn call_name(call) {
@@ -310,6 +320,7 @@ fn call_name(call) {
 
 fn call_args(call) {
     if call.contains("function") { return parse_args(call.function.arguments) }
+    if call.contains("arguments") { return parse_args(call.arguments) }
     return map()
 }
 
@@ -324,110 +335,92 @@ fn append_tool(log, messages, call) {
     messages.push(msg)
 }
 
-fn append_assistant(messages, answer) {
+fn router_tools() {
+    let defs = tool_defs("model")
+    defs.push(model_tool("none", "No tool is needed.", map(), []))
+    return defs
+}
+
+fn router_messages(messages, prompt, draft) {
+    let out = []
+    let sys = map()
+    sys.role = "system"
+    sys.content = "You are a tool-call router. Return exactly one tool call. Use none when no tool is needed, when the assistant draft already answers, or when the needed tool result is already in the conversation. Do not answer the user."
+    out.push(sys)
+    let user = map()
+    user.role = "user"
+    user.content = "Conversation JSON:\n" + json_encode(messages) + "\nLatest user prompt:\n" + prompt + "\nAssistant draft:\n" + draft
+    out.push(user)
+    return out
+}
+
+fn router_call(log, messages, state, draft) {
+    let opts = map()
+    opts.model = default_model()
+    opts.tools = router_tools()
+    opts.tool_choice = "required"
+    opts.parallel_tool_calls = false
+    opts.temperature = 0
+    let result = provider.chat_json(router_messages(messages, state.prompt, draft), opts)
+    if result.is_err() { return nil }
+    let msg = result.unwrap().choices[0].message
+    if !msg.contains("tool_calls") || msg.tool_calls.len() == 0 { return nil }
+    let call = msg.tool_calls[0]
+    let name = call_name(call)
+    if name == "none" { return nil }
+    if !valid_tool(name) {
+        log.push(item("system", "router", "ignored unknown tool: " + name))
+        return nil
+    }
+    return call
+}
+
+fn normalize_call(call, messages) {
+    if !call.contains("id") { call.id = "router-" + str(len(messages)) }
+    if !call.contains("type") { call.type = "function" }
+    if !call.contains("function") {
+        let f = map()
+        f.name = call.name
+        f.arguments = json_encode(call_args(call))
+        call.function = f
+    }
+    if !call.function.contains("arguments") { call.function.arguments = json_encode(map()) }
+    return call
+}
+
+fn append_tool_call(messages, call) {
     let msg = map()
     msg.role = "assistant"
-    msg.content = answer
+    msg.content = ""
+    msg.tool_calls = [call]
     messages.push(msg)
-}
-
-fn asks_cwd(prompt) {
-    let text = prompt.lower()
-    if text.contains("cwd") { return true }
-    if text.contains("current directory") { return true }
-    if text.contains("what folder") { return true }
-    if text.contains("which folder") { return true }
-    if text.contains("where are we") { return true }
-    if text.contains("where am i") { return true }
-    return false
-}
-
-fn asks_listing(prompt) {
-    let text = prompt.lower()
-    if text == "ls" { return true }
-    if text.contains("what files") { return true }
-    if text.contains("what fiels") { return true }
-    if text.contains("which files") { return true }
-    if text.contains("list files") { return true }
-    if text.contains("list fiels") { return true }
-    if text.contains("files are in") { return true }
-    if text.contains("fiels are in") { return true }
-    if text.contains("what is in it") { return true }
-    if text.contains("what's in it") { return true }
-    return false
-}
-
-fn needs_local_tool(prompt) {
-    let text = prompt.lower()
-    if asks_cwd(prompt) { return true }
-    if asks_listing(prompt) { return true }
-    if text.contains("file") { return true }
-    if text.contains("fiel") { return true }
-    if text.contains("folder") { return true }
-    if text.contains("directory") { return true }
-    if text.contains("repo") { return true }
-    if text.contains("workspace") { return true }
-    if text.contains("read") { return true }
-    if text.contains("write") { return true }
-    if text.contains("edit") { return true }
-    if text.contains("run") { return true }
-    if text.contains("command") { return true }
-    return false
-}
-
-fn cwd_answer(log, messages) {
-    let output = run_tool("cwd", map())
-    log.push(item("tool", "cwd", output))
-    if tool_failed(output) { return "" }
-    let answer = "We're in:\n\n`" + output + "`"
-    append_assistant(messages, answer)
-    return answer
-}
-
-fn listing_answer(log, messages) {
-    let args = map()
-    args.path = "."
-    let output = run_tool("ls", args)
-    log.push(item("tool", "ls", output))
-    if tool_failed(output) { return "" }
-    let names = json_parse(output)
-    let body = names.join("\n")
-    let answer = "Entries in the current folder:\n\n" + body
-    append_assistant(messages, answer)
-    return answer
-}
-
-fn direct_local_answer(log, messages, prompt) {
-    if asks_listing(prompt) { return listing_answer(log, messages) }
-    if asks_cwd(prompt) { return cwd_answer(log, messages) }
-    return ""
-}
-
-fn tool_choice(state) {
-    if state.force_tool {
-        state.force_tool = false
-        return "required"
-    }
-    return "auto"
 }
 
 fn agent_step(log, messages, state) {
     let opts = map()
     opts.model = default_model()
     opts.tools = tool_defs("model")
-    opts.tool_choice = tool_choice(state)
+    opts.tool_choice = "auto"
+    opts.parallel_tool_calls = true
     let result = provider.chat_json(messages, opts)
     if result.is_err() { state.answer = result.err(); return false }
     let msg = result.unwrap().choices[0].message
-    messages.push(msg)
     if msg.contains("tool_calls") {
+        messages.push(msg)
         for call in msg.tool_calls { append_tool(log, messages, call) }
         return true
     }
     state.answer = arg(msg, "content", "")
-    if state.needs_tool {
-        let fallback = direct_local_answer(log, messages, state.prompt)
-        if fallback != "" { state.answer = fallback }
+    let routed = router_call(log, messages, state, state.answer)
+    if routed != nil {
+        let call = normalize_call(routed, messages)
+        append_tool_call(messages, call)
+        append_tool(log, messages, call)
+        return true
+    }
+    messages.push(msg)
+    if state.answer == "" {
+        state.answer = "provider returned no content and no tool call"
     }
     return false
 }
@@ -441,10 +434,6 @@ fn agent_turn(log, session, prompt) {
     let state = map()
     state.answer = ""
     state.prompt = prompt
-    state.needs_tool = needs_local_tool(prompt)
-    state.force_tool = state.needs_tool
-    let direct = direct_local_answer(log, messages, prompt)
-    if direct != "" { return direct }
     if !provider_ready() { return provider_missing() }
     let mut step = 0
     while step < 6 {
