@@ -59,12 +59,14 @@ The secret is read from `<mount>/data/<path>/<provider-id>`. The loader accepts
 `Authorization: Bearer ...` bound header and is not visible to tetherscript code.
 
 `--access-mode full` is a convenience for local agent runs. It grants filesystem
-authority to the current directory and first tries Windows/process environment
-variables such as `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `CEREBRAS_API_KEY`,
-or `ZAI_API_KEY`. If no provider environment is configured, it falls back to
-Vault by listing `<mount>/metadata/<path>` and loading the first supported
-provider as `provider`. Set `TETHERSCRIPT_PROVIDER` or
-`TETHERSCRIPT_AGENT_PROVIDER` to choose a specific provider id.
+authority to the current directory and loads provider secrets from Vault first
+by listing `<mount>/metadata/<path>` and loading the first supported provider as
+`provider`. For local development, if no Vault default is configured, it falls
+back to Windows/process environment variables such as `OPENAI_API_KEY`,
+`OPENROUTER_API_KEY`, `CEREBRAS_API_KEY`, or `ZAI_API_KEY`. Set
+`CODETETHER_DISABLE_ENV_FALLBACK=1` to require Vault-configured providers only.
+Set `TETHERSCRIPT_PROVIDER` or `TETHERSCRIPT_AGENT_PROVIDER` to choose a
+specific provider id.
 
 ## Safety Defaults
 

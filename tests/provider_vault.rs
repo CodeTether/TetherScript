@@ -53,6 +53,7 @@ fn access_mode_full_loads_default_provider_from_vault() {
         .env("VAULT_TOKEN", "root-token")
         .env("VAULT_MOUNT", "secret")
         .env("VAULT_SECRETS_PATH", "codetether/providers")
+        .env("OPENAI_API_KEY", "sk-env-should-not-win")
         .output()
         .expect("tetherscript should run");
     let requests = handle.join().expect("vault thread should finish");
@@ -70,7 +71,7 @@ fn access_mode_full_loads_default_provider_from_vault() {
 }
 
 #[test]
-fn access_mode_full_loads_provider_from_environment() {
+fn access_mode_full_falls_back_to_provider_from_environment() {
     let out = Command::new(env!("CARGO_BIN_EXE_tetherscript"))
         .args([
             "run",
@@ -92,6 +93,33 @@ fn access_mode_full_loads_provider_from_environment() {
     assert_eq!(
         String::from_utf8_lossy(&out.stdout),
         "https://api.openai.com\n/v1/chat/completions\nAuthorization\n"
+    );
+}
+
+#[test]
+fn access_mode_full_can_disable_environment_fallback() {
+    let out = Command::new(env!("CARGO_BIN_EXE_tetherscript"))
+        .args([
+            "run",
+            "--access-mode",
+            "full",
+            "examples/provider_vault_describe.tether",
+        ])
+        .env("OPENAI_API_KEY", "sk-env")
+        .env("OPENAI_BASE_URL", "https://api.openai.com/v1")
+        .env("CODETETHER_DISABLE_ENV_FALLBACK", "1")
+        .env_remove("VAULT_ADDR")
+        .env_remove("VAULT_TOKEN")
+        .output()
+        .expect("tetherscript should run");
+    assert!(
+        !out.status.success(),
+        "provider should not load from env when fallback is disabled"
+    );
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("undefined variable `provider`"),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
     );
 }
 

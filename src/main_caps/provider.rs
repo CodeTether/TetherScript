@@ -26,9 +26,10 @@ pub(super) fn authority(
 }
 
 fn full_access_authority() -> Result<Option<Rc<dyn Authority>>, String> {
-    match provider_env::load_default()? {
+    match provider_vault::load_default()? {
         Some(auth) => Ok(Some(auth)),
-        None => provider_vault::load_default(),
+        None if provider_env::fallback_enabled() => provider_env::load_default(),
+        None => Ok(None),
     }
 }
 
