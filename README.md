@@ -185,6 +185,8 @@ including:
   `process_arch`
 - `tui_size`, `tui_render`, `tui_present`, `tui_read_event`,
   `tui_clear`, `tui_cursor`, `tui_alt_screen`, `tui_move_to`
+- `stdio_read`, `stdio_write`, `stdio_write_err`, `jsonrpc_request`,
+  `jsonrpc_response`, `jsonrpc_error`, `jsonrpc_notify`
 - `env_get`, `cwd`, `chdir`
 - `path_join`, `path_dirname`, `path_basename`, `path_extname`,
   `path_normalize`, `path_resolve`, `path_sep`
