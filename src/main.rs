@@ -47,6 +47,7 @@ mod provider_cap;
 mod provider_env;
 mod provider_vault;
 mod rpc_cap;
+mod run_reload;
 mod scheduler;
 mod smtp;
 mod system;
@@ -297,7 +298,7 @@ fn cmd_run(args: &[String]) {
         }
     };
 
-    execute_file(
+    run_reload::execute(
         &path,
         vm_mode,
         step_budget,
@@ -997,7 +998,6 @@ fn print_help() {
     println!("    tetherscript run --grant-fs . policy.tether");
     println!("    tetherscript run --grant-provider http://localhost:11434 chat.tether");
     println!("    tetherscript run --grant-provider-vault openai chat.tether");
-    println!("    tetherscript run --grant-provider https://api.cerebras.ai glm_chat.tether");
     println!("    tetherscript run --grant-provider https://api.cerebras.ai glm_chat.tether");
     println!("    tetherscript run --grant-rpc http://127.0.0.1:36627 agent.tether");
     println!("    tetherscript inspect --tokens hello.tether");

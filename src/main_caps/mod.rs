@@ -21,6 +21,7 @@ pub(crate) struct RunCaps<'a> {
 
 pub(crate) use interp::grant as grant_interp;
 pub(crate) use script::full_access as script_full_access;
+pub(crate) use script::hot_reload as script_hot_reload;
 pub(crate) use vm::grant as grant_vm;
 
 #[cfg(test)]
