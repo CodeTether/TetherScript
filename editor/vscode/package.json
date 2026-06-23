@@ -2,7 +2,7 @@
   "name": "tetherscript",
   "displayName": "tetherscript",
   "description": "Language support for tetherscript (.tether): syntax highlighting plus lex and parse diagnostics via LSP.",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "publisher": "tetherscript-rs",
   "repository": {
     "type": "git",
@@ -16,7 +16,11 @@
   ],
   "activationEvents": [
     "onLanguage:tetherscript",
-    "onCommand:tetherscript.runFile"
+    "onCommand:tetherscript.runFile",
+    "onCommand:tetherscript.runAgentTui",
+    "onCommand:tetherscript.inspectTokens",
+    "onCommand:tetherscript.inspectAst",
+    "onCommand:tetherscript.inspectBytecode"
   ],
   "main": "./extension.js",
   "contributes": {
@@ -45,6 +49,26 @@
       {
         "command": "tetherscript.runFile",
         "title": "Run File",
+        "category": "tetherscript"
+      },
+      {
+        "command": "tetherscript.runAgentTui",
+        "title": "Run Agent TUI",
+        "category": "tetherscript"
+      },
+      {
+        "command": "tetherscript.inspectTokens",
+        "title": "Show Tokens",
+        "category": "tetherscript"
+      },
+      {
+        "command": "tetherscript.inspectAst",
+        "title": "Show AST",
+        "category": "tetherscript"
+      },
+      {
+        "command": "tetherscript.inspectBytecode",
+        "title": "Show Bytecode",
         "category": "tetherscript"
       }
     ],
