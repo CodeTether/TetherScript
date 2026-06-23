@@ -1,5 +1,7 @@
 use std::io::Write;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
 fn stdio_mcp_tui_keeps_jsonrpc_on_stdout() {
@@ -26,7 +28,46 @@ fn stdio_mcp_tui_keeps_jsonrpc_on_stdout() {
     assert!(stdout.contains("\"id\":3"));
     assert!(stdout.contains("\"pong\""));
     assert!(!stdout.contains("stdio mcp tui"));
-    assert!(String::from_utf8_lossy(&output.stderr).contains("stdio mcp tui"));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("stdio tool server"));
+}
+
+#[test]
+fn stdio_mcp_tui_tools_can_edit_workspace() {
+    let dir = temp_dir("stdio-edit");
+    std::fs::create_dir_all(&dir).unwrap();
+    let script = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("examples")
+        .join("stdio_mcp_tui.tether");
+    let command = if cfg!(windows) {
+        "Get-Content note.txt"
+    } else {
+        "cat note.txt"
+    };
+    let input = edit_input(command);
+    let mut child = Command::new(env!("CARGO_BIN_EXE_tetherscript"))
+        .args(["run", script.to_str().unwrap()])
+        .current_dir(&dir)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("tetherscript should spawn");
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(input.as_bytes())
+        .unwrap();
+    drop(child.stdin.take());
+    let output = child.wait_with_output().unwrap();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(
+        output.status.success(),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(String::from_utf8_lossy(&output.stdout).contains("improved"));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("stdio tool server"));
 }
 
 fn input() -> &'static [u8] {
@@ -35,4 +76,21 @@ fn input() -> &'static [u8] {
 {"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
 {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"ping","arguments":{}}}
 "#
+}
+
+fn edit_input(command: &str) -> String {
+    format!(
+        "{{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{{\"name\":\"write_file\",\"arguments\":{{\"path\":\"note.txt\",\"body\":\"improved\"}}}}}}\n\
+         {{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{{\"name\":\"read_file\",\"arguments\":{{\"path\":\"note.txt\"}}}}}}\n\
+         {{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{{\"name\":\"run_command\",\"arguments\":{{\"command\":\"{}\"}}}}}}\n",
+        command
+    )
+}
+
+fn temp_dir(label: &str) -> PathBuf {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    std::env::temp_dir().join(format!("tetherscript-{label}-{nanos}"))
 }

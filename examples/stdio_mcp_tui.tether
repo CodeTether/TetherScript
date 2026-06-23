@@ -8,8 +8,8 @@ fn line(kind, name, text) {
 
 fn show(log, status) {
     let view = map()
-    view.title = "stdio mcp tui"
-    view.width = 48
+    view.title = "stdio tool server"
+    view.width = 64
     view.height = 8
     view.status = status
     view.items = log
@@ -24,15 +24,41 @@ fn text(value) {
 }
 
 fn tool_ping() {
+    return tool("ping", "Echo a ping through stdio JSON-RPC.", map(), [])
+}
+
+fn prop(desc) {
+    let p = map()
+    p.type = "string"
+    p.description = desc
+    return p
+}
+
+fn tool(name, desc, props, required) {
     let schema = map()
     schema.type = "object"
-    schema.properties = map()
-    schema.required = []
-    let tool = map()
-    tool.name = "ping"
-    tool.description = "Echo a ping through stdio JSON-RPC."
-    tool.inputSchema = schema
-    return tool
+    schema.properties = props
+    schema.required = required
+    let out = map()
+    out.name = name
+    out.description = desc
+    out.inputSchema = schema
+    return out
+}
+
+fn tools() {
+    let defs = [tool_ping()]
+    let p = map()
+    p.path = prop("Workspace-relative file path.")
+    defs.push(tool("read_file", "Read a file from the workspace.", p, ["path"]))
+    let w = map()
+    w.path = prop("Workspace-relative file path.")
+    w.body = prop("UTF-8 file body to write.")
+    defs.push(tool("write_file", "Write a UTF-8 file in the workspace.", w, ["path", "body"]))
+    let r = map()
+    r.command = prop("Shell command to run in the workspace.")
+    defs.push(tool("run_command", "Run a workspace command.", r, ["command"]))
+    return defs
 }
 
 fn initialize(id) {
@@ -48,15 +74,48 @@ fn initialize(id) {
 
 fn tools_list(id) {
     let result = map()
-    result.tools = [tool_ping()]
+    result.tools = tools()
     stdio_write(jsonrpc_response(id, result))
 }
 
-fn tools_call(id, params) {
+fn args(params) {
+    if params.contains("arguments") { return params.arguments }
+    return map()
+}
+
+fn write_result(id, body, is_error) {
     let result = map()
-    result.content = [text("pong")]
-    result.isError = false
+    result.content = [text(body)]
+    result.isError = is_error
     stdio_write(jsonrpc_response(id, result))
+}
+
+fn shell(command) {
+    if process_platform() == "windows" {
+        return process_run("powershell", ["-NoProfile", "-Command", command], nil, 30000)
+    }
+    return process_run("sh", ["-lc", command], nil, 30000)
+}
+
+fn tools_call(id, params) {
+    let a = args(params)
+    if params.name == "ping" { return write_result(id, "pong", false) }
+    if params.name == "read_file" {
+        let r = fs_read(a.path)
+        if r.is_err() { return write_result(id, r.err(), true) }
+        return write_result(id, r.unwrap(), false)
+    }
+    if params.name == "write_file" {
+        let r = fs_write(a.path, a.body)
+        if r.is_err() { return write_result(id, r.err(), true) }
+        return write_result(id, "wrote " + a.path, false)
+    }
+    if params.name == "run_command" {
+        let r = shell(a.command)
+        if r.is_err() { return write_result(id, r.err(), true) }
+        return write_result(id, json_encode(r.unwrap()), false)
+    }
+    write_result(id, "unknown tool: " + params.name, true)
 }
 
 fn handle(log, msg) {
@@ -71,7 +130,7 @@ fn handle(log, msg) {
 }
 
 fn main() {
-    let log = [line("system", "ready", "stdio JSON-RPC over stdin/stdout")]
+    let log = [line("system", "ready", "JSON-RPC only on stdin/stdout")]
     let mut running = true
     while running {
         show(log, "waiting")
