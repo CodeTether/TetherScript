@@ -62,8 +62,8 @@ function activate(context) {
   const command = config.get('serverPath') || 'tetherscript';
 
   const serverOptions = {
-    run:   { command, args: ['--lsp'], transport: TransportKind.stdio },
-    debug: { command, args: ['--lsp'], transport: TransportKind.stdio },
+    run:   { command, args: ['lsp'], transport: TransportKind.stdio },
+    debug: { command, args: ['lsp'], transport: TransportKind.stdio },
   };
 
   const clientOptions = {
