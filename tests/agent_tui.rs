@@ -77,6 +77,7 @@ fn spawn_provider() -> (String, thread::JoinHandle<Vec<String>>) {
         while requests.len() < 2 && Instant::now() < deadline {
             match listener.accept() {
                 Ok((mut stream, _)) => {
+                    stream.set_nonblocking(false).unwrap();
                     requests.push(read_request(&mut stream));
                     let body = if requests.len() == 1 {
                         tool_call_body()
