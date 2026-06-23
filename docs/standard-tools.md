@@ -66,6 +66,10 @@ the ChatGPT Codex Responses endpoint for streamed text responses.
 declare the same local agent authority with a top-of-file header:
 `// tetherscript: authority agent`. This grants filesystem authority to the
 current directory and loads provider secrets from Vault first.
+Agent scripts can opt into turn-boundary reloads with
+`// tetherscript: hot-reload`. The script writes `.tetherscript/reload` when it
+intentionally exits for reload, and the runner restarts the same source only when
+that marker matches the current script path.
 When `CODETETHER_DEFAULT_MODEL` is set to `provider/model`, full access prefers
 that Vault provider before falling back to the supported provider order. For
 local development, if no Vault default is configured, it falls back to

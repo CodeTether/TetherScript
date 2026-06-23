@@ -1,4 +1,5 @@
 // tetherscript: authority agent
+// tetherscript: hot-reload
 
 fn item(kind, name, text) {
     let row = map()
@@ -216,6 +217,87 @@ fn new_session() {
     return session
 }
 
+fn script_path() {
+    let args = process_args()
+    let mut i = args.len() - 1
+    while i >= 0 {
+        if args[i].ends_with(".tether") { return args[i] }
+        i = i - 1
+    }
+    return "examples/agent_tui.tether"
+}
+
+fn file_version(path) {
+    return fs_read(path).unwrap_or("")
+}
+
+fn reload_state() {
+    let state = map()
+    state.path = script_path()
+    state.version = file_version(state.path)
+    state.reloading = false
+    return state
+}
+
+fn snapshot_path() {
+    return ".tetherscript/agent_tui_state.json"
+}
+
+fn load_snapshot() {
+    let raw = fs_read(snapshot_path())
+    if raw.is_err() { return nil }
+    fs_remove(snapshot_path())
+    return json_parse(raw.unwrap())
+}
+
+fn initial_session(snapshot) {
+    if snapshot != nil && snapshot.contains("messages") {
+        let session = map()
+        session.messages = snapshot.messages
+        return session
+    }
+    return new_session()
+}
+
+fn initial_log(snapshot) {
+    if snapshot != nil && snapshot.contains("log") { return snapshot.log }
+    return [item("system", "ready", "type a prompt; tools run automatically; /quit exits")]
+}
+
+fn save_snapshot(log, session) {
+    let snapshot = map()
+    snapshot.log = log
+    snapshot.messages = session.messages
+    fs_mkdir(".tetherscript")
+    fs_write(snapshot_path(), json_encode(snapshot))
+}
+
+fn reload_needed(state) {
+    let current = file_version(state.path)
+    if current == "" { return false }
+    return current != state.version
+}
+
+fn reload_start(log, session, state) {
+    log.push(item("system", "reload", "source changed; restarting"))
+    state.reloading = true
+    save_snapshot(log, session)
+    fs_mkdir(".tetherscript")
+    fs_write(".tetherscript/reload", state.path)
+}
+
+fn reload_now(log, session, state) {
+    reload_start(log, session, state)
+    present(log, "reloading")
+    return false
+}
+
+fn reload_now_rpc(log, session, state) {
+    reload_start(log, session, state)
+    show(log, "reloading")
+    return false
+}
+
 fn parse_args(raw) {
     if type_of(raw) != "str" || raw == "" { return map() }
     return json_parse(raw)
@@ -297,16 +379,18 @@ fn agent_message(log, session, id, params) {
     write_result(id, answer, false)
 }
 
-fn handle(log, session, msg) {
-    if !msg.contains("method") { return nil }
+fn handle(log, session, reload, msg) {
+    if !msg.contains("method") { return true }
     log.push(item("rpc", "in", msg.method))
-    if msg.method == "initialize" { return initialize(msg.id) }
-    if msg.method == "tools/list" { return tools_list(msg.id) }
-    if msg.method == "tools/call" { return tools_call(log, msg.id, msg.params) }
-    if msg.method == "agent/message" { return agent_message(log, session, msg.id, msg.params) }
-    if msg.contains("id") {
+    if msg.method == "initialize" { initialize(msg.id); return true }
+    if msg.method == "tools/list" { tools_list(msg.id); return true }
+    if msg.method == "tools/call" { tools_call(log, msg.id, msg.params) }
+    if msg.method == "agent/message" { agent_message(log, session, msg.id, msg.params) }
+    if msg.method != "tools/call" && msg.method != "agent/message" && msg.contains("id") {
         stdio_write(jsonrpc_error(msg.id, -32601, "method not found", msg.method))
     }
+    if reload_needed(reload) { return reload_now_rpc(log, session, reload) }
+    return true
 }
 
 fn manual_tool(command) {
@@ -330,7 +414,7 @@ fn manual_tool(command) {
     return "tools: cwd, ls <path>, read <path>, run <command>"
 }
 
-fn interactive_handle(log, session, line) {
+fn interactive_handle(log, session, reload, line) {
     if line == "" { return true }
     if line == "/quit" { return false }
     if line == "/tools" {
@@ -345,12 +429,15 @@ fn interactive_handle(log, session, line) {
     log.push(item("user", "you", line))
     let answer = agent_turn(log, session, line)
     log.push(item("agent", "provider", answer))
+    if reload_needed(reload) { return reload_now(log, session, reload) }
     return true
 }
 
 fn interactive_main() {
-    let log = [item("system", "ready", "type a prompt; tools run automatically; /quit exits")]
-    let session = new_session()
+    let snapshot = load_snapshot()
+    let log = initial_log(snapshot)
+    let session = initial_session(snapshot)
+    let reload = reload_state()
     let mut running = true
     print(tui_enter())
     while running {
@@ -360,16 +447,18 @@ fn interactive_main() {
             log.push(item("system", "input", event.err()))
             running = false
         } else {
-            running = interactive_handle(log, session, event.unwrap().text)
+            running = interactive_handle(log, session, reload, event.unwrap().text)
         }
     }
-    present(log, "done")
+    if reload.reloading { present(log, "reloading") } else { present(log, "done") }
     print(tui_leave())
 }
 
 fn rpc_main() {
-    let log = [item("system", "ready", "JSON-RPC on stdin/stdout; TUI on stderr")]
-    let session = new_session()
+    let snapshot = load_snapshot()
+    let log = initial_log(snapshot)
+    let session = initial_session(snapshot)
+    let reload = reload_state()
     let mut running = true
     while running {
         show(log, "waiting")
@@ -378,7 +467,7 @@ fn rpc_main() {
             stdio_write(jsonrpc_error(nil, -32700, read.err()))
         } else {
             let msg = read.unwrap()
-            if msg == nil { running = false } else { handle(log, session, msg) }
+            if msg == nil { running = false } else { running = handle(log, session, reload, msg) }
         }
     }
     show(log, "done")

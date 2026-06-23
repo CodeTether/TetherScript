@@ -44,6 +44,13 @@ the same local agent authority that `--access-mode full` provides: filesystem
 authority to the current directory plus provider loading from Vault or Windows
 environment variables.
 
+It also declares `// tetherscript: hot-reload`. After each prompt turn, the TUI
+compares its loaded source with the file on disk. If an agent edits
+`examples/agent_tui.tether`, the script exits through a safe turn boundary,
+writes `.tetherscript/reload`, and the runner reloads the updated source in the
+same terminal process. `/quit` still exits normally because it does not write the
+reload marker.
+
 Inside the TUI, type prompts directly. Tool calls are sent to the model by
 default. Manual tool checks are available with `/tool cwd`, `/tool ls <path>`,
 `/tool read <path>`, and `/tool run <command>`.
