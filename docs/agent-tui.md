@@ -30,14 +30,19 @@ default:
 read line from stdin -> update script state -> call provider/tool capability -> redraw TUI
 ```
 
-Use `provider.chat(...)` for model calls when the host grants `--grant-provider`
-or `--grant-provider-vault`.
+Use `provider.chat(...)` for model calls when the script declares agent
+authority or when the host grants `--grant-provider` or `--grant-provider-vault`.
 
 For a CodeTether-like local run, use:
 
 ```bash
-tetherscript run --access-mode full examples/agent_tui.tether
+tetherscript run examples/agent_tui.tether
 ```
+
+The example starts with `// tetherscript: authority agent`, so the runner grants
+the same local agent authority that `--access-mode full` provides: filesystem
+authority to the current directory plus provider loading from Vault or Windows
+environment variables.
 
 Inside the TUI, type prompts directly. Tool calls are sent to the model by
 default. Manual tool checks are available with `/tool cwd`, `/tool ls <path>`,
@@ -49,7 +54,7 @@ a provider-missing message instead of crashing the process.
 For a host that needs JSON-RPC over stdio, set explicit RPC mode:
 
 ```bash
-TETHERSCRIPT_AGENT_MODE=rpc tetherscript run --access-mode full examples/agent_tui.tether
+TETHERSCRIPT_AGENT_MODE=rpc tetherscript run examples/agent_tui.tether
 ```
 
 Then send newline-delimited JSON-RPC on stdin:

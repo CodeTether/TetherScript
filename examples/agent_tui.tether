@@ -1,3 +1,5 @@
+// tetherscript: authority agent
+
 fn item(kind, name, text) {
     let row = map()
     row.kind = kind
@@ -117,7 +119,7 @@ fn provider_ready() {
 }
 
 fn provider_missing() {
-    return "provider capability missing; restart with --access-mode full or grant a provider"
+    return "provider capability missing; configure provider secrets or grant a provider"
 }
 
 fn arg(args, key, fallback) {

@@ -62,8 +62,10 @@ CodeTether `openai-codex` OAuth secrets from `codetether auth codex` are also
 accepted; tetherscript binds the access token and ChatGPT account id and uses
 the ChatGPT Codex Responses endpoint for streamed text responses.
 
-`--access-mode full` is a convenience for local agent runs. It grants filesystem
-authority to the current directory and loads provider secrets from Vault first.
+`--access-mode full` is a convenience for local agent runs. A script can also
+declare the same local agent authority with a top-of-file header:
+`// tetherscript: authority agent`. This grants filesystem authority to the
+current directory and loads provider secrets from Vault first.
 When `CODETETHER_DEFAULT_MODEL` is set to `provider/model`, full access prefers
 that Vault provider before falling back to the supported provider order. For
 local development, if no Vault default is configured, it falls back to

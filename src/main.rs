@@ -866,6 +866,7 @@ fn execute_file(
     browser_scopes: &[String],
 ) {
     let src = read_source(path);
+    let full_access = main_caps::script_full_access(&src, full_access);
 
     let tokens = match Lexer::new(&src).tokenize() {
         Ok(t) => t,
