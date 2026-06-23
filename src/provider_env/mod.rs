@@ -1,4 +1,4 @@
-//! Provider capability loading from host environment variables.
+//! Provider capability loading from local development environment variables.
 
 mod authority;
 mod base;
@@ -27,6 +27,13 @@ pub(crate) fn load_default() -> Result<Option<Rc<dyn Authority>>, String> {
     candidate::first_configured()
         .map(authority::from_candidate)
         .transpose()
+}
+
+pub(crate) fn fallback_enabled() -> bool {
+    !matches!(
+        vars::get("CODETETHER_DISABLE_ENV_FALLBACK").as_deref(),
+        Some("1")
+    )
 }
 
 fn selected_provider() -> Option<String> {

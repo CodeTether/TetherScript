@@ -196,7 +196,8 @@ See [`docs/standard-tools.md`](docs/standard-tools.md) for more detail. See
 Provider grants can also be bootstrapped from CodeTether-style Vault KV v2
 secrets with `--grant-provider-vault <provider-id>`.
 For local agent-style runs, `--access-mode full` grants the current directory
-and auto-loads a default provider from environment variables or Vault.
+and auto-loads a default provider from Vault first, then local environment
+fallback unless `CODETETHER_DISABLE_ENV_FALLBACK=1` is set.
 
 ## Plugin embedding
 
