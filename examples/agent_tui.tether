@@ -1,11 +1,18 @@
 // tetherscript: authority agent
 // tetherscript: hot-reload
 
+fn single_line(value) {
+    let mut text = str(value)
+    text = text.replace("\r\n", "\\n")
+    text = text.replace("\n", "\\n")
+    return text.replace("\r", "\\n")
+}
+
 fn item(kind, name, text) {
     let row = map()
     row.kind = kind
     row.name = name
-    row.text = text
+    row.text = single_line(text)
     if kind == "system" { row.fg = "cyan"; row.bold = true }
     if kind == "user" { row.fg = "bright_white" }
     if kind == "agent" { row.fg = "green" }
@@ -494,23 +501,69 @@ fn manual_tool(command) {
     return "tools: cwd, ls <path>, read <path>, run <command>"
 }
 
-fn interactive_handle(log, session, reload, line) {
+fn new_input() {
+    let input = map()
+    input.multiline = false
+    input.lines = []
+    return input
+}
+
+fn input_status(input) {
+    if input.multiline { return "multiline" }
+    return "waiting"
+}
+
+fn send_prompt(log, session, reload, prompt) {
+    log.push(item("user", "you", prompt))
+    let answer = agent_turn(log, session, prompt)
+    log.push(item("agent", "provider", answer))
+    if reload_needed(reload) { return reload_now(log, session, reload) }
+    return true
+}
+
+fn multiline_start(log, input, line) {
+    input.multiline = true
+    input.lines = []
+    if line.starts_with("/multi ") { input.lines.push(line.replace("/multi ", "")) }
+    log.push(item("system", "input", "multiline started; /send submits, /cancel cancels"))
+    return true
+}
+
+fn multiline_handle(log, session, reload, input, line) {
+    if line == "/send" {
+        input.multiline = false
+        let prompt = input.lines.join("\n")
+        input.lines = []
+        if prompt.trim() == "" { return true }
+        return send_prompt(log, session, reload, prompt)
+    }
+    if line == "/cancel" {
+        input.multiline = false
+        input.lines = []
+        log.push(item("system", "input", "multiline canceled"))
+        return true
+    }
+    input.lines.push(line)
+    return true
+}
+
+fn interactive_handle(log, session, reload, input, line) {
+    if input.multiline { return multiline_handle(log, session, reload, input, line) }
     if line == "" { return true }
     if line == "/quit" { return false }
     if line == "/tools" {
         log.push(item("system", "tools", "cwd, ls <path>, read <path>, run <command>"))
         return true
     }
+    if line == "/multi" || line.starts_with("/multi ") {
+        return multiline_start(log, input, line)
+    }
     if line.starts_with("/tool ") {
         let command = line.replace("/tool ", "")
         log.push(item("tool", command, manual_tool(command)))
         return true
     }
-    log.push(item("user", "you", line))
-    let answer = agent_turn(log, session, line)
-    log.push(item("agent", "provider", answer))
-    if reload_needed(reload) { return reload_now(log, session, reload) }
-    return true
+    return send_prompt(log, session, reload, line)
 }
 
 fn interactive_main() {
@@ -518,16 +571,17 @@ fn interactive_main() {
     let log = initial_log(snapshot)
     let session = initial_session(snapshot)
     let reload = reload_state()
+    let input = new_input()
     let mut running = true
     print(tui_enter())
     while running {
-        present(log, "waiting")
+        present(log, input_status(input))
         let event = tui_read_event("> ")
         if event.is_err() {
             log.push(item("system", "input", event.err()))
             running = false
         } else {
-            running = interactive_handle(log, session, reload, event.unwrap().text)
+            running = interactive_handle(log, session, reload, input, event.unwrap().text)
         }
     }
     if reload.reloading { present(log, "reloading") } else { present(log, "done") }
