@@ -205,9 +205,15 @@ fn base_messages() {
     let messages = []
     let sys = map()
     sys.role = "system"
-    sys.content = "You are a concise coding agent. Use tools when useful, then answer."
+    sys.content = "You are a concise coding agent running in a local project workspace. For requests about the current project, repository, files, code, edits, diagnostics, or shell commands, use cwd, ls, read, write, and run tools to inspect and act locally. Do not ask the user to upload or paste files that the tools can read. Ask for content only when it is outside the accessible workspace or genuinely missing. Keep answers concise and report tool-backed changes clearly."
     messages.push(sys)
     return messages
+}
+
+fn new_session() {
+    let session = map()
+    session.messages = base_messages()
+    return session
 }
 
 fn parse_args(raw) {
@@ -253,9 +259,9 @@ fn agent_step(log, messages, state) {
     return false
 }
 
-fn agent_turn(log, prompt) {
+fn agent_turn(log, session, prompt) {
     if !provider_ready() { return provider_missing() }
-    let messages = base_messages()
+    let messages = session.messages
     let user = map()
     user.role = "user"
     user.content = prompt
@@ -278,7 +284,7 @@ fn prompt(params) {
     return ""
 }
 
-fn agent_message(log, id, params) {
+fn agent_message(log, session, id, params) {
     let question = prompt(params)
     log.push(item("user", "jsonrpc", question))
     if !provider_ready() {
@@ -286,18 +292,18 @@ fn agent_message(log, id, params) {
         log.push(item("agent", "provider", answer))
         return write_result(id, answer, true)
     }
-    let answer = agent_turn(log, question)
+    let answer = agent_turn(log, session, question)
     log.push(item("agent", "provider", answer))
     write_result(id, answer, false)
 }
 
-fn handle(log, msg) {
+fn handle(log, session, msg) {
     if !msg.contains("method") { return nil }
     log.push(item("rpc", "in", msg.method))
     if msg.method == "initialize" { return initialize(msg.id) }
     if msg.method == "tools/list" { return tools_list(msg.id) }
     if msg.method == "tools/call" { return tools_call(log, msg.id, msg.params) }
-    if msg.method == "agent/message" { return agent_message(log, msg.id, msg.params) }
+    if msg.method == "agent/message" { return agent_message(log, session, msg.id, msg.params) }
     if msg.contains("id") {
         stdio_write(jsonrpc_error(msg.id, -32601, "method not found", msg.method))
     }
@@ -324,7 +330,7 @@ fn manual_tool(command) {
     return "tools: cwd, ls <path>, read <path>, run <command>"
 }
 
-fn interactive_handle(log, line) {
+fn interactive_handle(log, session, line) {
     if line == "" { return true }
     if line == "/quit" { return false }
     if line == "/tools" {
@@ -337,13 +343,14 @@ fn interactive_handle(log, line) {
         return true
     }
     log.push(item("user", "you", line))
-    let answer = agent_turn(log, line)
+    let answer = agent_turn(log, session, line)
     log.push(item("agent", "provider", answer))
     return true
 }
 
 fn interactive_main() {
     let log = [item("system", "ready", "type a prompt; tools run automatically; /quit exits")]
+    let session = new_session()
     let mut running = true
     print(tui_enter())
     while running {
@@ -353,7 +360,7 @@ fn interactive_main() {
             log.push(item("system", "input", event.err()))
             running = false
         } else {
-            running = interactive_handle(log, event.unwrap().text)
+            running = interactive_handle(log, session, event.unwrap().text)
         }
     }
     present(log, "done")
@@ -362,6 +369,7 @@ fn interactive_main() {
 
 fn rpc_main() {
     let log = [item("system", "ready", "JSON-RPC on stdin/stdout; TUI on stderr")]
+    let session = new_session()
     let mut running = true
     while running {
         show(log, "waiting")
@@ -370,7 +378,7 @@ fn rpc_main() {
             stdio_write(jsonrpc_error(nil, -32700, read.err()))
         } else {
             let msg = read.unwrap()
-            if msg == nil { running = false } else { handle(log, msg) }
+            if msg == nil { running = false } else { handle(log, session, msg) }
         }
     }
     show(log, "done")
