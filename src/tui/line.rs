@@ -2,30 +2,34 @@
 
 use crate::value::Value;
 
+use super::{escape, line_item};
+
 pub(super) fn fit(text: &str, width: usize) -> String {
-    let mut out: String = text.chars().take(width).collect();
-    while out.len() < width {
+    let mut out = String::new();
+    let mut visible = 0;
+    let mut truncated = false;
+    let mut chars = text.chars();
+    while let Some(ch) = chars.next() {
+        if ch == '\x1b' {
+            escape::push(&mut out, &mut chars);
+        } else if visible < width {
+            out.push(ch);
+            visible += 1;
+        } else {
+            truncated = true;
+            break;
+        }
+    }
+    if truncated && text.contains('\x1b') {
+        out.push_str("\x1b[0m");
+    }
+    while visible < width {
         out.push(' ');
+        visible += 1;
     }
     out
 }
 
 pub(super) fn item(value: &Value) -> String {
-    match value {
-        Value::Map(map) => {
-            let map = map.borrow();
-            let kind = field(&map, "kind");
-            let name = field(&map, "name");
-            let text = field(&map, "text");
-            format!("[{kind}] {name}: {text}")
-        }
-        Value::Str(text) => text.to_string(),
-        other => other.to_string(),
-    }
-}
-
-fn field(map: &std::collections::HashMap<String, Value>, key: &str) -> String {
-    map.get(key)
-        .map(Value::to_string)
-        .unwrap_or_else(|| "".into())
+    line_item::render(value)
 }

@@ -7,6 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 fn stdio_agent_keeps_jsonrpc_on_stdout() {
     let mut child = Command::new(env!("CARGO_BIN_EXE_tetherscript"))
         .args(["run", "examples/agent_tui.tether"])
+        .env("TETHERSCRIPT_AGENT_MODE", "rpc")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -46,6 +47,7 @@ fn stdio_agent_tools_can_edit_workspace() {
     let input = edit_input(command);
     let mut child = Command::new(env!("CARGO_BIN_EXE_tetherscript"))
         .args(["run", script.to_str().unwrap()])
+        .env("TETHERSCRIPT_AGENT_MODE", "rpc")
         .current_dir(&dir)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())

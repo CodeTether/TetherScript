@@ -37,5 +37,8 @@ fn read_line(prompt: &str) -> Result<String, String> {
     io::stdin()
         .read_line(&mut line)
         .map_err(|error| format!("tui_read_event: read failed: {error}"))?;
-    Ok(line.trim_end_matches(['\r', '\n']).to_string())
+    Ok(line
+        .trim_end_matches(['\r', '\n'])
+        .trim_start_matches('\u{feff}')
+        .to_string())
 }
