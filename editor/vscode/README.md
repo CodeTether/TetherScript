@@ -12,6 +12,10 @@ syntax highlighting plus live diagnostics from the built-in LSP server.
 - Snippets for functions, loops, `Result` flow, maps, filesystem reads,
   provider calls, and TUI views
 - `tetherscript: Run File` command for the active `.tether` file
+- `tetherscript: Show Tokens`, `Show AST`, and `Show Bytecode` commands
+- `tetherscript: Run Agent TUI` command for `examples/agent_tui.tether`
+- Completion suggestions for keywords, constants, built-ins, and methods
+- Hover docs for common built-ins, keywords, constants, and methods
 - Bracket matching, auto-close, and comment toggling
 
 ## Install from source
@@ -37,7 +41,7 @@ syntax highlighting plus live diagnostics from the built-in LSP server.
 
    ```bash
    npx vsce package
-   code --install-extension tetherscript-0.0.6.vsix
+   code --install-extension tetherscript-0.0.7.vsix
    ```
 
 ## Settings
@@ -49,6 +53,6 @@ syntax highlighting plus live diagnostics from the built-in LSP server.
 
 ## Missing
 
-The server currently reports lex and parse diagnostics only. Hover,
-go-to-definition, and completion require source spans on AST nodes, which are on
+The server currently reports lex and parse diagnostics only. Go-to-definition,
+rename, and exact semantic tokens require source spans on AST nodes, which are on
 the roadmap.
