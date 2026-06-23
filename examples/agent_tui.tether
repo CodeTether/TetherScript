@@ -342,10 +342,27 @@ fn asks_cwd(prompt) {
     return false
 }
 
+fn asks_listing(prompt) {
+    let text = prompt.lower()
+    if text == "ls" { return true }
+    if text.contains("what files") { return true }
+    if text.contains("what fiels") { return true }
+    if text.contains("which files") { return true }
+    if text.contains("list files") { return true }
+    if text.contains("list fiels") { return true }
+    if text.contains("files are in") { return true }
+    if text.contains("fiels are in") { return true }
+    if text.contains("what is in it") { return true }
+    if text.contains("what's in it") { return true }
+    return false
+}
+
 fn needs_local_tool(prompt) {
     let text = prompt.lower()
     if asks_cwd(prompt) { return true }
+    if asks_listing(prompt) { return true }
     if text.contains("file") { return true }
+    if text.contains("fiel") { return true }
     if text.contains("folder") { return true }
     if text.contains("directory") { return true }
     if text.contains("repo") { return true }
@@ -358,14 +375,32 @@ fn needs_local_tool(prompt) {
     return false
 }
 
-fn direct_local_answer(log, messages, prompt) {
-    if !asks_cwd(prompt) { return "" }
+fn cwd_answer(log, messages) {
     let output = run_tool("cwd", map())
     log.push(item("tool", "cwd", output))
     if tool_failed(output) { return "" }
     let answer = "We're in:\n\n`" + output + "`"
     append_assistant(messages, answer)
     return answer
+}
+
+fn listing_answer(log, messages) {
+    let args = map()
+    args.path = "."
+    let output = run_tool("ls", args)
+    log.push(item("tool", "ls", output))
+    if tool_failed(output) { return "" }
+    let names = json_parse(output)
+    let body = names.join("\n")
+    let answer = "Entries in the current folder:\n\n" + body
+    append_assistant(messages, answer)
+    return answer
+}
+
+fn direct_local_answer(log, messages, prompt) {
+    if asks_listing(prompt) { return listing_answer(log, messages) }
+    if asks_cwd(prompt) { return cwd_answer(log, messages) }
+    return ""
 }
 
 fn tool_choice(state) {
