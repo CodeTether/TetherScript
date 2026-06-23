@@ -2,7 +2,7 @@
   "name": "tetherscript",
   "displayName": "tetherscript",
   "description": "Language support for tetherscript (.tether): syntax highlighting plus lex and parse diagnostics via LSP.",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "publisher": "tetherscript-rs",
   "repository": {
     "type": "git",
@@ -15,7 +15,8 @@
     "Programming Languages"
   ],
   "activationEvents": [
-    "onLanguage:tetherscript"
+    "onLanguage:tetherscript",
+    "onCommand:tetherscript.runFile"
   ],
   "main": "./extension.js",
   "contributes": {
@@ -34,6 +35,19 @@
         "path": "./syntaxes/tetherscript.tmLanguage.json"
       }
     ],
+    "snippets": [
+      {
+        "language": "tetherscript",
+        "path": "./snippets/tetherscript.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "tetherscript.runFile",
+        "title": "Run File",
+        "category": "tetherscript"
+      }
+    ],
     "configuration": {
       "title": "tetherscript",
       "properties": {
@@ -41,6 +55,11 @@
           "type": "string",
           "default": "tetherscript",
           "description": "Path to the `tetherscript` binary used to serve LSP. Must be on PATH or an absolute path."
+        },
+        "tetherscript.runArgs": {
+          "type": "string",
+          "default": "",
+          "description": "Extra arguments inserted after `tetherscript run` for the Run File command, for example `--access-mode full`."
         },
         "tetherscript.trace.server": {
           "type": "string",
