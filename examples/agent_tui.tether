@@ -1,8 +1,8 @@
 fn item(kind, name, text) {
     let row = map()
-    row["kind"] = kind
-    row["name"] = name
-    row["text"] = text
+    row.kind = kind
+    row.name = name
+    row.text = text
     return row
 }
 
@@ -13,11 +13,11 @@ fn push(log, kind, name, text) {
 fn render(log, status) {
     let size = tui_size()
     let view = map()
-    view["title"] = "tetherscript agent tui"
-    view["width"] = size.cols
-    view["height"] = size.rows
-    view["status"] = status
-    view["items"] = log
+    view.title = "tetherscript agent tui"
+    view.width = size.cols
+    view.height = size.rows
+    view.status = status
+    view.items = log
     tui_present(view)
 }
 
@@ -28,63 +28,164 @@ fn shell(command) {
     return process_run("sh", ["-lc", command], nil, 30000)?
 }
 
-fn tool_call(command) {
-    if command == "cwd" {
-        return cwd()?
+fn str_arg(args, key, fallback) {
+    if args.contains(key) {
+        return args[key]
     }
+    return fallback
+}
+
+fn parse_args(raw) {
+    if type_of(raw) != "str" || raw == "" {
+        return map()
+    }
+    return json_parse(raw)
+}
+
+fn run_tool(name, args) {
+    if name == "cwd" { return cwd()? }
+    if name == "ls" { return json_encode(fs_list(str_arg(args, "path", "."))?) }
+    if name == "read" { return fs_read(str_arg(args, "path", ""))? }
+    if name == "run" { return json_encode(shell(str_arg(args, "command", ""))) }
+    return "unknown tool: " + name
+}
+
+fn manual_tool(command) {
+    if command == "cwd" { return run_tool("cwd", map()) }
     if command.starts_with("ls ") {
-        return json_encode(fs_list(command.replace("ls ", ""))?)
+        let args = map()
+        args.path = command.replace("ls ", "")
+        return run_tool("ls", args)
     }
     if command.starts_with("read ") {
-        return fs_read(command.replace("read ", ""))?
+        let args = map()
+        args.path = command.replace("read ", "")
+        return run_tool("read", args)
     }
     if command.starts_with("run ") {
-        return json_encode(shell(command.replace("run ", "")))
+        let args = map()
+        args.command = command.replace("run ", "")
+        return run_tool("run", args)
     }
     return "tools: cwd, ls <path>, read <path>, run <command>"
 }
 
-fn agent_call(prompt) {
+fn prop(desc) {
+    let p = map()
+    p.type = "string"
+    p.description = desc
+    return p
+}
+
+fn tool(name, desc, props, required) {
+    let params = map()
+    params.type = "object"
+    params.properties = props
+    params.required = required
+    let f = map()
+    f.name = name
+    f.description = desc
+    f.parameters = params
+    let t = map()
+    t.type = "function"
+    t.function = f
+    return t
+}
+
+fn tool_defs() {
+    let defs = []
+    defs.push(tool("cwd", "Return the current working directory.", map(), []))
+    let mut p = map(); p.path = prop("Directory path.")
+    defs.push(tool("ls", "List files in a directory.", p, ["path"]))
+    p = map(); p.path = prop("File path.")
+    defs.push(tool("read", "Read a UTF-8 file.", p, ["path"]))
+    p = map(); p.command = prop("Shell command to run.")
+    defs.push(tool("run", "Run a shell command.", p, ["command"]))
+    return defs
+}
+
+fn base_messages() {
     let messages = []
     let sys = map()
     sys.role = "system"
-    sys.content = "You are a concise terminal coding agent. Return short actionable answers."
+    sys.content = "You are a concise terminal coding agent. Use tools when useful, then answer."
     messages.push(sys)
+    return messages
+}
+
+fn call_name(call) {
+    if call.contains("function") { return call.function.name }
+    return call.name
+}
+
+fn call_args(call) {
+    if call.contains("function") { return parse_args(call.function.arguments) }
+    return parse_args("")
+}
+
+fn append_tool_result(log, messages, call) {
+    let name = call_name(call)
+    let output = run_tool(name, call_args(call))
+    push(log, "tool", name, output)
+    let msg = map()
+    msg.role = "tool"
+    msg.tool_call_id = call.id
+    msg.content = output
+    messages.push(msg)
+}
+
+fn agent_step(log, messages) {
+    let opts = map()
+    opts.model = env_get("TETHERSCRIPT_AGENT_MODEL").unwrap_or("llama3")
+    opts.tools = tool_defs()
+    opts.tool_choice = "auto"
+    let result = provider.chat_json(messages, opts)
+    if result.is_err() {
+        push(log, "agent", "provider", result.err())
+        return false
+    }
+    let msg = result.unwrap().choices[0].message
+    messages.push(msg)
+    if msg.contains("tool_calls") {
+        for call in msg.tool_calls {
+            append_tool_result(log, messages, call)
+        }
+        return true
+    }
+    push(log, "agent", "provider", str_arg(msg, "content", ""))
+    return false
+}
+
+fn agent_turn(log, prompt) {
+    let messages = base_messages()
     let user = map()
     user.role = "user"
     user.content = prompt
     messages.push(user)
-    let opts = map()
-    opts.model = env_get("TETHERSCRIPT_AGENT_MODEL").unwrap_or("llama3")
-    let result = provider.chat(messages, opts)
-    if result.is_ok() {
-        return result.unwrap()
+    let mut step = 0
+    while step < 6 {
+        if !agent_step(log, messages) { return nil }
+        step = step + 1
     }
-    return "agent error: " + result.err()
+    push(log, "agent", "provider", "stopped after tool loop limit")
 }
 
 fn handle(log, line) {
-    if line == "/quit" {
-        return false
-    }
+    if line == "" { return true }
+    if line == "/quit" { return false }
     if line.starts_with("/tool ") {
         let command = line.replace("/tool ", "")
-        push(log, "tool", command, tool_call(command))
+        push(log, "tool", command, manual_tool(command))
         return true
     }
-    if line.starts_with("/ask ") {
-        let prompt = line.replace("/ask ", "")
-        push(log, "user", "you", prompt)
-        push(log, "agent", "provider", agent_call(prompt))
-        return true
-    }
-    push(log, "system", "help", "use /ask <prompt>, /tool <cmd>, or /quit")
+    push(log, "user", "you", line)
+    agent_turn(log, line)
     return true
 }
 
 fn main() {
     let log = []
-    push(log, "system", "ready", "use /ask with a provider grant, /tool cwd, or /quit")
+    push(log, "system", "ready", "type a prompt; tools run automatically; /quit exits")
     let mut running = true
     while running {
         render(log, "waiting")

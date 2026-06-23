@@ -64,6 +64,9 @@ use crate::capability::Authority;
 use crate::json;
 use crate::value::{Runtime, Value};
 
+#[path = "provider_options.rs"]
+mod provider_options;
+
 const PROVIDER_TIMEOUT: Duration = Duration::from_secs(120);
 const PROVIDER_USER_AGENT: &str = "tetherscript-provider/0.2";
 const MAX_RESPONSE_BYTES: usize = 8 * 1024 * 1024;
@@ -211,53 +214,9 @@ impl ProviderAuthority {
         let mut body = HashMap::new();
         body.insert("messages".to_string(), messages_val.clone());
 
-        // Extract model from overrides or default
         let mut model = String::new();
         if let Some(Value::Map(m)) = args.get(1) {
-            let m = m.borrow();
-            if let Some(Value::Str(m_name)) = m.get("model") {
-                model = m_name.to_string();
-                body.insert("model".to_string(), Value::Str(Rc::new(model.clone())));
-            }
-            if let Some(Value::Int(mt)) = m.get("max_tokens") {
-                let capped = if self.max_tokens > 0 {
-                    (*mt).min(self.max_tokens as i64)
-                } else {
-                    *mt
-                };
-                body.insert("max_tokens".to_string(), Value::Int(capped));
-            }
-            if let Some(Value::Float(t)) = m.get("temperature") {
-                body.insert("temperature".to_string(), Value::Float(*t));
-            }
-            if let Some(Value::Str(s)) = m.get("stream") {
-                body.insert("stream".to_string(), Value::Str(s.clone()));
-            }
-
-            // top_p sampling (used by GLM 4.7 and others)
-            if let Some(Value::Float(p)) = m.get("top_p") {
-                body.insert("top_p".to_string(), Value::Float(*p));
-            }
-
-            // GLM 4.7 / Cerebras parameters
-            if let Some(Value::Int(mt)) = m.get("max_completion_tokens") {
-                let capped = if self.max_tokens > 0 {
-                    (*mt).min(self.max_tokens as i64)
-                } else {
-                    *mt
-                };
-                body.insert("max_completion_tokens".to_string(), Value::Int(capped));
-            }
-            if let Some(Value::Str(effort)) = m.get("reasoning_effort") {
-                body.insert("reasoning_effort".to_string(), Value::Str(effort.clone()));
-            }
-            if let Some(Value::Bool(ct)) = m.get("clear_thinking") {
-                body.insert("clear_thinking".to_string(), Value::Bool(*ct));
-            }
-            // Bool-valued stream parameter
-            if let Some(Value::Bool(b)) = m.get("stream") {
-                body.insert("stream".to_string(), Value::Bool(*b));
-            }
+            model = provider_options::apply(&mut body, &m.borrow(), self.max_tokens);
         }
 
         if !model.is_empty() {
