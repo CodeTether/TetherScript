@@ -983,6 +983,10 @@ impl<'a> Runtime for InterpRuntime<'a> {
             Err(Unwind::Return(_)) => Err("`return` unwound out of callback".into()),
         }
     }
+
+    fn global_defined(&self, name: &str) -> bool {
+        self.interp.globals.borrow().contains(name)
+    }
 }
 
 fn browser_assert(
@@ -1599,6 +1603,20 @@ fn install_pure_builtins(env: &Rc<RefCell<Env>>) {
         "type_of",
         pure_native("type_of", Some(1), |args| {
             Ok(Value::Str(Rc::new(args[0].type_name().into())))
+        }),
+        false,
+    );
+
+    e.define(
+        "global_defined",
+        runtime_native("global_defined", Some(1), |rt, args| {
+            let Value::Str(name) = &args[0] else {
+                return Err(format!(
+                    "global_defined: name must be str, got {}",
+                    args[0].type_name()
+                ));
+            };
+            Ok(Value::Bool(rt.global_defined(name)))
         }),
         false,
     );

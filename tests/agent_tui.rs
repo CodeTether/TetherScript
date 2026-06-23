@@ -33,6 +33,33 @@ fn agent_tui_runs_interactive_stdio_tui_by_default() {
 }
 
 #[test]
+fn agent_tui_prompt_without_provider_stays_in_tui() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_tetherscript"))
+        .args(["run", "examples/agent_tui.tether"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("tetherscript binary should spawn");
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(b"hi\n/quit\n")
+        .unwrap();
+    drop(child.stdin.take());
+    let output = child.wait_with_output().unwrap();
+    assert!(
+        output.status.success(),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("[agent] provider: provider capability missing"));
+    assert!(stdout.contains("+ done"));
+}
+
+#[test]
 fn agent_tui_sends_tools_and_executes_model_tool_call() {
     let (addr, handle) = spawn_provider();
     let mut child = Command::new(env!("CARGO_BIN_EXE_tetherscript"))
