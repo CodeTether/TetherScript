@@ -4,9 +4,9 @@ use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
-fn stdio_mcp_tui_keeps_jsonrpc_on_stdout() {
+fn stdio_agent_keeps_jsonrpc_on_stdout() {
     let mut child = Command::new(env!("CARGO_BIN_EXE_tetherscript"))
-        .args(["run", "examples/stdio_mcp_tui.tether"])
+        .args(["run", "examples/agent_tui.tether"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -26,18 +26,18 @@ fn stdio_mcp_tui_keeps_jsonrpc_on_stdout() {
     assert!(stdout.contains("\"id\":2"));
     assert!(stdout.contains("\"tools\""));
     assert!(stdout.contains("\"id\":3"));
-    assert!(stdout.contains("\"pong\""));
-    assert!(!stdout.contains("stdio mcp tui"));
-    assert!(String::from_utf8_lossy(&output.stderr).contains("stdio tool server"));
+    assert!(stdout.contains("tetherscript"));
+    assert!(!stdout.contains("tetherscript stdio agent"));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("tetherscript stdio agent"));
 }
 
 #[test]
-fn stdio_mcp_tui_tools_can_edit_workspace() {
+fn stdio_agent_tools_can_edit_workspace() {
     let dir = temp_dir("stdio-edit");
     std::fs::create_dir_all(&dir).unwrap();
     let script = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("examples")
-        .join("stdio_mcp_tui.tether");
+        .join("agent_tui.tether");
     let command = if cfg!(windows) {
         "Get-Content note.txt"
     } else {
@@ -67,22 +67,22 @@ fn stdio_mcp_tui_tools_can_edit_workspace() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert!(String::from_utf8_lossy(&output.stdout).contains("improved"));
-    assert!(String::from_utf8_lossy(&output.stderr).contains("stdio tool server"));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("tetherscript stdio agent"));
 }
 
 fn input() -> &'static [u8] {
     br#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}
 {"jsonrpc":"2.0","method":"notifications/initialized","params":{}}
 {"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
-{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"ping","arguments":{}}}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"cwd","arguments":{}}}
 "#
 }
 
 fn edit_input(command: &str) -> String {
     format!(
-        "{{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{{\"name\":\"write_file\",\"arguments\":{{\"path\":\"note.txt\",\"body\":\"improved\"}}}}}}\n\
-         {{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{{\"name\":\"read_file\",\"arguments\":{{\"path\":\"note.txt\"}}}}}}\n\
-         {{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{{\"name\":\"run_command\",\"arguments\":{{\"command\":\"{}\"}}}}}}\n",
+        "{{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{{\"name\":\"write\",\"arguments\":{{\"path\":\"note.txt\",\"body\":\"improved\"}}}}}}\n\
+         {{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{{\"name\":\"read\",\"arguments\":{{\"path\":\"note.txt\"}}}}}}\n\
+         {{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{{\"name\":\"run\",\"arguments\":{{\"command\":\"{}\"}}}}}}\n",
         command
     )
 }
