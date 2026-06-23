@@ -9,6 +9,9 @@ syntax highlighting plus live diagnostics from the built-in LSP server.
 - Highlighting for keywords, functions, methods, fields, built-ins, `Ok`/`Err`,
   byte strings, regular strings, and string interpolation
 - Lex and parse errors reported as red squigglies in real time
+- Snippets for functions, loops, `Result` flow, maps, filesystem reads,
+  provider calls, and TUI views
+- `tetherscript: Run File` command for the active `.tether` file
 - Bracket matching, auto-close, and comment toggling
 
 ## Install from source
@@ -34,12 +37,14 @@ syntax highlighting plus live diagnostics from the built-in LSP server.
 
    ```bash
    npx vsce package
-   code --install-extension tetherscript-0.0.4.vsix
+   code --install-extension tetherscript-0.0.5.vsix
    ```
 
 ## Settings
 
 - `tetherscript.serverPath`: path to the `tetherscript` binary.
+- `tetherscript.runArgs`: extra arguments for `tetherscript: Run File`, such as
+  `--access-mode full`.
 - `tetherscript.trace.server`: LSP trace mode (`off`, `messages`, `verbose`).
 
 ## Missing

@@ -1,0 +1,110 @@
+{
+  "main function": {
+    "prefix": ["main", "fnmain"],
+    "body": [
+      "fn main() {",
+      "    $0",
+      "}"
+    ],
+    "description": "Create a fn main entrypoint."
+  },
+  "function": {
+    "prefix": "fn",
+    "body": [
+      "fn ${1:name}(${2:args}) {",
+      "    $0",
+      "}"
+    ],
+    "description": "Create a function."
+  },
+  "mutable binding": {
+    "prefix": "letmut",
+    "body": "let mut ${1:name} = ${2:value}",
+    "description": "Create a mutable binding."
+  },
+  "for loop": {
+    "prefix": "for",
+    "body": [
+      "for ${1:item} in ${2:items} {",
+      "    $0",
+      "}"
+    ],
+    "description": "Iterate over a value."
+  },
+  "while loop": {
+    "prefix": "while",
+    "body": [
+      "while ${1:condition} {",
+      "    $0",
+      "}"
+    ],
+    "description": "Create a while loop."
+  },
+  "if else": {
+    "prefix": "ifelse",
+    "body": [
+      "if ${1:condition} {",
+      "    ${2}",
+      "} else {",
+      "    $0",
+      "}"
+    ],
+    "description": "Create an if/else block."
+  },
+  "try result": {
+    "prefix": "try",
+    "body": "let ${1:value} = ${2:call}?",
+    "description": "Bind the unwrapped Ok value from a Result."
+  },
+  "return ok": {
+    "prefix": "ok",
+    "body": "return Ok(${1:value})",
+    "description": "Return a successful Result."
+  },
+  "return err": {
+    "prefix": "err",
+    "body": "return Err(${1:\"message\"})",
+    "description": "Return an error Result."
+  },
+  "map value": {
+    "prefix": "map",
+    "body": [
+      "let ${1:name} = map()",
+      "${1:name}.${2:key} = ${3:value}"
+    ],
+    "description": "Create a map and set a field."
+  },
+  "read file": {
+    "prefix": "fsread",
+    "body": "let ${1:body} = fs_read(${2:path})?",
+    "description": "Read a file through the filesystem tool."
+  },
+  "provider chat": {
+    "prefix": "providerchat",
+    "body": [
+      "let messages = []",
+      "let user = map()",
+      "user.role = \"user\"",
+      "user.content = ${1:prompt}",
+      "messages.push(user)",
+      "let opts = map()",
+      "opts.model = ${2:\"zai/glm-5\"}",
+      "let result = provider.chat_json(messages, opts)?",
+      "$0"
+    ],
+    "description": "Call a granted provider with chat_json."
+  },
+  "tui view": {
+    "prefix": "tuiview",
+    "body": [
+      "let view = map()",
+      "view.title = ${1:\"tetherscript\"}",
+      "view.width = ${2:80}",
+      "view.height = ${3:10}",
+      "view.status = ${4:\"ready\"}",
+      "view.items = ${5:[]}",
+      "tui_present(view)"
+    ],
+    "description": "Render a terminal UI view."
+  }
+}
