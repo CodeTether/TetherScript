@@ -4,6 +4,7 @@ mod browser;
 mod fs;
 mod interp;
 mod provider;
+mod script;
 mod vm;
 
 pub(crate) struct RunCaps<'a> {
@@ -19,4 +20,8 @@ pub(crate) struct RunCaps<'a> {
 }
 
 pub(crate) use interp::grant as grant_interp;
+pub(crate) use script::full_access as script_full_access;
 pub(crate) use vm::grant as grant_vm;
+
+#[cfg(test)]
+mod script_tests;
