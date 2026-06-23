@@ -15,6 +15,13 @@ pub(super) fn install(env: &mut Env) {
     define(env, "tui_render", Some(1), super::render::render);
     define(env, "tui_present", Some(1), super::render::present);
     define(env, "tui_read_event", None, super::input::read_event);
+    define(env, "stdio_read", Some(0), super::stdio_io::read);
+    define(env, "stdio_write", Some(1), super::stdio_io::write);
+    define(env, "stdio_write_err", Some(1), super::stdio_err::write);
+    define(env, "jsonrpc_request", Some(3), super::jsonrpc::request);
+    define(env, "jsonrpc_response", Some(2), super::jsonrpc::response);
+    define(env, "jsonrpc_notify", Some(2), super::jsonrpc::notify);
+    define(env, "jsonrpc_error", None, super::jsonrpc_error::error);
 }
 
 fn define(env: &mut Env, name: &str, arity: Option<usize>, func: Native) {

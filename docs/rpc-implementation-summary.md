@@ -125,7 +125,8 @@ let rpc = rpc_cap::RpcAuthority::with_methods(rpc, &["initialize", "tools/list"]
 - **No WebSocket fragmentation**: Doesn't handle fragmented frames.
 - **No automatic reconnection**: SSE and WebSocket connections don't auto-reconnect.
 - **Basic WebSocket**: Only supports text frames, ping/pong, and close frames.
-- **No stdio transport**: MCP over stdio is not supported (only HTTP/SSE/WebSocket).
+- **Stdio transport is script-level**: use `stdio_read`, `stdio_write`, and
+  `jsonrpc_*` helpers for MCP over stdio.
 - **Simplified WebSocket**: Ping responses are ignored (would require write access during read loop).
 
 ## Implementation Details
@@ -134,6 +135,7 @@ let rpc = rpc_cap::RpcAuthority::with_methods(rpc, &["initialize", "tools/list"]
 All functionality is implemented using only `std`:
 - Custom HTTP/1.1 client using `std::net::TcpStream`
 - JSON-RPC 2.0 request/response handling
+- Stdio newline-delimited JSON-RPC helpers
 - SSE parser for streaming responses
 - WebSocket handshake (HTTP upgrade) and frame codec
 - Base64 encoding for WebSocket keys

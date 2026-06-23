@@ -1,0 +1,87 @@
+fn line(kind, name, text) {
+    let row = map()
+    row.kind = kind
+    row.name = name
+    row.text = text
+    return row
+}
+
+fn show(log, status) {
+    let view = map()
+    view.title = "stdio mcp tui"
+    view.width = 48
+    view.height = 8
+    view.status = status
+    view.items = log
+    stdio_write_err(tui_render(view))
+}
+
+fn text(value) {
+    let part = map()
+    part.type = "text"
+    part.text = value
+    return part
+}
+
+fn tool_ping() {
+    let schema = map()
+    schema.type = "object"
+    schema.properties = map()
+    schema.required = []
+    let tool = map()
+    tool.name = "ping"
+    tool.description = "Echo a ping through stdio JSON-RPC."
+    tool.inputSchema = schema
+    return tool
+}
+
+fn initialize(id) {
+    let result = map()
+    result.protocolVersion = "2024-11-05"
+    result.capabilities = map()
+    result.capabilities.tools = map()
+    result.serverInfo = map()
+    result.serverInfo.name = "tetherscript-stdio"
+    result.serverInfo.version = "0.1.0"
+    stdio_write(jsonrpc_response(id, result))
+}
+
+fn tools_list(id) {
+    let result = map()
+    result.tools = [tool_ping()]
+    stdio_write(jsonrpc_response(id, result))
+}
+
+fn tools_call(id, params) {
+    let result = map()
+    result.content = [text("pong")]
+    result.isError = false
+    stdio_write(jsonrpc_response(id, result))
+}
+
+fn handle(log, msg) {
+    if !msg.contains("method") { return nil }
+    log.push(line("rpc", "in", msg.method))
+    if msg.method == "initialize" { return initialize(msg.id) }
+    if msg.method == "tools/list" { return tools_list(msg.id) }
+    if msg.method == "tools/call" { return tools_call(msg.id, msg.params) }
+    if msg.contains("id") {
+        stdio_write(jsonrpc_error(msg.id, -32601, "method not found", msg.method))
+    }
+}
+
+fn main() {
+    let log = [line("system", "ready", "stdio JSON-RPC over stdin/stdout")]
+    let mut running = true
+    while running {
+        show(log, "waiting")
+        let read = stdio_read()
+        if read.is_err() {
+            stdio_write(jsonrpc_error(nil, -32700, read.err()))
+        } else {
+            let msg = read.unwrap()
+            if msg == nil { running = false } else { handle(log, msg) }
+        }
+    }
+    show(log, "done")
+}

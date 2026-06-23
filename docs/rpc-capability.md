@@ -130,7 +130,8 @@ let result = narrowed.call("tools/list", map());
 - **No WebSocket fragmentation**: Doesn't handle fragmented frames.
 - **No automatic reconnection**: SSE and WebSocket connections don't auto-reconnect.
 - **Basic WebSocket**: Only supports text frames, ping/pong, and close frames.
-- **No stdio transport**: MCP over stdio is not supported (only HTTP/SSE/WebSocket).
+- **Stdio transport is script-level**: use `stdio_read`, `stdio_write`, and
+  `jsonrpc_*` helpers for MCP over stdio.
 
 ## Examples
 
@@ -138,6 +139,7 @@ See the examples directory:
 - `examples/rpc_simple.tether` - Basic JSON-RPC usage
 - `examples/rpc_mcp.tether` - MCP server communication
 - `examples/rpc_a2a.tether` - A2A agent communication
+- `examples/stdio_mcp_tui.tether` - MCP-style stdio server with TUI on stderr
 
 ## Implementation Notes
 
