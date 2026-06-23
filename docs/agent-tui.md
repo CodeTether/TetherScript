@@ -15,10 +15,11 @@ The terminal surface is deliberately small and dependency-free:
 A view is a map with `title`, `status`, `width`, `height`, and `items`. Each
 item may be a string or a map with `kind`, `name`, and `text`.
 
-Agent behavior stays in script:
+Agent behavior stays in script. The reference example speaks JSON-RPC over
+stdin/stdout and renders its status frame to stderr:
 
 ```text
-read terminal event -> update script state -> call provider/tool capability -> render state
+read JSON-RPC -> update script state -> call provider/tool capability -> write JSON-RPC
 ```
 
 Use `provider.chat(...)` for model calls when the host grants `--grant-provider`
@@ -29,10 +30,13 @@ For a CodeTether-like local run, use:
 ```bash
 tetherscript run --access-mode full examples/agent_tui.tether
 ```
-Use standard tools such as `process_run`, `fs_read`, `fs_list`, and `cwd` for
-local tool calls. The reference example is `examples/agent_tui.tether`.
 
-For agent-driven tool calls over stdio, use `examples/stdio_mcp_tui.tether`.
-That script is not a human chat prompt. It reads newline-delimited JSON-RPC on
-stdin, writes protocol responses on stdout, and writes its TUI/status frame on
-stderr so an external agent can safely parse stdout.
+Send newline-delimited JSON-RPC on stdin:
+
+```json
+{"jsonrpc":"2.0","id":1,"method":"agent/message","params":{"prompt":"hi"}}
+```
+
+The script exposes `initialize`, `tools/list`, `tools/call`, and
+`agent/message`. Its built-in tools are `cwd`, `ls`, `read`, `write`, and
+`run`. Stdout is protocol-only so an external agent can parse it safely.

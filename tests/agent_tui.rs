@@ -5,7 +5,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 #[test]
-fn agent_tui_runs_tool_call_from_terminal_loop() {
+fn agent_tui_keeps_jsonrpc_on_stdout() {
     let mut child = Command::new(env!("CARGO_BIN_EXE_tetherscript"))
         .args(["run", "examples/agent_tui.tether"])
         .stdin(Stdio::piped())
@@ -17,8 +17,9 @@ fn agent_tui_runs_tool_call_from_terminal_loop() {
         .stdin
         .as_mut()
         .unwrap()
-        .write_all(b"\n/tool cwd\n/quit\n")
+        .write_all(agent_input())
         .unwrap();
+    drop(child.stdin.take());
     let output = child.wait_with_output().unwrap();
     assert!(
         output.status.success(),
@@ -26,8 +27,14 @@ fn agent_tui_runs_tool_call_from_terminal_loop() {
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("[tool] cwd:"));
-    assert!(stdout.contains("tetherscript agent tui"));
+    assert!(stdout.contains("\"id\":1"));
+    assert!(stdout.contains("\"serverInfo\""));
+    assert!(stdout.contains("\"id\":2"));
+    assert!(stdout.contains("\"tools\""));
+    assert!(stdout.contains("\"id\":3"));
+    assert!(stdout.contains("tetherscript"));
+    assert!(!stdout.contains("tetherscript stdio agent"));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("tetherscript stdio agent"));
 }
 
 #[test]
@@ -50,8 +57,9 @@ fn agent_tui_sends_tools_and_executes_model_tool_call() {
         .stdin
         .as_mut()
         .unwrap()
-        .write_all(b"where am i?\n/quit\n")
+        .write_all(agent_message_input())
         .unwrap();
+    drop(child.stdin.take());
     let output = child.wait_with_output().unwrap();
     let requests = handle.join().expect("provider thread should finish");
     assert!(
@@ -60,11 +68,25 @@ fn agent_tui_sends_tools_and_executes_model_tool_call() {
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("[tool] cwd:"));
-    assert!(stdout.contains("[agent] provider: done"));
+    assert!(stdout.contains("\"id\":1"));
+    assert!(stdout.contains("\"done\""));
+    assert!(!stdout.contains("tetherscript stdio agent"));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("tetherscript stdio agent"));
     assert!(requests[0].contains("\"tools\""));
     assert!(requests[0].contains("\"name\":\"cwd\""));
     assert!(requests[1].contains("\"tool_call_id\":\"call-1\""));
+}
+
+fn agent_input() -> &'static [u8] {
+    br#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}
+{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"cwd","arguments":{}}}
+"#
+}
+
+fn agent_message_input() -> &'static [u8] {
+    br#"{"jsonrpc":"2.0","id":1,"method":"agent/message","params":{"prompt":"where am i?"}}
+"#
 }
 
 fn spawn_provider() -> (String, thread::JoinHandle<Vec<String>>) {

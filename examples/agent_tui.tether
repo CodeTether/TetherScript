@@ -6,68 +6,14 @@ fn item(kind, name, text) {
     return row
 }
 
-fn push(log, kind, name, text) {
-    log.push(item(kind, name, text))
-}
-
-fn render(log, status) {
-    let size = tui_size()
+fn show(log, status) {
     let view = map()
-    view.title = "tetherscript agent tui"
-    view.width = size.cols
-    view.height = size.rows
+    view.title = "tetherscript stdio agent"
+    view.width = 80
+    view.height = 10
     view.status = status
     view.items = log
-    tui_present(view)
-}
-
-fn shell(command) {
-    if process_platform() == "windows" {
-        return process_run("powershell", ["-NoProfile", "-Command", command], nil, 30000)?
-    }
-    return process_run("sh", ["-lc", command], nil, 30000)?
-}
-
-fn str_arg(args, key, fallback) {
-    if args.contains(key) {
-        return args[key]
-    }
-    return fallback
-}
-
-fn parse_args(raw) {
-    if type_of(raw) != "str" || raw == "" {
-        return map()
-    }
-    return json_parse(raw)
-}
-
-fn run_tool(name, args) {
-    if name == "cwd" { return cwd()? }
-    if name == "ls" { return json_encode(fs_list(str_arg(args, "path", "."))?) }
-    if name == "read" { return fs_read(str_arg(args, "path", ""))? }
-    if name == "run" { return json_encode(shell(str_arg(args, "command", ""))) }
-    return "unknown tool: " + name
-}
-
-fn manual_tool(command) {
-    if command == "cwd" { return run_tool("cwd", map()) }
-    if command.starts_with("ls ") {
-        let args = map()
-        args.path = command.replace("ls ", "")
-        return run_tool("ls", args)
-    }
-    if command.starts_with("read ") {
-        let args = map()
-        args.path = command.replace("read ", "")
-        return run_tool("read", args)
-    }
-    if command.starts_with("run ") {
-        let args = map()
-        args.command = command.replace("run ", "")
-        return run_tool("run", args)
-    }
-    return "tools: cwd, ls <path>, read <path>, run <command>"
+    stdio_write_err(tui_render(view))
 }
 
 fn prop(desc) {
@@ -77,7 +23,19 @@ fn prop(desc) {
     return p
 }
 
-fn tool(name, desc, props, required) {
+fn mcp_tool(name, desc, props, required) {
+    let schema = map()
+    schema.type = "object"
+    schema.properties = props
+    schema.required = required
+    let out = map()
+    out.name = name
+    out.description = desc
+    out.inputSchema = schema
+    return out
+}
+
+fn model_tool(name, desc, props, required) {
     let params = map()
     params.type = "object"
     params.properties = props
@@ -92,16 +50,29 @@ fn tool(name, desc, props, required) {
     return t
 }
 
-fn tool_defs() {
+fn tool_defs(kind) {
     let defs = []
-    defs.push(tool("cwd", "Return the current working directory.", map(), []))
+    defs.push(tool_for(kind, "cwd", "Return the current working directory.", map(), []))
     let mut p = map(); p.path = prop("Directory path.")
-    defs.push(tool("ls", "List files in a directory.", p, ["path"]))
+    defs.push(tool_for(kind, "ls", "List files in a directory.", p, ["path"]))
     p = map(); p.path = prop("File path.")
-    defs.push(tool("read", "Read a UTF-8 file.", p, ["path"]))
+    defs.push(tool_for(kind, "read", "Read a UTF-8 file.", p, ["path"]))
+    p = map(); p.path = prop("File path."); p.body = prop("UTF-8 file body to write.")
+    defs.push(tool_for(kind, "write", "Write a UTF-8 file.", p, ["path", "body"]))
     p = map(); p.command = prop("Shell command to run.")
-    defs.push(tool("run", "Run a shell command.", p, ["command"]))
+    defs.push(tool_for(kind, "run", "Run a shell command.", p, ["command"]))
     return defs
+}
+
+fn tool_for(kind, name, desc, props, required) {
+    if kind == "mcp" { return mcp_tool(name, desc, props, required) }
+    return model_tool(name, desc, props, required)
+}
+
+fn env_text(name) {
+    let value = env_get(name).unwrap_or(nil)
+    if value == nil { return "" }
+    return value
 }
 
 fn default_model() {
@@ -119,25 +90,103 @@ fn default_model() {
     return model
 }
 
-fn env_text(name) {
-    let value = env_get(name).unwrap_or(nil)
-    if value == nil { return "" }
-    return value
-}
-
 fn openrouter_model(model) {
     if model.starts_with("openrouter/") { return model.replace("openrouter/", "") }
     if model.starts_with("zai/") { return model.replace("zai/", "z-ai/") }
     return model
 }
 
+fn arg(args, key, fallback) {
+    if type_of(args) == "map" && args.contains(key) { return args[key] }
+    return fallback
+}
+
+fn shell(command) {
+    if process_platform() == "windows" {
+        return process_run("powershell", ["-NoProfile", "-Command", command], nil, 30000)
+    }
+    return process_run("sh", ["-lc", command], nil, 30000)
+}
+
+fn run_tool(name, args) {
+    if name == "cwd" { return cwd().unwrap_or("cwd failed") }
+    if name == "ls" { return json_encode(fs_list(arg(args, "path", ".")).unwrap_or([])) }
+    if name == "read" { return fs_read(arg(args, "path", "")).unwrap_or("read failed") }
+    if name == "write" {
+        let path = arg(args, "path", "")
+        let r = fs_write(path, arg(args, "body", ""))
+        if r.is_err() { return "write failed: " + r.err() }
+        return "wrote " + path
+    }
+    if name == "run" { return json_encode(shell(arg(args, "command", "")).unwrap_or(map())) }
+    return "unknown tool: " + name
+}
+
+fn tool_failed(output) {
+    if output.starts_with("unknown tool:") { return true }
+    if output.starts_with("cwd failed") { return true }
+    if output.starts_with("read failed") { return true }
+    if output.starts_with("write failed:") { return true }
+    return false
+}
+
+fn text(value) {
+    let part = map()
+    part.type = "text"
+    part.text = value
+    return part
+}
+
+fn write_result(id, body, is_error) {
+    let result = map()
+    result.content = [text(body)]
+    result.isError = is_error
+    stdio_write(jsonrpc_response(id, result))
+}
+
+fn rpc_args(params) {
+    if type_of(params) == "map" && params.contains("arguments") { return params.arguments }
+    return map()
+}
+
+fn tools_call(log, id, params) {
+    if type_of(params) != "map" || !params.contains("name") {
+        return write_result(id, "tools/call: missing name", true)
+    }
+    let output = run_tool(params.name, rpc_args(params))
+    log.push(item("tool", params.name, output))
+    write_result(id, output, tool_failed(output))
+}
+
+fn tools_list(id) {
+    let result = map()
+    result.tools = tool_defs("mcp")
+    stdio_write(jsonrpc_response(id, result))
+}
+
+fn initialize(id) {
+    let result = map()
+    result.protocolVersion = "2024-11-05"
+    result.capabilities = map()
+    result.capabilities.tools = map()
+    result.serverInfo = map()
+    result.serverInfo.name = "tetherscript-agent"
+    result.serverInfo.version = "0.1.0"
+    stdio_write(jsonrpc_response(id, result))
+}
+
 fn base_messages() {
     let messages = []
     let sys = map()
     sys.role = "system"
-    sys.content = "You are a concise terminal coding agent. Use tools when useful, then answer."
+    sys.content = "You are a concise coding agent. Use tools when useful, then answer."
     messages.push(sys)
     return messages
+}
+
+fn parse_args(raw) {
+    if type_of(raw) != "str" || raw == "" { return map() }
+    return json_parse(raw)
 }
 
 fn call_name(call) {
@@ -147,13 +196,13 @@ fn call_name(call) {
 
 fn call_args(call) {
     if call.contains("function") { return parse_args(call.function.arguments) }
-    return parse_args("")
+    return map()
 }
 
-fn append_tool_result(log, messages, call) {
+fn append_tool(log, messages, call) {
     let name = call_name(call)
     let output = run_tool(name, call_args(call))
-    push(log, "tool", name, output)
+    log.push(item("tool", name, output))
     let msg = map()
     msg.role = "tool"
     msg.tool_call_id = call.id
@@ -161,25 +210,20 @@ fn append_tool_result(log, messages, call) {
     messages.push(msg)
 }
 
-fn agent_step(log, messages) {
+fn agent_step(log, messages, state) {
     let opts = map()
     opts.model = default_model()
-    opts.tools = tool_defs()
+    opts.tools = tool_defs("model")
     opts.tool_choice = "auto"
     let result = provider.chat_json(messages, opts)
-    if result.is_err() {
-        push(log, "agent", "provider", result.err())
-        return false
-    }
+    if result.is_err() { state.answer = result.err(); return false }
     let msg = result.unwrap().choices[0].message
     messages.push(msg)
     if msg.contains("tool_calls") {
-        for call in msg.tool_calls {
-            append_tool_result(log, messages, call)
-        }
+        for call in msg.tool_calls { append_tool(log, messages, call) }
         return true
     }
-    push(log, "agent", "provider", str_arg(msg, "content", ""))
+    state.answer = arg(msg, "content", "")
     return false
 }
 
@@ -189,35 +233,56 @@ fn agent_turn(log, prompt) {
     user.role = "user"
     user.content = prompt
     messages.push(user)
+    let state = map()
+    state.answer = ""
     let mut step = 0
     while step < 6 {
-        if !agent_step(log, messages) { return nil }
+        if !agent_step(log, messages, state) { return state.answer }
         step = step + 1
     }
-    push(log, "agent", "provider", "stopped after tool loop limit")
+    return "stopped after tool loop limit"
 }
 
-fn handle(log, line) {
-    if line == "" { return true }
-    if line == "/quit" { return false }
-    if line.starts_with("/tool ") {
-        let command = line.replace("/tool ", "")
-        push(log, "tool", command, manual_tool(command))
-        return true
+fn prompt(params) {
+    if type_of(params) != "map" { return "" }
+    if params.contains("prompt") { return params.prompt }
+    if params.contains("message") { return params.message }
+    if params.contains("text") { return params.text }
+    return ""
+}
+
+fn agent_message(log, id, params) {
+    let question = prompt(params)
+    log.push(item("user", "jsonrpc", question))
+    let answer = agent_turn(log, question)
+    log.push(item("agent", "provider", answer))
+    write_result(id, answer, false)
+}
+
+fn handle(log, msg) {
+    if !msg.contains("method") { return nil }
+    log.push(item("rpc", "in", msg.method))
+    if msg.method == "initialize" { return initialize(msg.id) }
+    if msg.method == "tools/list" { return tools_list(msg.id) }
+    if msg.method == "tools/call" { return tools_call(log, msg.id, msg.params) }
+    if msg.method == "agent/message" { return agent_message(log, msg.id, msg.params) }
+    if msg.contains("id") {
+        stdio_write(jsonrpc_error(msg.id, -32601, "method not found", msg.method))
     }
-    push(log, "user", "you", line)
-    agent_turn(log, line)
-    return true
 }
 
 fn main() {
-    let log = []
-    push(log, "system", "ready", "type a prompt; tools run automatically; /quit exits")
+    let log = [item("system", "ready", "JSON-RPC on stdin/stdout; TUI on stderr")]
     let mut running = true
     while running {
-        render(log, "waiting")
-        let event = tui_read_event("> ")?
-        running = handle(log, event.text)
+        show(log, "waiting")
+        let read = stdio_read()
+        if read.is_err() {
+            stdio_write(jsonrpc_error(nil, -32700, read.err()))
+        } else {
+            let msg = read.unwrap()
+            if msg == nil { running = false } else { handle(log, msg) }
+        }
     }
-    render(log, "done")
+    show(log, "done")
 }

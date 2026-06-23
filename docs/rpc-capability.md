@@ -139,7 +139,7 @@ See the examples directory:
 - `examples/rpc_simple.tether` - Basic JSON-RPC usage
 - `examples/rpc_mcp.tether` - MCP server communication
 - `examples/rpc_a2a.tether` - A2A agent communication
-- `examples/stdio_mcp_tui.tether` - MCP-style stdio server with TUI on stderr
+- `examples/agent_tui.tether` - stdio agent server with TUI on stderr
 
 ## Implementation Notes
 
