@@ -324,11 +324,63 @@ fn append_tool(log, messages, call) {
     messages.push(msg)
 }
 
+fn append_assistant(messages, answer) {
+    let msg = map()
+    msg.role = "assistant"
+    msg.content = answer
+    messages.push(msg)
+}
+
+fn asks_cwd(prompt) {
+    let text = prompt.lower()
+    if text.contains("cwd") { return true }
+    if text.contains("current directory") { return true }
+    if text.contains("what folder") { return true }
+    if text.contains("which folder") { return true }
+    if text.contains("where are we") { return true }
+    if text.contains("where am i") { return true }
+    return false
+}
+
+fn needs_local_tool(prompt) {
+    let text = prompt.lower()
+    if asks_cwd(prompt) { return true }
+    if text.contains("file") { return true }
+    if text.contains("folder") { return true }
+    if text.contains("directory") { return true }
+    if text.contains("repo") { return true }
+    if text.contains("workspace") { return true }
+    if text.contains("read") { return true }
+    if text.contains("write") { return true }
+    if text.contains("edit") { return true }
+    if text.contains("run") { return true }
+    if text.contains("command") { return true }
+    return false
+}
+
+fn direct_local_answer(log, messages, prompt) {
+    if !asks_cwd(prompt) { return "" }
+    let output = run_tool("cwd", map())
+    log.push(item("tool", "cwd", output))
+    if tool_failed(output) { return "" }
+    let answer = "We're in:\n\n`" + output + "`"
+    append_assistant(messages, answer)
+    return answer
+}
+
+fn tool_choice(state) {
+    if state.force_tool {
+        state.force_tool = false
+        return "required"
+    }
+    return "auto"
+}
+
 fn agent_step(log, messages, state) {
     let opts = map()
     opts.model = default_model()
     opts.tools = tool_defs("model")
-    opts.tool_choice = "auto"
+    opts.tool_choice = tool_choice(state)
     let result = provider.chat_json(messages, opts)
     if result.is_err() { state.answer = result.err(); return false }
     let msg = result.unwrap().choices[0].message
@@ -338,11 +390,14 @@ fn agent_step(log, messages, state) {
         return true
     }
     state.answer = arg(msg, "content", "")
+    if state.needs_tool {
+        let fallback = direct_local_answer(log, messages, state.prompt)
+        if fallback != "" { state.answer = fallback }
+    }
     return false
 }
 
 fn agent_turn(log, session, prompt) {
-    if !provider_ready() { return provider_missing() }
     let messages = session.messages
     let user = map()
     user.role = "user"
@@ -350,6 +405,12 @@ fn agent_turn(log, session, prompt) {
     messages.push(user)
     let state = map()
     state.answer = ""
+    state.prompt = prompt
+    state.needs_tool = needs_local_tool(prompt)
+    state.force_tool = state.needs_tool
+    let direct = direct_local_answer(log, messages, prompt)
+    if direct != "" { return direct }
+    if !provider_ready() { return provider_missing() }
     let mut step = 0
     while step < 6 {
         if !agent_step(log, messages, state) { return state.answer }
@@ -369,14 +430,9 @@ fn prompt(params) {
 fn agent_message(log, session, id, params) {
     let question = prompt(params)
     log.push(item("user", "jsonrpc", question))
-    if !provider_ready() {
-        let answer = provider_missing()
-        log.push(item("agent", "provider", answer))
-        return write_result(id, answer, true)
-    }
     let answer = agent_turn(log, session, question)
     log.push(item("agent", "provider", answer))
-    write_result(id, answer, false)
+    write_result(id, answer, answer == provider_missing())
 }
 
 fn handle(log, session, reload, msg) {
