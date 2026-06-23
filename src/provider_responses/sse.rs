@@ -1,55 +1,29 @@
 //! Responses SSE parsing.
 
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::rc::Rc;
-
 use crate::value::Value;
 
-pub(super) fn chat_json(text: &str) -> Result<Value, String> {
-    let content = output_text(text)?;
-    let mut msg = HashMap::new();
-    msg.insert("role".into(), Value::Str(Rc::new("assistant".into())));
-    msg.insert("content".into(), Value::Str(Rc::new(content)));
-    let mut choice = HashMap::new();
-    choice.insert("message".into(), Value::Map(Rc::new(RefCell::new(msg))));
-    let mut root = HashMap::new();
-    root.insert(
-        "choices".into(),
-        Value::List(Rc::new(RefCell::new(vec![Value::Map(Rc::new(
-            RefCell::new(choice),
-        ))]))),
-    );
-    Ok(Value::Map(Rc::new(RefCell::new(root))))
-}
+use super::{output_items, output_shape, sse_event};
 
-fn output_text(text: &str) -> Result<String, String> {
-    let mut out = String::new();
+pub(super) fn chat_json(text: &str) -> Result<Value, String> {
+    let mut state = sse_event::State::new();
     for line in text.lines() {
-        let Some(data) = line.strip_prefix("data: ") else {
+        let Some(data) = data_line(line) else {
             continue;
         };
+        if data == "[DONE]" {
+            break;
+        }
         let event = crate::json::parse_str(data)
             .map_err(|error| format!("provider.responses: invalid SSE JSON: {error}"))?;
-        if event_type(&event).as_deref() == Some("response.output_text.delta") {
-            if let Some(delta) = string_field(&event, "delta") {
-                out.push_str(&delta);
-            }
-        }
+        state.apply(&event)?;
     }
-    Ok(out)
+    if let Some(response) = state.response {
+        let (text, calls) = output_items::collect(&response)?;
+        return Ok(output_shape::chat(text, calls));
+    }
+    Ok(output_shape::chat(state.text, state.calls))
 }
 
-fn event_type(value: &Value) -> Option<String> {
-    string_field(value, "type")
-}
-
-fn string_field(value: &Value, key: &str) -> Option<String> {
-    let Value::Map(map) = value else {
-        return None;
-    };
-    match map.borrow().get(key) {
-        Some(Value::Str(text)) => Some(text.to_string()),
-        _ => None,
-    }
+fn data_line(line: &str) -> Option<&str> {
+    line.trim_start().strip_prefix("data:").map(str::trim_start)
 }

@@ -1,5 +1,8 @@
 //! Responses request body construction.
 
+#[path = "tool_options.rs"]
+mod tool_options;
+
 use crate::value::Value;
 
 use super::messages;
@@ -20,9 +23,8 @@ pub(super) fn build(args: &[Value], max_tokens: u64) -> Result<String, String> {
         format!("\"input\":{}", messages::input(messages)?),
         "\"stream\":true".into(),
         "\"store\":false".into(),
-        "\"tool_choice\":\"auto\"".into(),
-        "\"parallel_tool_calls\":true".into(),
     ];
+    tool_options::push(&mut parts, opts)?;
     if let Some(tier) = tier {
         parts.push(format!("\"service_tier\":{}", string(&tier)?));
     }
