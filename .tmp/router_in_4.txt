@@ -1,0 +1,2 @@
+what folder are you in
+/quit

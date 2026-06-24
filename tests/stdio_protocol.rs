@@ -13,7 +13,12 @@ fn stdio_agent_keeps_jsonrpc_on_stdout() {
         .stderr(Stdio::piped())
         .spawn()
         .expect("tetherscript should spawn");
-    child.stdin.as_mut().unwrap().write_all(input()).unwrap();
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(input().as_bytes())
+        .unwrap();
     drop(child.stdin.take());
     let output = child.wait_with_output().unwrap();
     assert!(
@@ -72,21 +77,32 @@ fn stdio_agent_tools_can_edit_workspace() {
     assert!(String::from_utf8_lossy(&output.stderr).contains("tetherscript stdio agent"));
 }
 
-fn input() -> &'static [u8] {
-    br#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}
-{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}
-{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
-{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"cwd","arguments":{}}}
-"#
+fn input() -> String {
+    framed_many(&[
+        r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#,
+        r#"{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}"#,
+        r#"{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}"#,
+        r#"{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"cwd","arguments":{}}}"#,
+    ])
 }
 
 fn edit_input(command: &str) -> String {
-    format!(
-        "{{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{{\"name\":\"write\",\"arguments\":{{\"path\":\"note.txt\",\"body\":\"improved\"}}}}}}\n\
-         {{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{{\"name\":\"read\",\"arguments\":{{\"path\":\"note.txt\"}}}}}}\n\
-         {{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{{\"name\":\"run\",\"arguments\":{{\"command\":\"{}\"}}}}}}\n",
+    let run = format!(
+        "{{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{{\"name\":\"run\",\"arguments\":{{\"command\":\"{}\"}}}}}}",
         command
-    )
+    );
+    framed_many(&[
+        r#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"write","arguments":{"path":"note.txt","body":"improved"}}}"#,
+        r#"{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"read","arguments":{"path":"note.txt"}}}"#,
+        &run,
+    ])
+}
+
+fn framed_many(messages: &[&str]) -> String {
+    messages
+        .iter()
+        .map(|message| format!("Content-Length: {}\r\n\r\n{}", message.len(), message))
+        .collect()
 }
 
 fn temp_dir(label: &str) -> PathBuf {

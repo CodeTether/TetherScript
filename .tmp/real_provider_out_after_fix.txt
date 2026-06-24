@@ -1,0 +1,77 @@
+[?1049h[?25l[2J[H[?25l[2J[H+ tetherscript agent tui                                                       +
+|[1;36m[system] ready: type a prompt; tools run automatically; /quit exits[0m           |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++ waiting                                                                      +
+[?25h> [?25l[2J[H+ tetherscript agent tui                                                       +
+|[1;36m[system] ready: type a prompt; tools run automatically; /quit exits[0m           |
+|[97m[user] you: what folder are you in[0m                                            |
+|[33m[tool] cwd: C:\Users\riley\Documents\programming\rust\tetherscript[0m            |
+|[32m[agent] provider: I’m in:
+
+`C:\Users\riley\Documents\programming\rust\tethersc[0m|
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++ waiting                                                                      +
+[?25h> [?25l[2J[H+ tetherscript agent tui                                                       +
+|[1;36m[system] ready: type a prompt; tools run automatically; /quit exits[0m           |
+|[97m[user] you: what folder are you in[0m                                            |
+|[33m[tool] cwd: C:\Users\riley\Documents\programming\rust\tetherscript[0m            |
+|[32m[agent] provider: I’m in:
+
+`C:\Users\riley\Documents\programming\rust\tethersc[0m|
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++ done                                                                         +
+[?25h[0m[?25h[?1049l

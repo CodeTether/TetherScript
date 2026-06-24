@@ -29,16 +29,24 @@ pub(super) fn read_event(args: &[Value]) -> Result<Value, String> {
 }
 
 fn read_line(prompt: &str) -> Result<String, String> {
-    print!("{prompt}");
-    io::stdout()
-        .flush()
-        .map_err(|error| format!("tui_read_event: flush failed: {error}"))?;
+    write_prompt(prompt)?;
     let mut line = String::new();
-    io::stdin()
+    let read = io::stdin()
         .read_line(&mut line)
         .map_err(|error| format!("tui_read_event: read failed: {error}"))?;
+    if read == 0 {
+        return Err("tui_read_event: end of input".into());
+    }
     Ok(line
         .trim_end_matches(['\r', '\n'])
         .trim_start_matches('\u{feff}')
         .to_string())
+}
+
+fn write_prompt(prompt: &str) -> Result<(), String> {
+    let mut out = io::stdout().lock();
+    out.write_all(b"\x1b[?25h")
+        .and_then(|_| out.write_all(prompt.as_bytes()))
+        .and_then(|_| out.flush())
+        .map_err(|error| format!("tui_read_event: prompt failed: {error}"))
 }
