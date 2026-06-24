@@ -21,6 +21,154 @@ fn item(kind, name, text) {
     return row
 }
 
+fn esc() {
+    return b"\x1b".decode_utf8()
+}
+
+fn ansi_clear_home() {
+    return esc() + "[2J" + esc() + "[H"
+}
+
+fn ansi_enter() {
+    return esc() + "[?1049h" + esc() + "[?25l" + ansi_clear_home()
+}
+
+fn ansi_leave() {
+    return esc() + "[0m" + esc() + "[?25h" + esc() + "[?1049l"
+}
+
+fn ansi_reset() {
+    return esc() + "[0m"
+}
+
+fn env_int(name, fallback) {
+    let raw = env_get(name).unwrap_or(nil)
+    if raw == nil { return fallback }
+    let parsed = parse_int(raw)
+    if parsed.is_err() { return fallback }
+    let value = parsed.unwrap()
+    if value <= 0 { return fallback }
+    return value
+}
+
+fn terminal_size() {
+    let size = map()
+    size.cols = env_int("COLUMNS", 80)
+    size.rows = env_int("LINES", 24)
+    return size
+}
+
+fn at_least(value, floor) {
+    if value < floor { return floor }
+    return value
+}
+
+fn repeat_text(text, count) {
+    let mut out = ""
+    let mut i = 0
+    while i < count {
+        out = out + text
+        i = i + 1
+    }
+    return out
+}
+
+fn take_text(value, limit) {
+    let text = str(value)
+    if limit <= 0 { return "" }
+    if text.len() <= limit { return text }
+    let mut out = ""
+    let mut i = 0
+    while i < limit && i < text.len() {
+        out = out + text[i]
+        i = i + 1
+    }
+    return out
+}
+
+fn fit_text(value, width) {
+    let clipped = take_text(single_line(value), width)
+    let pad = width - clipped.len()
+    if pad <= 0 { return clipped }
+    return clipped + repeat_text(" ", pad)
+}
+
+fn color_code(name) {
+    if name == "cyan" { return "36" }
+    if name == "green" { return "32" }
+    if name == "yellow" { return "33" }
+    if name == "magenta" { return "35" }
+    if name == "bright_white" { return "97" }
+    return ""
+}
+
+fn style_open(row) {
+    let color = color_code(arg(row, "fg", ""))
+    let bold = arg(row, "bold", false)
+    if bold && color != "" { return esc() + "[1;" + color + "m" }
+    if bold { return esc() + "[1m" }
+    if color != "" { return esc() + "[" + color + "m" }
+    return ""
+}
+
+fn styled(row, text) {
+    let open = style_open(row)
+    if open == "" { return text }
+    return open + text + ansi_reset()
+}
+
+fn border(label, width) {
+    let inner = at_least(width, 4) - 2
+    let title = " " + single_line(label) + " "
+    if title.len() >= inner { return "+" + take_text(title, inner) + "+" }
+    return "+" + title + repeat_text("-", inner - title.len()) + "+"
+}
+
+fn blank_line(width) {
+    return "|" + repeat_text(" ", at_least(width, 2) - 2) + "|"
+}
+
+fn frame_line(text, width) {
+    let inner = at_least(width, 2) - 2
+    return "|" + fit_text(text, inner) + "|"
+}
+
+fn item_text(row) {
+    let mut text = "[" + arg(row, "kind", "item") + "]"
+    let name = arg(row, "name", "")
+    if name != "" { text = text + " " + name }
+    let body = arg(row, "text", "")
+    if body != "" { text = text + ": " + body }
+    return text
+}
+
+fn item_line(row, width) {
+    let inner = at_least(width, 2) - 2
+    return "|" + styled(row, fit_text(item_text(row), inner)) + "|"
+}
+
+fn render_items(items, width, rows) {
+    let mut out = ""
+    let mut start = 0
+    if items.len() > rows { start = items.len() - rows }
+    let mut i = 0
+    while i < rows {
+        let idx = start + i
+        if idx < items.len() { out = out + item_line(items[idx], width) + "\n" } else { out = out + blank_line(width) + "\n" }
+        i = i + 1
+    }
+    return out
+}
+
+fn render_view(view) {
+    let width = at_least(arg(view, "width", 80), 20)
+    let height = at_least(arg(view, "height", 10), 4)
+    let body_rows = height - 3
+    return border(arg(view, "title", "tetherscript"), width) + "\n" +
+        render_items(arg(view, "items", []), width, body_rows) +
+        border(arg(view, "status", ""), width) + "\n"
+}
+
 fn show(log, status) {
     let view = map()
     view.title = "tetherscript stdio agent"
@@ -28,18 +176,18 @@ fn show(log, status) {
     view.height = 10
     view.status = status
     view.items = log
-    stdio_write_err(tui_render(view))
+    stdio_write_err(render_view(view))
 }
 
 fn present(log, status) {
-    let size = tui_size()
+    let size = terminal_size()
     let view = map()
     view.title = "tetherscript agent tui"
     view.width = size.cols
     view.height = size.rows
     view.status = status
     view.items = log
-    tui_present(view)
+    print(ansi_clear_home() + render_view(view))
 }
 
 fn prop(desc) {
@@ -83,8 +231,24 @@ fn tool_defs(kind) {
     defs.push(tool_for(kind, "ls", "List files in a directory.", p, ["path"]))
     p = map(); p.path = prop("File path.")
     defs.push(tool_for(kind, "read", "Read a UTF-8 file.", p, ["path"]))
+    p = map(); p.path = prop("File or directory path.")
+    defs.push(tool_for(kind, "exists", "Return whether a file or directory exists.", p, ["path"]))
+    p = map(); p.path = prop("File or directory path.")
+    defs.push(tool_for(kind, "stat", "Return file or directory metadata as JSON.", p, ["path"]))
+    p = map(); p.path = prop("Directory path to create, including parents.")
+    defs.push(tool_for(kind, "mkdir", "Create a directory and missing parents.", p, ["path"]))
     p = map(); p.path = prop("File path."); p.body = prop("UTF-8 file body to write.")
     defs.push(tool_for(kind, "write", "Write a UTF-8 file.", p, ["path", "body"]))
+    p = map(); p.path = prop("File path."); p.body = prop("UTF-8 text to append.")
+    defs.push(tool_for(kind, "append", "Append UTF-8 text to a file, creating it if needed.", p, ["path", "body"]))
+    p = map(); p.path = prop("File path."); p.old = prop("Exact text to replace."); p.new = prop("Replacement text.")
+    defs.push(tool_for(kind, "replace", "Replace exact text in a UTF-8 file.", p, ["path", "old", "new"]))
+    p = map(); p.path = prop("File or directory path to remove.")
+    defs.push(tool_for(kind, "remove", "Remove a file or directory tree.", p, ["path"]))
+    p = map(); p.from = prop("Source path."); p.to = prop("Destination path.")
+    defs.push(tool_for(kind, "copy", "Copy a file.", p, ["from", "to"]))
+    p = map(); p.from = prop("Source path."); p.to = prop("Destination path.")
+    defs.push(tool_for(kind, "rename", "Rename or move a file or directory.", p, ["from", "to"]))
     p = map(); p.command = prop("Shell command to run.")
     defs.push(tool_for(kind, "run", "Run a shell command.", p, ["command"]))
     return defs
@@ -146,11 +310,54 @@ fn run_tool(name, args) {
     if name == "cwd" { return cwd().unwrap_or("cwd failed") }
     if name == "ls" { return json_encode(fs_list(arg(args, "path", ".")).unwrap_or([])) }
     if name == "read" { return fs_read(arg(args, "path", "")).unwrap_or("read failed") }
+    if name == "exists" { return json_encode(fs_exists(arg(args, "path", "")).unwrap_or(false)) }
+    if name == "stat" { return json_encode(fs_stat(arg(args, "path", "")).unwrap_or(map())) }
+    if name == "mkdir" {
+        let path = arg(args, "path", "")
+        let r = fs_mkdir(path)
+        if r.is_err() { return "mkdir failed: " + r.err() }
+        return "created " + path
+    }
     if name == "write" {
         let path = arg(args, "path", "")
         let r = fs_write(path, arg(args, "body", ""))
         if r.is_err() { return "write failed: " + r.err() }
         return "wrote " + path
+    }
+    if name == "append" {
+        let path = arg(args, "path", "")
+        let mut body = ""
+        if fs_exists(path).unwrap_or(false) {
+            let read = fs_read(path)
+            if read.is_err() { return "append failed: " + read.err() }
+            body = read.unwrap()
+        }
+        let r = fs_write(path, body + arg(args, "body", ""))
+        if r.is_err() { return "append failed: " + r.err() }
+        return "appended " + path
+    }
+    if name == "replace" {
+        let path = arg(args, "path", "")
+        let old = arg(args, "old", "")
+        if old == "" { return "replace failed: old text is empty" }
+        let read = fs_read(path)
+        if read.is_err() { return "replace failed: " + read.err() }
+        let body = read.unwrap()
+        if !body.contains(old) { return "replace failed: old text not found" }
+        let r = fs_write(path, body.replace(old, arg(args, "new", "")))
+        if r.is_err() { return "replace failed: " + r.err() }
+        return "replaced text in " + path
+    }
+    if name == "remove" { return json_encode(fs_remove(arg(args, "path", "")).unwrap_or(false)) }
+    if name == "copy" {
+        let r = fs_copy(arg(args, "from", ""), arg(args, "to", ""))
+        if r.is_err() { return "copy failed: " + r.err() }
+        return "copied " + str(r.unwrap()) + " bytes"
+    }
+    if name == "rename" {
+        let r = fs_rename(arg(args, "from", ""), arg(args, "to", ""))
+        if r.is_err() { return "rename failed: " + r.err() }
+        return "renamed"
     }
     if name == "run" { return json_encode(shell(arg(args, "command", "")).unwrap_or(map())) }
     return "unknown tool: " + name
@@ -160,7 +367,12 @@ fn tool_failed(output) {
     if output.starts_with("unknown tool:") { return true }
     if output.starts_with("cwd failed") { return true }
     if output.starts_with("read failed") { return true }
+    if output.starts_with("mkdir failed:") { return true }
+    if output.starts_with("append failed:") { return true }
     if output.starts_with("write failed:") { return true }
+    if output.starts_with("replace failed:") { return true }
+    if output.starts_with("copy failed:") { return true }
+    if output.starts_with("rename failed:") { return true }
     return false
 }
 
@@ -247,18 +459,36 @@ fn reload_state() {
 }
 
 fn snapshot_path() {
-    return ".tetherscript/agent_tui_state.json"
+    return ".tetherscript/agent_tui_state.jsonl"
+}
+
+fn snapshot_row(kind, value) {
+    let row = map()
+    row.kind = kind
+    row.value = value
+    return json_encode(row) + "\n"
 }
 
 fn load_snapshot() {
     let raw = fs_read(snapshot_path())
     if raw.is_err() { return nil }
     fs_remove(snapshot_path())
-    return json_parse(raw.unwrap())
+    let snapshot = map()
+    snapshot.log = []
+    snapshot.messages = []
+    for line in raw.unwrap().split("\n") {
+        let trimmed = line.trim()
+        if trimmed != "" {
+            let row = json_parse(trimmed)
+            if arg(row, "kind", "") == "log" { snapshot.log.push(row.value) }
+            if arg(row, "kind", "") == "message" { snapshot.messages.push(row.value) }
+        }
+    }
+    return snapshot
 }
 
 fn initial_session(snapshot) {
-    if snapshot != nil && snapshot.contains("messages") {
+    if snapshot != nil && snapshot.contains("messages") && snapshot.messages.len() > 0 {
         let session = map()
         session.messages = snapshot.messages
         return session
@@ -267,16 +497,16 @@ fn initial_session(snapshot) {
 }
 
 fn initial_log(snapshot) {
-    if snapshot != nil && snapshot.contains("log") { return snapshot.log }
+    if snapshot != nil && snapshot.contains("log") && snapshot.log.len() > 0 { return snapshot.log }
     return [item("system", "ready", "type a prompt; tools run automatically; /quit exits")]
 }
 
 fn save_snapshot(log, session) {
-    let snapshot = map()
-    snapshot.log = log
-    snapshot.messages = session.messages
+    let mut body = ""
+    for row in log { body = body + snapshot_row("log", row) }
+    for message in session.messages { body = body + snapshot_row("message", message) }
     fs_mkdir(".tetherscript")
-    fs_write(snapshot_path(), json_encode(snapshot))
+    fs_write(snapshot_path(), body)
 }
 
 fn reload_needed(state) {
@@ -315,7 +545,15 @@ fn valid_tool(name) {
     if name == "cwd" { return true }
     if name == "ls" { return true }
     if name == "read" { return true }
+    if name == "exists" { return true }
+    if name == "stat" { return true }
+    if name == "mkdir" { return true }
     if name == "write" { return true }
+    if name == "append" { return true }
+    if name == "replace" { return true }
+    if name == "remove" { return true }
+    if name == "copy" { return true }
+    if name == "rename" { return true }
     if name == "run" { return true }
     return false
 }
@@ -382,6 +620,10 @@ fn router_call(log, messages, state, draft) {
     return call
 }
 
+fn router_enabled() {
+    return env_text("TETHERSCRIPT_AGENT_ROUTER") == "1"
+}
+
 fn normalize_call(call, messages) {
     if !call.contains("id") { call.id = "router-" + str(len(messages)) }
     if !call.contains("type") { call.type = "function" }
@@ -418,12 +660,14 @@ fn agent_step(log, messages, state) {
         return true
     }
     state.answer = arg(msg, "content", "")
-    let routed = router_call(log, messages, state, state.answer)
-    if routed != nil {
-        let call = normalize_call(routed, messages)
-        append_tool_call(messages, call)
-        append_tool(log, messages, call)
-        return true
+    if router_enabled() {
+        let routed = router_call(log, messages, state, state.answer)
+        if routed != nil {
+            let call = normalize_call(routed, messages)
+            append_tool_call(messages, call)
+            append_tool(log, messages, call)
+            return true
+        }
     }
     messages.push(msg)
     if state.answer == "" {
@@ -442,12 +686,9 @@ fn agent_turn(log, session, prompt) {
     state.answer = ""
     state.prompt = prompt
     if !provider_ready() { return provider_missing() }
-    let mut step = 0
-    while step < 6 {
+    while true {
         if !agent_step(log, messages, state) { return state.answer }
-        step = step + 1
     }
-    return "stopped after tool loop limit"
 }
 
 fn prompt(params) {
@@ -498,7 +739,10 @@ fn manual_tool(command) {
         args.command = trimmed.replace("run ", "")
         return run_tool("run", args)
     }
-    return "tools: cwd, ls <path>, read <path>, run <command>"
+    if trimmed.starts_with("replace ") {
+        return run_tool("replace", parse_args(trimmed.replace("replace ", "")))
+    }
+    return "tools: cwd, ls <path>, read <path>, replace path/old/new JSON, run <command>"
 }
 
 fn new_input() {
@@ -515,6 +759,7 @@ fn input_status(input) {
 
 fn send_prompt(log, session, reload, prompt) {
     log.push(item("user", "you", prompt))
+    present(log, "working")
     let answer = agent_turn(log, session, prompt)
     log.push(item("agent", "provider", answer))
     if reload_needed(reload) { return reload_now(log, session, reload) }
@@ -534,7 +779,10 @@ fn multiline_handle(log, session, reload, input, line) {
         input.multiline = false
         let prompt = input.lines.join("\n")
         input.lines = []
-        if prompt.trim() == "" { return true }
+        if prompt.trim() == "" {
+            log.push(item("system", "input", "empty multiline ignored"))
+            return true
+        }
         return send_prompt(log, session, reload, prompt)
     }
     if line == "/cancel" {
@@ -552,7 +800,7 @@ fn interactive_handle(log, session, reload, input, line) {
     if line == "" { return true }
     if line == "/quit" { return false }
     if line == "/tools" {
-        log.push(item("system", "tools", "cwd, ls <path>, read <path>, run <command>"))
+        log.push(item("system", "tools", "cwd, ls <path>, read <path>, replace path/old/new JSON, run <command>"))
         return true
     }
     if line == "/multi" || line.starts_with("/multi ") {
@@ -573,7 +821,7 @@ fn interactive_main() {
     let reload = reload_state()
     let input = new_input()
     let mut running = true
-    print(tui_enter())
+    print(ansi_enter())
     while running {
         present(log, input_status(input))
         let event = tui_read_event("> ")
@@ -585,7 +833,7 @@ fn interactive_main() {
         }
     }
     if reload.reloading { present(log, "reloading") } else { present(log, "done") }
-    print(tui_leave())
+    print(ansi_leave())
 }
 
 fn rpc_main() {
