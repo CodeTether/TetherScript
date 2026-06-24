@@ -106,10 +106,47 @@ cargo build --release
 ./target/release/tetherscript inspect --tokens   examples/hello.tether
 ./target/release/tetherscript inspect --ast      examples/hello.tether
 ./target/release/tetherscript inspect --bytecode examples/hello.tether
+./target/release/tetherscript inspect --bytecode-visual examples/fib.tether
 
 # Serve LSP over stdio for editors
 ./target/release/tetherscript lsp
 ```
+
+## Bytecode visualizer
+
+The default `run` command compiles source into bytecode and executes it on the
+stack VM. The visualizer makes that pipeline inspectable:
+
+```bash
+./target/release/tetherscript inspect --bytecode-visual examples/fib.tether
+```
+
+Example output:
+
+```text
+bytecode visualizer
+chunk main
+  names (2)
+    n000 = fib
+    n001 = main
+  code (6)
+    0000  MakeFn(0)
+    0001  DefLet(0, false)
+    0002  MakeFn(1)
+    0003  DefLet(1, false)
+    0004  Nil
+    0005  Return
+  chunk p000 fn fib(n)
+    code (22)
+      0000  GetName(0)
+      0001  Const(0)
+      0002  Lt
+      0003  JumpIfFalse(4) -> 0008
+      ...
+```
+
+Use `--bytecode` for the raw debug dump and `--bytecode-visual` for teaching,
+reviews, and understanding how source maps to VM instructions.
 
 ## Language example
 
