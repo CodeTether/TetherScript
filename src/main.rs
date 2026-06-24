@@ -822,7 +822,7 @@ fn cmd_run_legacy(args: &[String]) {
         }
     };
 
-    execute_file(
+    run_reload::execute(
         &path,
         vm_mode,
         step_budget,

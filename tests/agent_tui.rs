@@ -226,6 +226,47 @@ fn agent_tui_restarts_after_http_tool_edits_script() {
     let _ = std::fs::remove_dir_all(root);
 }
 
+#[test]
+fn legacy_run_mode_honors_hot_reload_marker() {
+    let root = temp_root("legacy-hot-reload");
+    std::fs::create_dir_all(&root).unwrap();
+    let script = root.join("reload_once.tether");
+    std::fs::write(
+        &script,
+        r#"// tetherscript: authority agent
+// tetherscript: hot-reload
+
+fn main() {
+    let count_path = ".tetherscript/count.txt"
+    fs_mkdir(".tetherscript")
+    let previous = fs_read(count_path).unwrap_or("0")
+    if previous == "0" {
+        fs_write(count_path, "1")
+        fs_write(".tetherscript/reload", process_args()[1])
+        fs_write(process_args()[1], fs_read(process_args()[1]).unwrap() + "\n// changed\n")
+        println("first")
+        return nil
+    }
+    println("second")
+}
+"#,
+    )
+    .unwrap();
+    let output = agent_command()
+        .current_dir(&root)
+        .arg(&script)
+        .output()
+        .expect("tetherscript binary should run");
+    assert!(
+        output.status.success(),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "first\nsecond\n");
+    assert!(!root.join(".tetherscript").join("reload").exists());
+    let _ = std::fs::remove_dir_all(root);
+}
+
 fn agent_command() -> Command {
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_tetherscript"));
     cmd.env("CODETETHER_DISABLE_ENV_FALLBACK", "1")
