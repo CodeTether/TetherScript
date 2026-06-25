@@ -227,6 +227,54 @@ fn agent_tui_restarts_after_http_tool_edits_script() {
 }
 
 #[test]
+fn agent_tui_rejects_invalid_self_edit_and_restores_source() {
+    let root = temp_root("agent-tui-self-check");
+    std::fs::create_dir_all(&root).unwrap();
+    let script = root.join("agent_tui_guard.tether");
+    std::fs::copy("examples/agent_tui.tether", &script).unwrap();
+    let original = std::fs::read_to_string(&script).unwrap();
+    let script_text = script.to_string_lossy().into_owned();
+    let (addr, handle) = spawn_provider_with(vec![
+        append_invalid_call_body(&script_text),
+        final_body().to_string(),
+    ]);
+    let mut child = agent_command()
+        .current_dir(&root)
+        .arg("run")
+        .arg("--grant-provider")
+        .arg(format!("http://{addr}"))
+        .arg(&script)
+        .env("TETHERSCRIPT_AGENT_MODEL", "test-model")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("tetherscript binary should spawn");
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(b"break yourself\n/quit\n")
+        .unwrap();
+    drop(child.stdin.take());
+    let output = child.wait_with_output().unwrap();
+    let requests = handle.join().expect("provider thread should finish");
+    assert!(
+        output.status.success(),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("[system] self-check: candidate rejected"));
+    assert!(!stdout.contains("[system] reload: source changed; restarting"));
+    assert!(stdout.contains("+ done"));
+    assert_eq!(requests.len(), 2);
+    assert_eq!(std::fs::read_to_string(&script).unwrap(), original);
+    assert!(!root.join(".tetherscript").join("reload").exists());
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
 fn legacy_run_mode_honors_hot_reload_marker() {
     let root = temp_root("legacy-hot-reload");
     std::fs::create_dir_all(&root).unwrap();
@@ -374,6 +422,17 @@ fn append_call_body(path: &str) -> String {
     );
     format!(
         "{{\"choices\":[{{\"message\":{{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{{\"id\":\"call-append\",\"type\":\"function\",\"function\":{{\"name\":\"append\",\"arguments\":{}}}}}]}}}}]}}",
+        json_string(&args)
+    )
+}
+
+fn append_invalid_call_body(path: &str) -> String {
+    let args = format!(
+        "{{\"path\":{},\"body\":\"\\nfn broken( {{\\n\"}}",
+        json_string(path)
+    );
+    format!(
+        "{{\"choices\":[{{\"message\":{{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{{\"id\":\"call-invalid\",\"type\":\"function\",\"function\":{{\"name\":\"append\",\"arguments\":{}}}}}]}}}}]}}",
         json_string(&args)
     )
 }
