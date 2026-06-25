@@ -12,3 +12,7 @@ editor/vscode/*.vsix
 editor/vscode/package-lock.json
 .codetether-worktrees/
 .codetether/
+
+# TetherScript local agent runtime state
+.tetherscript/
+examples/.tetherscript/
