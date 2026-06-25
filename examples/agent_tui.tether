@@ -8,11 +8,18 @@ fn single_line(value) {
     return text.replace("\r", "\\n")
 }
 
+fn clean_text(value) {
+    let mut text = str(value)
+    text = text.replace("\r\n", "\n")
+    text = text.replace("\r", "\n")
+    return text
+}
+
 fn item(kind, name, text) {
     let row = map()
     row.kind = kind
     row.name = name
-    row.text = single_line(text)
+    row.text = clean_text(text)
     if kind == "system" { row.fg = "bright_cyan"; row.bold = true }
     if kind == "user" { row.fg = "bright_white" }
     if kind == "agent" { row.fg = "bright_green" }
@@ -137,33 +144,79 @@ fn frame_line(text, width) {
     return "|" + fit_text(text, inner) + "|"
 }
 
-fn item_text(row) {
-    let mut text = "[" + arg(row, "kind", "item") + "]"
+fn item_parts(row) {
+    let mut prefix = "[" + arg(row, "kind", "item") + "]"
     let name = arg(row, "name", "")
-    if name != "" { text = text + " " + name }
+    if name != "" { prefix = prefix + " " + name }
     let body = arg(row, "text", "")
-    if body != "" { text = text + ": " + body }
-    return text
-}
-
-fn item_line(row, width) {
-    let inner = at_least(width, 2) - 2
-    return "|" + styled(row, fit_text(item_text(row), inner)) + "|"
-}
-
-fn render_items(items, width, rows) {
-    let mut out = ""
-    let mut start = 0
-    if items.len() > rows { start = items.len() - rows }
+    let lines = []
+    if body == "" {
+        lines.push(prefix)
+        return lines
+    }
+    let parts = clean_text(body).split("\n")
     let mut i = 0
-    while i < rows {
-        let idx = start + i
-        if idx < items.len() { out = out + item_line(items[idx], width) + "\n" } else { out = out + blank_line(width) + "\n" }
+    while i < parts.len() {
+        if i == 0 { lines.push(prefix + ": " + parts[i]) } else { lines.push("  " + parts[i]) }
+        i = i + 1
+    }
+    return lines
+}
+
+fn slice_text(value, start, limit) {
+    let text = str(value)
+    if limit <= 0 { return "" }
+    let mut out = ""
+    let mut i = start
+    let end = start + limit
+    while i < end && i < text.len() {
+        out = out + text[i]
         i = i + 1
     }
     return out
 }
 
+fn pad_text(value, width) {
+    let text = str(value)
+    let pad = width - text.len()
+    if pad <= 0 { return text }
+    return text + repeat_text(" ", pad)
+}
+
+fn wrapped_item_lines(row, width) {
+    let inner = at_least(width, 2) - 2
+    let lines = []
+    for text in item_parts(row) {
+        if text == "" {
+            lines.push("|" + styled(row, repeat_text(" ", inner)) + "|")
+        } else {
+            let mut i = 0
+            while i < text.len() {
+                let part = slice_text(text, i, inner)
+                lines.push("|" + styled(row, pad_text(part, inner)) + "|")
+                i = i + inner
+            }
+        }
+    }
+    return lines
+}
+
+fn render_items(items, width, rows) {
+    let lines = []
+    for row in items {
+        for line in wrapped_item_lines(row, width) { lines.push(line) }
+    }
+    let mut out = ""
+    let mut start = 0
+    if lines.len() > rows { start = lines.len() - rows }
+    let mut i = 0
+    while i < rows {
+        let idx = start + i
+        if idx < lines.len() { out = out + lines[idx] + "\n" } else { out = out + blank_line(width) + "\n" }
+        i = i + 1
+    }
+    return out
+}
 fn render_view(view) {
     let width = at_least(arg(view, "width", 80), 20)
     let height = at_least(arg(view, "height", 10), 4)
@@ -254,7 +307,11 @@ fn tool_defs(kind) {
     p = map(); p.from = prop("Source path."); p.to = prop("Destination path.")
     defs.push(tool_for(kind, "rename", "Rename or move a file or directory.", p, ["from", "to"]))
     p = map(); p.command = prop("Shell command to run.")
-    defs.push(tool_for(kind, "run", "Run a shell command.", p, ["command"]))
+    defs.push(tool_for(kind, "run", "Run a shell command using the platform default shell.", p, ["command"]))
+    p = map(); p.command = prop("PowerShell command to run.")
+    defs.push(tool_for(kind, "powershell", "Run a command with PowerShell.", p, ["command"]))
+    p = map(); p.command = prop("Bash command to run.")
+    defs.push(tool_for(kind, "bash", "Run a command with bash.", p, ["command"]))
     return defs
 }
 
@@ -308,6 +365,14 @@ fn shell(command) {
         return process_run("powershell", ["-NoProfile", "-Command", command], nil, 30000)
     }
     return process_run("sh", ["-lc", command], nil, 30000)
+}
+
+fn powershell(command) {
+    return process_run("powershell", ["-NoProfile", "-Command", command], nil, 30000)
+}
+
+fn bash(command) {
+    return process_run("bash", ["-lc", command], nil, 30000)
 }
 
 fn run_tool(name, args) {
@@ -364,6 +429,8 @@ fn run_tool(name, args) {
         return "renamed"
     }
     if name == "run" { return json_encode(shell(arg(args, "command", "")).unwrap_or(map())) }
+    if name == "powershell" { return json_encode(powershell(arg(args, "command", "")).unwrap_or(map())) }
+    if name == "bash" { return json_encode(bash(arg(args, "command", "")).unwrap_or(map())) }
     return "unknown tool: " + name
 }
 
@@ -466,14 +533,27 @@ fn session_path() {
     return ".tetherscript/agent_tui_session.jsonl"
 }
 
+fn sessions_dir() {
+    return ".tetherscript/sessions"
+}
+
+fn session_file(name) {
+    return sessions_dir() + "/" + name.trim() + ".jsonl"
+}
+
 fn session_row(value) {
     return json_encode(value) + "\n"
 }
 
-fn load_session() {
-    let raw = fs_read(session_path())
+fn session_body(session) {
+    let mut body = ""
+    for message in session.messages { body = body + session_row(message) }
+    return body
+}
+
+fn load_session_at(path) {
+    let raw = fs_read(path)
     if raw.is_err() { return nil }
-    fs_remove(session_path())
     let session = map()
     session.messages = []
     for line in raw.unwrap().split("\n") {
@@ -483,6 +563,10 @@ fn load_session() {
     return session
 }
 
+fn load_session() {
+    return load_session_at(session_path())
+}
+
 fn initial_session(saved) {
     if saved != nil && saved.contains("messages") && saved.messages.len() > 0 { return saved }
     return new_session()
@@ -490,16 +574,55 @@ fn initial_session(saved) {
 
 fn initial_log(saved) {
     if saved != nil && saved.contains("messages") && saved.messages.len() > 0 {
-        return [item("system", "ready", "restored session from jsonl; type a prompt; /quit exits")]
+        let log = [item("system", "ready", "restored session from jsonl; /save <name>, /load <name>, /sessions, /clear")]
+        for message in saved.messages { append_log_message(log, message) }
+        return log
     }
-    return [item("system", "ready", "type a prompt; tools run automatically; /quit exits")]
+    return [item("system", "ready", "type a prompt; tools run automatically; /save <name>, /load <name>, /sessions")]
 }
 
+fn append_log_message(log, message) {
+    if type_of(message) != "map" || !message.contains("role") { return nil }
+    let content = arg(message, "content", "")
+    if message.role == "system" { return nil }
+    if message.role == "user" { log.push(item("user", "you", content)); return nil }
+    if message.role == "assistant" && content != "" { log.push(item("agent", "provider", content)); return nil }
+    if message.role == "tool" { log.push(item("tool", arg(message, "tool_call_id", "saved"), content)); return nil }
+    return nil
+}
+
+fn clear_session() {
+    fs_remove(session_path())
+    return new_session()
+}
 fn save_session(session) {
-    let mut body = ""
-    for message in session.messages { body = body + session_row(message) }
     fs_mkdir(".tetherscript")
-    fs_write(session_path(), body)
+    fs_write(session_path(), session_body(session))
+}
+
+fn save_named_session(session, name) {
+    let clean = name.trim()
+    if clean == "" { return "usage: /save <name>" }
+    fs_mkdir(sessions_dir())
+    let r = fs_write(session_file(clean), session_body(session))
+    if r.is_err() { return "save failed: " + r.err() }
+    return "saved session " + clean
+}
+
+fn load_named_session(name) {
+    let clean = name.trim()
+    if clean == "" { return nil }
+    return load_session_at(session_file(clean))
+}
+
+fn session_names() {
+    let list = fs_list(sessions_dir()).unwrap_or([])
+    let names = []
+    for path in list {
+        let name = str(path)
+        if name.ends_with(".jsonl") { names.push(name.replace(".jsonl", "")) }
+    }
+    return names
 }
 
 fn check_output(report) {
@@ -587,6 +710,8 @@ fn valid_tool(name) {
     if name == "copy" { return true }
     if name == "rename" { return true }
     if name == "run" { return true }
+    if name == "powershell" { return true }
+    if name == "bash" { return true }
     return false
 }
 
@@ -771,10 +896,20 @@ fn manual_tool(command) {
         args.command = trimmed.replace("run ", "")
         return run_tool("run", args)
     }
+    if trimmed.starts_with("powershell ") {
+        let args = map()
+        args.command = trimmed.replace("powershell ", "")
+        return run_tool("powershell", args)
+    }
+    if trimmed.starts_with("bash ") {
+        let args = map()
+        args.command = trimmed.replace("bash ", "")
+        return run_tool("bash", args)
+    }
     if trimmed.starts_with("replace ") {
         return run_tool("replace", parse_args(trimmed.replace("replace ", "")))
     }
-    return "tools: cwd, ls <path>, read <path>, replace path/old/new JSON, run <command>"
+    return "tools: cwd, ls <path>, read <path>, replace path/old/new JSON, run|powershell|bash <command>"
 }
 
 fn new_input() {
@@ -791,13 +926,47 @@ fn input_status(input) {
 
 fn send_prompt(log, session, reload, prompt) {
     log.push(item("user", "you", prompt))
+    save_session(session)
     present(log, "working")
     let answer = agent_turn(log, session, prompt)
     log.push(item("agent", "provider", answer))
+    save_session(session)
     if reload_needed(reload) { return reload_now(log, session, reload) }
     return true
 }
 
+fn restore_log(log, session, label) {
+    while log.len() > 0 { log.pop() }
+    log.push(item("system", "session", label))
+    for message in session.messages { append_log_message(log, message) }
+}
+
+fn session_command(log, session, line) {
+    if line == "/sessions" {
+        let names = session_names()
+        if names.len() == 0 { log.push(item("system", "sessions", "no named sessions")) } else { log.push(item("system", "sessions", names.join(", "))) }
+        return true
+    }
+    if line.starts_with("/save ") {
+        let name = line.replace("/save ", "")
+        save_session(session)
+        log.push(item("system", "session", save_named_session(session, name)))
+        return true
+    }
+    if line.starts_with("/load ") {
+        let name = line.replace("/load ", "").trim()
+        let loaded = load_named_session(name)
+        if loaded == nil {
+            log.push(item("system", "session", "load failed: " + name))
+            return true
+        }
+        session.messages = loaded.messages
+        save_session(session)
+        restore_log(log, session, "loaded session " + name)
+        return true
+    }
+    return false
+}
 fn multiline_start(log, input, line) {
     input.multiline = true
     input.lines = []
@@ -830,9 +999,17 @@ fn multiline_handle(log, session, reload, input, line) {
 fn interactive_handle(log, session, reload, input, line) {
     if input.multiline { return multiline_handle(log, session, reload, input, line) }
     if line == "" { return true }
-    if line == "/quit" { return false }
+    if line == "/quit" { save_session(session); return false }
+    if line == "/clear" {
+        let fresh = clear_session()
+        session.messages = fresh.messages
+        while log.len() > 0 { log.pop() }
+        log.push(item("system", "session", "cleared; type a prompt; /quit exits"))
+        return true
+    }
+    if session_command(log, session, line) { return true }
     if line == "/tools" {
-        log.push(item("system", "tools", "cwd, ls <path>, read <path>, replace path/old/new JSON, run <command>"))
+        log.push(item("system", "tools", "cwd, ls <path>, read <path>, replace path/old/new JSON, run|powershell|bash <command>"))
         return true
     }
     if line == "/multi" || line.starts_with("/multi ") {
