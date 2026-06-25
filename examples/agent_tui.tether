@@ -41,6 +41,44 @@
 // =============================================================================
 //  TEXT NORMALIZATION AND LOG ROWS
 // =============================================================================
+
+fn agent_version() {
+    return "0.5.0"
+}
+
+fn agent_name() {
+    return "tetherscript-agent-tui"
+}
+
+fn agent_label() {
+    return agent_name() + " v" + agent_version()
+}
+fn bump_version_text(part) {
+    let current = agent_version()
+    let pieces = current.split(".")
+    if pieces.len() < 3 { return current }
+    let major = parse_int(pieces[0]).unwrap_or(0)
+    let minor = parse_int(pieces[1]).unwrap_or(0)
+    let patch = parse_int(pieces[2]).unwrap_or(0)
+    if part == "major" { return str(major + 1) + ".0.0" }
+    if part == "minor" { return str(major) + "." + str(minor + 1) + ".0" }
+    return str(major) + "." + str(minor) + "." + str(patch + 1)
+}
+
+fn bump_version(part) {
+    let next = bump_version_text(part)
+    let path = script_path()
+    let read = fs_read(path)
+    if read.is_err() { return "version bump failed: " + read.err() }
+    let body = read.unwrap()
+    let old = "return \"" + agent_version() + "\""
+    let new = "return \"" + next + "\""
+    if !body.contains(old) { return "version bump failed: version literal not found" }
+    let checkpoint = save_checkpoint(path, body)
+    let r = fs_write(path, body.replace(old, new))
+    if r.is_err() { return "version bump failed: " + r.err() }
+    return "version bumped " + agent_version() + " -> " + next + "\n" + checkpoint
+}
 // Normalize text for one-line UI labels and borders.
 fn single_line(value) {
     let mut text = str(value)
@@ -268,14 +306,15 @@ fn wrapped_item_lines(row, width) {
 }
 
 // Flatten wrapped log rows and keep the newest visible rows at the bottom.
-fn render_items(items, width, rows) {
+fn render_items(items, width, rows, scroll) {
     let lines = []
     for row in items {
         for line in wrapped_item_lines(row, width) { lines.push(line) }
     }
     let mut out = ""
     let mut start = 0
-    if lines.len() > rows { start = lines.len() - rows }
+    if lines.len() > rows { start = lines.len() - rows - scroll }
+    if start < 0 { start = 0 }
     let mut i = 0
     while i < rows {
         let idx = start + i
@@ -290,13 +329,13 @@ fn render_view(view) {
     let height = at_least(arg(view, "height", 10), 4)
     let body_rows = height - 3
     return border(arg(view, "title", "tetherscript"), width) + "\n" +
-        render_items(arg(view, "items", []), width, body_rows) +
+        render_items(arg(view, "items", []), width, body_rows, arg(view, "scroll", 0)) +
         border(arg(view, "status", ""), width) + "\n"
 }
 
 fn show(log, status) {
     let view = map()
-    view.title = "tetherscript stdio agent"
+    view.title = agent_label() + " stdio"
     view.width = 80
     view.height = 10
     view.status = status
@@ -304,15 +343,20 @@ fn show(log, status) {
     stdio_write_err(render_view(view))
 }
 
-fn present(log, status) {
+fn present_at(log, status, scroll) {
     let size = terminal_size()
     let view = map()
-    view.title = "tetherscript agent tui"
+    view.title = agent_label()
     view.width = size.cols
     view.height = size.rows
     view.status = status
     view.items = log
+    view.scroll = scroll
     print(ansi_clear_home() + render_view(view))
+}
+
+fn present(log, status) {
+    present_at(log, status, 0)
 }
 
 // =============================================================================
@@ -368,23 +412,23 @@ fn tool_defs(kind) {
     defs.push(tool_for(kind, "stat", "Return file or directory metadata as JSON.", p, ["path"]))
     p = map(); p.path = prop("Directory path to create, including parents.")
     defs.push(tool_for(kind, "mkdir", "Create a directory and missing parents.", p, ["path"]))
-    p = map(); p.path = prop("File path."); p.body = prop("UTF-8 file body to write.")
+    p = map(); p.path = prop("File path."); p.body = prop("UTF-8 file body to write."); p.confirm = prop("Set to true when destructive confirmation is required.")
     defs.push(tool_for(kind, "write", "Write a UTF-8 file.", p, ["path", "body"]))
     p = map(); p.path = prop("File path."); p.body = prop("UTF-8 text to append.")
     defs.push(tool_for(kind, "append", "Append UTF-8 text to a file, creating it if needed.", p, ["path", "body"]))
-    p = map(); p.path = prop("File path."); p.old = prop("Exact text to replace."); p.new = prop("Replacement text.")
+    p = map(); p.path = prop("File path."); p.old = prop("Exact text to replace."); p.new = prop("Replacement text."); p.confirm = prop("Set to true when destructive confirmation is required.")
     defs.push(tool_for(kind, "replace", "Replace exact text in a UTF-8 file.", p, ["path", "old", "new"]))
-    p = map(); p.path = prop("File or directory path to remove.")
+    p = map(); p.path = prop("File or directory path to remove."); p.confirm = prop("Set to true when destructive confirmation is required.")
     defs.push(tool_for(kind, "remove", "Remove a file or directory tree.", p, ["path"]))
     p = map(); p.from = prop("Source path."); p.to = prop("Destination path.")
     defs.push(tool_for(kind, "copy", "Copy a file.", p, ["from", "to"]))
     p = map(); p.from = prop("Source path."); p.to = prop("Destination path.")
     defs.push(tool_for(kind, "rename", "Rename or move a file or directory.", p, ["from", "to"]))
-    p = map(); p.command = prop("Shell command to run.")
+    p = map(); p.command = prop("Shell command to run."); p.timeout_ms = prop("Optional timeout in milliseconds.")
     defs.push(tool_for(kind, "run", "Run a shell command using the platform default shell.", p, ["command"]))
-    p = map(); p.command = prop("PowerShell command to run.")
+    p = map(); p.command = prop("PowerShell command to run."); p.timeout_ms = prop("Optional timeout in milliseconds.")
     defs.push(tool_for(kind, "powershell", "Run a command with PowerShell.", p, ["command"]))
-    p = map(); p.command = prop("Bash command to run.")
+    p = map(); p.command = prop("Bash command to run."); p.timeout_ms = prop("Optional timeout in milliseconds.")
     defs.push(tool_for(kind, "bash", "Run a command with bash.", p, ["command"]))
     p = map(); p.html = prop("HTML document or fragment."); p.selector = prop("CSS selector.")
     defs.push(tool_for(kind, "browser_text", "Return textContent for a selector in HTML.", p, ["html", "selector"]))
@@ -454,21 +498,102 @@ fn arg(args, key, fallback) {
 // =============================================================================
 
 // Shell adapters. run uses the platform default; explicit tools use PowerShell/Bash.
-fn shell(command) {
+fn default_tool_timeout_ms() {
+    return env_int("TETHERSCRIPT_AGENT_TOOL_TIMEOUT_MS", 30000)
+}
+
+fn tool_timeout_ms(args) {
+    let raw = arg(args, "timeout_ms", "")
+    if raw == "" { return default_tool_timeout_ms() }
+    let parsed = parse_int(str(raw))
+    if parsed.is_err() { return default_tool_timeout_ms() }
+    let value = parsed.unwrap()
+    if value <= 0 { return default_tool_timeout_ms() }
+    return value
+}
+
+fn shell(command, timeout_ms) {
     if process_platform() == "windows" {
-        return process_run("powershell", ["-NoProfile", "-Command", command], nil, 30000)
+        return process_run("powershell", ["-NoProfile", "-Command", command], nil, timeout_ms)
     }
-    return process_run("sh", ["-lc", command], nil, 30000)
+    return process_run("sh", ["-lc", command], nil, timeout_ms)
 }
 
-fn powershell(command) {
-    return process_run("powershell", ["-NoProfile", "-Command", command], nil, 30000)
+fn powershell(command, timeout_ms) {
+    return process_run("powershell", ["-NoProfile", "-Command", command], nil, timeout_ms)
 }
 
-fn bash(command) {
-    return process_run("bash", ["-lc", command], nil, 30000)
+fn bash(command, timeout_ms) {
+    return process_run("bash", ["-lc", command], nil, timeout_ms)
 }
 
+fn change_preview(path, before, after) {
+    let before_text = str(before)
+    let after_text = str(after)
+    let delta = after_text.len() - before_text.len()
+    let mut out = "change preview " + path + ": " + str(before_text.len()) + " -> " + str(after_text.len()) + " chars; delta=" + str(delta)
+    let before_one = take_text(single_line(before_text), 160)
+    let after_one = take_text(single_line(after_text), 160)
+    if before_one != after_one {
+        out = out + "\nbefore: " + before_one + "\nafter: " + after_one
+    }
+    return out
+}
+fn checkpoints_dir() {
+    return ".tetherscript/checkpoints"
+}
+
+fn checkpoint_name(path) {
+    let mut name = str(path)
+    name = name.replace("\\", "_")
+    name = name.replace("/", "_")
+    name = name.replace(":", "_")
+    if name == "" { name = "unnamed" }
+    return name + ".bak"
+}
+
+fn checkpoint_path(path) {
+    return checkpoints_dir() + "/" + checkpoint_name(path)
+}
+
+fn save_checkpoint(path, body) {
+    fs_mkdir(checkpoints_dir())
+    let target = checkpoint_path(path)
+    let r = fs_write(target, body)
+    if r.is_err() { return "checkpoint failed: " + r.err() }
+    return "checkpoint saved: " + target
+}
+
+fn restore_checkpoint(path) {
+    let source = checkpoint_path(path)
+    let read = fs_read(source)
+    if read.is_err() { return "restore failed: no checkpoint for " + path }
+    let current = fs_read(path).unwrap_or("")
+    let checkpoint = ""
+    if current != "" { checkpoint = save_checkpoint(path, current) }
+    let r = fs_write(path, read.unwrap())
+    if r.is_err() { return "restore failed: " + r.err() }
+    return "restored " + path + " from " + source + "\n" + checkpoint
+}
+
+fn checkpoint_names() {
+    return json_encode(fs_list(checkpoints_dir()).unwrap_or([]))
+}
+fn destructive_confirm_enabled() {
+    return env_text("TETHERSCRIPT_AGENT_CONFIRM_DESTRUCTIVE") == "1"
+}
+
+fn confirmed(args) {
+    let value = arg(args, "confirm", false)
+    if value == true { return true }
+    if str(value) == "true" { return true }
+    if str(value) == "1" { return true }
+    return false
+}
+
+fn confirm_required(action, path) {
+    return action + " blocked for " + path + ": set confirm=true or TETHERSCRIPT_AGENT_CONFIRM_DESTRUCTIVE=0"
+}
 // Execute a named tool. Tool outputs are returned as text for model/TUI consumption.
 fn run_tool(name, args) {
     if name == "cwd" { return cwd().unwrap_or("cwd failed") }
@@ -484,9 +609,15 @@ fn run_tool(name, args) {
     }
     if name == "write" {
         let path = arg(args, "path", "")
-        let r = fs_write(path, arg(args, "body", ""))
+        let existed = fs_exists(path).unwrap_or(false)
+        if destructive_confirm_enabled() && existed && !confirmed(args) { return confirm_required("write overwrite", path) }
+        let before = fs_read(path).unwrap_or("")
+        let checkpoint = ""
+        if existed { checkpoint = save_checkpoint(path, before) }
+        let after = arg(args, "body", "")
+        let r = fs_write(path, after)
         if r.is_err() { return "write failed: " + r.err() }
-        return "wrote " + path
+        return "wrote " + path + "\n" + checkpoint + "\n" + change_preview(path, before, after)
     }
     if name == "append" {
         let path = arg(args, "path", "")
@@ -502,17 +633,27 @@ fn run_tool(name, args) {
     }
     if name == "replace" {
         let path = arg(args, "path", "")
+        if destructive_confirm_enabled() && !confirmed(args) { return confirm_required("replace", path) }
         let old = arg(args, "old", "")
         if old == "" { return "replace failed: old text is empty" }
         let read = fs_read(path)
         if read.is_err() { return "replace failed: " + read.err() }
         let body = read.unwrap()
         if !body.contains(old) { return "replace failed: old text not found" }
-        let r = fs_write(path, body.replace(old, arg(args, "new", "")))
+        let after = body.replace(old, arg(args, "new", ""))
+        let checkpoint = save_checkpoint(path, body)
+        let r = fs_write(path, after)
         if r.is_err() { return "replace failed: " + r.err() }
-        return "replaced text in " + path
+        return "replaced text in " + path + "\n" + checkpoint + "\n" + change_preview(path, body, after)
     }
-    if name == "remove" { return json_encode(fs_remove(arg(args, "path", "")).unwrap_or(false)) }
+    if name == "remove" {
+        let path = arg(args, "path", "")
+        if destructive_confirm_enabled() && !confirmed(args) { return confirm_required("remove", path) }
+        let before = fs_read(path).unwrap_or("")
+        let checkpoint = ""
+        if before != "" { checkpoint = save_checkpoint(path, before) }
+        return checkpoint + "\nremoved=" + json_encode(fs_remove(path).unwrap_or(false))
+    }
     if name == "copy" {
         let r = fs_copy(arg(args, "from", ""), arg(args, "to", ""))
         if r.is_err() { return "copy failed: " + r.err() }
@@ -523,9 +664,9 @@ fn run_tool(name, args) {
         if r.is_err() { return "rename failed: " + r.err() }
         return "renamed"
     }
-    if name == "run" { return json_encode(shell(arg(args, "command", "")).unwrap_or(map())) }
-    if name == "powershell" { return json_encode(powershell(arg(args, "command", "")).unwrap_or(map())) }
-    if name == "bash" { return json_encode(bash(arg(args, "command", "")).unwrap_or(map())) }
+    if name == "run" { return json_encode(shell(arg(args, "command", ""), tool_timeout_ms(args)).unwrap_or(map())) }
+    if name == "powershell" { return json_encode(powershell(arg(args, "command", ""), tool_timeout_ms(args)).unwrap_or(map())) }
+    if name == "bash" { return json_encode(bash(arg(args, "command", ""), tool_timeout_ms(args)).unwrap_or(map())) }
     if name == "browser_text" { return browser_text_content(arg(args, "html", ""), arg(args, "selector", "body")) }
     if name == "browser_query" { return browser_query_selector(arg(args, "html", ""), arg(args, "selector", "body")) }
     if name == "browser_render" { return browser_render(arg(args, "html", ""), arg(args, "css", ""), parse_int(arg(args, "width", "80")).unwrap_or(80)) }
@@ -534,6 +675,26 @@ fn run_tool(name, args) {
     return "unknown tool: " + name
 }
 
+fn tool_diagnostic(name, output) {
+    let text = str(output)
+    if tool_failed(text) { return "diagnostic: " + name + " failed; " + take_text(single_line(text), 240) }
+    if text.contains("success") && text.contains("false") { return "diagnostic: " + name + " reported success=false; inspect stdout/stderr/code" }
+    if text.contains("timed_out") && text.contains("true") { return "diagnostic: " + name + " timed out; retry with timeout_ms or narrow the command" }
+    return ""
+}
+
+fn tool_log_text(name, output) {
+    let summary = summarize_tool_output(output)
+    let diag = tool_diagnostic(name, output)
+    if diag == "" { return summary }
+    return summary + "\n" + diag
+}
+fn summarize_tool_output(output) {
+    let text = str(output)
+    let limit = 2400
+    if text.len() <= limit { return text }
+    return take_text(text, limit) + "\n... tool output truncated in TUI log; full output kept in tool result (" + str(text.len()) + " chars)"
+}
 // Convert simple string outputs into JSON-RPC tool error status.
 fn tool_failed(output) {
     if output.starts_with("unknown tool:") { return true }
@@ -577,7 +738,7 @@ fn tools_call(log, id, params) {
         return write_result(id, "tools/call: missing name", true)
     }
     let output = run_tool(params.name, rpc_args(params))
-    log.push(item("tool", params.name, output))
+    log.push(item("tool", params.name, tool_log_text(params.name, output)))
     write_result(id, output, tool_failed(output))
 }
 
@@ -593,8 +754,8 @@ fn initialize(id) {
     result.capabilities = map()
     result.capabilities.tools = map()
     result.serverInfo = map()
-    result.serverInfo.name = "tetherscript-agent"
-    result.serverInfo.version = "0.1.0"
+    result.serverInfo.name = agent_name()
+    result.serverInfo.version = agent_version()
     stdio_write(jsonrpc_response(id, result))
 }
 
@@ -650,6 +811,67 @@ fn self_prompt_path() {
     return ".tetherscript/agent_tui_self_prompt.txt"
 }
 
+fn self_prompt_budget_path() {
+    return ".tetherscript/agent_tui_self_prompt_budget.txt"
+}
+
+fn next_feature_path() {
+    return ".tetherscript/agent_tui_next_feature.txt"
+}
+
+fn default_next_feature() {
+    return "Run /release, review /git-diff, then commit and push."
+}
+
+fn read_next_feature() {
+    let raw = fs_read(next_feature_path())
+    if raw.is_err() { return default_next_feature() }
+    let text = raw.unwrap().trim()
+    if text == "" { return default_next_feature() }
+    return text
+}
+
+fn write_next_feature(feature) {
+    let text = feature.trim()
+    if text == "" { return "usage: /next <feature>" }
+    fs_mkdir(".tetherscript")
+    fs_write(next_feature_path(), text)
+    return "next feature recorded: " + text
+}
+
+fn self_prompt_continue_text() {
+    return "Continue the ongoing TUI-agent improvement objective. There is more to do. Next feature to consider: " + read_next_feature() + "\n\nInspect the current file, choose the next highest-leverage small improvement, implement it safely, verify it, and report concise status. Before completing the turn, record the next feature to consider in the reload prompt/next-feature state and preserve the continuation indicator so the next reload keeps moving."
+}
+
+fn read_self_prompt_budget() {
+    let raw = fs_read(self_prompt_budget_path())
+    if raw.is_err() { return 0 }
+    let parsed = parse_int(raw.unwrap().trim())
+    if parsed.is_err() { return 0 }
+    let value = parsed.unwrap()
+    if value < 0 { return 0 }
+    return value
+}
+
+fn write_self_prompt_budget(value) {
+    fs_mkdir(".tetherscript")
+    fs_write(self_prompt_budget_path(), str(value))
+}
+
+fn consume_self_prompt_budget() {
+    let budget = read_self_prompt_budget()
+    if budget <= 0 { return false }
+    write_self_prompt_budget(budget - 1)
+    return true
+}
+
+fn seed_self_prompt(goal, budget) {
+    fs_mkdir(".tetherscript")
+    fs_write(self_prompt_path(), goal)
+    write_self_prompt_budget(budget)
+    return "self-prompt queued with " + str(budget) + " continuation step(s); each step must choose and record the next feature before finishing"
+}
+
 fn last_user_prompt(session) {
     let mut i = session.messages.len() - 1
     while i >= 0 {
@@ -662,11 +884,17 @@ fn last_user_prompt(session) {
     return ""
 }
 
+fn reload_prompt_context(prompt) {
+    if prompt.starts_with("The TUI reloaded after source changes") { return "ongoing autonomous TUI-agent improvement loop" }
+    if prompt.starts_with("Continue the ongoing TUI-agent improvement objective") { return "ongoing autonomous TUI-agent improvement loop" }
+    return prompt
+}
+
 fn save_self_prompt(session) {
-    let prompt = last_user_prompt(session)
+    let prompt = reload_prompt_context(last_user_prompt(session))
     if prompt == "" { return nil }
     fs_mkdir(".tetherscript")
-    let body = "The TUI reloaded after source changes while working on this request:\n\n" + prompt + "\n\nContinue from the reloaded state. Verify the change if useful, then report concise status."
+    let body = "The TUI reloaded after source changes.\n\nCurrent objective: " + prompt + "\n\nNext feature to consider: " + read_next_feature() + "\n\nContinue from the reloaded state. Verify the change if useful, then report concise status. Before completing the turn, record the next feature to consider in the reload prompt/next-feature state. If more improvement remains, preserve the continuation indicator so the next reload keeps moving."
     fs_write(self_prompt_path(), body)
     return nil
 }
@@ -675,9 +903,12 @@ fn load_self_prompt() {
     let raw = fs_read(self_prompt_path())
     if raw.is_err() { return "" }
     fs_remove(self_prompt_path())
-    return raw.unwrap()
+    let prompt = raw.unwrap()
+    if consume_self_prompt_budget() {
+        fs_write(self_prompt_path(), self_prompt_continue_text())
+    }
+    return prompt
 }
-
 // =============================================================================
 //  SESSION PERSISTENCE
 // =============================================================================
@@ -727,13 +958,23 @@ fn initial_session(saved) {
 }
 
 // Rebuild the visible TUI log from persisted chat messages.
+fn onboarding_text() {
+    return "welcome to " + agent_label() + "; start with /palette, /examples, /checklist, or type a coding request. Use /self <goal> for autonomous continuation."
+}
+
+fn startup_checklist_text() {
+    let provider = "missing"
+    if provider_ready() { provider = "ready" }
+    return "startup: provider=" + provider + "; session=" + session_path() + "; next=" + read_next_feature() + "; use /config, /provider, /health for details"
+}
+
 fn initial_log(saved) {
     if saved != nil && saved.contains("messages") && saved.messages.len() > 0 {
-        let log = [item("system", "ready", "restored session from jsonl; /save <name>, /load <name>, /sessions, /clear")]
+        let log = [item("system", "ready", "restored session from jsonl; /help for commands")]
         for message in saved.messages { append_log_message(log, message) }
         return log
     }
-    return [item("system", "ready", "type a prompt; tools run automatically; /save <name>, /load <name>, /sessions")]
+    return [item("system", "ready", onboarding_text()), item("system", "checklist", startup_checklist_text())]
 }
 
 fn append_log_message(log, message) {
@@ -780,6 +1021,34 @@ fn session_names() {
     }
     return names
 }
+fn exports_dir() {
+    return ".tetherscript/exports"
+}
+
+fn export_path(name) {
+    return exports_dir() + "/" + name.trim() + ".md"
+}
+
+fn export_message(message) {
+    if type_of(message) != "map" || !message.contains("role") { return "" }
+    let role = arg(message, "role", "message")
+    let content = arg(message, "content", "")
+    if content == "" && message.contains("tool_calls") { content = json_encode(message.tool_calls) }
+    return "## " + role + "\n\n" + content + "\n\n"
+}
+
+fn export_session(session, name) {
+    let clean = name.trim()
+    if clean == "" { clean = "agent_tui_transcript" }
+    fs_mkdir(exports_dir())
+    let mut body = "# " + agent_label() + " transcript\n\n"
+    body = body + "Exported from " + session_path() + "\n\n"
+    for message in session.messages { body = body + export_message(message) }
+    let path = export_path(clean)
+    let r = fs_write(path, body)
+    if r.is_err() { return "export failed: " + r.err() }
+    return "exported transcript to " + path
+}
 
 fn check_output(report) {
     let stderr = arg(report, "stderr", "").trim()
@@ -790,6 +1059,120 @@ fn check_output(report) {
     return "check exited with code " + str(arg(report, "code", "unknown"))
 }
 
+fn timeline_entry(index, message) {
+    if type_of(message) != "map" || !message.contains("role") { return "" }
+    let role = arg(message, "role", "message")
+    let content = single_line(arg(message, "content", ""))
+    if content == "" && message.contains("tool_calls") { content = "tool_calls=" + str(message.tool_calls.len()) }
+    return str(index) + ". " + role + ": " + take_text(content, 96)
+}
+
+fn event_log_path() {
+    return ".tetherscript/agent_tui_events.jsonl"
+}
+
+fn log_event(kind, name, text) {
+    let event = map()
+    event.kind = kind
+    event.name = name
+    event.text = single_line(text)
+    event.version = agent_version()
+    fs_mkdir(".tetherscript")
+    fs_write(event_log_path(), fs_read(event_log_path()).unwrap_or("") + json_encode(event) + "\n")
+    return nil
+}
+
+fn recent_events() {
+    let raw = fs_read(event_log_path())
+    if raw.is_err() { return "no events" }
+    let lines = []
+    for line in raw.unwrap().split("\n") {
+        let trimmed = line.trim()
+        if trimmed != "" { lines.push(trimmed) }
+    }
+    if lines.len() == 0 { return "no events" }
+    let mut start = 0
+    if lines.len() > 12 { start = lines.len() - 12 }
+    let recent = []
+    let mut i = start
+    while i < lines.len() {
+        recent.push(lines[i])
+        i = i + 1
+    }
+    return recent.join("\n")
+}
+fn clear_events() {
+    fs_remove(event_log_path())
+    return "events cleared"
+}
+
+fn clear_bookmarks() {
+    fs_remove(bookmarks_path())
+    return "bookmarks cleared"
+}
+fn bookmarks_path() {
+    return ".tetherscript/agent_tui_bookmarks.jsonl"
+}
+
+fn bookmark_row(label, index, text) {
+    let row = map()
+    row.label = label
+    row.index = index
+    row.text = text
+    return json_encode(row) + "\n"
+}
+
+fn add_bookmark(session, label) {
+    let clean = label.trim()
+    if clean == "" { clean = "bookmark" }
+    let index = session.messages.len() - 1
+    if index < 0 { return "bookmark failed: no messages" }
+    let message = session.messages[index]
+    let text = take_text(single_line(arg(message, "content", "")), 180)
+    fs_mkdir(".tetherscript")
+    fs_write(bookmarks_path(), fs_read(bookmarks_path()).unwrap_or("") + bookmark_row(clean, index, text))
+    return "bookmarked message " + str(index) + " as " + clean
+}
+
+fn list_bookmarks() {
+    let raw = fs_read(bookmarks_path())
+    if raw.is_err() { return "no bookmarks" }
+    let lines = []
+    for line in raw.unwrap().split("\n") {
+        let trimmed = line.trim()
+        if trimmed != "" {
+            let row = json_parse(trimmed)
+            lines.push(str(arg(row, "index", "?")) + " [" + arg(row, "label", "bookmark") + "] " + arg(row, "text", ""))
+        }
+    }
+    if lines.len() == 0 { return "no bookmarks" }
+    return lines.join("\n")
+}
+fn timeline_text(session) {
+    let lines = []
+    let mut user_count = 0
+    let mut assistant_count = 0
+    let mut tool_count = 0
+    let mut i = 0
+    for message in session.messages {
+        let role = arg(message, "role", "")
+        if role == "user" { user_count = user_count + 1 }
+        if role == "assistant" { assistant_count = assistant_count + 1 }
+        if role == "tool" { tool_count = tool_count + 1 }
+        let entry = timeline_entry(i, message)
+        if entry != "" { lines.push(entry) }
+        i = i + 1
+    }
+    let mut start = 0
+    if lines.len() > 12 { start = lines.len() - 12 }
+    let recent = []
+    let mut j = start
+    while j < lines.len() {
+        recent.push(lines[j])
+        j = j + 1
+    }
+    return "timeline messages=" + str(session.messages.len()) + "; user=" + str(user_count) + "; assistant=" + str(assistant_count) + "; tool=" + str(tool_count) + "\n" + recent.join("\n")
+}
 // =============================================================================
 //  SELF-CHECKED HOT RELOAD
 // =============================================================================
@@ -831,6 +1214,7 @@ fn reload_needed(state) {
 
 fn reload_start(log, session, state) {
     log.push(item("system", "reload", "source changed; restarting"))
+    log_event("system", "reload", "source changed; restarting")
     state.reloading = true
     save_self_prompt(session)
     save_session(session)
@@ -903,7 +1287,7 @@ fn call_args(call) {
 fn append_tool(log, messages, call) {
     let name = call_name(call)
     let output = run_tool(name, call_args(call))
-    log.push(item("tool", name, output))
+    log.push(item("tool", name, tool_log_text(name, output)))
     let msg = map()
     msg.role = "tool"
     msg.tool_call_id = call.id
@@ -1110,7 +1494,7 @@ fn manual_tool(command) {
     if trimmed.starts_with("replace ") {
         return run_tool("replace", parse_args(trimmed.replace("replace ", "")))
     }
-    return "tools: cwd, ls <path>, read <path>, replace path/old/new JSON, run|powershell|bash <command>, js <script>, browser_text|browser_query|browser_render JSON"
+    return "tools: cwd, ls <path>, read <path>, replace path/old/new JSON, run|powershell|bash <command> or JSON timeout_ms, js <script>, browser_text|browser_query|browser_render JSON"
 }
 
 // Input state supports single-line prompts and /multi multiline prompts.
@@ -1118,21 +1502,27 @@ fn new_input() {
     let input = map()
     input.multiline = false
     input.lines = []
+    input.scroll = 0
     return input
 }
 
 fn input_status(input) {
-    if input.multiline { return "multiline" }
-    return "waiting"
+    if input.multiline { return "multiline input: /send submits, /cancel cancels" }
+    return "waiting for you"
 }
 
+fn status_with_hints(input) {
+    return input_status(input) + " | /h help /s status /r roadmap /u up /j down /b bottom /q quit"
+}
 // Send a prompt from the TUI, save session state, and trigger hot reload if needed.
 fn send_prompt(log, session, reload, prompt) {
     log.push(item("user", "you", prompt))
+    log_event("user", "prompt", prompt)
     save_session(session)
-    present(log, "working")
+    present(log, "agent working")
     let answer = agent_turn(log, session, prompt)
     log.push(item("agent", "provider", answer))
+    log_event("agent", "provider", answer)
     save_session(session)
     if reload_needed(reload) { return reload_now(log, session, reload) }
     return true
@@ -1169,7 +1559,396 @@ fn session_command(log, session, line) {
         restore_log(log, session, "loaded session " + name)
         return true
     }
+    if line.starts_with("/self ") {
+        let goal = line.replace("/self ", "")
+        log.push(item("system", "self-prompt", seed_self_prompt(goal, 100)))
+        return true
+    }
+    if line.starts_with("/next ") {
+        let feature = line.replace("/next ", "")
+        log.push(item("system", "next", write_next_feature(feature)))
+        return true
+    }
+    if line == "/next" {
+        log.push(item("system", "next", read_next_feature()))
+        return true
+    }
+    if line == "/timeline" {
+        log.push(item("system", "timeline", timeline_text(session)))
+        return true
+    }
+    if line == "/bookmarks" {
+        log.push(item("system", "bookmarks", list_bookmarks()))
+        return true
+    }
+    if line == "/bookmarks-clear" {
+        log.push(item("system", "bookmarks", clear_bookmarks()))
+        return true
+    }
+    if line == "/events" {
+        log.push(item("system", "events", recent_events()))
+        return true
+    }
+    if line == "/events-clear" {
+        log.push(item("system", "events", clear_events()))
+        return true
+    }
+    if line.starts_with("/bookmark ") {
+        let label = line.replace("/bookmark ", "")
+        log.push(item("system", "bookmark", add_bookmark(session, label)))
+        return true
+    }
+    if line == "/bookmark" {
+        log.push(item("system", "bookmark", add_bookmark(session, "bookmark")))
+        return true
+    }
+    if line.starts_with("/search ") {
+        let query = line.replace("/search ", "")
+        log.push(item("system", "search", search_session(session, query)))
+        return true
+    }
+    if line == "/last" {
+        log.push(item("system", "last", last_output(session)))
+        return true
+    }
+    if line == "/last-agent" {
+        log.push(item("system", "last-agent", last_message_by_role(session, "assistant")))
+        return true
+    }
+    if line == "/last-tool" {
+        log.push(item("system", "last-tool", last_message_by_role(session, "tool")))
+        return true
+    }
+    if line == "/retry-tool" {
+        log.push(item("system", "retry", retry_last_tool(log, session)))
+        return true
+    }
+    if line == "/compact" {
+        log.push(item("system", "compact", compact_session(log, session)))
+        return true
+    }
+    if line == "/templates" {
+        log.push(item("system", "templates", prompt_templates()))
+        return true
+    }
+    if line.starts_with("/use ") {
+        let raw = line.replace("/use ", "")
+        let parts = raw.split(" ")
+        let name = parts[0]
+        let rest = raw.replace(name, "").trim()
+        return send_prompt(log, session, reload_state(), template_prompt(name, rest))
+    }
+    if line == "/checkpoints" {
+        log.push(item("system", "checkpoints", checkpoint_names()))
+        return true
+    }
+    if line.starts_with("/restore ") {
+        let path = line.replace("/restore ", "")
+        log.push(item("system", "restore", restore_checkpoint(path)))
+        return true
+    }
+    if line.starts_with("/export ") {
+        let name = line.replace("/export ", "")
+        log.push(item("system", "export", export_session(session, name)))
+        return true
+    }
+    if line == "/export" {
+        log.push(item("system", "export", export_session(session, "agent_tui_transcript")))
+        return true
+    }
     return false
+}
+fn search_session(session, query) {
+    let needle = query.trim()
+    if needle == "" { return "usage: /search <text>" }
+    let hits = []
+    let mut i = 0
+    for message in session.messages {
+        let role = arg(message, "role", "message")
+        let content = single_line(arg(message, "content", ""))
+        if content.contains(needle) || role.contains(needle) {
+            hits.push(str(i) + ". " + role + ": " + take_text(content, 120))
+        }
+        i = i + 1
+    }
+    if hits.len() == 0 { return "no session hits for: " + needle }
+    let mut start = 0
+    if hits.len() > 12 { start = hits.len() - 12 }
+    let recent = []
+    let mut j = start
+    while j < hits.len() {
+        recent.push(hits[j])
+        j = j + 1
+    }
+    return "search hits=" + str(hits.len()) + " for: " + needle + "\n" + recent.join("\n")
+}
+fn last_message_by_role(session, role) {
+    let mut i = session.messages.len() - 1
+    while i >= 0 {
+        let message = session.messages[i]
+        if type_of(message) == "map" && arg(message, "role", "") == role {
+            return role + ": " + arg(message, "content", "")
+        }
+        i = i - 1
+    }
+    return "no recent " + role + " message"
+}
+
+fn last_output(session) {
+    let tool = last_message_by_role(session, "tool")
+    if !tool.starts_with("no recent") { return tool }
+    return last_message_by_role(session, "assistant")
+}
+fn last_tool_call(session) {
+    let mut i = session.messages.len() - 1
+    while i >= 0 {
+        let message = session.messages[i]
+        if type_of(message) == "map" && message.contains("tool_calls") && message.tool_calls.len() > 0 {
+            return message.tool_calls[message.tool_calls.len() - 1]
+        }
+        i = i - 1
+    }
+    return nil
+}
+
+fn retry_last_tool(log, session) {
+    let call = last_tool_call(session)
+    if call == nil { return "no previous model tool call to retry" }
+    append_tool(log, session.messages, call)
+    save_session(session)
+    return "retried tool: " + call_name(call)
+}
+fn compact_summary(session) {
+    return "Compacted prior session. " + timeline_text(session)
+}
+
+fn compact_session(log, session) {
+    let old_count = session.messages.len()
+    if old_count <= 16 { return "session small enough; no compaction needed" }
+    let summary = map()
+    summary.role = "system"
+    summary.content = compact_summary(session)
+    let kept = []
+    let start = old_count - 12
+    let mut i = start
+    while i < old_count {
+        kept.push(session.messages[i])
+        i = i + 1
+    }
+    let messages = base_messages()
+    messages.push(summary)
+    for message in kept { messages.push(message) }
+    session.messages = messages
+    save_session(session)
+    restore_log(log, session, "compacted session: " + str(old_count) + " -> " + str(session.messages.len()) + " messages")
+    return "compacted session: " + str(old_count) + " -> " + str(session.messages.len()) + " messages"
+}
+fn prompt_template(name) {
+    if name == "fix" { return "Inspect the relevant files, reproduce or identify the bug, make the smallest safe fix, run an appropriate check, and summarize the change." }
+    if name == "test" { return "Inspect the project, identify the right test target, run the smallest useful test, fix failures if appropriate, and report results." }
+    if name == "docs" { return "Inspect the relevant code or behavior, update documentation clearly, and verify formatting or links if possible." }
+    if name == "refactor" { return "Inspect the current implementation, make a behavior-preserving refactor in small steps, run checks, and summarize risk." }
+    if name == "release" { return "Inspect version/status, run checks, summarize changes, and prepare concise release notes."
+    }
+    return ""
+}
+
+fn prompt_templates() {
+    return "templates: fix, test, docs, refactor, release"
+}
+
+fn template_prompt(name, rest) {
+    let base = prompt_template(name)
+    if base == "" { return prompt_templates() }
+    if rest.trim() == "" { return base }
+    return base + "\n\nTask: " + rest.trim()
+}
+fn workspace_health(reload) {
+    let path = arg(reload, "path", script_path())
+    let check = self_check(path)
+    let status = "ok"
+    if check != "" { status = "check failed: " + single_line(check) }
+    let git = shell("git status --short", default_tool_timeout_ms())
+    let git_text = "git unavailable"
+    if git.is_ok() {
+        let report = git.unwrap()
+        git_text = arg(report, "stdout", "").trim()
+        if git_text == "" { git_text = "clean" }
+    }
+    return "health: script=" + path + "; check=" + status + "\ngit:\n" + git_text
+}
+fn git_report(command) {
+    let result = shell(command, default_tool_timeout_ms())
+    if result.is_err() { return result.err() }
+    let report = result.unwrap()
+    let stdout = arg(report, "stdout", "").trim()
+    let stderr = arg(report, "stderr", "").trim()
+    let out = stdout
+    if stderr != "" { out = out + "\n" + stderr }
+    if out == "" { out = "ok" }
+    return out
+}
+
+fn git_status_text() {
+    return git_report("git status --short")
+}
+
+fn git_diff_text() {
+    return git_report("git diff --stat") + "\n" + git_report("git diff --check")
+}
+
+fn git_commit_text(message) {
+    let msg = message.trim()
+    if msg == "" { return "usage: /git-commit <message>" }
+    return git_report("git add agent_tui.tether tetherscript_agent_post.md; git commit --no-gpg-sign -m \"" + msg + "\"")
+}
+fn release_notes(session) {
+    let mut body = "# Release notes for " + agent_label() + "\n\n"
+    body = body + "## Summary\n\n"
+    body = body + "- Messages: " + str(session.messages.len()) + "\n"
+    body = body + "- Next feature: " + read_next_feature() + "\n"
+    body = body + "- Tool timeout: " + str(default_tool_timeout_ms()) + " ms\n"
+    body = body + "- Checkpoints: " + checkpoints_dir() + "\n\n"
+    body = body + "## Recent timeline\n\n```text\n" + timeline_text(session) + "\n```\n\n"
+    body = body + "## Git status\n\n```text\n" + git_status_text() + "\n```\n"
+    return body
+}
+
+fn write_release_notes(session, name) {
+    let clean = name.trim()
+    if clean == "" { clean = "agent_tui_release_notes" }
+    fs_mkdir(exports_dir())
+    let path = exports_dir() + "/" + clean + ".md"
+    let r = fs_write(path, release_notes(session))
+    if r.is_err() { return "release notes failed: " + r.err() }
+    return "wrote release notes to " + path
+}
+fn config_text() {
+    return "config: version=" + agent_version() +
+        "; model=" + default_model() +
+        "; router=" + env_text("TETHERSCRIPT_AGENT_ROUTER") +
+        "; mode=" + env_text("TETHERSCRIPT_AGENT_MODE") +
+        "; stdio_rpc=" + env_text("TETHERSCRIPT_AGENT_STDIO_RPC") +
+        "; timeout_ms=" + str(default_tool_timeout_ms()) +
+        "; confirm_destructive=" + str(destructive_confirm_enabled()) +
+        "; session=" + session_path() +
+        "; sessions_dir=" + sessions_dir() +
+        "; exports_dir=" + exports_dir() +
+        "; checkpoints_dir=" + checkpoints_dir()
+}
+fn provider_diag_text() {
+    if !provider_ready() { return provider_missing() }
+    let desc = provider.describe()
+    if desc.is_err() { return "provider describe failed: " + desc.err() }
+    let info = desc.unwrap()
+    return "provider: ready" +
+        "; model=" + default_model() +
+        "; endpoint=" + arg(info, "endpoint", "unknown") +
+        "; router=" + env_text("TETHERSCRIPT_AGENT_ROUTER")
+}
+fn checklist_text(reload) {
+    let provider = "missing"
+    if provider_ready() { provider = "ready" }
+    let check = self_check(arg(reload, "path", script_path()))
+    let check_status = "ok"
+    if check != "" { check_status = "failed" }
+    return "startup checklist:" +
+        " provider=" + provider +
+        "; model=" + default_model() +
+        "; check=" + check_status +
+        "; session=" + str(fs_exists(session_path()).unwrap_or(false)) +
+        "; next=" + read_next_feature() +
+        "; self_budget=" + str(read_self_prompt_budget()) +
+        "; timeout_ms=" + str(default_tool_timeout_ms()) +
+        "; confirm_destructive=" + str(destructive_confirm_enabled())
+}
+fn changelog_path() {
+    return ".tetherscript/agent_tui_changelog.md"
+}
+
+fn changelog_entry(text) {
+    let body = "## " + agent_label() + "\n\n- " + text.trim() + "\n- Next: " + read_next_feature() + "\n\n"
+    fs_mkdir(".tetherscript")
+    let existing = fs_read(changelog_path()).unwrap_or("# agent_tui changelog\n\n")
+    let r = fs_write(changelog_path(), existing + body)
+    if r.is_err() { return "changelog failed: " + r.err() }
+    return "wrote changelog entry to " + changelog_path()
+}
+
+fn changelog_recent() {
+    let raw = fs_read(changelog_path())
+    if raw.is_err() { return "no changelog yet" }
+    return take_text(raw.unwrap(), 2400)
+}
+fn release_flow(session) {
+    let check = self_check(script_path())
+    if check != "" { return "release blocked: check failed: " + single_line(check) }
+    let notes = write_release_notes(session, "agent_tui_release_notes")
+    let reference = export_command_reference()
+    let change = changelog_entry("Prepared release artifacts for " + agent_label())
+    let git = git_diff_text()
+    return "release flow complete\n" + notes + "\n" + reference + "\n" + change + "\n" + git
+}
+// Operator-facing help/status commands keep the TUI discoverable as it grows.
+fn policy_text() {
+    let destructive = "off"
+    if destructive_confirm_enabled() { destructive = "on" }
+    return "policy: destructive_confirm=" + destructive +
+        "; set TETHERSCRIPT_AGENT_CONFIRM_DESTRUCTIVE=1 to require confirm=true for overwrite/replace/remove" +
+        "; checkpoints=" + checkpoints_dir() +
+        "; tool_timeout_ms=" + str(default_tool_timeout_ms()) +
+        "; shell timeout override uses timeout_ms"
+}
+fn roadmap_text(session) {
+    return "roadmap: " + agent_label() +
+        "; self_budget=" + str(read_self_prompt_budget()) +
+        "; next=" + read_next_feature() +
+        "; messages=" + str(session.messages.len()) +
+        "; sessions=" + sessions_dir() + "; checkpoints=" + checkpoints_dir() +
+        "; upcoming=stale prompt cleanup, commit-ready cleanup, version bump"
+}
+fn command_reference() {
+    return "# " + agent_label() + " command reference\n\n" +
+        "## Palette\n\n```text\n" + command_palette() + "\n```\n\n" +
+        "## Help\n\n```text\n" + command_help() + "\n```\n\n" +
+        "## Examples\n\n```text\n" + command_examples() + "\n```\n"
+}
+
+fn export_command_reference() {
+    fs_mkdir(exports_dir())
+    let path = exports_dir() + "/agent_tui_command_reference.md"
+    let r = fs_write(path, command_reference())
+    if r.is_err() { return "command reference failed: " + r.err() }
+    return "wrote command reference to " + path
+}
+fn command_palette() {
+    return "palette:\n" +
+        "core: /help /examples /status /config /provider /checklist /health /roadmap /policy\n" +
+        "navigation: /up /down /bottom /timeline /search <text> /last /bookmark [label] /bookmarks\n" +
+        "sessions: /save <name> /load <name> /sessions /compact /export [name] /release-notes [name]\n" +
+        "tools: /tools /tool <cmd> /retry-tool /checkpoints /restore <path>\n" +
+        "git: /git /git-diff /git-commit <msg>\n" +
+        "automation: /self <goal> /next [feature] /templates /use <template> [task]"
+}
+fn command_examples() {
+    return "examples:\n" +
+        "/tool powershell Get-ChildItem\n" +
+        "/tool browser_text html=<h1>Hello</h1> selector=h1\n" +
+        "/use fix describe the bug here\n" +
+        "/search provider\n" +
+        "/bookmark important\n" +
+        "/export demo-transcript\n" +
+        "/git-diff\n" +
+        "/next Add the next small feature"
+}
+fn command_help() {
+    return "commands: /help, /status, /config, /provider, /checklist, /health, /git, /git-diff, /git-commit <msg>, /release-notes [name], /release, /changelog [entry], /version, /bump patch|minor|major, /roadmap, /policy, /up, /down, /bottom, /tools, /tool <cmd>, /multi, /send, /cancel, /save <name>, /load <name>, /sessions, /self <goal>, /next [feature], /checkpoints, /restore <path>, /export [name], /clear, /quit"
+}
+
+fn command_status(session, reload, input) {
+    let provider = "missing"
+    if provider_ready() { provider = "ready" }
+    return "version=" + agent_version() + "; provider=" + provider + "; model=" + default_model() + "; messages=" + str(session.messages.len()) + "; input=" + input_status(input) + "; scroll=" + str(arg(input, "scroll", 0)) + "; reload=" + str(reload.reloading) + "; timeout_ms=" + str(default_tool_timeout_ms()) + "; confirm_destructive=" + str(destructive_confirm_enabled()) + "; self_budget=" + str(read_self_prompt_budget()) + "; next=" + read_next_feature()
 }
 // Multiline prompt mode: collect lines until /send or /cancel.
 fn multiline_start(log, input, line) {
@@ -1201,9 +1980,27 @@ fn multiline_handle(log, session, reload, input, line) {
     return true
 }
 
+fn normalize_command(line) {
+    if line == "/h" { return "/help" }
+    if line == "/?" { return "/help" }
+    if line == "/q" { return "/quit" }
+    if line == "/s" { return "/status" }
+    if line == "/r" { return "/roadmap" }
+    if line == "/p" { return "/provider" }
+    if line == "/c" { return "/checklist" }
+    if line == "/g" { return "/git" }
+    if line == "/d" { return "/git-diff" }
+    if line == "/b" { return "/bottom" }
+    if line == "/u" { return "/up" }
+    if line == "/j" { return "/down" }
+    if line == "/t" { return "/timeline" }
+    if line == "/l" { return "/last" }
+    return line
+}
 // Dispatch one TUI input line: commands, manual tools, or normal agent prompt.
 fn interactive_handle(log, session, reload, input, line) {
     if input.multiline { return multiline_handle(log, session, reload, input, line) }
+    line = normalize_command(line)
     if line == "" { return true }
     if line == "/quit" { save_session(session); return false }
     if line == "/clear" {
@@ -1214,8 +2011,105 @@ fn interactive_handle(log, session, reload, input, line) {
         return true
     }
     if session_command(log, session, line) { return true }
+    if line == "/up" {
+        input.scroll = arg(input, "scroll", 0) + 5
+        return true
+    }
+    if line == "/down" {
+        input.scroll = arg(input, "scroll", 0) - 5
+        if input.scroll < 0 { input.scroll = 0 }
+        return true
+    }
+    if line == "/bottom" {
+        input.scroll = 0
+        return true
+    }
+    if line == "/help" {
+        log.push(item("system", "help", command_help()))
+        return true
+    }
+    if line == "/examples" {
+        log.push(item("system", "examples", command_examples()))
+        return true
+    }
+    if line == "/command-reference" {
+        log.push(item("system", "reference", export_command_reference()))
+        return true
+    }
+    if line == "/palette" {
+        log.push(item("system", "palette", command_palette()))
+        return true
+    }
+    if line == "/status" {
+        log.push(item("system", "status", command_status(session, reload, input)))
+        return true
+    }
+    if line == "/config" {
+        log.push(item("system", "config", config_text()))
+        return true
+    }
+    if line == "/provider" {
+        log.push(item("system", "provider", provider_diag_text()))
+        return true
+    }
+    if line == "/checklist" {
+        log.push(item("system", "checklist", checklist_text(reload)))
+        return true
+    }
+    if line == "/health" {
+        log.push(item("system", "health", workspace_health(reload)))
+        return true
+    }
+    if line == "/git" || line == "/git-status" {
+        log.push(item("system", "git", git_status_text()))
+        return true
+    }
+    if line == "/git-diff" {
+        log.push(item("system", "git", git_diff_text()))
+        return true
+    }
+    if line.starts_with("/git-commit ") {
+        let message = line.replace("/git-commit ", "")
+        log.push(item("system", "git", git_commit_text(message)))
+        return true
+    }
+    if line == "/release-notes" {
+        log.push(item("system", "release", write_release_notes(session, "agent_tui_release_notes")))
+        return true
+    }
+    if line == "/release" {
+        log.push(item("system", "release", release_flow(session)))
+        return true
+    }
+    if line == "/changelog" {
+        log.push(item("system", "changelog", changelog_recent()))
+        return true
+    }
+    if line.starts_with("/changelog ") {
+        let text = line.replace("/changelog ", "")
+        log.push(item("system", "changelog", changelog_entry(text)))
+        return true
+    }
+    if line == "/version" {
+        log.push(item("system", "version", agent_label()))
+        return true
+    }
+    if line.starts_with("/bump ") {
+        let part = line.replace("/bump ", "")
+        log.push(item("system", "version", bump_version(part)))
+        return true
+    }
+    if line.starts_with("/release-notes ") {
+        let name = line.replace("/release-notes ", "")
+        log.push(item("system", "release", write_release_notes(session, name)))
+        return true
+    }
+    if line == "/roadmap" {
+        log.push(item("system", "roadmap", roadmap_text(session)))
+        return true
+    }
     if line == "/tools" {
-        log.push(item("system", "tools", "cwd, ls <path>, read <path>, replace path/old/new JSON, run|powershell|bash <command>, js <script>, browser_text|browser_query|browser_render JSON"))
+        log.push(item("system", "tools", "cwd, ls <path>, read <path>, replace path/old/new JSON, run|powershell|bash <command> or JSON timeout_ms, js <script>, browser_text|browser_query|browser_render JSON"))
         return true
     }
     if line == "/multi" || line.starts_with("/multi ") {
@@ -1223,9 +2117,11 @@ fn interactive_handle(log, session, reload, input, line) {
     }
     if line.starts_with("/tool ") {
         let command = line.replace("/tool ", "")
-        log.push(item("tool", command, manual_tool(command)))
+        let output = manual_tool(command)
+        log.push(item("tool", command, tool_log_text(command, output)))
         return true
     }
+    input.scroll = 0
     return send_prompt(log, session, reload, line)
 }
 
@@ -1236,15 +2132,16 @@ fn interactive_main() {
     let session = initial_session(saved)
     let reload = reload_state()
     let input = new_input()
-    let resumed = load_self_prompt()
+    let mut resumed = load_self_prompt()
     let mut running = true
     print(ansi_enter())
-    if resumed != "" {
-        log.push(item("system", "self-prompt", "continuing previous request after reload"))
+    while running && resumed != "" {
+        log.push(item("system", "self-prompt", "auto-prompting continuation"))
         running = send_prompt(log, session, reload, resumed)
+        if running { resumed = load_self_prompt() } else { resumed = "" }
     }
     while running {
-        present(log, input_status(input))
+        present_at(log, status_with_hints(input), arg(input, "scroll", 0))
         let event = tui_read_event("> ")
         if event.is_err() {
             log.push(item("system", "input", event.err()))
@@ -1268,7 +2165,7 @@ fn rpc_main() {
     let reload = reload_state()
     let mut running = true
     while running {
-        show(log, "waiting")
+        show(log, "waiting for rpc")
         let read = stdio_read()
         if read.is_err() {
             stdio_write(jsonrpc_error(nil, -32700, read.err()))
