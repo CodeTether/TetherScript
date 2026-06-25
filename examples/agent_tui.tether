@@ -378,14 +378,16 @@ fn status_label(view) {
     return status
 }
 
-// Render a complete framed TUI view: title, body, and status bar.
+// Render a complete framed TUI view: title, scrollable body, status panel, and bottom edge.
 fn render_view(view) {
     let width = at_least(arg(view, "width", 80), 20)
-    let height = at_least(arg(view, "height", 10), 4)
-    let body_rows = height - 3
+    let height = at_least(arg(view, "height", 10), 5)
+    let body_rows = height - 4
     return top_border(arg(view, "title", "tetherscript"), width) + "\n" +
         render_items(arg(view, "items", []), width, body_rows, arg(view, "scroll", 0)) +
-        bottom_border(status_label(view), width) + "\n"
+        mid_border(" status ", width) + "\n" +
+        frame_line(status_label(view), width) + "\n" +
+        bottom_border("", width) + "\n"
 }
 
 fn show(log, status) {
@@ -893,7 +895,7 @@ fn next_feature_path() {
 }
 
 fn default_next_feature() {
-    return "Use /preview output to tune TUI spacing and visual hierarchy."
+    return "Commit TUI status panel and compact hint rendering."
 }
 
 fn read_next_feature() {
@@ -1599,7 +1601,7 @@ fn input_status(input) {
 }
 
 fn status_with_hints(input) {
-    return input_status(input) + " | /h help /s status /r roadmap /u up /j down /b bottom /q quit"
+    return input_status(input) + " | /h help /s status /r map /u up /j down /b end /q quit"
 }
 // Send a prompt from the TUI, save session state, and trigger hot reload if needed.
 fn send_prompt(log, session, reload, prompt) {
