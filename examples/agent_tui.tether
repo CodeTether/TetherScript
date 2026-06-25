@@ -815,12 +815,30 @@ fn self_prompt_budget_path() {
     return ".tetherscript/agent_tui_self_prompt_budget.txt"
 }
 
+fn self_prompt_pause_path() {
+    return ".tetherscript/agent_tui_self_prompt_paused"
+}
+
+fn self_prompt_paused() {
+    return fs_exists(self_prompt_pause_path()).unwrap_or(false)
+}
+
+fn pause_self_prompt() {
+    fs_mkdir(".tetherscript")
+    fs_write(self_prompt_pause_path(), "paused")
+    return "self-prompt continuation paused"
+}
+
+fn resume_self_prompt() {
+    fs_remove(self_prompt_pause_path())
+    return "self-prompt continuation resumed"
+}
 fn next_feature_path() {
     return ".tetherscript/agent_tui_next_feature.txt"
 }
 
 fn default_next_feature() {
-    return "Run /release, review /git-diff, then commit and push."
+    return "Add compact autonomous controls summary to /help."
 }
 
 fn read_next_feature() {
@@ -872,6 +890,19 @@ fn seed_self_prompt(goal, budget) {
     return "self-prompt queued with " + str(budget) + " continuation step(s); each step must choose and record the next feature before finishing"
 }
 
+fn stop_self_prompt() {
+    write_self_prompt_budget(0)
+    fs_remove(self_prompt_path())
+    return "self-prompt continuation stopped"
+}
+fn set_self_prompt_budget_text(raw) {
+    let parsed = parse_int(raw.trim())
+    if parsed.is_err() { return "usage: /self-budget <number>" }
+    let value = parsed.unwrap()
+    if value < 0 { return "usage: /self-budget <number>" }
+    write_self_prompt_budget(value)
+    return "self-prompt budget set to " + str(value)
+}
 fn last_user_prompt(session) {
     let mut i = session.messages.len() - 1
     while i >= 0 {
@@ -900,6 +931,7 @@ fn save_self_prompt(session) {
 }
 
 fn load_self_prompt() {
+    if self_prompt_paused() { return "" }
     let raw = fs_read(self_prompt_path())
     if raw.is_err() { return "" }
     fs_remove(self_prompt_path())
@@ -1564,6 +1596,27 @@ fn session_command(log, session, line) {
         log.push(item("system", "self-prompt", seed_self_prompt(goal, 100)))
         return true
     }
+    if line == "/self-stop" || line == "/stop-self" {
+        log.push(item("system", "self-prompt", stop_self_prompt()))
+        return true
+    }
+    if line == "/self-budget" {
+        log.push(item("system", "self-prompt", "self-prompt budget=" + str(read_self_prompt_budget())))
+        return true
+    }
+    if line.starts_with("/self-budget ") {
+        let raw = line.replace("/self-budget ", "")
+        log.push(item("system", "self-prompt", set_self_prompt_budget_text(raw)))
+        return true
+    }
+    if line == "/self-pause" {
+        log.push(item("system", "self-prompt", pause_self_prompt()))
+        return true
+    }
+    if line == "/self-resume" {
+        log.push(item("system", "self-prompt", resume_self_prompt()))
+        return true
+    }
     if line.starts_with("/next ") {
         let feature = line.replace("/next ", "")
         log.push(item("system", "next", write_next_feature(feature)))
@@ -1902,6 +1955,7 @@ fn policy_text() {
 fn roadmap_text(session) {
     return "roadmap: " + agent_label() +
         "; self_budget=" + str(read_self_prompt_budget()) +
+        "; paused=" + str(self_prompt_paused()) +
         "; next=" + read_next_feature() +
         "; messages=" + str(session.messages.len()) +
         "; sessions=" + sessions_dir() + "; checkpoints=" + checkpoints_dir() +
@@ -1942,13 +1996,13 @@ fn command_examples() {
         "/next Add the next small feature"
 }
 fn command_help() {
-    return "commands: /help, /status, /config, /provider, /checklist, /health, /git, /git-diff, /git-commit <msg>, /release-notes [name], /release, /changelog [entry], /version, /bump patch|minor|major, /roadmap, /policy, /up, /down, /bottom, /tools, /tool <cmd>, /multi, /send, /cancel, /save <name>, /load <name>, /sessions, /self <goal>, /next [feature], /checkpoints, /restore <path>, /export [name], /clear, /quit"
+    return "commands: /help, /status, /config, /provider, /checklist, /health, /git, /git-diff, /git-commit <msg>, /release-notes [name], /release, /changelog [entry], /version, /bump patch|minor|major, /roadmap, /policy, /up, /down, /bottom, /tools, /tool <cmd>, /multi, /send, /cancel, /save <name>, /load <name>, /sessions, /self <goal>, /self-stop, /self-budget [n], /self-pause, /self-resume, /next [feature], /checkpoints, /restore <path>, /export [name], /clear, /quit"
 }
 
 fn command_status(session, reload, input) {
     let provider = "missing"
     if provider_ready() { provider = "ready" }
-    return "version=" + agent_version() + "; provider=" + provider + "; model=" + default_model() + "; messages=" + str(session.messages.len()) + "; input=" + input_status(input) + "; scroll=" + str(arg(input, "scroll", 0)) + "; reload=" + str(reload.reloading) + "; timeout_ms=" + str(default_tool_timeout_ms()) + "; confirm_destructive=" + str(destructive_confirm_enabled()) + "; self_budget=" + str(read_self_prompt_budget()) + "; next=" + read_next_feature()
+    return "version=" + agent_version() + "; provider=" + provider + "; model=" + default_model() + "; messages=" + str(session.messages.len()) + "; input=" + input_status(input) + "; scroll=" + str(arg(input, "scroll", 0)) + "; reload=" + str(reload.reloading) + "; timeout_ms=" + str(default_tool_timeout_ms()) + "; confirm_destructive=" + str(destructive_confirm_enabled()) + "; self_budget=" + str(read_self_prompt_budget()) + "; paused=" + str(self_prompt_paused()) + "; next=" + read_next_feature()
 }
 // Multiline prompt mode: collect lines until /send or /cancel.
 fn multiline_start(log, input, line) {
