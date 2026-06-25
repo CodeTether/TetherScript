@@ -357,9 +357,9 @@ fn wrapped_item_lines(row, width) {
 fn separator_mode() {
     let mode = env_text("TETHERSCRIPT_AGENT_SEPARATOR_MODE")
     if mode == "off" { return "off" }
-    if mode == "compact" { return "compact" }
+    if mode == "full" { return "full" }
     if env_text("TETHERSCRIPT_AGENT_NO_SEPARATORS") == "1" { return "off" }
-    return "full"
+    return "compact"
 }
 
 fn separator_enabled() {
@@ -373,9 +373,13 @@ fn separator_line(width) {
 fn render_items(items, width, rows, scroll) {
     let lines = []
     let mut first = true
+    let mut last_kind = ""
+    let mode = separator_mode()
     for row in items {
-        if !first && separator_enabled() && separator_mode() == "full" { lines.push(separator_line(width)) }
+        let kind = arg(row, "kind", "")
+        if !first && separator_enabled() && (mode == "full" || kind != last_kind) { lines.push(separator_line(width)) }
         first = false
+        last_kind = kind
         for line in wrapped_item_lines(row, width) { lines.push(line) }
     }
     let mut out = ""
