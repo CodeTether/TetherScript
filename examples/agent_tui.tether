@@ -893,7 +893,7 @@ fn next_feature_path() {
 }
 
 fn default_next_feature() {
-    return "Refine TUI rendering with panels, box drawing, and clearer scroll state."
+    return "Use /preview output to tune TUI spacing and visual hierarchy."
 }
 
 fn read_next_feature() {
@@ -2039,6 +2039,21 @@ fn command_palette() {
         "git: /git /git-diff /git-commit <msg>\n" +
         "automation: /self <goal> /next [feature] /templates /use <template> [task]"
 }
+fn tui_preview_text() {
+    let rows = []
+    rows.push(item("system", "preview", "box drawing, wrapping, and color sample"))
+    rows.push(item("user", "you", "short prompt"))
+    rows.push(item("agent", "provider", "This is a longer preview line that should wrap cleanly inside the frame and preserve readable indentation across wrapped rows."))
+    rows.push(item("tool", "sample", "stdout line 1\nstdout line 2\nstdout line 3"))
+    let view = map()
+    view.title = agent_label() + " preview"
+    view.width = 72
+    view.height = 12
+    view.status = "preview | /bottom exits scroll"
+    view.items = rows
+    view.scroll = 0
+    return render_view(view)
+}
 fn command_examples() {
     return "examples:\n" +
         "/tool powershell Get-ChildItem\n" +
@@ -2139,6 +2154,10 @@ fn interactive_handle(log, session, reload, input, line) {
     }
     if line == "/examples" {
         log.push(item("system", "examples", command_examples()))
+        return true
+    }
+    if line == "/preview" {
+        log.push(item("system", "preview", tui_preview_text()))
         return true
     }
     if line == "/command-reference" {
