@@ -2060,7 +2060,7 @@ fn command_palette() {
         "git: /git /git-diff /git-commit <msg>\n" +
         "automation: /self <goal> /next [feature] /templates /use <template> [task]"
 }
-fn tui_preview_text() {
+fn tui_preview_text_at(width) {
     let rows = []
     rows.push(item("system", "preview", "box drawing, wrapping, and color sample"))
     rows.push(item("user", "you", "short prompt"))
@@ -2068,12 +2068,16 @@ fn tui_preview_text() {
     rows.push(item("tool", "sample", "stdout line 1\nstdout line 2\nstdout line 3"))
     let view = map()
     view.title = agent_label() + " preview"
-    view.width = 72
+    view.width = at_least(width, 32)
     view.height = 12
     view.status = "preview | /bottom exits scroll"
     view.items = rows
     view.scroll = 0
     return render_view(view)
+}
+
+fn tui_preview_text() {
+    return tui_preview_text_at(72)
 }
 fn command_examples() {
     return "examples:\n" +
@@ -2179,6 +2183,12 @@ fn interactive_handle(log, session, reload, input, line) {
     }
     if line == "/preview" {
         log.push(item("system", "preview", tui_preview_text()))
+        return true
+    }
+    if line.starts_with("/preview ") {
+        let raw = line.replace("/preview ", "")
+        let width = parse_int(raw).unwrap_or(72)
+        log.push(item("system", "preview", tui_preview_text_at(width)))
         return true
     }
     if line == "/command-reference" {
