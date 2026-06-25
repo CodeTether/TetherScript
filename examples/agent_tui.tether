@@ -43,7 +43,7 @@
 // =============================================================================
 
 fn agent_version() {
-    return "0.5.0"
+    return "0.5.1"
 }
 
 fn agent_name() {
@@ -229,6 +229,53 @@ fn styled(row, text) {
 //  TUI FRAME AND LOG RENDERER
 // =============================================================================
 
+fn tui_ascii() {
+    return env_text("TETHERSCRIPT_AGENT_ASCII") == "1"
+}
+
+fn utf8(bytes) {
+    return bytes.decode_utf8()
+}
+
+fn box_char(kind) {
+    if tui_ascii() {
+        if kind == "h" { return "-" }
+        if kind == "v" { return "|" }
+        if kind == "tl" { return "+" }
+        if kind == "tr" { return "+" }
+        if kind == "ml" { return "+" }
+        if kind == "mr" { return "+" }
+        if kind == "bl" { return "+" }
+        if kind == "br" { return "+" }
+    }
+    if kind == "h" { return utf8(b"\xE2\x94\x80") }
+    if kind == "v" { return utf8(b"\xE2\x94\x82") }
+    if kind == "tl" { return utf8(b"\xE2\x95\xAD") }
+    if kind == "tr" { return utf8(b"\xE2\x95\xAE") }
+    if kind == "ml" { return utf8(b"\xE2\x94\x9C") }
+    if kind == "mr" { return utf8(b"\xE2\x94\xA4") }
+    if kind == "bl" { return utf8(b"\xE2\x95\xB0") }
+    if kind == "br" { return utf8(b"\xE2\x95\xAF") }
+    return "?"
+}
+fn border_with(left, right, label, width) {
+    let inner = at_least(width, 4) - 2
+    let title = " " + single_line(label) + " "
+    if title.len() >= inner { return left + take_text(title, inner) + right }
+    return left + title + repeat_text(box_char("h"), inner - title.len()) + right
+}
+
+fn top_border(label, width) {
+    return border_with(box_char("tl"), box_char("tr"), label, width)
+}
+
+fn mid_border(label, width) {
+    return border_with(box_char("ml"), box_char("mr"), label, width)
+}
+
+fn bottom_border(label, width) {
+    return border_with(box_char("bl"), box_char("br"), label, width)
+}
 // Draw the boxed TUI frame.
 fn border(label, width) {
     let inner = at_least(width, 4) - 2
@@ -238,12 +285,12 @@ fn border(label, width) {
 }
 
 fn blank_line(width) {
-    return "|" + repeat_text(" ", at_least(width, 2) - 2) + "|"
+    return box_char("v") + repeat_text(" ", at_least(width, 2) - 2) + box_char("v")
 }
 
 fn frame_line(text, width) {
     let inner = at_least(width, 2) - 2
-    return "|" + fit_text(text, inner) + "|"
+    return box_char("v") + fit_text(text, inner) + box_char("v")
 }
 
 // Split a log row into display lines. Real newlines become clean TUI rows.
@@ -258,9 +305,10 @@ fn item_parts(row) {
         return lines
     }
     let parts = clean_text(body).split("\n")
+    let indent = repeat_text(" ", prefix.len() + 2)
     let mut i = 0
     while i < parts.len() {
-        if i == 0 { lines.push(prefix + ": " + parts[i]) } else { lines.push("  " + parts[i]) }
+        if i == 0 { lines.push(prefix + ": " + parts[i]) } else { lines.push(indent + parts[i]) }
         i = i + 1
     }
     return lines
@@ -292,12 +340,12 @@ fn wrapped_item_lines(row, width) {
     let lines = []
     for text in item_parts(row) {
         if text == "" {
-            lines.push("|" + styled(row, repeat_text(" ", inner)) + "|")
+            lines.push(box_char("v") + styled(row, repeat_text(" ", inner)) + box_char("v"))
         } else {
             let mut i = 0
             while i < text.len() {
                 let part = slice_text(text, i, inner)
-                lines.push("|" + styled(row, pad_text(part, inner)) + "|")
+                lines.push(box_char("v") + styled(row, pad_text(part, inner)) + box_char("v"))
                 i = i + inner
             }
         }
@@ -323,14 +371,21 @@ fn render_items(items, width, rows, scroll) {
     }
     return out
 }
+fn status_label(view) {
+    let status = arg(view, "status", "")
+    let scroll = arg(view, "scroll", 0)
+    if scroll > 0 { return status + " | scroll +" + str(scroll) + " (/bottom)" }
+    return status
+}
+
 // Render a complete framed TUI view: title, body, and status bar.
 fn render_view(view) {
     let width = at_least(arg(view, "width", 80), 20)
     let height = at_least(arg(view, "height", 10), 4)
     let body_rows = height - 3
-    return border(arg(view, "title", "tetherscript"), width) + "\n" +
+    return top_border(arg(view, "title", "tetherscript"), width) + "\n" +
         render_items(arg(view, "items", []), width, body_rows, arg(view, "scroll", 0)) +
-        border(arg(view, "status", ""), width) + "\n"
+        bottom_border(status_label(view), width) + "\n"
 }
 
 fn show(log, status) {
@@ -838,7 +893,7 @@ fn next_feature_path() {
 }
 
 fn default_next_feature() {
-    return "Add compact autonomous controls summary to /help."
+    return "Refine TUI rendering with panels, box drawing, and clearer scroll state."
 }
 
 fn read_next_feature() {
@@ -1996,7 +2051,7 @@ fn command_examples() {
         "/next Add the next small feature"
 }
 fn command_help() {
-    return "commands: /help, /status, /config, /provider, /checklist, /health, /git, /git-diff, /git-commit <msg>, /release-notes [name], /release, /changelog [entry], /version, /bump patch|minor|major, /roadmap, /policy, /up, /down, /bottom, /tools, /tool <cmd>, /multi, /send, /cancel, /save <name>, /load <name>, /sessions, /self <goal>, /self-stop, /self-budget [n], /self-pause, /self-resume, /next [feature], /checkpoints, /restore <path>, /export [name], /clear, /quit"
+    return "help: /palette groups commands; /examples shows usage; /status shows runtime state; /roadmap shows next work. autonomous: /self <goal>, /self-budget [n], /self-pause, /self-resume, /self-stop, /next [feature]. navigation: /up /down /bottom. exit: /quit"
 }
 
 fn command_status(session, reload, input) {
