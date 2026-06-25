@@ -453,8 +453,7 @@ fn arg(args, key, fallback) {
 //  TOOL EXECUTION BACKEND
 // =============================================================================
 
-// Shell adapters.
-un uses the platform default; explicit tools use PowerShell/Bash.
+// Shell adapters. run uses the platform default; explicit tools use PowerShell/Bash.
 fn shell(command) {
     if process_platform() == "windows" {
         return process_run("powershell", ["-NoProfile", "-Command", command], nil, 30000)
