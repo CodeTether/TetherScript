@@ -569,7 +569,7 @@ fn restore_checkpoint(path) {
     let read = fs_read(source)
     if read.is_err() { return "restore failed: no checkpoint for " + path }
     let current = fs_read(path).unwrap_or("")
-    let checkpoint = ""
+    let mut checkpoint = ""
     if current != "" { checkpoint = save_checkpoint(path, current) }
     let r = fs_write(path, read.unwrap())
     if r.is_err() { return "restore failed: " + r.err() }
@@ -612,7 +612,7 @@ fn run_tool(name, args) {
         let existed = fs_exists(path).unwrap_or(false)
         if destructive_confirm_enabled() && existed && !confirmed(args) { return confirm_required("write overwrite", path) }
         let before = fs_read(path).unwrap_or("")
-        let checkpoint = ""
+        let mut checkpoint = ""
         if existed { checkpoint = save_checkpoint(path, before) }
         let after = arg(args, "body", "")
         let r = fs_write(path, after)
@@ -650,7 +650,7 @@ fn run_tool(name, args) {
         let path = arg(args, "path", "")
         if destructive_confirm_enabled() && !confirmed(args) { return confirm_required("remove", path) }
         let before = fs_read(path).unwrap_or("")
-        let checkpoint = ""
+        let mut checkpoint = ""
         if before != "" { checkpoint = save_checkpoint(path, before) }
         return checkpoint + "\nremoved=" + json_encode(fs_remove(path).unwrap_or(false))
     }
