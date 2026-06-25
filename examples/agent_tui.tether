@@ -1,6 +1,7 @@
 // tetherscript: authority agent
 // tetherscript: hot-reload
 
+// Normalize text for one-line UI labels and borders.
 fn single_line(value) {
     let mut text = str(value)
     text = text.replace("\r\n", "\\n")
@@ -8,6 +9,7 @@ fn single_line(value) {
     return text.replace("\r", "\\n")
 }
 
+// Preserve real newlines for log body rendering while normalizing CRLF/CR.
 fn clean_text(value) {
     let mut text = str(value)
     text = text.replace("\r\n", "\n")
@@ -15,6 +17,7 @@ fn clean_text(value) {
     return text
 }
 
+// Build a typed log row. The kind controls color and rendering in the TUI.
 fn item(kind, name, text) {
     let row = map()
     row.kind = kind
@@ -28,6 +31,7 @@ fn item(kind, name, text) {
     return row
 }
 
+// ANSI helpers for alternate-screen TUI rendering.
 fn esc() {
     return b"\x1b".decode_utf8()
 }
@@ -58,6 +62,7 @@ fn env_int(name, fallback) {
     return value
 }
 
+// Terminal dimensions come from environment variables supplied by the host.
 fn terminal_size() {
     let size = map()
     size.cols = env_int("COLUMNS", 80)
@@ -70,6 +75,7 @@ fn at_least(value, floor) {
     return value
 }
 
+// Small string/layout helpers used by the frame renderer.
 fn repeat_text(text, count) {
     let mut out = ""
     let mut i = 0
@@ -100,6 +106,7 @@ fn fit_text(value, width) {
     return clipped + repeat_text(" ", pad)
 }
 
+// Map friendly color names to ANSI foreground color codes.
 fn color_code(name) {
     if name == "cyan" { return "36" }
     if name == "green" { return "32" }
@@ -128,6 +135,7 @@ fn styled(row, text) {
     return open + text + ansi_reset()
 }
 
+// Draw the boxed TUI frame.
 fn border(label, width) {
     let inner = at_least(width, 4) - 2
     let title = " " + single_line(label) + " "
@@ -144,6 +152,7 @@ fn frame_line(text, width) {
     return "|" + fit_text(text, inner) + "|"
 }
 
+// Split a log row into display lines. Real newlines become clean TUI rows.
 fn item_parts(row) {
     let mut prefix = "[" + arg(row, "kind", "item") + "]"
     let name = arg(row, "name", "")
@@ -183,6 +192,7 @@ fn pad_text(value, width) {
     return text + repeat_text(" ", pad)
 }
 
+// Wrap long display lines to the current terminal width instead of clipping them.
 fn wrapped_item_lines(row, width) {
     let inner = at_least(width, 2) - 2
     let lines = []
@@ -201,6 +211,7 @@ fn wrapped_item_lines(row, width) {
     return lines
 }
 
+// Flatten wrapped log rows and keep the newest visible rows at the bottom.
 fn render_items(items, width, rows) {
     let lines = []
     for row in items {
@@ -217,6 +228,7 @@ fn render_items(items, width, rows) {
     }
     return out
 }
+// Render a complete framed TUI view: title, body, and status bar.
 fn render_view(view) {
     let width = at_least(arg(view, "width", 80), 20)
     let height = at_least(arg(view, "height", 10), 4)
@@ -247,6 +259,7 @@ fn present(log, status) {
     print(ansi_clear_home() + render_view(view))
 }
 
+// Tool-schema helpers. These produce either MCP or model-function tool definitions.
 fn prop(desc) {
     let p = map()
     p.type = "string"
@@ -281,6 +294,7 @@ fn model_tool(name, desc, props, required) {
     return t
 }
 
+// All tools exposed to the model/MCP clients. Keep this list in sync with run_tool().
 fn tool_defs(kind) {
     let defs = []
     defs.push(tool_for(kind, "cwd", "Return the current working directory.", map(), []))
@@ -312,6 +326,16 @@ fn tool_defs(kind) {
     defs.push(tool_for(kind, "powershell", "Run a command with PowerShell.", p, ["command"]))
     p = map(); p.command = prop("Bash command to run.")
     defs.push(tool_for(kind, "bash", "Run a command with bash.", p, ["command"]))
+    p = map(); p.html = prop("HTML document or fragment."); p.selector = prop("CSS selector.")
+    defs.push(tool_for(kind, "browser_text", "Return textContent for a selector in HTML.", p, ["html", "selector"]))
+    p = map(); p.html = prop("HTML document or fragment."); p.selector = prop("CSS selector.")
+    defs.push(tool_for(kind, "browser_query", "Return the matched element HTML for a selector.", p, ["html", "selector"]))
+    p = map(); p.html = prop("HTML document or fragment."); p.css = prop("CSS stylesheet."); p.width = prop("Render width in columns.")
+    defs.push(tool_for(kind, "browser_render", "Render HTML and CSS to a text browser view.", p, ["html"]))
+    p = map(); p.html = prop("HTML document containing scripts to execute.")
+    defs.push(tool_for(kind, "browser_run_scripts", "Execute scripts embedded in HTML and return the result.", p, ["html"]))
+    p = map(); p.script = prop("JavaScript source to evaluate.")
+    defs.push(tool_for(kind, "js_eval", "Evaluate JavaScript and return the result.", p, ["script"]))
     return defs
 }
 
@@ -326,6 +350,7 @@ fn env_text(name) {
     return value
 }
 
+// Resolve the model name from environment variables and provider endpoint conventions.
 fn default_model() {
     let mut model = env_text("TETHERSCRIPT_AGENT_MODEL")
     if model == "" { model = env_text("CODETETHER_DEFAULT_MODEL") }
@@ -360,6 +385,7 @@ fn arg(args, key, fallback) {
     return fallback
 }
 
+// Shell adapters. `run` uses the platform default; explicit tools use PowerShell/Bash.
 fn shell(command) {
     if process_platform() == "windows" {
         return process_run("powershell", ["-NoProfile", "-Command", command], nil, 30000)
@@ -375,6 +401,7 @@ fn bash(command) {
     return process_run("bash", ["-lc", command], nil, 30000)
 }
 
+// Execute a named tool. Tool outputs are returned as text for model/TUI consumption.
 fn run_tool(name, args) {
     if name == "cwd" { return cwd().unwrap_or("cwd failed") }
     if name == "ls" { return json_encode(fs_list(arg(args, "path", ".")).unwrap_or([])) }
@@ -431,9 +458,15 @@ fn run_tool(name, args) {
     if name == "run" { return json_encode(shell(arg(args, "command", "")).unwrap_or(map())) }
     if name == "powershell" { return json_encode(powershell(arg(args, "command", "")).unwrap_or(map())) }
     if name == "bash" { return json_encode(bash(arg(args, "command", "")).unwrap_or(map())) }
+    if name == "browser_text" { return browser_text_content(arg(args, "html", ""), arg(args, "selector", "body")) }
+    if name == "browser_query" { return browser_query_selector(arg(args, "html", ""), arg(args, "selector", "body")) }
+    if name == "browser_render" { return browser_render(arg(args, "html", ""), arg(args, "css", ""), parse_int(arg(args, "width", "80")).unwrap_or(80)) }
+    if name == "browser_run_scripts" { return json_encode(browser_run_scripts(arg(args, "html", ""))) }
+    if name == "js_eval" { return json_encode(js_eval(arg(args, "script", ""))) }
     return "unknown tool: " + name
 }
 
+// Convert simple string outputs into JSON-RPC tool error status.
 fn tool_failed(output) {
     if output.starts_with("unknown tool:") { return true }
     if output.starts_with("cwd failed") { return true }
@@ -466,6 +499,7 @@ fn rpc_args(params) {
     return map()
 }
 
+// MCP JSON-RPC handlers.
 fn tools_call(log, id, params) {
     if type_of(params) != "map" || !params.contains("name") {
         return write_result(id, "tools/call: missing name", true)
@@ -492,6 +526,7 @@ fn initialize(id) {
     stdio_write(jsonrpc_response(id, result))
 }
 
+// System prompt for the local coding agent.
 fn base_messages() {
     let messages = []
     let sys = map()
@@ -507,6 +542,7 @@ fn new_session() {
     return session
 }
 
+// Hot-reload state tracks the currently running .tether source file.
 fn script_path() {
     let args = process_args()
     let mut i = args.len() - 1
@@ -529,6 +565,40 @@ fn reload_state() {
     return state
 }
 
+// Self-prompt persistence lets a hot-reloaded TUI continue the task that caused reload.
+fn self_prompt_path() {
+    return ".tetherscript/agent_tui_self_prompt.txt"
+}
+
+fn last_user_prompt(session) {
+    let mut i = session.messages.len() - 1
+    while i >= 0 {
+        let message = session.messages[i]
+        if type_of(message) == "map" && arg(message, "role", "") == "user" {
+            return arg(message, "content", "")
+        }
+        i = i - 1
+    }
+    return ""
+}
+
+fn save_self_prompt(session) {
+    let prompt = last_user_prompt(session)
+    if prompt == "" { return nil }
+    fs_mkdir(".tetherscript")
+    let body = "The TUI reloaded after source changes while working on this request:\n\n" + prompt + "\n\nContinue from the reloaded state. Verify the change if useful, then report concise status."
+    fs_write(self_prompt_path(), body)
+    return nil
+}
+
+fn load_self_prompt() {
+    let raw = fs_read(self_prompt_path())
+    if raw.is_err() { return "" }
+    fs_remove(self_prompt_path())
+    return raw.unwrap()
+}
+
+// Session persistence. Default and named sessions are JSONL conversation logs.
 fn session_path() {
     return ".tetherscript/agent_tui_session.jsonl"
 }
@@ -572,6 +642,7 @@ fn initial_session(saved) {
     return new_session()
 }
 
+// Rebuild the visible TUI log from persisted chat messages.
 fn initial_log(saved) {
     if saved != nil && saved.contains("messages") && saved.messages.len() > 0 {
         let log = [item("system", "ready", "restored session from jsonl; /save <name>, /load <name>, /sessions, /clear")]
@@ -595,6 +666,7 @@ fn clear_session() {
     fs_remove(session_path())
     return new_session()
 }
+// Persist the current/default session after turns and on exit.
 fn save_session(session) {
     fs_mkdir(".tetherscript")
     fs_write(session_path(), session_body(session))
@@ -634,6 +706,7 @@ fn check_output(report) {
     return "check exited with code " + str(arg(report, "code", "unknown"))
 }
 
+// Before hot-reloading changed source, ask the TetherScript binary to check it.
 fn self_check(path) {
     let args = process_args()
     if args.len() == 0 { return "process args did not include tetherscript binary" }
@@ -671,11 +744,13 @@ fn reload_needed(state) {
 fn reload_start(log, session, state) {
     log.push(item("system", "reload", "source changed; restarting"))
     state.reloading = true
+    save_self_prompt(session)
     save_session(session)
     fs_mkdir(".tetherscript")
     fs_write(".tetherscript/reload", state.path)
 }
 
+// Hot reload: save session, request restart, and let the outer host relaunch us.
 fn reload_now(log, session, state) {
     if !reload_allowed(log, state) { return true }
     reload_start(log, session, state)
@@ -696,6 +771,7 @@ fn parse_args(raw) {
     return json_parse(raw)
 }
 
+// Router allow-list. The router can only request tools declared here.
 fn valid_tool(name) {
     if name == "cwd" { return true }
     if name == "ls" { return true }
@@ -712,6 +788,11 @@ fn valid_tool(name) {
     if name == "run" { return true }
     if name == "powershell" { return true }
     if name == "bash" { return true }
+    if name == "browser_text" { return true }
+    if name == "browser_query" { return true }
+    if name == "browser_render" { return true }
+    if name == "browser_run_scripts" { return true }
+    if name == "js_eval" { return true }
     return false
 }
 
@@ -726,6 +807,7 @@ fn call_args(call) {
     return map()
 }
 
+// Execute a model tool call, log it, and append the tool result to chat history.
 fn append_tool(log, messages, call) {
     let name = call_name(call)
     let output = run_tool(name, call_args(call))
@@ -737,6 +819,7 @@ fn append_tool(log, messages, call) {
     messages.push(msg)
 }
 
+// Optional second-pass router: decides whether a draft answer needs one more tool call.
 fn router_tools() {
     let defs = tool_defs("model")
     defs.push(model_tool("none", "No tool is needed.", map(), []))
@@ -802,6 +885,7 @@ fn append_tool_call(messages, call) {
     messages.push(msg)
 }
 
+// One provider round-trip. Handles tool calls until a final assistant answer appears.
 fn agent_step(log, messages, state) {
     let opts = map()
     opts.model = default_model()
@@ -833,6 +917,7 @@ fn agent_step(log, messages, state) {
     return false
 }
 
+// Complete user turn: append prompt, run provider/tool loop, return final answer.
 fn agent_turn(log, session, prompt) {
     let messages = session.messages
     let user = map()
@@ -878,6 +963,7 @@ fn handle(log, session, reload, msg) {
     return true
 }
 
+// Manual TUI tool escape hatch: `/tool ...` executes without asking the model.
 fn manual_tool(command) {
     let trimmed = command.trim()
     if trimmed == "cwd" { return run_tool("cwd", map()) }
@@ -906,12 +992,32 @@ fn manual_tool(command) {
         args.command = trimmed.replace("bash ", "")
         return run_tool("bash", args)
     }
+    if trimmed.starts_with("js ") {
+        let args = map()
+        args.script = trimmed.replace("js ", "")
+        return run_tool("js_eval", args)
+    }
+    if trimmed.starts_with("browser_text ") {
+        return run_tool("browser_text", parse_args(trimmed.replace("browser_text ", "")))
+    }
+    if trimmed.starts_with("browser_query ") {
+        return run_tool("browser_query", parse_args(trimmed.replace("browser_query ", "")))
+    }
+    if trimmed.starts_with("browser_render ") {
+        return run_tool("browser_render", parse_args(trimmed.replace("browser_render ", "")))
+    }
+    if trimmed.starts_with("browser_run_scripts ") {
+        let args = map()
+        args.html = trimmed.replace("browser_run_scripts ", "")
+        return run_tool("browser_run_scripts", args)
+    }
     if trimmed.starts_with("replace ") {
         return run_tool("replace", parse_args(trimmed.replace("replace ", "")))
     }
-    return "tools: cwd, ls <path>, read <path>, replace path/old/new JSON, run|powershell|bash <command>"
+    return "tools: cwd, ls <path>, read <path>, replace path/old/new JSON, run|powershell|bash <command>, js <script>, browser_text|browser_query|browser_render JSON"
 }
 
+// Input state supports single-line prompts and /multi multiline prompts.
 fn new_input() {
     let input = map()
     input.multiline = false
@@ -924,6 +1030,7 @@ fn input_status(input) {
     return "waiting"
 }
 
+// Send a prompt from the TUI, save session state, and trigger hot reload if needed.
 fn send_prompt(log, session, reload, prompt) {
     log.push(item("user", "you", prompt))
     save_session(session)
@@ -935,6 +1042,7 @@ fn send_prompt(log, session, reload, prompt) {
     return true
 }
 
+// Named-session helpers used by /save, /load, and /sessions.
 fn restore_log(log, session, label) {
     while log.len() > 0 { log.pop() }
     log.push(item("system", "session", label))
@@ -967,6 +1075,7 @@ fn session_command(log, session, line) {
     }
     return false
 }
+// Multiline prompt mode: collect lines until /send or /cancel.
 fn multiline_start(log, input, line) {
     input.multiline = true
     input.lines = []
@@ -996,6 +1105,7 @@ fn multiline_handle(log, session, reload, input, line) {
     return true
 }
 
+// Dispatch one TUI input line: commands, manual tools, or normal agent prompt.
 fn interactive_handle(log, session, reload, input, line) {
     if input.multiline { return multiline_handle(log, session, reload, input, line) }
     if line == "" { return true }
@@ -1009,7 +1119,7 @@ fn interactive_handle(log, session, reload, input, line) {
     }
     if session_command(log, session, line) { return true }
     if line == "/tools" {
-        log.push(item("system", "tools", "cwd, ls <path>, read <path>, replace path/old/new JSON, run|powershell|bash <command>"))
+        log.push(item("system", "tools", "cwd, ls <path>, read <path>, replace path/old/new JSON, run|powershell|bash <command>, js <script>, browser_text|browser_query|browser_render JSON"))
         return true
     }
     if line == "/multi" || line.starts_with("/multi ") {
@@ -1023,14 +1133,20 @@ fn interactive_handle(log, session, reload, input, line) {
     return send_prompt(log, session, reload, line)
 }
 
+// Interactive terminal UI entrypoint.
 fn interactive_main() {
     let saved = load_session()
     let log = initial_log(saved)
     let session = initial_session(saved)
     let reload = reload_state()
     let input = new_input()
+    let resumed = load_self_prompt()
     let mut running = true
     print(ansi_enter())
+    if resumed != "" {
+        log.push(item("system", "self-prompt", "continuing previous request after reload"))
+        running = send_prompt(log, session, reload, resumed)
+    }
     while running {
         present(log, input_status(input))
         let event = tui_read_event("> ")
@@ -1044,7 +1160,7 @@ fn interactive_main() {
     if reload.reloading { present(log, "reloading") } else { present(log, "done") }
     print(ansi_leave())
 }
-
+// JSON-RPC/MCP entrypoint for stdio clients.
 fn rpc_main() {
     let saved = load_session()
     let log = initial_log(saved)
@@ -1064,6 +1180,7 @@ fn rpc_main() {
     show(log, "done")
 }
 
+// Choose TUI mode by default, or JSON-RPC mode via environment variables.
 fn main() {
     if env_text("TETHERSCRIPT_AGENT_MODE") == "rpc" { return rpc_main() }
     if env_text("TETHERSCRIPT_AGENT_STDIO_RPC") == "1" { return rpc_main() }
