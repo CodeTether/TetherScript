@@ -1,6 +1,46 @@
 // tetherscript: authority agent
 // tetherscript: hot-reload
 
+// -----------------------------------------------------------------------------
+//  File:        agent_tui.tether
+//  Purpose:     Local terminal UI + MCP/JSON-RPC agent host for TetherScript.
+//  Author:      CodeTether / TetherScript contributors
+//  Notes:       This example is intentionally self-contained and public-facing.
+//
+//  Overview:
+//      agent_tui.tether is a small, inspectable agent runtime. It renders a
+//      terminal UI, talks to a provider-backed chat model, exposes local tools,
+//      persists sessions, supports hot reload, and can resume work after reload
+//      with a self-prompt.
+//
+//  Modes:
+//      1. Interactive TUI mode      default
+//      2. JSON-RPC/MCP stdio mode   TETHERSCRIPT_AGENT_MODE=rpc
+//
+//  Major features:
+//      - Framed ANSI terminal UI with colored log rows
+//      - Clean multiline rendering and width wrapping
+//      - File-system, shell, PowerShell, Bash, browser, and JavaScript tools
+//      - Provider/model tool-call loop
+//      - Optional router pass for one more tool call after a draft answer
+//      - Default and named JSONL session persistence
+//      - Hot reload with self-check and automatic continuation prompt
+//
+//  Storage:
+//      .tetherscript/agent_tui_session.jsonl       default session
+//      .tetherscript/sessions/<name>.jsonl         named sessions
+//      .tetherscript/agent_tui_self_prompt.txt     reload continuation prompt
+//      .tetherscript/reload                        hot-reload handoff marker
+//
+//  Public sharing note:
+//      This file favors clarity over cleverness. Sections are separated with
+//      old-fashioned comment blocks so readers can understand the runtime as a
+//      sequence of simple subsystems rather than a hidden framework.
+// -----------------------------------------------------------------------------
+
+// =============================================================================
+//  TEXT NORMALIZATION AND LOG ROWS
+// =============================================================================
 // Normalize text for one-line UI labels and borders.
 fn single_line(value) {
     let mut text = str(value)
@@ -30,6 +70,10 @@ fn item(kind, name, text) {
     if kind == "rpc" { row.fg = "bright_magenta" }
     return row
 }
+
+// =============================================================================
+//  ANSI TERMINAL CONTROL
+// =============================================================================
 
 // ANSI helpers for alternate-screen TUI rendering.
 fn esc() {
@@ -61,6 +105,10 @@ fn env_int(name, fallback) {
     if value <= 0 { return fallback }
     return value
 }
+
+// =============================================================================
+//  TERMINAL SIZING AND SMALL LAYOUT HELPERS
+// =============================================================================
 
 // Terminal dimensions come from environment variables supplied by the host.
 fn terminal_size() {
@@ -106,6 +154,10 @@ fn fit_text(value, width) {
     return clipped + repeat_text(" ", pad)
 }
 
+// =============================================================================
+//  COLORS AND STYLING
+// =============================================================================
+
 // Map friendly color names to ANSI foreground color codes.
 fn color_code(name) {
     if name == "cyan" { return "36" }
@@ -134,6 +186,10 @@ fn styled(row, text) {
     if open == "" { return text }
     return open + text + ansi_reset()
 }
+
+// =============================================================================
+//  TUI FRAME AND LOG RENDERER
+// =============================================================================
 
 // Draw the boxed TUI frame.
 fn border(label, width) {
@@ -259,6 +315,10 @@ fn present(log, status) {
     print(ansi_clear_home() + render_view(view))
 }
 
+// =============================================================================
+//  TOOL SCHEMAS
+// =============================================================================
+
 // Tool-schema helpers. These produce either MCP or model-function tool definitions.
 fn prop(desc) {
     let p = map()
@@ -350,6 +410,10 @@ fn env_text(name) {
     return value
 }
 
+// =============================================================================
+//  PROVIDER AND MODEL SELECTION
+// =============================================================================
+
 // Resolve the model name from environment variables and provider endpoint conventions.
 fn default_model() {
     let mut model = env_text("TETHERSCRIPT_AGENT_MODEL")
@@ -385,7 +449,12 @@ fn arg(args, key, fallback) {
     return fallback
 }
 
-// Shell adapters. `run` uses the platform default; explicit tools use PowerShell/Bash.
+// =============================================================================
+//  TOOL EXECUTION BACKEND
+// =============================================================================
+
+// Shell adapters.
+un uses the platform default; explicit tools use PowerShell/Bash.
 fn shell(command) {
     if process_platform() == "windows" {
         return process_run("powershell", ["-NoProfile", "-Command", command], nil, 30000)
@@ -499,6 +568,10 @@ fn rpc_args(params) {
     return map()
 }
 
+// =============================================================================
+//  MCP / JSON-RPC SERVER HANDLERS
+// =============================================================================
+
 // MCP JSON-RPC handlers.
 fn tools_call(log, id, params) {
     if type_of(params) != "map" || !params.contains("name") {
@@ -526,6 +599,10 @@ fn initialize(id) {
     stdio_write(jsonrpc_response(id, result))
 }
 
+// =============================================================================
+//  CHAT SESSION AND SYSTEM PROMPT
+// =============================================================================
+
 // System prompt for the local coding agent.
 fn base_messages() {
     let messages = []
@@ -541,6 +618,10 @@ fn new_session() {
     session.messages = base_messages()
     return session
 }
+
+// =============================================================================
+//  HOT RELOAD AND SELF-PROMPT STATE
+// =============================================================================
 
 // Hot-reload state tracks the currently running .tether source file.
 fn script_path() {
@@ -597,6 +678,10 @@ fn load_self_prompt() {
     fs_remove(self_prompt_path())
     return raw.unwrap()
 }
+
+// =============================================================================
+//  SESSION PERSISTENCE
+// =============================================================================
 
 // Session persistence. Default and named sessions are JSONL conversation logs.
 fn session_path() {
@@ -706,6 +791,10 @@ fn check_output(report) {
     return "check exited with code " + str(arg(report, "code", "unknown"))
 }
 
+// =============================================================================
+//  SELF-CHECKED HOT RELOAD
+// =============================================================================
+
 // Before hot-reloading changed source, ask the TetherScript binary to check it.
 fn self_check(path) {
     let args = process_args()
@@ -770,6 +859,10 @@ fn parse_args(raw) {
     if type_of(raw) != "str" || raw == "" { return map() }
     return json_parse(raw)
 }
+
+// =============================================================================
+//  MODEL TOOL-CALL LOOP AND ROUTER
+// =============================================================================
 
 // Router allow-list. The router can only request tools declared here.
 fn valid_tool(name) {
@@ -963,7 +1056,11 @@ fn handle(log, session, reload, msg) {
     return true
 }
 
-// Manual TUI tool escape hatch: `/tool ...` executes without asking the model.
+// =============================================================================
+//  INTERACTIVE TUI COMMANDS AND INPUT
+// =============================================================================
+
+// Manual TUI tool escape hatch: /tool ... executes without asking the model.
 fn manual_tool(command) {
     let trimmed = command.trim()
     if trimmed == "cwd" { return run_tool("cwd", map()) }
@@ -1160,6 +1257,10 @@ fn interactive_main() {
     if reload.reloading { present(log, "reloading") } else { present(log, "done") }
     print(ansi_leave())
 }
+// =============================================================================
+//  PROGRAM ENTRYPOINTS
+// =============================================================================
+
 // JSON-RPC/MCP entrypoint for stdio clients.
 fn rpc_main() {
     let saved = load_session()
