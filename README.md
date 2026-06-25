@@ -80,6 +80,8 @@ tetherscript currently includes:
 - SMTP sending support.
 - Standard tools for filesystem, process, environment, path, time, Base64,
   SHA-256, and URL parsing.
+- A self-hosting agent TUI example with hot reload, persistent conversation
+  state, and a source-check gate for agentic self-improvement.
 - A Rust plugin host for loading tetherscript source and calling named hooks.
 - A small LSP server plus VSCode extension.
 
@@ -237,6 +239,31 @@ secrets with `--grant-provider-vault <provider-id>`.
 For local agent-style runs, `--access-mode full` grants the current directory
 and auto-loads a default provider from Vault first, then local environment
 fallback unless `CODETETHER_DISABLE_ENV_FALLBACK=1` is set.
+
+## Agentic self-improvement
+
+`examples/agent_tui.tether` is the reference self-hosting agent loop. It is a
+real `.tether` script, not a built-in Rust agent: the model can inspect the
+workspace, call file tools, edit the TUI source, and let the runner hot-reload
+the changed script in the same terminal process.
+
+The improvement guarantee is deliberately narrow and testable. tetherscript does
+not claim that an agent can prove every self-edit is globally better. Instead,
+the TUI guarantees that a self-edit is not accepted for reload unless the edited
+source passes the project's source check:
+
+```text
+agent edits examples/agent_tui.tether
+-> TUI detects the source changed at a turn boundary
+-> TUI runs: tetherscript check <script>
+-> passing candidate reloads
+-> failing candidate restores the previous source and keeps running
+```
+
+This makes self-improvement an acceptance-gated workflow rather than an
+unbounded rewrite loop. The regression coverage in `tests/agent_tui.rs` includes
+both the successful self-reload path and an invalid self-edit that must be
+rejected, restored, and prevented from writing a reload marker.
 
 ## Plugin embedding
 
