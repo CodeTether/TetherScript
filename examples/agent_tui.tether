@@ -210,7 +210,16 @@ fn color_code(name) {
     return ""
 }
 
+fn color_enabled() {
+    if env_text("NO_COLOR") != "" { return false }
+    if env_text("TETHERSCRIPT_AGENT_COLOR") == "0" { return false }
+    if env_text("TETHERSCRIPT_AGENT_COLOR") == "1" { return true }
+    if process_platform() == "windows" { return false }
+    return true
+}
+
 fn style_open(row) {
+    if !color_enabled() { return "" }
     let color = color_code(arg(row, "fg", ""))
     let bold = arg(row, "bold", false)
     if bold && color != "" { return esc() + "[1;" + color + "m" }
@@ -230,32 +239,18 @@ fn styled(row, text) {
 // =============================================================================
 
 fn tui_ascii() {
-    return env_text("TETHERSCRIPT_AGENT_ASCII") == "1"
-}
-
-fn utf8(bytes) {
-    return bytes.decode_utf8()
+    return true
 }
 
 fn box_char(kind) {
-    if tui_ascii() {
-        if kind == "h" { return "-" }
-        if kind == "v" { return "|" }
-        if kind == "tl" { return "+" }
-        if kind == "tr" { return "+" }
-        if kind == "ml" { return "+" }
-        if kind == "mr" { return "+" }
-        if kind == "bl" { return "+" }
-        if kind == "br" { return "+" }
-    }
-    if kind == "h" { return utf8(b"\xE2\x94\x80") }
-    if kind == "v" { return utf8(b"\xE2\x94\x82") }
-    if kind == "tl" { return utf8(b"\xE2\x95\xAD") }
-    if kind == "tr" { return utf8(b"\xE2\x95\xAE") }
-    if kind == "ml" { return utf8(b"\xE2\x94\x9C") }
-    if kind == "mr" { return utf8(b"\xE2\x94\xA4") }
-    if kind == "bl" { return utf8(b"\xE2\x95\xB0") }
-    if kind == "br" { return utf8(b"\xE2\x95\xAF") }
+    if kind == "h" { return "-" }
+    if kind == "v" { return "|" }
+    if kind == "tl" { return "+" }
+    if kind == "tr" { return "+" }
+    if kind == "ml" { return "+" }
+    if kind == "mr" { return "+" }
+    if kind == "bl" { return "+" }
+    if kind == "br" { return "+" }
     return "?"
 }
 fn border_with(left, right, label, width) {
@@ -918,7 +913,7 @@ fn next_feature_path() {
 }
 
 fn default_next_feature() {
-    return "Commit TUI separator rendering controls."
+    return "Keep /palette and /help aligned as TUI commands evolve."
 }
 
 fn read_next_feature() {
@@ -937,6 +932,9 @@ fn write_next_feature(feature) {
     return "next feature recorded: " + text
 }
 
+fn feedback_checkpoint() {
+    return read_next_feature().starts_with("Review real TUI usage feedback")
+}
 fn self_prompt_continue_text() {
     return "Continue the ongoing TUI-agent improvement objective. There is more to do. Next feature to consider: " + read_next_feature() + "\n\nInspect the current file, choose the next highest-leverage small improvement, implement it safely, verify it, and report concise status. Before completing the turn, record the next feature to consider in the reload prompt/next-feature state and preserve the continuation indicator so the next reload keeps moving."
 }
@@ -1012,6 +1010,11 @@ fn save_self_prompt(session) {
 
 fn load_self_prompt() {
     if self_prompt_paused() { return "" }
+    if feedback_checkpoint() {
+        fs_remove(self_prompt_path())
+        write_self_prompt_budget(0)
+        return ""
+    }
     let raw = fs_read(self_prompt_path())
     if raw.is_err() { return "" }
     fs_remove(self_prompt_path())
@@ -1179,6 +1182,42 @@ fn timeline_entry(index, message) {
     return str(index) + ". " + role + ": " + take_text(content, 96)
 }
 
+fn feedback_path() {
+    return ".tetherscript/agent_tui_feedback.jsonl"
+}
+
+fn record_feedback(text) {
+    let clean = text.trim()
+    if clean == "" { return "usage: /feedback <what felt wrong>" }
+    let row = map()
+    row.version = agent_version()
+    row.text = clean
+    row.next = read_next_feature()
+    fs_mkdir(".tetherscript")
+    fs_write(feedback_path(), fs_read(feedback_path()).unwrap_or("") + json_encode(row) + "\n")
+    write_next_feature("Address recorded TUI feedback: " + clean)
+    return "feedback recorded; next feature updated"
+}
+
+fn recent_feedback() {
+    let raw = fs_read(feedback_path())
+    if raw.is_err() { return "no feedback recorded" }
+    let lines = []
+    for line in raw.unwrap().split("\n") {
+        let trimmed = line.trim()
+        if trimmed != "" { lines.push(trimmed) }
+    }
+    if lines.len() == 0 { return "no feedback recorded" }
+    let mut start = 0
+    if lines.len() > 8 { start = lines.len() - 8 }
+    let recent = []
+    let mut i = start
+    while i < lines.len() {
+        recent.push(lines[i])
+        i = i + 1
+    }
+    return recent.join("\n")
+}
 fn event_log_path() {
     return ".tetherscript/agent_tui_events.jsonl"
 }
@@ -1629,7 +1668,7 @@ fn hints_enabled() {
 
 fn status_with_hints(input) {
     if !hints_enabled() { return input_status(input) }
-    return input_status(input) + " | /h help /s status /r map /u up /j down /b end /q quit"
+    return input_status(input) + " | /h help /s status /r map ?/PgUp up ?/PgDn down End bottom /q quit"
 }
 // Send a prompt from the TUI, save session state, and trigger hot reload if needed.
 fn send_prompt(log, session, reload, prompt) {
@@ -1725,6 +1764,15 @@ fn session_command(log, session, line) {
     }
     if line == "/events" {
         log.push(item("system", "events", recent_events()))
+        return true
+    }
+    if line == "/feedback" {
+        log.push(item("system", "feedback", recent_feedback()))
+        return true
+    }
+    if line.starts_with("/feedback ") {
+        let text = line.replace("/feedback ", "")
+        log.push(item("system", "feedback", record_feedback(text)))
         return true
     }
     if line == "/events-clear" {
@@ -1961,6 +2009,14 @@ fn write_release_notes(session, name) {
     if r.is_err() { return "release notes failed: " + r.err() }
     return "wrote release notes to " + path
 }
+fn render_config_text() {
+    return "render: ascii=" + str(tui_ascii()) +
+        "; hints=" + str(hints_enabled()) +
+        "; separators=" + separator_mode() +
+        "; width_env=" + env_text("COLUMNS") +
+        "; height_env=" + env_text("LINES") +
+        "; toggles: TETHERSCRIPT_AGENT_ASCII=1, TETHERSCRIPT_AGENT_HINTS=0, TETHERSCRIPT_AGENT_SEPARATOR_MODE=compact|full|off"
+}
 fn config_text() {
     return "config: version=" + agent_version() +
         "; model=" + default_model() +
@@ -2062,12 +2118,13 @@ fn export_command_reference() {
 }
 fn command_palette() {
     return "palette:\n" +
-        "core: /help /examples /status /config /provider /checklist /health /roadmap /policy\n" +
-        "navigation: /up /down /bottom /timeline /search <text> /last /bookmark [label] /bookmarks\n" +
-        "sessions: /save <name> /load <name> /sessions /compact /export [name] /release-notes [name]\n" +
+        "core: /help /examples /palette /status /config /provider /checklist /health /roadmap /policy\n" +
+        "rendering: /preview [width] /preview-all /up /page-up /down /page-down /top /bottom\n" +
+        "navigation: /timeline /search <text> /last /last-agent /last-tool /bookmark [label] /bookmarks /events\n" +
+        "sessions: /save <name> /load <name> /sessions /compact /export [name] /release-notes [name] /changelog [entry]\n" +
         "tools: /tools /tool <cmd> /retry-tool /checkpoints /restore <path>\n" +
-        "git: /git /git-diff /git-commit <msg>\n" +
-        "automation: /self <goal> /next [feature] /templates /use <template> [task]"
+        "git-release: /git /git-diff /git-commit <msg> /release /version /bump patch|minor|major\n" +
+        "automation: /self <goal> /self-budget [n] /self-pause /self-resume /self-stop /next [feature] /templates /use <template> [task]"
 }
 fn tui_preview_text_at(width) {
     let rows = []
@@ -2103,13 +2160,13 @@ fn command_examples() {
         "/next Add the next small feature"
 }
 fn command_help() {
-    return "help: /palette groups commands; /examples shows usage; /status shows runtime state; /roadmap shows next work. autonomous: /self <goal>, /self-budget [n], /self-pause, /self-resume, /self-stop, /next [feature]. navigation: /up /down /bottom. exit: /quit"
+    return "help: type /u or /pgup to scroll chat; PowerShell arrow keys recall input history. /palette groups commands; /examples shows usage; /status shows runtime state; /roadmap shows next work. autonomous: /self <goal>, /self-budget [n], /self-pause, /self-resume, /self-stop, /next [feature]. navigation: arrow/PageUp/PageDown keys or /up /down /top /bottom. exit: /quit"
 }
 
 fn command_status(session, reload, input) {
     let provider = "missing"
     if provider_ready() { provider = "ready" }
-    return "version=" + agent_version() + "; provider=" + provider + "; model=" + default_model() + "; messages=" + str(session.messages.len()) + "; input=" + input_status(input) + "; scroll=" + str(arg(input, "scroll", 0)) + "; reload=" + str(reload.reloading) + "; timeout_ms=" + str(default_tool_timeout_ms()) + "; confirm_destructive=" + str(destructive_confirm_enabled()) + "; separators=" + separator_mode() + "; hints=" + str(hints_enabled()) + "; self_budget=" + str(read_self_prompt_budget()) + "; paused=" + str(self_prompt_paused()) + "; next=" + read_next_feature()
+    return "version=" + agent_version() + "; provider=" + provider + "; model=" + default_model() + "; messages=" + str(session.messages.len()) + "; input=" + input_status(input) + "; scroll=" + str(arg(input, "scroll", 0)) + "; reload=" + str(reload.reloading) + "; timeout_ms=" + str(default_tool_timeout_ms()) + "; confirm_destructive=" + str(destructive_confirm_enabled()) + "; separators=" + separator_mode() + "; hints=" + str(hints_enabled()) + "; color=" + str(color_enabled()) + "; self_budget=" + str(read_self_prompt_budget()) + "; paused=" + str(self_prompt_paused()) + "; next=" + read_next_feature()
 }
 // Multiline prompt mode: collect lines until /send or /cancel.
 fn multiline_start(log, input, line) {
@@ -2152,11 +2209,30 @@ fn normalize_command(line) {
     if line == "/g" { return "/git" }
     if line == "/d" { return "/git-diff" }
     if line == "/b" { return "/bottom" }
+    if line == "/home" { return "/top" }
+    if line == "/pgup" { return "/page-up" }
+    if line == "/pgdn" { return "/page-down" }
     if line == "/u" { return "/up" }
+    if line == "/pgup" { return "/up" }
+    if line == "/pageup" { return "/up" }
     if line == "/j" { return "/down" }
+    if line == "/pgdn" { return "/down" }
+    if line == "/pagedown" { return "/down" }
+    if line == "/end" { return "/bottom" }
     if line == "/t" { return "/timeline" }
     if line == "/l" { return "/last" }
     return line
+}
+fn event_command(event) {
+    let text = arg(event, "text", "")
+    if text != "" { return text }
+    let key = str(arg(event, "key", "")).lower()
+    let kind = str(arg(event, "kind", "")).lower()
+    if key == "up" || key == "pageup" || key == "pgup" || kind == "scroll_up" || kind == "wheel_up" { return "/up" }
+    if key == "down" || key == "pagedown" || key == "pgdn" || kind == "scroll_down" || kind == "wheel_down" { return "/down" }
+    if key == "home" { return "/top" }
+    if key == "end" { return "/bottom" }
+    return text
 }
 // Dispatch one TUI input line: commands, manual tools, or normal agent prompt.
 fn interactive_handle(log, session, reload, input, line) {
@@ -2176,9 +2252,22 @@ fn interactive_handle(log, session, reload, input, line) {
         input.scroll = arg(input, "scroll", 0) + 5
         return true
     }
+    if line == "/page-up" {
+        input.scroll = arg(input, "scroll", 0) + 20
+        return true
+    }
     if line == "/down" {
         input.scroll = arg(input, "scroll", 0) - 5
         if input.scroll < 0 { input.scroll = 0 }
+        return true
+    }
+    if line == "/page-down" {
+        input.scroll = arg(input, "scroll", 0) - 20
+        if input.scroll < 0 { input.scroll = 0 }
+        return true
+    }
+    if line == "/top" {
+        input.scroll = 999999
         return true
     }
     if line == "/bottom" {
@@ -2221,6 +2310,10 @@ fn interactive_handle(log, session, reload, input, line) {
     }
     if line == "/config" {
         log.push(item("system", "config", config_text()))
+        return true
+    }
+    if line == "/render" {
+        log.push(item("system", "render", render_config_text()))
         return true
     }
     if line == "/provider" {
@@ -2322,7 +2415,7 @@ fn interactive_main() {
             log.push(item("system", "input", event.err()))
             running = false
         } else {
-            running = interactive_handle(log, session, reload, input, event.unwrap().text)
+            running = interactive_handle(log, session, reload, input, event_command(event.unwrap()))
         }
     }
     if reload.reloading { present(log, "reloading") } else { present(log, "done") }
