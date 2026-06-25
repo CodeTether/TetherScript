@@ -2080,6 +2080,9 @@ fn tui_preview_text_at(width) {
     return render_view(view)
 }
 
+fn tui_preview_suite() {
+    return "preview width 40\n" + tui_preview_text_at(40) + "\npreview width 72\n" + tui_preview_text_at(72)
+}
 fn tui_preview_text() {
     return tui_preview_text_at(72)
 }
@@ -2193,6 +2196,10 @@ fn interactive_handle(log, session, reload, input, line) {
         let raw = line.replace("/preview ", "")
         let width = parse_int(raw).unwrap_or(72)
         log.push(item("system", "preview", tui_preview_text_at(width)))
+        return true
+    }
+    if line == "/preview-all" {
+        log.push(item("system", "preview", tui_preview_suite()))
         return true
     }
     if line == "/command-reference" {
