@@ -13,11 +13,11 @@ fn item(kind, name, text) {
     row.kind = kind
     row.name = name
     row.text = single_line(text)
-    if kind == "system" { row.fg = "cyan"; row.bold = true }
+    if kind == "system" { row.fg = "bright_cyan"; row.bold = true }
     if kind == "user" { row.fg = "bright_white" }
-    if kind == "agent" { row.fg = "green" }
-    if kind == "tool" { row.fg = "yellow" }
-    if kind == "rpc" { row.fg = "magenta" }
+    if kind == "agent" { row.fg = "bright_green" }
+    if kind == "tool" { row.fg = "bright_yellow" }
+    if kind == "rpc" { row.fg = "bright_magenta" }
     return row
 }
 
@@ -99,6 +99,10 @@ fn color_code(name) {
     if name == "yellow" { return "33" }
     if name == "magenta" { return "35" }
     if name == "bright_white" { return "97" }
+    if name == "bright_cyan" { return "96" }
+    if name == "bright_green" { return "92" }
+    if name == "bright_yellow" { return "93" }
+    if name == "bright_magenta" { return "95" }
     return ""
 }
 
@@ -458,55 +462,81 @@ fn reload_state() {
     return state
 }
 
-fn snapshot_path() {
-    return ".tetherscript/agent_tui_state.jsonl"
+fn session_path() {
+    return ".tetherscript/agent_tui_session.jsonl"
 }
 
-fn snapshot_row(kind, value) {
-    let row = map()
-    row.kind = kind
-    row.value = value
-    return json_encode(row) + "\n"
+fn session_row(value) {
+    return json_encode(value) + "\n"
 }
 
-fn load_snapshot() {
-    let raw = fs_read(snapshot_path())
+fn load_session() {
+    let raw = fs_read(session_path())
     if raw.is_err() { return nil }
-    fs_remove(snapshot_path())
-    let snapshot = map()
-    snapshot.log = []
-    snapshot.messages = []
+    fs_remove(session_path())
+    let session = map()
+    session.messages = []
     for line in raw.unwrap().split("\n") {
         let trimmed = line.trim()
-        if trimmed != "" {
-            let row = json_parse(trimmed)
-            if arg(row, "kind", "") == "log" { snapshot.log.push(row.value) }
-            if arg(row, "kind", "") == "message" { snapshot.messages.push(row.value) }
-        }
+        if trimmed != "" { session.messages.push(json_parse(trimmed)) }
     }
-    return snapshot
+    return session
 }
 
-fn initial_session(snapshot) {
-    if snapshot != nil && snapshot.contains("messages") && snapshot.messages.len() > 0 {
-        let session = map()
-        session.messages = snapshot.messages
-        return session
-    }
+fn initial_session(saved) {
+    if saved != nil && saved.contains("messages") && saved.messages.len() > 0 { return saved }
     return new_session()
 }
 
-fn initial_log(snapshot) {
-    if snapshot != nil && snapshot.contains("log") && snapshot.log.len() > 0 { return snapshot.log }
+fn initial_log(saved) {
+    if saved != nil && saved.contains("messages") && saved.messages.len() > 0 {
+        return [item("system", "ready", "restored session from jsonl; type a prompt; /quit exits")]
+    }
     return [item("system", "ready", "type a prompt; tools run automatically; /quit exits")]
 }
 
-fn save_snapshot(log, session) {
+fn save_session(session) {
     let mut body = ""
-    for row in log { body = body + snapshot_row("log", row) }
-    for message in session.messages { body = body + snapshot_row("message", message) }
+    for message in session.messages { body = body + session_row(message) }
     fs_mkdir(".tetherscript")
-    fs_write(snapshot_path(), body)
+    fs_write(session_path(), body)
+}
+
+fn check_output(report) {
+    let stderr = arg(report, "stderr", "").trim()
+    if stderr != "" { return stderr }
+    let stdout = arg(report, "stdout", "").trim()
+    if stdout != "" { return stdout }
+    if arg(report, "timed_out", false) { return "check timed out" }
+    return "check exited with code " + str(arg(report, "code", "unknown"))
+}
+
+fn self_check(path) {
+    let args = process_args()
+    if args.len() == 0 { return "process args did not include tetherscript binary" }
+    let run = process_run(args[0], ["check", path], nil, 30000)
+    if run.is_err() { return run.err() }
+    let report = run.unwrap()
+    if arg(report, "success", false) { return "" }
+    return check_output(report)
+}
+
+fn reject_reload(log, state, reason) {
+    let restore = fs_write(state.path, state.version)
+    let mut text = "candidate rejected: " + single_line(reason)
+    if restore.is_err() { text = text + "; restore failed: " + restore.err() }
+    if restore.is_ok() { text = text + "; restored previous source" }
+    log.push(item("system", "self-check", text))
+}
+
+fn reload_allowed(log, state) {
+    let reason = self_check(state.path)
+    if reason == "" {
+        log.push(item("system", "self-check", "passed"))
+        return true
+    }
+    reject_reload(log, state, reason)
+    return false
 }
 
 fn reload_needed(state) {
@@ -518,18 +548,20 @@ fn reload_needed(state) {
 fn reload_start(log, session, state) {
     log.push(item("system", "reload", "source changed; restarting"))
     state.reloading = true
-    save_snapshot(log, session)
+    save_session(session)
     fs_mkdir(".tetherscript")
     fs_write(".tetherscript/reload", state.path)
 }
 
 fn reload_now(log, session, state) {
+    if !reload_allowed(log, state) { return true }
     reload_start(log, session, state)
     present(log, "reloading")
     return false
 }
 
 fn reload_now_rpc(log, session, state) {
+    if !reload_allowed(log, state) { return true }
     reload_start(log, session, state)
     show(log, "reloading")
     return false
@@ -815,9 +847,9 @@ fn interactive_handle(log, session, reload, input, line) {
 }
 
 fn interactive_main() {
-    let snapshot = load_snapshot()
-    let log = initial_log(snapshot)
-    let session = initial_session(snapshot)
+    let saved = load_session()
+    let log = initial_log(saved)
+    let session = initial_session(saved)
     let reload = reload_state()
     let input = new_input()
     let mut running = true
@@ -837,9 +869,9 @@ fn interactive_main() {
 }
 
 fn rpc_main() {
-    let snapshot = load_snapshot()
-    let log = initial_log(snapshot)
-    let session = initial_session(snapshot)
+    let saved = load_session()
+    let log = initial_log(saved)
+    let session = initial_session(saved)
     let reload = reload_state()
     let mut running = true
     while running {
