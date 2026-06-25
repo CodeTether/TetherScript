@@ -1623,7 +1623,12 @@ fn input_status(input) {
     return "waiting for you"
 }
 
+fn hints_enabled() {
+    return env_text("TETHERSCRIPT_AGENT_HINTS") != "0"
+}
+
 fn status_with_hints(input) {
+    if !hints_enabled() { return input_status(input) }
     return input_status(input) + " | /h help /s status /r map /u up /j down /b end /q quit"
 }
 // Send a prompt from the TUI, save session state, and trigger hot reload if needed.
@@ -2104,7 +2109,7 @@ fn command_help() {
 fn command_status(session, reload, input) {
     let provider = "missing"
     if provider_ready() { provider = "ready" }
-    return "version=" + agent_version() + "; provider=" + provider + "; model=" + default_model() + "; messages=" + str(session.messages.len()) + "; input=" + input_status(input) + "; scroll=" + str(arg(input, "scroll", 0)) + "; reload=" + str(reload.reloading) + "; timeout_ms=" + str(default_tool_timeout_ms()) + "; confirm_destructive=" + str(destructive_confirm_enabled()) + "; separators=" + separator_mode() + "; self_budget=" + str(read_self_prompt_budget()) + "; paused=" + str(self_prompt_paused()) + "; next=" + read_next_feature()
+    return "version=" + agent_version() + "; provider=" + provider + "; model=" + default_model() + "; messages=" + str(session.messages.len()) + "; input=" + input_status(input) + "; scroll=" + str(arg(input, "scroll", 0)) + "; reload=" + str(reload.reloading) + "; timeout_ms=" + str(default_tool_timeout_ms()) + "; confirm_destructive=" + str(destructive_confirm_enabled()) + "; separators=" + separator_mode() + "; hints=" + str(hints_enabled()) + "; self_budget=" + str(read_self_prompt_budget()) + "; paused=" + str(self_prompt_paused()) + "; next=" + read_next_feature()
 }
 // Multiline prompt mode: collect lines until /send or /cancel.
 fn multiline_start(log, input, line) {
