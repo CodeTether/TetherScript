@@ -43,7 +43,11 @@
 // =============================================================================
 
 fn agent_version() {
-    return "0.5.1"
+    return "0.5.2"
+}
+
+fn renderer_version() {
+    return "2"
 }
 
 fn agent_name() {
@@ -81,13 +85,33 @@ fn bump_version(part) {
 }
 // Normalize text for one-line UI labels and borders.
 fn single_line(value) {
-    let mut text = str(value)
+    let mut text = sanitize_terminal_text(str(value))
     text = text.replace("\r\n", "\\n")
     text = text.replace("\n", "\\n")
     return text.replace("\r", "\\n")
 }
 
 // Preserve real newlines for log body rendering while normalizing CRLF/CR.
+fn sanitize_terminal_text(value) {
+    let mut text = str(value)
+    // Strip common UTF-8-as-Windows-1252 mojibake from old rendered previews/logs.
+    text = text.replace(b"\xC3\xA2".decode_utf8(), "")
+    text = text.replace(b"\xC2\xA2".decode_utf8(), "")
+    text = text.replace(b"\xC2\xB0".decode_utf8(), "")
+    text = text.replace(b"\xC2\xA0".decode_utf8(), " ")
+    text = text.replace(b"\xEF\xBF\xBD".decode_utf8(), "")
+    // Normalize old Unicode box-drawing output persisted in session logs.
+    text = text.replace(b"\xE2\x94\x80".decode_utf8(), "-")
+    text = text.replace(b"\xE2\x94\x82".decode_utf8(), "|")
+    text = text.replace(b"\xE2\x94\x9C".decode_utf8(), "+")
+    text = text.replace(b"\xE2\x94\xA4".decode_utf8(), "+")
+    text = text.replace(b"\xE2\x95\xAD".decode_utf8(), "+")
+    text = text.replace(b"\xE2\x95\xAE".decode_utf8(), "+")
+    text = text.replace(b"\xE2\x95\xB0".decode_utf8(), "+")
+    text = text.replace(b"\xE2\x95\xAF".decode_utf8(), "+")
+    return text
+}
+
 fn clean_text(value) {
     let mut text = str(value)
     text = text.replace("\r\n", "\n")
@@ -100,7 +124,7 @@ fn item(kind, name, text) {
     let row = map()
     row.kind = kind
     row.name = name
-    row.text = clean_text(text)
+    row.text = sanitize_terminal_text(clean_text(text))
     if kind == "system" { row.fg = "bright_cyan"; row.bold = true }
     if kind == "user" { row.fg = "bright_white" }
     if kind == "agent" { row.fg = "bright_green" }
@@ -239,23 +263,39 @@ fn styled(row, text) {
 // =============================================================================
 
 fn tui_ascii() {
+    if env_text("TETHERSCRIPT_AGENT_UNICODE") == "1" { return false }
     return true
 }
 
-fn box_char(kind) {
-    if kind == "h" { return "-" }
-    if kind == "v" { return "|" }
-    if kind == "tl" { return "+" }
-    if kind == "tr" { return "+" }
-    if kind == "ml" { return "+" }
-    if kind == "mr" { return "+" }
-    if kind == "bl" { return "+" }
-    if kind == "br" { return "+" }
-    return "?"
+fn utf8(bytes) {
+    return bytes.decode_utf8()
 }
-fn border_with(left, right, label, width) {
+
+fn box_char(kind) {
+    if tui_ascii() {
+        if kind == "h" { return "-" }
+        if kind == "v" { return "|" }
+        if kind == "tl" { return "+" }
+        if kind == "tr" { return "+" }
+        if kind == "ml" { return "+" }
+        if kind == "mr" { return "+" }
+        if kind == "bl" { return "+" }
+        if kind == "br" { return "+" }
+    }
+    if kind == "h" { return utf8(b"\xE2\x94\x80") }
+    if kind == "v" { return utf8(b"\xE2\x94\x82") }
+    if kind == "tl" { return utf8(b"\xE2\x95\xAD") }
+    if kind == "tr" { return utf8(b"\xE2\x95\xAE") }
+    if kind == "ml" { return utf8(b"\xE2\x94\x9C") }
+    if kind == "mr" { return utf8(b"\xE2\x94\xA4") }
+    if kind == "bl" { return utf8(b"\xE2\x95\xB0") }
+    if kind == "br" { return utf8(b"\xE2\x95\xAF") }
+    return "?"
+}fn border_with(left, right, label, width) {
     let inner = at_least(width, 4) - 2
-    let title = " " + single_line(label) + " "
+    let clean = single_line(label)
+    if clean == "" { return left + repeat_text(box_char("h"), inner) + right }
+    let title = " " + clean + " "
     if title.len() >= inner { return left + take_text(title, inner) + right }
     return left + title + repeat_text(box_char("h"), inner - title.len()) + right
 }
@@ -285,25 +325,37 @@ fn blank_line(width) {
 
 fn frame_line(text, width) {
     let inner = at_least(width, 2) - 2
-    return box_char("v") + fit_text(text, inner) + box_char("v")
+    return box_char("v") + fit_text(sanitize_terminal_text(text), inner) + box_char("v")
+}
+
+fn kind_label(kind) {
+    if kind == "system" { return "SYS" }
+    if kind == "user" { return "YOU" }
+    if kind == "agent" { return "AGT" }
+    if kind == "tool" { return "TLS" }
+    if kind == "rpc" { return "RPC" }
+    return "MSG"
+}
+
+fn item_header(row) {
+    let kind = arg(row, "kind", "item")
+    let name = arg(row, "name", "")
+    let label = kind_label(kind)
+    if name == "" { return label }
+    return label + " " + name
 }
 
 // Split a log row into display lines. Real newlines become clean TUI rows.
 fn item_parts(row) {
-    let mut prefix = "[" + arg(row, "kind", "item") + "]"
-    let name = arg(row, "name", "")
-    if name != "" { prefix = prefix + " " + name }
+    let header = item_header(row)
     let body = arg(row, "text", "")
     let lines = []
-    if body == "" {
-        lines.push(prefix)
-        return lines
-    }
+    lines.push("-- " + header + " ")
+    if body == "" { return lines }
     let parts = clean_text(body).split("\n")
-    let indent = repeat_text(" ", prefix.len() + 2)
     let mut i = 0
     while i < parts.len() {
-        if i == 0 { lines.push(prefix + ": " + parts[i]) } else { lines.push(indent + parts[i]) }
+        lines.push("   " + parts[i])
         i = i + 1
     }
     return lines
@@ -390,10 +442,22 @@ fn render_items(items, width, rows, scroll) {
     return out
 }
 fn status_label(view) {
-    let status = arg(view, "status", "")
+    let status = sanitize_terminal_text(arg(view, "status", ""))
     let scroll = arg(view, "scroll", 0)
     if scroll > 0 { return status + " | scroll +" + str(scroll) + " (/bottom)" }
     return status
+}
+
+fn panel(title, body, status, width) {
+    return top_border(title, width) + "\n" +
+        body +
+        mid_border(" status ", width) + "\n" +
+        frame_line(status, width) + "\n" +
+        bottom_border("", width) + "\n"
+}
+
+fn transcript_body(view, width, rows) {
+    return render_items(arg(view, "items", []), width, rows, arg(view, "scroll", 0))
 }
 
 // Render a complete framed TUI view: title, scrollable body, status panel, and bottom edge.
@@ -401,11 +465,7 @@ fn render_view(view) {
     let width = at_least(arg(view, "width", 80), 20)
     let height = at_least(arg(view, "height", 10), 5)
     let body_rows = height - 4
-    return top_border(arg(view, "title", "tetherscript"), width) + "\n" +
-        render_items(arg(view, "items", []), width, body_rows, arg(view, "scroll", 0)) +
-        mid_border(" status ", width) + "\n" +
-        frame_line(status_label(view), width) + "\n" +
-        bottom_border("", width) + "\n"
+    return panel(arg(view, "title", "tetherscript"), transcript_body(view, width, body_rows), status_label(view), width)
 }
 
 fn show(log, status) {
@@ -614,6 +674,64 @@ fn change_preview(path, before, after) {
     }
     return out
 }
+fn audit_log_path() {
+    return ".tetherscript/agent_tui_audit.jsonl"
+}
+
+fn audit_append(action, path, existed, summary) {
+    let row = map()
+    row.action = action
+    row.path = path
+    row.existed = existed
+    row.summary = single_line(summary)
+    row.version = agent_version()
+    fs_mkdir(".tetherscript")
+    fs_write(audit_log_path(), fs_read(audit_log_path()).unwrap_or("") + json_encode(row) + "\n")
+    return "audit logged: " + action + " " + path
+}
+
+fn audit_recent() {
+    let raw = fs_read(audit_log_path())
+    if raw.is_err() { return "no audit events" }
+    let lines = []
+    for line in raw.unwrap().split("\n") {
+        let trimmed = line.trim()
+        if trimmed != "" { lines.push(trimmed) }
+    }
+    if lines.len() == 0 { return "no audit events" }
+    let mut start = 0
+    if lines.len() > 20 { start = lines.len() - 20 }
+    let recent = []
+    let mut i = start
+    while i < lines.len() {
+        recent.push(lines[i])
+        i = i + 1
+    }
+    return recent.join("\n")
+}
+
+fn audit_last() {
+    let raw = fs_read(audit_log_path())
+    if raw.is_err() { return nil }
+    let last = nil
+    for line in raw.unwrap().split("\n") {
+        let trimmed = line.trim()
+        if trimmed != "" { last = json_parse(trimmed) }
+    }
+    return last
+}
+
+fn undo_last_audit() {
+    let last = audit_last()
+    if last == nil { return "undo failed: no audit events" }
+    let path = arg(last, "path", "")
+    let existed = arg(last, "existed", true)
+    if path == "" { return "undo failed: audit event has no path" }
+    if !existed {
+        return "undo create " + path + "\nremoved=" + json_encode(fs_remove(path).unwrap_or(false))
+    }
+    return restore_checkpoint(path)
+}
 fn checkpoints_dir() {
     return ".tetherscript/checkpoints"
 }
@@ -692,7 +810,9 @@ fn run_tool(name, args) {
         let after = arg(args, "body", "")
         let r = fs_write(path, after)
         if r.is_err() { return "write failed: " + r.err() }
-        return "wrote " + path + "\n" + checkpoint + "\n" + change_preview(path, before, after)
+        let preview = change_preview(path, before, after)
+        let audit = audit_append("write", path, existed, preview)
+        return "wrote " + path + "\n" + checkpoint + "\n" + preview + "\n" + audit
     }
     if name == "append" {
         let path = arg(args, "path", "")
@@ -719,15 +839,20 @@ fn run_tool(name, args) {
         let checkpoint = save_checkpoint(path, body)
         let r = fs_write(path, after)
         if r.is_err() { return "replace failed: " + r.err() }
-        return "replaced text in " + path + "\n" + checkpoint + "\n" + change_preview(path, body, after)
+        let preview = change_preview(path, body, after)
+        let audit = audit_append("replace", path, true, preview)
+        return "replaced text in " + path + "\n" + checkpoint + "\n" + preview + "\n" + audit
     }
     if name == "remove" {
         let path = arg(args, "path", "")
         if destructive_confirm_enabled() && !confirmed(args) { return confirm_required("remove", path) }
+        let existed = fs_exists(path).unwrap_or(false)
         let before = fs_read(path).unwrap_or("")
         let mut checkpoint = ""
         if before != "" { checkpoint = save_checkpoint(path, before) }
-        return checkpoint + "\nremoved=" + json_encode(fs_remove(path).unwrap_or(false))
+        let removed = json_encode(fs_remove(path).unwrap_or(false))
+        let audit = audit_append("remove", path, existed, "removed=" + removed)
+        return checkpoint + "\nremoved=" + removed + "\n" + audit
     }
     if name == "copy" {
         let r = fs_copy(arg(args, "from", ""), arg(args, "to", ""))
@@ -1058,7 +1183,13 @@ fn load_session_at(path) {
     session.messages = []
     for line in raw.unwrap().split("\n") {
         let trimmed = line.trim()
-        if trimmed != "" { session.messages.push(json_parse(trimmed)) }
+        if trimmed != "" {
+            let message = json_parse(trimmed)
+            if type_of(message) == "map" && message.contains("content") {
+                message.content = sanitize_terminal_text(clean_text(message.content))
+            }
+            session.messages.push(message)
+        }
     }
     return session
 }
@@ -1824,6 +1955,14 @@ fn session_command(log, session, line) {
         let rest = raw.replace(name, "").trim()
         return send_prompt(log, session, reload_state(), template_prompt(name, rest))
     }
+    if line == "/audit" {
+        log.push(item("system", "audit", audit_recent()))
+        return true
+    }
+    if line == "/undo-last" {
+        log.push(item("system", "undo", undo_last_audit()))
+        return true
+    }
     if line == "/checkpoints" {
         log.push(item("system", "checkpoints", checkpoint_names()))
         return true
@@ -2018,7 +2157,7 @@ fn render_config_text() {
         "; toggles: TETHERSCRIPT_AGENT_ASCII=1, TETHERSCRIPT_AGENT_HINTS=0, TETHERSCRIPT_AGENT_SEPARATOR_MODE=compact|full|off"
 }
 fn config_text() {
-    return "config: version=" + agent_version() +
+    return "config: version=" + agent_version() + "; renderer=" + renderer_version() +
         "; model=" + default_model() +
         "; router=" + env_text("TETHERSCRIPT_AGENT_ROUTER") +
         "; mode=" + env_text("TETHERSCRIPT_AGENT_MODE") +
@@ -2133,7 +2272,7 @@ fn tui_preview_text_at(width) {
     rows.push(item("agent", "provider", "This is a longer preview line that should wrap cleanly inside the frame and preserve readable indentation across wrapped rows."))
     rows.push(item("tool", "sample", "stdout line 1\nstdout line 2\nstdout line 3"))
     let view = map()
-    view.title = agent_label() + " preview"
+    view.title = agent_label() + " renderer v" + renderer_version() + " preview"
     view.width = at_least(width, 32)
     view.height = 12
     view.status = "preview | /bottom exits scroll"
@@ -2166,7 +2305,7 @@ fn command_help() {
 fn command_status(session, reload, input) {
     let provider = "missing"
     if provider_ready() { provider = "ready" }
-    return "version=" + agent_version() + "; provider=" + provider + "; model=" + default_model() + "; messages=" + str(session.messages.len()) + "; input=" + input_status(input) + "; scroll=" + str(arg(input, "scroll", 0)) + "; reload=" + str(reload.reloading) + "; timeout_ms=" + str(default_tool_timeout_ms()) + "; confirm_destructive=" + str(destructive_confirm_enabled()) + "; separators=" + separator_mode() + "; hints=" + str(hints_enabled()) + "; color=" + str(color_enabled()) + "; self_budget=" + str(read_self_prompt_budget()) + "; paused=" + str(self_prompt_paused()) + "; next=" + read_next_feature()
+    return "version=" + agent_version() + "; renderer=" + renderer_version() + "; ascii=" + str(tui_ascii()) + "; provider=" + provider + "; model=" + default_model() + "; messages=" + str(session.messages.len()) + "; input=" + input_status(input) + "; scroll=" + str(arg(input, "scroll", 0)) + "; reload=" + str(reload.reloading) + "; timeout_ms=" + str(default_tool_timeout_ms()) + "; confirm_destructive=" + str(destructive_confirm_enabled()) + "; separators=" + separator_mode() + "; hints=" + str(hints_enabled()) + "; color=" + str(color_enabled()) + "; self_budget=" + str(read_self_prompt_budget()) + "; paused=" + str(self_prompt_paused()) + "; next=" + read_next_feature()
 }
 // Multiline prompt mode: collect lines until /send or /cancel.
 fn multiline_start(log, input, line) {
