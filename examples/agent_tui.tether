@@ -628,6 +628,23 @@ fn arg(args, key, fallback) {
     return fallback
 }
 
+fn content_text_part(part) {
+    if type_of(part) == "str" { return part }
+    if type_of(part) != "map" { return "" }
+    if part.contains("text") { return str(part.text) }
+    if part.contains("output_text") { return str(part.output_text) }
+    return ""
+}
+
+fn message_content_text(msg) {
+    let content = arg(msg, "content", "")
+    if type_of(content) == "str" { return content }
+    if type_of(content) != "list" { return "" }
+    let out = []
+    for part in content { out.push(content_text_part(part)) }
+    return out.join("")
+}
+
 // =============================================================================
 //  TOOL EXECUTION BACKEND
 // =============================================================================
@@ -1658,7 +1675,7 @@ fn agent_step(log, messages, state) {
         for call in msg.tool_calls { append_tool(log, messages, call) }
         return true
     }
-    state.answer = arg(msg, "content", "")
+    state.answer = message_content_text(msg)
     if router_enabled() {
         let routed = router_call(log, messages, state, state.answer)
         if routed != nil {

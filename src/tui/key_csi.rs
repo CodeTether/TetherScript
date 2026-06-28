@@ -31,7 +31,10 @@ fn named(byte: u8) -> Option<KeyEvent> {
 fn numbered(code: &[u8]) -> Option<KeyEvent> {
     Some(KeyEvent::named(match code {
         b"1" | b"7" => "home",
+        b"2" => "insert",
         b"3" => "delete",
+        b"5" => "pageup",
+        b"6" => "pagedown",
         b"4" | b"8" => "end",
         _ => return None,
     }))

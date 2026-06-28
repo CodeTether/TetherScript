@@ -31,7 +31,10 @@ mod browser_js;
 mod bytecode;
 mod bytecode_visual;
 mod capability;
+mod cli_args;
 mod compiler;
+mod embed;
+mod embed_perm;
 mod fs_cap;
 mod git_tui;
 mod http;
@@ -40,8 +43,14 @@ mod js;
 mod json;
 mod lexer;
 mod lsp;
+mod main_build;
+mod main_build_parse;
 mod main_caps;
+mod main_embedded;
+mod main_help;
+mod main_help_examples;
 mod main_inspect_help;
+mod main_run_help;
 mod main_usage;
 mod output;
 mod ownership;
@@ -82,6 +91,15 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 fn main() {
     let args: Vec<String> = env::args().collect();
 
+    if let Some(src) = embed::read_current() {
+        let script_args: Vec<String> = args.iter().skip(1).cloned().collect();
+        if let Err(e) = main_embedded::run(&src, &script_args) {
+            eprintln!("tetherscript: {}", e);
+            process::exit(1);
+        }
+        return;
+    }
+
     // No arguments at all
     if args.len() < 2 {
         print_usage();
@@ -93,7 +111,7 @@ fn main() {
     // Global flags (before subcommand)
     match first.as_str() {
         "--help" | "-h" => {
-            print_help();
+            main_help::print();
             return;
         }
         "--version" | "-V" | "-v" => {
@@ -106,6 +124,7 @@ fn main() {
     // Subcommands
     match first.as_str() {
         "run" => cmd_run(&args[2..]),
+        "build" => cmd_build(&args[2..]),
         "check" => cmd_check(&args[2..]),
         "render" => cmd_render(&args[2..]),
         "raster" => cmd_raster(&args[2..]),
@@ -132,6 +151,17 @@ fn main() {
 // Subcommands
 // ---------------------------------------------------------------------------
 
+fn cmd_build(args: &[String]) {
+    match main_build::run(args) {
+        Ok(()) => {}
+        Err(e) if e == "__help__" => main_build::print_help(),
+        Err(e) => {
+            eprintln!("tetherscript build: {}", e);
+            process::exit(2);
+        }
+    }
+}
+
 fn cmd_run(args: &[String]) {
     let mut vm_mode = true;
     let mut step_budget: Option<u64> = None;
@@ -144,13 +174,14 @@ fn cmd_run(args: &[String]) {
     let mut browser_grant: Option<String> = None;
     let mut browser_origins: Vec<String> = Vec::new();
     let mut browser_scopes: Vec<String> = Vec::new();
+    let mut script_args: Vec<String> = Vec::new();
     let mut path: Option<String> = None;
 
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
             "--help" | "-h" => {
-                print_run_help();
+                main_run_help::print();
                 return;
             }
             "--vm" => {
@@ -278,12 +309,18 @@ fn cmd_run(args: &[String]) {
                 i += 1;
             }
             other => {
-                if other.starts_with('-') {
-                    eprintln!("tetherscript run: unknown option '{}'", other);
-                    process::exit(2);
+                if other == "--" {
+                    i += 1;
+                    script_args.extend(args[i..].iter().cloned());
+                    break;
                 }
                 if path.is_some() {
-                    eprintln!("tetherscript run: unexpected argument '{}'", other);
+                    script_args.push(other.to_string());
+                    i += 1;
+                    continue;
+                }
+                if other.starts_with('-') {
+                    eprintln!("tetherscript run: unknown option '{}'", other);
                     process::exit(2);
                 }
                 path = Some(other.to_string());
@@ -314,6 +351,7 @@ fn cmd_run(args: &[String]) {
         &browser_grant,
         &browser_origins,
         &browser_scopes,
+        &script_args,
     );
 }
 
@@ -790,7 +828,7 @@ fn cmd_run_legacy(args: &[String]) {
                 i += 1;
             }
             "--help" | "-h" => {
-                print_help();
+                main_help::print();
                 return;
             }
             "--version" | "-V" => {
@@ -835,6 +873,7 @@ fn cmd_run_legacy(args: &[String]) {
         &browser_grant,
         &browser_origins,
         &browser_scopes,
+        &[],
     );
 }
 
@@ -876,6 +915,7 @@ fn execute_file(
     browser_grant: &Option<String>,
     browser_origins: &[String],
     browser_scopes: &[String],
+    script_args: &[String],
 ) {
     let src = read_source(path);
     let full_access = main_caps::script_full_access(&src, full_access);
@@ -910,6 +950,7 @@ fn execute_file(
         let chunk = Compiler::compile_program(&program);
         let mut vm = VM::new();
         vm.set_instruction_budget(step_budget);
+        vm.install_cli_args(script_args);
         let caps = RunCaps {
             fs_grant,
             full_access,
@@ -932,6 +973,7 @@ fn execute_file(
         }
     } else {
         let mut interp = Interpreter::new();
+        interp.install_cli_args(script_args);
         let caps = RunCaps {
             fs_grant,
             full_access,
@@ -968,91 +1010,4 @@ fn parse_access_mode(value: &str, label: &str) -> bool {
             process::exit(2);
         }
     }
-}
-
-// ---------------------------------------------------------------------------
-// Help text
-// ---------------------------------------------------------------------------
-
-fn print_help() {
-    println!(
-        "TetherScript {} -- a scripting language with Rust-style ownership",
-        VERSION
-    );
-    println!();
-    println!("USAGE:");
-    println!("    tetherscript <command> [options]");
-    println!("    tetherscript <file.tether> [options]    (legacy, same as 'run')");
-    println!();
-    println!("COMMANDS:");
-    println!("    run <file>        Run a TetherScript program");
-    println!("    inspect <file>    Inspect frontend output (tokens, AST, bytecode)");
-    println!("    render <html>     Render HTML/CSS to a display list");
-    println!("    raster <html>     Render HTML/CSS to a native PPM image");
-    println!("    js <file.js>      Run JavaScript with the built-in engine");
-    println!("    git               Show first-class git workspace status");
-    println!("    repl              Start an interactive read-eval-print loop");
-    println!("    lsp               Start the LSP server over stdio");
-    println!();
-    println!("GLOBAL OPTIONS:");
-    println!("    -h, --help        Print this help message");
-    println!("    -V, --version     Print version");
-    println!();
-    println!("CAPABILITIES:");
-    println!("    TetherScript uses capability-based security. Scripts cannot access");
-    println!("    the filesystem, network, or LLM APIs unless explicitly granted.");
-    println!();
-    println!("EXAMPLES:");
-    println!("    tetherscript run hello.tether");
-    println!("    tetherscript run --interp fib.tether");
-    println!("    tetherscript run --access-mode full examples/agent_tui.tether");
-    println!("    tetherscript run --grant-fs . policy.tether");
-    println!("    tetherscript run --grant-provider http://localhost:11434 chat.tether");
-    println!("    tetherscript run --grant-provider-vault openai chat.tether");
-    println!("    tetherscript run --grant-provider https://api.cerebras.ai glm_chat.tether");
-    println!("    tetherscript run --grant-rpc http://127.0.0.1:36627 agent.tether");
-    println!("    tetherscript inspect --tokens hello.tether");
-    println!("    tetherscript inspect --ast hello.tether");
-    println!("    tetherscript inspect --bytecode hello.tether");
-    println!("    tetherscript render examples/browser.html examples/browser.css");
-    println!("    tetherscript raster examples/browser.html out.ppm examples/browser.css");
-    println!("    tetherscript js app.js");
-    println!("    tetherscript git");
-    println!("    tetherscript repl");
-    println!("    tetherscript lsp");
-    println!();
-    println!("MORE INFO:");
-    println!("    https://github.com/CodeTether/TetherScript");
-}
-
-fn print_run_help() {
-    println!("tetherscript run -- Run a TetherScript program");
-    println!();
-    println!("USAGE:");
-    println!("    tetherscript run [options] <file.tether>");
-    println!();
-    println!("OPTIONS:");
-    println!(
-        "    --vm                    Use bytecode VM (default)
-    --interp, --tree-walk    Use tree-walking interpreter for debugging"
-    );
-    println!("    --step-budget <n>       Set max execution steps (default: unlimited)");
-    println!("    --access-mode <mode>    restricted (default) or full");
-    println!("    --grant-fs <dir>        Grant filesystem capability scoped to <dir>");
-    println!(
-        "    --grant-provider <url>  Grant LLM provider capability (http:// or https://host:port)"
-    );
-    println!("    --grant-provider-key <k> API key for the provider (sent as Bearer token)");
-    println!("    --grant-provider-vault <id> Load provider grant from Vault KV v2");
-    println!("    --grant-rpc <url>       Grant JSON-RPC capability (http://host:port)");
-    println!("    -h, --help              Print this help message");
-    println!();
-    println!("EXAMPLES:");
-    println!("    tetherscript run hello.tether");
-    println!("    tetherscript run --access-mode full examples/agent_tui.tether");
-    println!("    tetherscript run --step-budget 100000 fib.tether");
-    println!("    tetherscript run --grant-fs . policy.tether");
-    println!("    tetherscript run --grant-provider http://localhost:11434 chat.tether");
-    println!("    tetherscript run --grant-provider-vault openai chat.tether");
-    println!("    tetherscript run --grant-rpc http://127.0.0.1:36627 agent.tether");
 }

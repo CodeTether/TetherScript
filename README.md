@@ -10,6 +10,37 @@ tetherscript is meant for project policy, validators, workflow glue, plugin hook
 and other fast-changing behavior that should not require rebuilding a Rust
 application.
 
+## CLI scripts and standalone launchers
+
+Run a script with command-line arguments:
+
+```bash
+tetherscript run examples/cli_args.tether -- --name Riley
+```
+
+Inside the script, `env_args()` returns the process arguments passed after the
+script path or after `--`:
+
+```tether
+fn main() {
+    let args = env_args()
+    println("argc", args.len())
+    for arg in args { println("arg", arg) }
+}
+```
+
+Build a standalone launcher executable that embeds the `.tether` source and runs
+it with the bytecode VM:
+
+```bash
+tetherscript build examples/cli_args.tether -o mycli
+./mycli --name Riley
+```
+
+The built launcher forwards its own process arguments to `env_args()`. It is a
+self-contained runner for the script; internally it compiles the embedded source
+to tetherscript bytecode on startup before VM execution.
+
 ## Status
 
 tetherscript `0.1.0-alpha.17` is the current release candidate for crates.io.
@@ -19,6 +50,8 @@ tetherscript currently includes:
 - A tree-walking interpreter used as the reference runtime.
 - A stack-based bytecode VM targeting the same observable semantics, with local
   slots for function parameters and locals plus constant-pool deduplication.
+- Script CLI arguments via `env_args()` for `tetherscript run <file> -- [args...]`.
+- Standalone executable launchers via `tetherscript build <file.tether> -o <output>`.
 - Dynamic values: integers, floats, booleans, strings, lists, maps, functions,
   native functions, `nil`, and `Result`.
 - Variables, lexical scopes, functions, closures, recursion, `if`/`else`,

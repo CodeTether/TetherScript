@@ -12,6 +12,7 @@ pub mod browser_loop;
 pub mod browser_session;
 pub mod bytecode;
 pub mod capability;
+pub(crate) mod cli_args;
 pub mod compiler;
 pub mod computer_cap;
 pub mod fs_cap;
