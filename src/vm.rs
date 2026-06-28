@@ -93,6 +93,11 @@ impl VM {
             .define(name, Value::Capability(cap), false);
     }
 
+    /// Install script command-line arguments as `env_args()`.
+    pub fn install_cli_args(&mut self, args: &[String]) {
+        crate::cli_args::install(&self.globals, args);
+    }
+
     pub fn run(&mut self, top_level: Chunk) -> Result<(), String> {
         let proto = Rc::new(FnProto {
             name: Some("<script>".into()),

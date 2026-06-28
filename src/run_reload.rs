@@ -16,6 +16,7 @@ pub(crate) fn execute(
     browser_grant: &Option<String>,
     browser_origins: &[String],
     browser_scopes: &[String],
+    script_args: &[String],
 ) {
     let hot = crate::main_caps::script_hot_reload(&source(path));
     let mut previous = source(path);
@@ -36,6 +37,7 @@ pub(crate) fn execute(
             browser_grant,
             browser_origins,
             browser_scopes,
+            script_args,
         );
         if !hot || !marker::take(path) {
             break;

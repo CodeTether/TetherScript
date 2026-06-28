@@ -15,4 +15,6 @@ fn parses_common_escape_keys() {
     assert_eq!(key_parse::parse(b"\x1b[A").unwrap().key, "up");
     assert_eq!(key_parse::parse(b"\x1b[B").unwrap().key, "down");
     assert_eq!(key_parse::parse(b"\x1b[3~").unwrap().key, "delete");
+    assert_eq!(key_parse::parse(b"\x1b[5~").unwrap().key, "pageup");
+    assert_eq!(key_parse::parse(b"\x1b[6~").unwrap().key, "pagedown");
 }

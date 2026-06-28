@@ -74,6 +74,11 @@ impl Interpreter {
             .define(name, Value::Capability(cap), false);
     }
 
+    /// Install script command-line arguments as `env_args()`.
+    pub fn install_cli_args(&mut self, args: &[String]) {
+        crate::cli_args::install(&self.globals, args);
+    }
+
     /// Run a program as a REPL snippet: hoist fn decls, evaluate each
     /// top-level statement in order, and return the last evaluated value
     /// (or `Nil` if the snippet ended in a statement with no value).
