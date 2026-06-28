@@ -20,6 +20,8 @@ include = [
     "/README.md",
     "/docs/**",
     "/examples/**",
+    "!/examples/.codetether/**",
+    "!/examples/.tetherscript/**",
     "/src/**",
     "/tests/**",
 ]
