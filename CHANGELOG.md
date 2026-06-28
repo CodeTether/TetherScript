@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added script CLI arguments via `env_args()` and `tetherscript run <file> -- [args...]`.
+- Added `tetherscript build <file.tether> -o <output>` standalone launchers that embed scripts and run them with the bytecode VM.
+
 - Event dispatch ordering: capture, target, and bubble phases now fire listeners
   in the correct order with `stopPropagation` blocking later phases and
   `preventDefault` suppressing default actions while allowing continued propagation.
