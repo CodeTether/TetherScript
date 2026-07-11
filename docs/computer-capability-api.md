@@ -85,6 +85,43 @@ Scopes are action-style and match the agent-facing contract:
 `computer.narrow({ scopes: [...] })` can only remove scopes; it cannot add new
 authority.
 
+## Named logical cursors
+
+Named cursors provide stable, independent window-relative coordinate state for nested desktops such as RDP and applications such as Blender. Moving a logical cursor does **not** move the OS pointer. The bridge is contacted only for click, drag, or window-snapshot actions.
+
+```tether
+let rdp = map()
+rdp.name = "rdp"
+rdp.hwnd = 42599730
+rdp.x = 725
+rdp.y = 432
+rdp.client_area = true
+computer.cursor_set(rdp)
+
+let move = map()
+move.name = "rdp"
+move.dx = 0
+move.dy = 31
+computer.cursor_move(move) // local state only
+
+let click = map()
+click.name = "rdp"
+computer.cursor_click(click) // dispatches the real click
+```
+
+Available methods:
+
+| Method | Purpose | Bridge action / scope |
+|---|---|---|
+| `cursor_set({name, hwnd, x, y, client_area?})` | Create/reset local cursor state | none |
+| `cursor_move({name, dx, dy})` | Move local state relatively | none |
+| `cursor_state({name})` | Read local state | none |
+| `cursor_click({name, button?})` | Click at stored coordinates | `click`/`right_click`; `computer.click` |
+| `cursor_drag({name, dx, dy, button?, duration_ms?, steps?})` | Drag relatively and store endpoint | `drag`; `computer.click` |
+| `cursor_snapshot({name})` | Snapshot the target window | `window_snapshot`; `computer.window_snapshot` |
+
+Cursor registries are shared by narrowed child authorities, but dispatched actions still enforce the child's current scopes. The outgoing payload remains the existing computer bridge contract. See `examples/computer_named_cursors.tether` for an RDP/Blender example.
+
 ## Readiness
 
 A host that serves the bridge should expose:
