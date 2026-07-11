@@ -1,7 +1,7 @@
 //! Public computer-use authority implementation.
 
 use std::cell::RefCell;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::time::Duration;
 
@@ -9,6 +9,14 @@ use crate::capability::Authority;
 use crate::value::Value;
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct LogicalCursor {
+    pub(crate) hwnd: i64,
+    pub(crate) x: f64,
+    pub(crate) y: f64,
+    pub(crate) client_area: bool,
+}
 
 /// Desktop automation authority exposed as a capability value.
 #[derive(Clone, Debug)]
@@ -18,6 +26,7 @@ pub struct ComputerAuthority {
     pub(crate) origin: Option<String>,
     pub(crate) timeout: Duration,
     pub(crate) trace: Rc<RefCell<Vec<Value>>>,
+    pub(crate) cursors: Rc<RefCell<HashMap<String, LogicalCursor>>>,
 }
 
 impl ComputerAuthority {
@@ -39,6 +48,7 @@ impl ComputerAuthority {
             origin,
             timeout: DEFAULT_TIMEOUT,
             trace: Rc::new(RefCell::new(Vec::new())),
+            cursors: Rc::new(RefCell::new(HashMap::new())),
         })
     }
 

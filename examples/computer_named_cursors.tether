@@ -1,0 +1,45 @@
+// Named logical cursors for nested RDP + Blender automation.
+//
+// The logical cursor moves without touching the OS pointer. A real pointer
+// action occurs only when cursor_click/cursor_drag is called.
+
+fn cursor(name, hwnd, x, y) {
+    let p = map()
+    p.name = name
+    p.hwnd = hwnd
+    p.x = x
+    p.y = y
+    p.client_area = true
+    return computer.cursor_set(p)
+}
+
+fn move_cursor(name, dx, dy) {
+    let p = map()
+    p.name = name
+    p.dx = dx
+    p.dy = dy
+    return computer.cursor_move(p)
+}
+
+fn click_cursor(name) {
+    let p = map()
+    p.name = name
+    return computer.cursor_click(p)
+}
+
+fn snapshot_cursor_window(name) {
+    let p = map()
+    p.name = name
+    return computer.cursor_snapshot(p)
+}
+
+fn prepare_rdp_and_blender(rdp_hwnd, blender_hwnd) {
+    let rdp = cursor("rdp", rdp_hwnd, 725, 432)
+    let blender = cursor("blender", blender_hwnd, 640, 450)
+    println("rdp cursor:", rdp)
+    println("blender cursor:", blender)
+
+    // This only changes the logical RDP position.
+    move_cursor("rdp", 0, 31)
+    return snapshot_cursor_window("rdp")
+}

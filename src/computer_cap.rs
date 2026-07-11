@@ -12,6 +12,8 @@ mod authority;
 mod authority_trait;
 #[path = "computer_cap/call.rs"]
 mod call;
+#[path = "computer_cap/cursor.rs"]
+mod cursor;
 #[path = "computer_cap/describe.rs"]
 mod describe;
 #[path = "computer_cap/invoke.rs"]
