@@ -3,6 +3,7 @@
 mod authority;
 mod base_url;
 mod body;
+mod capability;
 mod config;
 mod config_url;
 mod default;
@@ -30,6 +31,10 @@ pub(crate) fn load(provider_id: &str) -> Result<Rc<dyn Authority>, String> {
 
 pub(crate) fn load_default() -> Result<Option<Rc<dyn Authority>>, String> {
     default::load()
+}
+
+pub(crate) fn vault_authority() -> Rc<dyn Authority> {
+    capability::authority()
 }
 
 #[cfg(test)]

@@ -5,6 +5,9 @@ use std::rc::Rc;
 
 use crate::value::Value;
 
+#[path = "provider_option_keys.rs"]
+mod option_keys;
+
 pub(crate) fn apply(
     body: &mut HashMap<String, Value>,
     opts: &HashMap<String, Value>,
@@ -13,20 +16,7 @@ pub(crate) fn apply(
     let model = copy_model(body, opts);
     copy_capped_int(body, opts, "max_tokens", max_tokens);
     copy_capped_int(body, opts, "max_completion_tokens", max_tokens);
-    copy_keys(
-        body,
-        opts,
-        &[
-            "temperature",
-            "stream",
-            "top_p",
-            "reasoning_effort",
-            "clear_thinking",
-            "tools",
-            "tool_choice",
-            "parallel_tool_calls",
-        ],
-    );
+    copy_keys(body, opts, option_keys::PASSTHROUGH);
     model
 }
 
@@ -39,6 +29,10 @@ fn copy_model(body: &mut HashMap<String, Value>, opts: &HashMap<String, Value>) 
         _ => String::new(),
     }
 }
+
+#[cfg(test)]
+#[path = "provider_options_tests.rs"]
+mod tests;
 
 fn copy_capped_int(
     body: &mut HashMap<String, Value>,

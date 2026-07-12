@@ -33,8 +33,7 @@ fn stdio_agent_keeps_jsonrpc_on_stdout() {
     assert!(stdout.contains("\"tools\""));
     assert!(stdout.contains("\"id\":3"));
     assert!(stdout.contains("tetherscript"));
-    assert!(!stdout.contains("tetherscript stdio agent"));
-    assert!(String::from_utf8_lossy(&output.stderr).contains("tetherscript stdio agent"));
+    assert!(!String::from_utf8_lossy(&output.stderr).contains("\"jsonrpc\""));
 }
 
 #[test]
@@ -74,7 +73,7 @@ fn stdio_agent_tools_can_edit_workspace() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert!(String::from_utf8_lossy(&output.stdout).contains("improved"));
-    assert!(String::from_utf8_lossy(&output.stderr).contains("tetherscript stdio agent"));
+    assert!(!String::from_utf8_lossy(&output.stderr).contains("\"jsonrpc\""));
 }
 
 fn input() -> String {

@@ -33,7 +33,11 @@ count_effective_lines() {
 }
 
 count_base_lines() {
-  git show "$base:$1" 2>/dev/null | awk '
+  if ! git cat-file -e "$base:$1" 2>/dev/null; then
+    echo 0
+    return
+  fi
+  git show "$base:$1" | awk '
     {
       line=$0
       sub(/^[[:space:]]+/, "", line)
@@ -44,7 +48,7 @@ count_base_lines() {
       count++
     }
     END { print count + 0 }
-  ' || echo 0
+  '
 }
 
 files="$(

@@ -559,6 +559,8 @@ fn tool_defs(kind) {
     defs.push(tool_for(kind, "copy", "Copy a file.", p, ["from", "to"]))
     p = map(); p.from = prop("Source path."); p.to = prop("Destination path.")
     defs.push(tool_for(kind, "rename", "Rename or move a file or directory.", p, ["from", "to"]))
+    p = map(); p.message = prop("Message to write to self_improvement_indicator.txt and display in Notepad on Windows.")
+    defs.push(tool_for(kind, "system_indicator", "Write a workspace self-improvement indicator and display it in Notepad on Windows.", p, ["message"]))
     p = map(); p.command = prop("Shell command to run."); p.timeout_ms = prop("Optional timeout in milliseconds.")
     defs.push(tool_for(kind, "run", "Run a shell command using the platform default shell.", p, ["command"]))
     p = map(); p.command = prop("PowerShell command to run."); p.timeout_ms = prop("Optional timeout in milliseconds.")
@@ -593,12 +595,28 @@ fn env_text(name) {
 //  PROVIDER AND MODEL SELECTION
 // =============================================================================
 
-// Resolve the model name from environment variables and provider endpoint conventions.
-fn default_model() {
+fn model_choice_path() {
+    return ".tetherscript/agent_tui_model.txt"
+}
+
+fn saved_model() {
+    let raw = fs_read(model_choice_path()).unwrap_or("").trim()
+    return raw
+}
+
+fn configured_model() {
     let mut model = env_text("TETHERSCRIPT_AGENT_MODEL")
     if model == "" { model = env_text("CODETETHER_DEFAULT_MODEL") }
+    if model == "" { model = saved_model() }
     if model == "" { model = "zai/glm-5" }
-    let info = provider.describe().unwrap()
+    return model
+}
+
+// Resolve the model name from stored choice, environment variables, and provider endpoint conventions.
+fn default_model() {
+    let mut model = configured_model()
+    if !provider_ready() { return model }
+    let info = selected_provider().describe().unwrap()
     if info.endpoint.contains("openrouter.ai") { return openrouter_model(model) }
     if model.starts_with("openai/") { return model.replace("openai/", "") }
     if model.starts_with("openai-codex/") { return model.replace("openai-codex/", "") }
@@ -615,8 +633,104 @@ fn openrouter_model(model) {
     return model
 }
 
+fn provider_registry() {
+    let registry = map()
+    registry["zai"] = ["glm-5", "glm-5.1"]
+    registry["openai"] = ["gpt-4.1", "o3"]
+    registry["openai-codex"] = ["gpt-5.6-sol-fast:high", "gpt-5-codex"]
+    registry["cerebras"] = ["qwen-3-coder-480b"]
+    registry["bedrock"] = [
+        "anthropic.claude-3-5-sonnet-20241022-v2:0",
+        "us-east-1/anthropic.claude-3-5-sonnet-20241022-v2:0"
+    ]
+    return registry
+}
+
+fn model_provider_id(model) {
+    let parts = model.split("/")
+    if parts.len() < 2 { return "" }
+    let id = parts[0]
+    if provider_registry().contains(id) { return id }
+    return ""
+}
+
+fn selected_model_options() {
+    let spec = configured_model()
+    let model = default_model()
+    let opts = map()
+    opts.model = model.replace(":high", "").replace(":xhigh", "")
+    if spec.ends_with(":high") { opts.reasoning_effort = "high" }
+    if spec.ends_with(":xhigh") { opts.reasoning_effort = "xhigh" }
+    if spec.contains("-fast:") || spec.ends_with("-fast") {
+        opts.service_tier = "priority"
+        opts.model = opts.model.replace("-fast", "")
+    }
+    return opts
+}
+
+fn apply_model_options(opts) {
+    let selected = selected_model_options()
+    opts.model = selected.model
+    if selected.contains("reasoning_effort") {
+        opts.reasoning_effort = selected.reasoning_effort
+    }
+    if selected.contains("service_tier") { opts.service_tier = selected.service_tier }
+    return opts
+}
+
+fn selected_provider() {
+    let id = model_provider_id(configured_model())
+    if id != "" && global_defined("vault") {
+        let selected = vault.provider(id)
+        if selected.is_ok() { return selected.unwrap() }
+    }
+    if global_defined("provider") { return provider }
+    return nil
+}
+
+fn model_presets() {
+    return [
+        "zai/glm-5",
+        "openai/gpt-4.1",
+        "openai-codex/gpt-5.6-sol-fast:high",
+        "openai-codex/gpt-5-codex",
+        "cerebras/qwen-3-coder-480b",
+        "bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0",
+        "bedrock/us-east-1/anthropic.claude-3-5-sonnet-20241022-v2:0"
+    ]
+}
+
+fn model_list_text() {
+    let out = ["models: current=" + configured_model() + "; effective=" + default_model()]
+    let presets = model_presets()
+    let mut i = 0
+    while i < presets.len() {
+        out.push(str(i + 1) + ". " + presets[i])
+        i = i + 1
+    }
+    out.push("usage: /model <number|model-id>; /models lists presets")
+    return out.join("\n")
+}
+
+fn resolve_model_choice(raw) {
+    let choice = raw.trim()
+    if choice == "" { return configured_model() }
+    let n = parse_int(choice).unwrap_or(0)
+    let presets = model_presets()
+    if n > 0 && n <= presets.len() { return presets[n - 1] }
+    return choice
+}
+
+fn set_model_choice(raw) {
+    let model = resolve_model_choice(raw)
+    fs_mkdir(".tetherscript")
+    let r = fs_write(model_choice_path(), model)
+    if r.is_err() { return "model selection failed: " + r.err() }
+    return "model selected: " + model + "; effective=" + default_model()
+}
+
 fn provider_ready() {
-    return global_defined("provider")
+    return selected_provider() != nil
 }
 
 fn provider_missing() {
@@ -880,6 +994,20 @@ fn run_tool(name, args) {
         let r = fs_rename(arg(args, "from", ""), arg(args, "to", ""))
         if r.is_err() { return "rename failed: " + r.err() }
         return "renamed"
+    }
+    if name == "system_indicator" {
+        let path = "self_improvement_indicator.txt"
+        let message = arg(args, "message", "")
+        let written = fs_write(path, message)
+        if written.is_err() { return "system_indicator failed: " + written.err() }
+        if process_platform() == "windows" {
+            let command = "Start-Process notepad.exe -ArgumentList (Resolve-Path -LiteralPath 'self_improvement_indicator.txt').Path"
+            let launched = powershell(command, tool_timeout_ms(args))
+            if launched.is_err() { return "system_indicator launch failed: " + launched.err() }
+            let report = launched.unwrap()
+            if !arg(report, "success", false) { return "system_indicator launch failed: " + check_output(report) }
+        }
+        return "system indicator wrote " + path
     }
     if name == "run" { return json_encode(shell(arg(args, "command", ""), tool_timeout_ms(args)).unwrap_or(map())) }
     if name == "powershell" { return json_encode(powershell(arg(args, "command", ""), tool_timeout_ms(args)).unwrap_or(map())) }
@@ -1226,9 +1354,9 @@ fn onboarding_text() {
 }
 
 fn startup_checklist_text() {
-    let provider = "missing"
-    if provider_ready() { provider = "ready" }
-    return "startup: provider=" + provider + "; session=" + session_path() + "; next=" + read_next_feature() + "; use /config, /provider, /health for details"
+    let mut provider_status = "missing"
+    if provider_ready() { provider_status = "ready" }
+    return "startup: provider=" + provider_status + "; session=" + session_path() + "; next=" + read_next_feature() + "; use /config, /provider, /health for details"
 }
 
 fn initial_log(saved) {
@@ -1478,9 +1606,11 @@ fn timeline_text(session) {
 
 // Before hot-reloading changed source, ask the TetherScript binary to check it.
 fn self_check(path) {
+    let mut binary = env_text("TETHERSCRIPT_BIN")
     let args = process_args()
-    if args.len() == 0 { return "process args did not include tetherscript binary" }
-    let run = process_run(args[0], ["check", path], nil, 30000)
+    if binary == "" && args.len() > 0 { binary = args[0] }
+    if binary == "" { return "no tetherscript compiler; set TETHERSCRIPT_BIN" }
+    let run = process_run(binary, ["check", path], nil, 30000)
     if run.is_err() { return run.err() }
     let report = run.unwrap()
     if arg(report, "success", false) { return "" }
@@ -1560,6 +1690,7 @@ fn valid_tool(name) {
     if name == "remove" { return true }
     if name == "copy" { return true }
     if name == "rename" { return true }
+    if name == "system_indicator" { return true }
     if name == "run" { return true }
     if name == "powershell" { return true }
     if name == "bash" { return true }
@@ -1616,12 +1747,12 @@ fn router_messages(messages, prompt, draft) {
 
 fn router_call(log, messages, state, draft) {
     let opts = map()
-    opts.model = default_model()
+    apply_model_options(opts)
     opts.tools = router_tools()
     opts.tool_choice = "required"
     opts.parallel_tool_calls = false
     opts.temperature = 0
-    let result = provider.chat_json(router_messages(messages, state.prompt, draft), opts)
+    let result = selected_provider().chat_json(router_messages(messages, state.prompt, draft), opts)
     if result.is_err() { return nil }
     let msg = result.unwrap().choices[0].message
     if !msg.contains("tool_calls") || msg.tool_calls.len() == 0 { return nil }
@@ -1660,22 +1791,227 @@ fn append_tool_call(messages, call) {
     messages.push(msg)
 }
 
-// One provider round-trip. Handles tool calls until a final assistant answer appears.
-fn agent_step(log, messages, state) {
-    let opts = map()
-    opts.model = default_model()
-    opts.tools = tool_defs("model")
-    opts.tool_choice = "auto"
-    opts.parallel_tool_calls = true
-    let result = provider.chat_json(messages, opts)
-    if result.is_err() { state.answer = result.err(); return false }
-    let msg = result.unwrap().choices[0].message
+fn bedrock_ok(value) {
+    let out = map(); out.ok = true; out.value = value; return out
+}
+
+fn bedrock_err(error) {
+    let out = map(); out.ok = false; out.error = error; return out
+}
+
+fn bedrock_vault_secret() {
+    let addr = env_text("VAULT_ADDR").trim()
+    let token = env_text("VAULT_TOKEN")
+    let headers = map(); headers["X-Vault-Token"] = token
+    let url = addr + "/v1/secret/data/codetether/providers/bedrock"
+    let res = http_request("GET", url, nil, headers)
+    if res.is_err() { return bedrock_err(res.err()) }
+    let resp = res.unwrap()
+    if !resp.ok { return bedrock_err("bedrock vault HTTP " + str(resp.status) + ": " + resp.body) }
+    return bedrock_ok(json_parse(resp.body).data.data)
+}
+
+fn shell_out(command, args, stdin) {
+    let r = process_run(command, args, stdin, 30000)
+    if r.is_err() { return bedrock_err(r.err()) }
+    let out = r.unwrap()
+    if !out.success { return bedrock_err(out.stderr) }
+    return bedrock_ok(out.stdout.trim())
+}
+
+fn openssl_hex(args, stdin) {
+    let r = shell_out("openssl", args, stdin)
+    if !r.ok { return r }
+    let parts = r.value.split(" ")
+    return bedrock_ok(parts[parts.len() - 1].trim())
+}
+
+fn sha256_hex(text) {
+    return openssl_hex(["dgst", "-sha256", "-hex"], text)
+}
+
+fn hmac_hex(keyopt, data) {
+    return openssl_hex(["dgst", "-sha256", "-mac", "HMAC", "-macopt", keyopt], data)
+}
+
+fn aws_time() {
+    let cmd = "$d=(Get-Date).ToUniversalTime(); $d.ToString('yyyyMMddTHHmmssZ'); $d.ToString('yyyyMMdd')"
+    let r = shell_out("powershell", ["-NoProfile", "-Command", cmd], "")
+    if !r.ok { return r }
+    let lines = r.value.split("\n")
+    let out = map(); out.amz = lines[0].trim(); out.day = lines[1].trim()
+    return bedrock_ok(out)
+}
+
+fn bedrock_field(secret, primary, secondary) {
+    if secret.contains(primary) { return secret[primary] }
+    if secret.contains(secondary) { return secret[secondary] }
+    if primary == "aws_access_key_id" && secret.contains("api_key") { return secret.api_key }
+    if primary == "aws_access_key_id" && secret.contains("AWS_ACCESS_KEY_ID") { return secret["AWS_ACCESS_KEY_ID"] }
+    if primary == "aws_secret_access_key" && secret.contains("secret_key") { return secret.secret_key }
+    if primary == "aws_secret_access_key" && secret.contains("AWS_SECRET_ACCESS_KEY") { return secret["AWS_SECRET_ACCESS_KEY"] }
+    return ""
+}
+
+fn bedrock_token(secret) {
+    if secret.contains("aws_session_token") { return secret.aws_session_token }
+    if secret.contains("session_token") { return secret.session_token }
+    if secret.contains("AWS_SESSION_TOKEN") { return secret["AWS_SESSION_TOKEN"] }
+    return ""
+}
+
+fn bedrock_sign(secret, region, host, path, body) {
+    let t = aws_time(); if !t.ok { return t }
+    let stamp = t.value
+    let payload = sha256_hex(body); if !payload.ok { return payload }
+    let mut signed_names = "content-type;host;x-amz-date"
+    let mut token_header = ""
+    let token = bedrock_token(secret)
+    if token != "" { signed_names = "content-type;host;x-amz-date;x-amz-security-token"; token_header = "x-amz-security-token:" + token + "\n" }
+    let canonical = "POST\n" + path + "\n\ncontent-type:application/json\nhost:" + host + "\nx-amz-date:" + stamp.amz + "\n" + token_header + "\n" + signed_names + "\n" + payload.value
+    let ch = sha256_hex(canonical); if !ch.ok { return ch }
+    let scope = stamp.day + "/" + region + "/bedrock/aws4_request"
+    let sts = "AWS4-HMAC-SHA256\n" + stamp.amz + "\n" + scope + "\n" + ch.value
+    let secret_key = bedrock_field(secret, "aws_secret_access_key", "secret_access_key")
+    let access_key = bedrock_field(secret, "aws_access_key_id", "access_key_id")
+    let kd = hmac_hex("key:AWS4" + secret_key, stamp.day); if !kd.ok { return kd }
+    let kr = hmac_hex("hexkey:" + kd.value, region); if !kr.ok { return kr }
+    let ks = hmac_hex("hexkey:" + kr.value, "bedrock"); if !ks.ok { return ks }
+    let key = hmac_hex("hexkey:" + ks.value, "aws4_request"); if !key.ok { return key }
+    let sig = hmac_hex("hexkey:" + key.value, sts); if !sig.ok { return sig }
+    let out = map(); out.amz = stamp.amz; out.signed = signed_names; out.auth = "AWS4-HMAC-SHA256 Credential=" + access_key + "/" + scope + ", SignedHeaders=" + signed_names + ", Signature=" + sig.value
+    return bedrock_ok(out)
+}
+
+fn bedrock_body(messages) {
+    let out = []
+    for m in messages {
+        let b = map(); b.role = "user"
+        if m.role == "assistant" { b.role = "assistant" }
+        b.content = [map()]; b.content[0].text = str(m.content)
+        out.push(b)
+    }
+    let body = map(); body.messages = out; body.inferenceConfig = map(); body.inferenceConfig.maxTokens = 256
+    return json_encode(body)
+}
+
+fn bedrock_bearer(secret) {
+    if secret.contains("bearer_token") && type_of(secret.bearer_token) == "str" { return secret.bearer_token }
+    if secret.contains("access_token") && type_of(secret.access_token) == "str" { return secret.access_token }
+    if secret.contains("bedrock_api_key") && type_of(secret.bedrock_api_key) == "str" { return secret.bedrock_api_key }
+    return ""
+}
+
+fn bedrock_proxy_chat_json(secret, messages, model) {
+    let mut url = secret.base_url
+    if !url.contains("chat/completions") { url = url + "/chat/completions" }
+    if !url.starts_with("http://") && !url.starts_with("https://") { url = "https://" + url }
+    let body = map(); body.model = model; body.messages = messages
+    let headers = map(); headers["Content-Type"] = "application/json"; headers["Authorization"] = "Bearer " + secret.api_key
+    let res = http_request("POST", url, json_encode(body), headers)
+    if res.is_err() { return bedrock_err(res.err()) }
+    let resp = res.unwrap(); if !resp.ok { return bedrock_err("bedrock proxy HTTP " + str(resp.status) + ": " + resp.body) }
+    return bedrock_ok(json_parse(resp.body))
+}
+
+fn url_escape(value) {
+    let cmd = "[uri]::EscapeDataString($Input)"
+    let r = shell_out("powershell", ["-NoProfile", "-Command", cmd], value)
+    if !r.ok { return value }
+    return r.value
+}
+
+fn bedrock_refresh_sso(secret, region) {
+    let url = "https://oidc." + region + ".amazonaws.com/token"
+    let body = "grantType=refresh_token&clientId=" + url_escape(secret.sso_client_id) + "&clientSecret=" + url_escape(secret.sso_client_secret) + "&refreshToken=" + url_escape(secret.sso_refresh_token)
+    let headers = map(); headers["Content-Type"] = "application/x-www-form-urlencoded"
+    let res = http_request("POST", url, body, headers)
+    if res.is_err() { return bedrock_err(res.err()) }
+    let resp = res.unwrap(); if !resp.ok { return bedrock_err("bedrock sso refresh HTTP " + str(resp.status) + ": " + resp.body) }
+    return bedrock_ok(json_parse(resp.body).accessToken)
+}
+
+fn bedrock_sso_fetch(secret, region, token) {
+    let url = "https://portal.sso." + region + ".amazonaws.com/federation/credentials?role_name=" + secret.sso_role_name + "&account_id=" + secret.sso_account_id
+    let headers = map(); headers["x-amz-sso_bearer_token"] = token
+    let res = http_request("GET", url, nil, headers)
+    if res.is_err() { return bedrock_err(res.err()) }
+    return bedrock_ok(res.unwrap())
+}
+
+fn bedrock_sso_credentials(secret) {
+    if !secret.contains("sso_access_token") { return bedrock_ok(secret) }
+    let mut sso_region = "us-east-1"; if secret.contains("sso_region") { sso_region = secret.sso_region }
+    let fetched = bedrock_sso_fetch(secret, sso_region, secret.sso_access_token)
+    if !fetched.ok { return fetched }
+    let mut resp = fetched.value
+    if !resp.ok && resp.status == 401 && secret.contains("sso_refresh_token") {
+        let fresh = bedrock_refresh_sso(secret, sso_region); if !fresh.ok { return fresh }
+        let retry = bedrock_sso_fetch(secret, sso_region, fresh.value); if !retry.ok { return retry }
+        resp = retry.value
+    }
+    if !resp.ok { return bedrock_err("bedrock sso HTTP " + str(resp.status) + ": " + resp.body) }
+    let creds = json_parse(resp.body).roleCredentials
+    secret.aws_access_key_id = creds.accessKeyId
+    secret.aws_secret_access_key = creds.secretAccessKey
+    secret.aws_session_token = creds.sessionToken
+    return bedrock_ok(secret)
+}
+
+fn bedrock_chat_json(messages, opts) {
+    let secret = bedrock_vault_secret(); if !secret.ok { return secret }
+    let ready = bedrock_sso_credentials(secret.value); if !ready.ok { return ready }
+    let s = ready.value; let mut region = "us-east-1"; if s.contains("region") { region = s.region }
+    let model = opts.model.replace("bedrock/", "")
+    if s.contains("base_url") && type_of(s.base_url) == "str" && s.contains("api_key") && type_of(s.api_key) == "str" { return bedrock_proxy_chat_json(s, messages, model) }
+    let host = "bedrock-runtime." + region + ".amazonaws.com"
+    let path = "/model/" + model + "/converse"
+    let url = "https://" + host + path
+    let body = bedrock_body(messages)
+    let headers = map(); headers["Content-Type"] = "application/json"
+    let bearer = bedrock_bearer(s)
+    if bearer != "" { headers["Authorization"] = "Bearer " + bearer } else {
+        let sig = bedrock_sign(s, region, host, path, body); if !sig.ok { return sig }
+        headers["X-Amz-Date"] = sig.value.amz; headers["Authorization"] = sig.value.auth
+        let session_token = bedrock_token(s)
+        if session_token != "" { headers["X-Amz-Security-Token"] = session_token }
+    }
+    let res = http_request("POST", url, body, headers)
+    if res.is_err() { return bedrock_err(res.err()) }
+    let resp = res.unwrap(); if !resp.ok { return bedrock_err("bedrock HTTP " + str(resp.status) + ": " + resp.body) }
+    let raw = json_parse(resp.body).unwrap(); let msg = map(); msg.role = "assistant"; msg.content = raw.output.message.content[0].text
+    let choice = map(); choice.message = msg; let final = map(); final.choices = [choice]
+    return bedrock_ok(final)
+}
+
+fn handle_provider_message(log, messages, state, msg) {
     if msg.contains("tool_calls") {
         messages.push(msg)
         for call in msg.tool_calls { append_tool(log, messages, call) }
         return true
     }
     state.answer = message_content_text(msg)
+    messages.push(msg)
+    if state.answer == "" { state.answer = "provider returned no content and no tool call" }
+    return false
+}
+
+// One provider round-trip. Handles tool calls until a final assistant answer appears.
+fn agent_step(log, messages, state) {
+    let opts = map()
+    apply_model_options(opts)
+    opts.tools = tool_defs("model")
+    opts.tool_choice = "auto"
+    opts.parallel_tool_calls = true
+    if configured_model().starts_with("bedrock/") {
+        let direct = bedrock_chat_json(messages, opts)
+        if !direct.ok { state.answer = direct.error; return false }
+        return handle_provider_message(log, messages, state, direct.value.choices[0].message)
+    }
+    let result = selected_provider().chat_json(messages, opts)
+    if result.is_err() { state.answer = result.err(); return false }
+    let msg = result.unwrap().choices[0].message
+    if handle_provider_message(log, messages, state, msg) { return true }
     if router_enabled() {
         let routed = router_call(log, messages, state, state.answer)
         if routed != nil {
@@ -1684,10 +2020,6 @@ fn agent_step(log, messages, state) {
             append_tool(log, messages, call)
             return true
         }
-    }
-    messages.push(msg)
-    if state.answer == "" {
-        state.answer = "provider returned no content and no tool call"
     }
     return false
 }
@@ -1702,7 +2034,7 @@ fn agent_turn(log, session, prompt) {
     let state = map()
     state.answer = ""
     state.prompt = prompt
-    if !provider_ready() { return provider_missing() }
+    if !configured_model().starts_with("bedrock/") && !provider_ready() { return provider_missing() }
     while true {
         if !agent_step(log, messages, state) { return state.answer }
     }
@@ -2188,7 +2520,7 @@ fn config_text() {
 }
 fn provider_diag_text() {
     if !provider_ready() { return provider_missing() }
-    let desc = provider.describe()
+    let desc = selected_provider().describe()
     if desc.is_err() { return "provider describe failed: " + desc.err() }
     let info = desc.unwrap()
     return "provider: ready" +
@@ -2197,13 +2529,13 @@ fn provider_diag_text() {
         "; router=" + env_text("TETHERSCRIPT_AGENT_ROUTER")
 }
 fn checklist_text(reload) {
-    let provider = "missing"
-    if provider_ready() { provider = "ready" }
+    let mut provider_status = "missing"
+    if provider_ready() { provider_status = "ready" }
     let check = self_check(arg(reload, "path", script_path()))
     let check_status = "ok"
     if check != "" { check_status = "failed" }
     return "startup checklist:" +
-        " provider=" + provider +
+        " provider=" + provider_status +
         "; model=" + default_model() +
         "; check=" + check_status +
         "; session=" + str(fs_exists(session_path()).unwrap_or(false)) +
@@ -2274,7 +2606,7 @@ fn export_command_reference() {
 }
 fn command_palette() {
     return "palette:\n" +
-        "core: /help /examples /palette /status /config /provider /checklist /health /roadmap /policy\n" +
+        "core: /help /examples /palette /status /config /provider /models /model <n|id> /checklist /health /roadmap /policy\n" +
         "rendering: /preview [width] /preview-all /up /page-up /down /page-down /top /bottom\n" +
         "navigation: /timeline /search <text> /last /last-agent /last-tool /bookmark [label] /bookmarks /events\n" +
         "sessions: /save <name> /load <name> /sessions /compact /export [name] /release-notes [name] /changelog [entry]\n" +
@@ -2310,19 +2642,21 @@ fn command_examples() {
         "/tool browser_text html=<h1>Hello</h1> selector=h1\n" +
         "/use fix describe the bug here\n" +
         "/search provider\n" +
+        "/models\n" +
+        "/model 5\n" +
         "/bookmark important\n" +
         "/export demo-transcript\n" +
         "/git-diff\n" +
         "/next Add the next small feature"
 }
 fn command_help() {
-    return "help: type /u or /pgup to scroll chat; PowerShell arrow keys recall input history. /palette groups commands; /examples shows usage; /status shows runtime state; /roadmap shows next work. autonomous: /self <goal>, /self-budget [n], /self-pause, /self-resume, /self-stop, /next [feature]. navigation: arrow/PageUp/PageDown keys or /up /down /top /bottom. exit: /quit"
+    return "help: type /u or /pgup to scroll chat; PowerShell arrow keys recall input history. /palette groups commands; /examples shows usage; /status shows runtime state; /models lists model presets; /model <n|id> selects one. autonomous: /self <goal>, /self-budget [n], /self-pause, /self-resume, /self-stop, /next [feature]. navigation: arrow/PageUp/PageDown keys or /up /down /top /bottom. exit: /quit"
 }
 
 fn command_status(session, reload, input) {
-    let provider = "missing"
-    if provider_ready() { provider = "ready" }
-    return "version=" + agent_version() + "; renderer=" + renderer_version() + "; ascii=" + str(tui_ascii()) + "; provider=" + provider + "; model=" + default_model() + "; messages=" + str(session.messages.len()) + "; input=" + input_status(input) + "; scroll=" + str(arg(input, "scroll", 0)) + "; reload=" + str(reload.reloading) + "; timeout_ms=" + str(default_tool_timeout_ms()) + "; confirm_destructive=" + str(destructive_confirm_enabled()) + "; separators=" + separator_mode() + "; hints=" + str(hints_enabled()) + "; color=" + str(color_enabled()) + "; self_budget=" + str(read_self_prompt_budget()) + "; paused=" + str(self_prompt_paused()) + "; next=" + read_next_feature()
+    let mut provider_status = "missing"
+    if provider_ready() { provider_status = "ready" }
+    return "version=" + agent_version() + "; renderer=" + renderer_version() + "; ascii=" + str(tui_ascii()) + "; provider=" + provider_status + "; model=" + default_model() + "; messages=" + str(session.messages.len()) + "; input=" + input_status(input) + "; scroll=" + str(arg(input, "scroll", 0)) + "; reload=" + str(reload.reloading) + "; timeout_ms=" + str(default_tool_timeout_ms()) + "; confirm_destructive=" + str(destructive_confirm_enabled()) + "; separators=" + separator_mode() + "; hints=" + str(hints_enabled()) + "; color=" + str(color_enabled()) + "; self_budget=" + str(read_self_prompt_budget()) + "; paused=" + str(self_prompt_paused()) + "; next=" + read_next_feature()
 }
 // Multiline prompt mode: collect lines until /send or /cancel.
 fn multiline_start(log, input, line) {
@@ -2474,6 +2808,14 @@ fn interactive_handle(log, session, reload, input, line) {
     }
     if line == "/provider" {
         log.push(item("system", "provider", provider_diag_text()))
+        return true
+    }
+    if line == "/models" {
+        log.push(item("system", "models", model_list_text()))
+        return true
+    }
+    if line.starts_with("/model ") {
+        log.push(item("system", "model", set_model_choice(line.replace("/model ", ""))))
         return true
     }
     if line == "/checklist" {
