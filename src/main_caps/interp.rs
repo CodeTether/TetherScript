@@ -15,6 +15,9 @@ pub(crate) fn grant(interp: &mut Interpreter, caps: &RunCaps<'_>) -> Result<(), 
     )? {
         interp.grant("provider", auth);
     }
+    if caps.full_access {
+        interp.grant("vault", crate::provider_vault::vault_authority());
+    }
     if let Some(endpoint) = caps.rpc_grant {
         interp.grant("rpc", rpc_cap::RpcAuthority::new(endpoint));
     }

@@ -15,6 +15,9 @@ pub(crate) fn grant(vm: &mut VM, caps: &RunCaps<'_>) -> Result<(), String> {
     )? {
         vm.grant("provider", auth);
     }
+    if caps.full_access {
+        vm.grant("vault", crate::provider_vault::vault_authority());
+    }
     if let Some(endpoint) = caps.rpc_grant {
         vm.grant("rpc", rpc_cap::RpcAuthority::new(endpoint));
     }

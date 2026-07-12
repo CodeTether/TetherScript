@@ -28,9 +28,9 @@ fn agent_tui_runs_interactive_stdio_tui_by_default() {
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("tetherscript agent tui"));
-    assert!(stdout.contains("[tool] cwd:"));
-    assert!(stdout.contains("+ done"));
+    assert!(stdout.contains("tetherscript-agent-tui v0.5.2"));
+    assert!(stdout.contains("TLS cwd"));
+    assert!(stdout.contains("waiting for you"));
 }
 
 #[test]
@@ -50,7 +50,7 @@ fn agent_tui_exits_on_stdin_eof_instead_of_redrawing_forever() {
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("tui_read_event: end of input"));
-    assert!(stdout.contains("+ done"));
+    assert!(stdout.contains("waiting for you"));
 }
 
 #[test]
@@ -76,8 +76,9 @@ fn agent_tui_prompt_without_provider_stays_in_tui() {
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("[agent] provider: provider capability missing"));
-    assert!(stdout.contains("+ done"));
+    assert!(stdout.contains("AGT provider"));
+    assert!(stdout.contains("provider capability missing"));
+    assert!(stdout.contains("waiting for you"));
 }
 
 #[test]
@@ -103,8 +104,8 @@ fn agent_tui_empty_multiline_send_returns_to_waiting() {
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("[system] input: empty multiline ignored"));
-    assert!(stdout.contains("+ done"));
+    assert!(stdout.contains("empty multiline ignored"));
+    assert!(stdout.contains("waiting for you"));
 }
 
 #[test]
@@ -138,7 +139,9 @@ fn agent_tui_plain_answer_uses_one_provider_request() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert_eq!(requests.len(), 1);
-    assert!(String::from_utf8_lossy(&output.stdout).contains("[agent] provider: done"));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("AGT provider"));
+    assert!(stdout.contains("done"));
 }
 
 #[test]
@@ -172,10 +175,11 @@ fn agent_tui_sends_tools_and_executes_model_tool_call() {
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("tetherscript agent tui"));
-    assert!(stdout.contains("+ working"));
-    assert!(stdout.contains("[tool] cwd:"));
-    assert!(stdout.contains("[agent] provider: done"));
+    assert!(stdout.contains("tetherscript-agent-tui v0.5.2"));
+    assert!(stdout.contains("waiting for you"));
+    assert!(stdout.contains("TLS cwd"));
+    assert!(stdout.contains("AGT provider"));
+    assert!(stdout.contains("done"));
     assert!(requests[0].contains("\"tools\""));
     assert!(requests[0].contains("\"name\":\"cwd\""));
     assert!(requests[1].contains("\"tool_call_id\":\"call-1\""));
@@ -219,8 +223,8 @@ fn agent_tui_restarts_after_http_tool_edits_script() {
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("[system] reload: source changed; restarting"));
-    assert!(stdout.contains("+ done"));
+    assert!(stdout.contains("source changed; restarting"));
+    assert!(stdout.contains("waiting for you"));
     assert_eq!(requests.len(), 2);
     assert!(!root.join(".tetherscript").join("reload").exists());
     let _ = std::fs::remove_dir_all(root);
@@ -265,9 +269,9 @@ fn agent_tui_rejects_invalid_self_edit_and_restores_source() {
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("[system] self-check: candidate rejected"));
-    assert!(!stdout.contains("[system] reload: source changed; restarting"));
-    assert!(stdout.contains("+ done"));
+    assert!(stdout.contains("candidate rejected"));
+    assert!(!stdout.contains("source changed; restarting"));
+    assert!(stdout.contains("waiting for you"));
     assert_eq!(requests.len(), 2);
     assert_eq!(std::fs::read_to_string(&script).unwrap(), original);
     assert!(!root.join(".tetherscript").join("reload").exists());
