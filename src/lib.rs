@@ -19,6 +19,7 @@ pub mod fs_cap;
 pub mod git_tui;
 pub mod http;
 pub mod interp;
+pub mod ir;
 pub mod js;
 pub mod json;
 pub mod lexer;

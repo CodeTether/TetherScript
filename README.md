@@ -50,6 +50,9 @@ tetherscript currently includes:
 - A tree-walking interpreter used as the reference runtime.
 - A stack-based bytecode VM targeting the same observable semantics, with local
   slots for function parameters and locals plus constant-pool deduplication.
+- An experimental, tetherscript-owned SSA-like IR for straight-line functions,
+  with structural verification and `tetherscript inspect --ir <file>` output.
+  Native machine-code generation is not part of this initial slice.
 - Script CLI arguments via `env_args()` for `tetherscript run <file> -- [args...]`.
 - Standalone executable launchers via `tetherscript build <file.tether> -o <output>`.
 - Dynamic values: integers, floats, booleans, strings, lists, maps, functions,

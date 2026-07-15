@@ -5,7 +5,7 @@ pub(crate) fn print_usage() {
     eprintln!();
     eprintln!("Commands:");
     eprintln!("  run <file>           Run a TetherScript program");
-    eprintln!("  inspect <file>       Inspect source (tokens, AST, bytecode)");
+    eprintln!("  inspect <file>       Inspect source (tokens, AST, IR, bytecode)");
     eprintln!("  render <html>        Render HTML/CSS display list");
     eprintln!("  raster <html> <ppm>  Render HTML/CSS to a PPM image");
     eprintln!("  js <file.js>         Run JavaScript with the built-in engine");
