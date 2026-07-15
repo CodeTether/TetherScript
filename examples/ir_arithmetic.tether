@@ -1,0 +1,10 @@
+// Straight-line arithmetic supported by the first Tether IR lowering slice.
+
+fn calculate(left, right) {
+    let doubled = left * 2
+    doubled + right
+}
+
+fn main() {
+    println(calculate(20, 2))
+}

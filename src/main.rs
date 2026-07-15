@@ -12,6 +12,7 @@
 //! tetherscript raster <html-file> <output.ppm> [css-file] [width] [height] [scale] render to pixels
 //! tetherscript inspect --tokens <file>        dump tokens
 //! tetherscript inspect --ast <file>           dump AST
+//! tetherscript inspect --ir <file>            dump Tether IR
 //! tetherscript inspect --bytecode <file>      dump compiled bytecode
 //! tetherscript inspect --bytecode-visual <file> render annotated bytecode
 //! tetherscript lsp                            serve LSP over stdio
@@ -39,6 +40,7 @@ mod fs_cap;
 mod git_tui;
 mod http;
 mod interp;
+mod ir;
 mod js;
 mod json;
 mod lexer;
@@ -49,6 +51,7 @@ mod main_caps;
 mod main_embedded;
 mod main_help;
 mod main_help_examples;
+mod main_inspect;
 mod main_inspect_help;
 mod main_run_help;
 mod main_usage;
@@ -129,7 +132,7 @@ fn main() {
         "render" => cmd_render(&args[2..]),
         "raster" => cmd_raster(&args[2..]),
         "js" => cmd_js(&args[2..]),
-        "inspect" => cmd_inspect(&args[2..]),
+        "inspect" => main_inspect::run(&args[2..]),
         "lsp" => cmd_lsp(),
         "repl" => cmd_repl(),
         "git" => cmd_git(),
@@ -353,112 +356,6 @@ fn cmd_run(args: &[String]) {
         &browser_scopes,
         &script_args,
     );
-}
-
-fn cmd_inspect(args: &[String]) {
-    let mut mode = "";
-    let mut path: Option<String> = None;
-
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--help" | "-h" => {
-                main_inspect_help::print();
-                return;
-            }
-            "--tokens" => {
-                mode = "tokens";
-                i += 1;
-            }
-            "--ast" => {
-                mode = "ast";
-                i += 1;
-            }
-            "--bytecode" => {
-                mode = "bytecode";
-                i += 1;
-            }
-            "--bytecode-visual" | "--bytecode-viz" | "--visual" => {
-                mode = "bytecode-visual";
-                i += 1;
-            }
-            other => {
-                if other.starts_with('-') {
-                    eprintln!("tetherscript inspect: unknown option '{}'", other);
-                    process::exit(2);
-                }
-                if path.is_some() {
-                    eprintln!("tetherscript inspect: unexpected argument '{}'", other);
-                    process::exit(2);
-                }
-                path = Some(other.to_string());
-                i += 1;
-            }
-        }
-    }
-
-    let path = match path {
-        Some(p) => p,
-        None => {
-            eprintln!("tetherscript inspect: missing source file");
-            process::exit(2);
-        }
-    };
-
-    if mode.is_empty() {
-        eprintln!("tetherscript inspect: specify one of --tokens, --ast, --bytecode");
-        process::exit(2);
-    }
-
-    let src = read_source(&path);
-
-    let tokens = match Lexer::new(&src).tokenize() {
-        Ok(t) => t,
-        Err(e) => {
-            eprintln!("tetherscript: lex error at {}:{}: {}", e.line, e.col, e.msg);
-            process::exit(1);
-        }
-    };
-
-    match mode {
-        "tokens" => {
-            for t in &tokens {
-                println!("{:>3}:{:<3}  {:?}", t.line, t.col, t.token);
-            }
-        }
-        "ast" => {
-            let program = match Parser::new(tokens).parse_program() {
-                Ok(p) => p,
-                Err(e) => {
-                    eprintln!(
-                        "tetherscript: parse error at {}:{}: {}",
-                        e.line, e.col, e.msg
-                    );
-                    process::exit(1);
-                }
-            };
-            println!("{:#?}", program);
-        }
-        "bytecode" | "bytecode-visual" => {
-            let program = match Parser::new(tokens).parse_program() {
-                Ok(p) => p,
-                Err(e) => {
-                    eprintln!(
-                        "tetherscript: parse error at {}:{}: {}",
-                        e.line, e.col, e.msg
-                    );
-                    process::exit(1);
-                }
-            };
-            let chunk = Compiler::compile_program(&program);
-            if mode == "bytecode-visual" {
-                println!("{}", bytecode_visual::render(&chunk));
-            } else {
-                println!("{:#?}", chunk);
-            }
-        }
-        _ => unreachable!(),
-    }
 }
 
 fn cmd_lsp() {
