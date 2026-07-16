@@ -1,14 +1,16 @@
 # tetherscript
 
-tetherscript is a small, embeddable scripting language for Rust hosts and AI-agent
-workflows. It is dynamically typed, uses Rust-like syntax, and is implemented in
-Rust with two runtimes: a tree-walking interpreter and a stack-based bytecode VM.
+tetherscript is a dynamically typed, ownership-aware language for portable tools,
+AI-agent workflows, and embeddable application logic. It uses Rust-like syntax and
+is currently implemented in Rust with a tree-walking reference interpreter and a
+stack-based bytecode VM.
 
 The package, library, and binary are named `tetherscript`.
 
-tetherscript is meant for project policy, validators, workflow glue, plugin hooks,
-and other fast-changing behavior that should not require rebuilding a Rust
-application.
+The long-term goal is to compete in the space served by Zig: standalone native
+tools, predictable deployment, cross-compilation, and direct native interoperability.
+tetherscript is not intended to replace Rust. Rust remains the bootstrap and host
+implementation language while tetherscript develops its own compiler stack.
 
 ## CLI scripts and standalone launchers
 
@@ -121,9 +123,31 @@ tetherscript currently includes:
 - A Rust plugin host for loading tetherscript source and calling named hooks.
 - A small LSP server plus VSCode extension.
 
-The long-term direction is controlled extensibility for Rust applications:
-tetherscript source is editable and inspectable, while the Rust host remains
-responsible for trust, capabilities, auditing, and resource budgets.
+Embedding remains a first-class use case: tetherscript source is editable and
+inspectable, while a Rust host can remain responsible for trust, capabilities,
+auditing, and resource budgets.
+
+## Compiler architecture
+
+The interpreter defines observable language semantics. The native compiler track
+keeps those semantics in a tetherscript-owned pipeline rather than making LLVM the
+language's architectural boundary:
+
+```text
+.tether source -> AST -> Tether IR -> machine IR -> native object -> executable
+```
+
+Today, Tether IR lowers and verifies straight-line functions with constants,
+bindings, dynamic arithmetic and comparisons, explicit moves, named calls, and
+returns. Inspect it with:
+
+```bash
+tetherscript inspect --ir examples/ir_arithmetic.tether
+```
+
+Control-flow lowering, optimization passes, machine IR, register allocation,
+object emission, and cross-compilation are roadmap work. The existing `build`
+command creates a standalone bytecode launcher; it does not yet emit native code.
 
 ## Quick start
 
@@ -143,6 +167,7 @@ cargo build --release
 # Inspect the frontend / compiler output
 ./target/release/tetherscript inspect --tokens   examples/hello.tether
 ./target/release/tetherscript inspect --ast      examples/hello.tether
+./target/release/tetherscript inspect --ir       examples/ir_arithmetic.tether
 ./target/release/tetherscript inspect --bytecode examples/hello.tether
 ./target/release/tetherscript inspect --bytecode-visual examples/fib.tether
 
@@ -355,6 +380,11 @@ diagnostics.
 - Capability audit logs and richer resource budgets.
 - Moving ambient host tools behind explicit capabilities where practical.
 - Async scheduler.
+- Tether IR lowering for control flow, closures, mutable slots, and all ownership
+  operations.
+- Optimization passes, machine IR, instruction selection, register allocation,
+  native object emission, and debug information.
+- Cross-compilation and stable C ABI interoperability.
 
 ## Repository layout
 
@@ -371,6 +401,7 @@ src/
   http_server.rs — dynamic handler HTTP server
   http_static/   — native cached static-file HTTP server
   interp.rs      — tree-walking interpreter
+  ir/            — Tether IR model, lowering, verifier, and renderer
   json.rs        — in-tree JSON parser/encoder
   lexer.rs       — lexer
   lib.rs         — library surface for embedding
@@ -398,6 +429,7 @@ docs/
 - [x] Tree-walking interpreter
 - [x] Runtime ownership tracking
 - [x] Bytecode compiler and VM
+- [x] Initial straight-line Tether IR, verifier, and textual renderer
 - [x] LSP server and VSCode extension
 - [x] `Result` and `?` semantics
 - [x] `for x in iterable` loops
@@ -409,6 +441,10 @@ docs/
 - [x] Native production debug report for bundled UI validation
 - [x] Rust embedding/plugin host
 - [ ] Native full browser parity
+- [ ] Full AST-to-Tether-IR lowering
+- [ ] Optimization pass framework and machine IR
+- [ ] First native backend and object-file emission
+- [ ] Cross-compilation and stable C ABI interoperability
 - [ ] Runtime `&mut` exclusivity enforcement
 - [ ] Modules and imports
 - [ ] Plugin and capability manifests as stable formats
