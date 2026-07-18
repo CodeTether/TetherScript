@@ -1,0 +1,5 @@
+fn main() {
+    let html = "<main id='app'><p id='a'>A</p><p id='b'>B</p></main>"
+    let script = "let app=document.getElementById('app');let a=document.getElementById('a');let b=document.getElementById('b');let frag=document.createDocumentFragment();let em=document.createElement('em');em.textContent='E';frag.appendChild(em);app.insertBefore(frag,b);let clone=a.cloneNode(true);clone.id='c';let replaced=app.replaceChild(clone,b);let imported=document.importNode(em,true);let adopted=document.adoptNode(a);[app.textContent,app.children.length,replaced.id,imported.textContent,adopted.id,adopted.isConnected].join('|');"
+    println(browser_eval_js(html, script).value)
+}
