@@ -1,0 +1,5 @@
+fn main() {
+    let html = "<main><section id='group'><p>A</p></section><button id='save' class='primary action' data-state='ready'>Save</button><button id='cancel' class='secondary'>Cancel</button></main>"
+    let script = "let actions=document.querySelectorAll('button.action');let ready=document.querySelector('[data-state=ready]');let child=document.querySelector('main > section:first-child');let adjacent=document.querySelector('section + button');let sibling=document.querySelector('section ~ button:last-child');let nth=document.querySelector('button:nth-child(3)');let negated=document.querySelector('button:not(.secondary)');[actions.length,actions[0].id,ready.textContent,child.id,adjacent.id,sibling.id,nth.id,negated.id].join(':');"
+    println(browser_eval_js(html, script).value)
+}
