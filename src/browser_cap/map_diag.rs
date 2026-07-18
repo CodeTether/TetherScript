@@ -5,7 +5,10 @@ use crate::value::Value;
 use super::call::BrowserCall;
 
 pub(crate) fn prepare(method: &str, args: &[Value]) -> Result<BrowserCall, String> {
-    let mut entries = vec![("action", super::value::str_value("diagnose"))];
+    let mut entries = vec![
+        ("action", super::value::str_value("diagnose")),
+        ("kind", super::value::str_value(method)),
+    ];
     if let Some(arg) = args.first() {
         entries.push(("query", arg.clone()));
     }

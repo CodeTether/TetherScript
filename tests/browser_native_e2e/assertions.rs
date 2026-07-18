@@ -66,6 +66,10 @@ pub fn check(output: Output, expected_url: &str, screenshot: &Path, upload_size:
         stdout.contains("native-browser-requests 200 200 200 200"),
         "{stdout}"
     );
+    assert!(
+        stdout.contains("native-browser-diagnostics 2 1 1 true 1 div true"),
+        "{stdout}"
+    );
     let png = std::fs::read(screenshot).expect("native screenshot exists");
     assert!(png.starts_with(b"\x89PNG\r\n\x1a\n"));
 }
