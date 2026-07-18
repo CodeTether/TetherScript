@@ -30,6 +30,11 @@ pub fn check(output: Output, expected_url: &str, screenshot: &Path) {
         stdout.contains("native-browser-coordinate-scroll 7,11"),
         "{stdout}"
     );
+    assert!(stdout.contains("native-browser-wait true"), "{stdout}");
+    assert!(
+        stdout.contains("native-browser-wait-timeout true"),
+        "{stdout}"
+    );
     let png = std::fs::read(screenshot).expect("native screenshot exists");
     assert!(png.starts_with(b"\x89PNG\r\n\x1a\n"));
 }

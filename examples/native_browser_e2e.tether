@@ -6,6 +6,9 @@ fn main() {
     browser.goto(args[0])?
     browser.click("#change")?
     assert_text(browser, "clicked")?
+    let waited = browser.wait_for_selector("#below", 50)?
+    let wait_timeout = browser.wait_for_selector("#never", 15)
+    if !wait_timeout.is_err() { panic("browser wait did not time out") }
 
     let snapshot = browser.page_snapshot()?
     let screenshot = browser.screenshot(args[1])?
@@ -34,4 +37,6 @@ fn main() {
     println("native-browser-focus", focus)
     println("native-browser-selector-scroll", selector_scroll)
     println("native-browser-coordinate-scroll", coordinate_scroll)
+    println("native-browser-wait", waited)
+    println("native-browser-wait-timeout", wait_timeout.is_err())
 }
