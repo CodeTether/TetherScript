@@ -3,9 +3,6 @@
 use crate::browser_agent::BrowserHarRequest;
 use crate::value::Value;
 
-#[path = "diagnose_har_headers.rs"]
-mod headers;
-
 pub(super) fn value(request: BrowserHarRequest) -> Value {
     super::super::super::super::value::map(vec![
         (
@@ -16,7 +13,7 @@ pub(super) fn value(request: BrowserHarRequest) -> Value {
             "url",
             super::super::super::super::value::string(request.url),
         ),
-        ("headers", headers::value(request.headers)),
+        ("headers", super::headers::value(request.headers)),
         (
             "post_data",
             request

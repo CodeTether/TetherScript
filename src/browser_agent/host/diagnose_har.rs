@@ -3,6 +3,8 @@
 use crate::browser_agent::{BrowserHarEntry, BrowserHarTimings, BrowserPage};
 use crate::value::Value;
 
+#[path = "diagnose_har_headers.rs"]
+mod headers;
 #[path = "diagnose_har_request.rs"]
 mod request;
 #[path = "diagnose_har_response.rs"]
