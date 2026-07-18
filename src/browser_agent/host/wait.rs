@@ -23,7 +23,12 @@ pub(super) fn invoke(state: &mut HostState, payload: &Value) -> Result<Value, St
             Ok(host.page.session.url.contains(&expected))
         });
     }
-    Err("browser.wait: expected selector, text, or url_contains".into())
+    if super::value::optional_bool(payload, "network_idle")? == Some(true) {
+        return super::wait_poll::until(state, timeout, "network idle", |host| {
+            Ok(host.page.load_state() == crate::browser_agent::PageLoadState::NetworkIdle)
+        });
+    }
+    Err("browser.wait: expected selector, text, url_contains, or network_idle".into())
 }
 
 fn timeout(payload: &Value) -> Result<u64, String> {

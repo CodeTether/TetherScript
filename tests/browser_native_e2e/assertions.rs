@@ -53,6 +53,10 @@ pub fn check(output: Output, expected_url: &str, screenshot: &Path, upload_size:
     );
     assert!(stdout.contains("native-browser-wait true"), "{stdout}");
     assert!(
+        stdout.contains("native-browser-network-idle true"),
+        "{stdout}"
+    );
+    assert!(
         stdout.contains("native-browser-wait-timeout true"),
         "{stdout}"
     );

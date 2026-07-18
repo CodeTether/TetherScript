@@ -6,7 +6,9 @@ use std::rc::Rc;
 
 use crate::value::Value;
 
-pub(super) use super::value_optional::{int as optional_int, string as optional_string};
+pub(super) use super::value_optional::{
+    bool as optional_bool, int as optional_int, string as optional_string,
+};
 
 pub(super) fn map(entries: Vec<(&str, Value)>) -> Value {
     Value::Map(Rc::new(RefCell::new(

@@ -97,14 +97,16 @@ The wait helpers are tetherscript convenience methods over the host
 - `wait_for_selector(selector, timeout_ms?)` sends `{"action":"wait","selector":...,"state":"visible","timeout_ms":...}`.
 - `wait_for_text(text, timeout_ms?)` sends `{"action":"wait","text":...,"timeout_ms":...}`.
 - `wait_for_url(url_substring, timeout_ms?)` sends `{"action":"wait","url_contains":...,"timeout_ms":...}`.
+- `wait_for_network_idle()` sends `{"action":"wait","network_idle":true}`.
 
 The native host polls until the requested wall-clock timeout while settling the
 deterministic page runtime between attempts. Raw selector waits support
 `attached`, `detached`, `visible`, and `hidden` states.
 
-`wait_for_network_idle` remains reserved. `compare_screenshots` and `visual_diff`
-compare deterministic native screenshot files and report match state, encoded
-byte counts, and changed encoded bytes.
+`wait_for_network_idle` drains pending deterministic page scripts and requests
+until the native page reaches its `NetworkIdle` lifecycle milestone.
+`compare_screenshots` and `visual_diff` compare deterministic native screenshot
+files and report match state, encoded byte counts, and changed encoded bytes.
 
 `scroll` accepts `scroll(selector)`, `scroll(x, y)`, or
 `scroll(selector, x, y)` and sends a `scroll` action envelope with the matching

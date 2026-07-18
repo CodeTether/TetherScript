@@ -298,6 +298,7 @@ fn high_level_methods_emit_only_browserctl_actions() {
         ("eval", vec![str_value("document.title")]),
         ("wait_for_selector", vec![str_value("#ready")]),
         ("wait_for_text", vec![str_value("Ready")]),
+        ("wait_for_network_idle", vec![]),
         ("screenshot", vec![str_value("screen.png")]),
         ("console_logs", vec![]),
         ("react.detect", vec![]),
@@ -351,11 +352,4 @@ fn high_level_methods_emit_only_browserctl_actions() {
             "browser.{method} emitted non-browserctl action `{action}`"
         );
     }
-}
-
-#[test]
-fn unsupported_network_idle_fails_before_network_io() {
-    let auth = BrowserAuthority::new("http://127.0.0.1:1/browser", Vec::new(), all_scopes());
-    let idle = invoke(&auth, "wait_for_network_idle", &[]).unwrap_err();
-    assert!(idle.contains("does not support network idle waits"));
 }
