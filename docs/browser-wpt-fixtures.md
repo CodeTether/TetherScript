@@ -39,7 +39,7 @@ The runner lives under `tests/browser_wpt_like/`. Each fixture records:
 | Security policy | `tests/browser_wpt_like/security_policy.rs` | full CSP parser, COOP/COEP and mixed-content enforcement |
 | Canvas/WebGL | `tests/browser_wpt_like/canvas_webgl.rs` | GPU rendering, complete CanvasRenderingContext2D and WebGL APIs |
 | Accessibility snapshots | `tests/browser_wpt_like/accessibility.rs` | platform accessibility tree adapters, complete ARIA role mapping |
-| Locator/actionability | `tests/browser_wpt_like/actionability.rs` | stable visibility animation gate, attached-to-document check |
+| Locator/actionability | `tests/browser_wpt_like/actionability.rs` | continuous animation sampling, attached-to-document check |
 | Drag and pointer capture | `tests/browser_wpt_like/drag_pointer_capture.rs` | DataTransfer object construction, real OS drag source negotiation |
 | Service workers/cache storage | `tests/browser_wpt_like/service_worker_cache.rs` | real worker thread execution, complete fetch event lifecycle |
 | IndexedDB | `tests/browser_wpt_like/indexed_db.rs` | transaction scheduling, structured clone value storage |

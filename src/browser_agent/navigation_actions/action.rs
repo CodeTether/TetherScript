@@ -10,7 +10,7 @@ impl BrowserPage {
     /// Click an actionable element and apply anchor/form navigation defaults.
     pub fn click(&mut self, locator: &Locator) -> Result<ActionReport, String> {
         let (resolved, checks) =
-            retry::run(self, "click", locator, |page| prepare::click(page, locator))?;
+            retry::stable(self, "click", locator, |page| prepare::click(page, locator))?;
         let is_download = downloads::is_anchor_download(&resolved);
         let script = if is_download {
             downloads::click_script(&resolved.dom.path)

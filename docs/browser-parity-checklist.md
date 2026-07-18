@@ -198,7 +198,7 @@ Completed tests:
 - Missing CacheStorage and IndexedDB records return empty origin-scoped results.
 - Missing visual and selection targets return strict locator diagnostics.
 - Locator/actionability checks distinguish visible enabled controls from hidden
-  or disabled controls.
+  or disabled controls and require two matching layout observations.
 - Drag/drop events and pointer-capture ownership are observable.
 - Wheel input updates page scroll offsets.
 - Viewport resize and media emulation expose page-visible state.
@@ -206,8 +206,7 @@ Completed tests:
 
 ## Immediate Next Item
 
-Expand WPT-like browser parity toward remaining rendering/input edge cases: more
-complete actionability stability checks, DataTransfer drag payloads, matchMedia
-listener dispatch, and quota/memory-pressure style resource guards.
+Expand HTML parsing parity toward table insertion modes, implicit `tbody`
+construction, and active-formatting-element reconstruction.
 
 **Tracking issue:** <https://github.com/CodeTether/TetherScript/issues/12>

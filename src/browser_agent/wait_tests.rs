@@ -22,6 +22,20 @@ fn click_retries_until_target_is_actionable() {
 }
 
 #[test]
+fn click_waits_for_two_matching_layout_observations() {
+    let html = "<button id='move' style='position:absolute;left:0px'>Go</button>\
+        <script style='display:none'>let b=document.getElementById('move');\
+        b.addEventListener('click',function(){window.clicked='yes';});\
+        setTimeout(function(){b.setAttribute('style','position:absolute;left:12px');},0);</script>";
+    let mut page = BrowserPage::from_html("mem://stable-click", html);
+
+    let report = page.click(&Locator::css("#move")).unwrap();
+
+    assert_eq!(report.bounds.x, 12);
+    assert_eq!(page.eval_js("window.clicked").unwrap().display(), "yes");
+}
+
+#[test]
 fn timeout_reports_last_locator_error() {
     let mut page = BrowserPage::from_html("mem://missing", "<main></main>");
     page.set_default_timeout_ticks(1);
