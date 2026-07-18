@@ -9,6 +9,10 @@ pub(super) struct WebGlState {
     pub height: u32,
     pub viewport: [i64; 4],
     pub clear_color: [f64; 4],
+    pub scissor_box: [i64; 4],
+    pub scissor_test: bool,
+    pub color_mask: [bool; 4],
+    pub errors: Vec<u32>,
     pub commands: Vec<String>,
 }
 
@@ -20,6 +24,10 @@ impl WebGlState {
             height,
             viewport: [0, 0, width as i64, height as i64],
             clear_color: [0.0, 0.0, 0.0, 0.0],
+            scissor_box: [0, 0, width as i64, height as i64],
+            scissor_test: false,
+            color_mask: [true; 4],
+            errors: Vec::new(),
             commands: Vec::new(),
         }
     }

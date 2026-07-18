@@ -24,24 +24,19 @@ pub(super) fn ensure(handle: &DomHandle, version: u8) {
     super::webgl_attrs::sync_attrs(handle, &state);
 }
 
-pub(super) fn mutate(handle: &DomHandle, version: u8, f: impl FnOnce(&mut WebGlState)) {
-    ensure(handle, version);
-    let key = handle.event_key();
-    let state = STATES.with(|states| {
-        let mut states = states.borrow_mut();
-        let state = states.get_mut(&key).expect("webgl state exists");
-        f(state);
-        state.clone()
-    });
-    super::webgl_attrs::sync_attrs(handle, &state);
-}
-
-pub(super) fn with_state<T>(
+pub(super) fn mutate<T>(
     handle: &DomHandle,
     version: u8,
-    f: impl FnOnce(&WebGlState) -> T,
+    f: impl FnOnce(&mut WebGlState) -> T,
 ) -> T {
     ensure(handle, version);
     let key = handle.event_key();
-    STATES.with(|states| f(states.borrow().get(&key).expect("webgl state exists")))
+    let (state, output) = STATES.with(|states| {
+        let mut states = states.borrow_mut();
+        let state = states.get_mut(&key).expect("webgl state exists");
+        let output = f(state);
+        (state.clone(), output)
+    });
+    super::webgl_attrs::sync_attrs(handle, &state);
+    output
 }

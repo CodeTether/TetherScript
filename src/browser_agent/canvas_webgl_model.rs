@@ -34,6 +34,9 @@ pub struct WebGlCommand {
 ///     height: 150,
 ///     viewport: [0, 0, 300, 150],
 ///     clear_color: [0.0, 0.0, 0.0, 0.0],
+///     scissor_box: [0, 0, 300, 150],
+///     scissor_test: false,
+///     color_mask: [true; 4],
 ///     supported_extensions: Vec::new(),
 ///     commands: Vec::new(),
 /// };
@@ -51,6 +54,12 @@ pub struct WebGlContextSnapshot {
     pub viewport: [i64; 4],
     /// Current clear color `[r, g, b, a]`.
     pub clear_color: [f64; 4],
+    /// Current scissor rectangle `[x, y, width, height]` in drawing-buffer coordinates.
+    pub scissor_box: [i64; 4],
+    /// Whether the scissor test currently restricts raster operations.
+    pub scissor_test: bool,
+    /// Per-channel color write mask in red, green, blue, alpha order.
+    pub color_mask: [bool; 4],
     /// Deterministic supported extension names.
     pub supported_extensions: Vec<String>,
     /// Bounded WebGL command log.

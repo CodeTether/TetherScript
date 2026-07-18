@@ -47,9 +47,4 @@ impl Surface {
         ));
         super::surface_paint::paint(self, rect, [0, 0, 0, 0]);
     }
-
-    pub fn clear(&mut self, color: [u8; 4]) {
-        let rect = (0, 0, self.width as i64, self.height as i64);
-        super::surface_paint::paint(self, rect, color);
-    }
 }

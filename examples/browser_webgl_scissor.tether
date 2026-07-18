@@ -1,0 +1,5 @@
+fn main() {
+    let html = "<canvas id='gl' width='4' height='2'></canvas>"
+    let script = "let gl=document.getElementById('gl').getContext('webgl');gl.clearColor(0,0,1,1);gl.clear(gl.COLOR_BUFFER_BIT);gl.enable(gl.SCISSOR_TEST);gl.scissor(1,0,2,1);gl.colorMask(true,false,false,true);gl.clearColor(1,1,0,1);gl.clear(gl.COLOR_BUFFER_BIT);let bottom=new Uint8Array(4);let top=new Uint8Array(4);gl.readPixels(1,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,bottom);gl.readPixels(1,1,1,1,gl.RGBA,gl.UNSIGNED_BYTE,top);bottom.join(',')+'|'+top.join(',');"
+    println(browser_eval_js(html, script).value)
+}

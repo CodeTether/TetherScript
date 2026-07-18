@@ -4,7 +4,7 @@ use tetherscript::browser_agent::{BrowserPage, Locator};
 const CASE: Case = Case {
     area: "html/canvas/offscreen/webgl",
     wpt_shape: "2D ImageData and WebGL color operations update native raster buffers",
-    unsupported: &["complete CanvasRenderingContext2D and WebGL APIs"],
+    unsupported: &["WebGL shaders, buffers, textures, and draw calls"],
 };
 
 pub fn run() {
@@ -19,7 +19,10 @@ pub fn run() {
         gl.viewport(1,2,3,4);gl.clearColor(1,0,0,1);gl.clear(gl.COLOR_BUFFER_BIT);\
         let pixels=new Uint8Array(4);\
         gl.readPixels(0,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,pixels);\
-        canvasPixels+'|'+pixels.join(',');";
+        gl.enable(gl.SCISSOR_TEST);gl.scissor(1,0,2,1);gl.colorMask(false,true,true,true);\
+        gl.clearColor(0,1,1,1);gl.clear(gl.COLOR_BUFFER_BIT);let masked=new Uint8Array(4);\
+        gl.readPixels(1,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,masked);\
+        canvasPixels+'|'+pixels.join(',')+'|'+masked.join(',');";
     let mut page = BrowserPage::from_html("mem://canvas", html);
     let readback = page.eval_js(script).unwrap();
     let surface = page.canvas_surface(&Locator::css("#c")).unwrap();
@@ -29,9 +32,20 @@ pub fn run() {
     assert_eq!(surface.commands[0].args, vec![1, 1, 2, 1]);
     assert_eq!((webgl.version, webgl.width, webgl.height), (2, 8, 4));
     assert_eq!(webgl.viewport, [1, 2, 3, 4]);
+    assert_eq!(webgl.scissor_box, [1, 0, 2, 1]);
+    assert!(webgl.scissor_test);
+    assert_eq!(webgl.color_mask, [false, true, true, true]);
     assert_eq!(webgl.commands[2].operation, "clear");
+    assert_eq!(webgl.commands.last().unwrap().operation, "clear");
     let gl_surface = page.canvas_surface(&Locator::css("#gl")).unwrap();
-    let pixel = u32::from_be_bytes([255, 0, 0, 255]) as u64;
-    assert_eq!(gl_surface.checksum, Some(528 * (pixel + 1)));
-    assert_eq!(readback.display(), "0,0,255,255|255,0,0,255");
+    let red = u32::from_be_bytes([255, 0, 0, 255]) as u64;
+    let white = u32::from_be_bytes([255, 255, 255, 255]) as u64;
+    assert_eq!(
+        gl_surface.checksum,
+        Some(528 * (red + 1) + 53 * (white - red))
+    );
+    assert_eq!(
+        readback.display(),
+        "0,0,255,255|255,0,0,255|255,255,255,255"
+    );
 }
