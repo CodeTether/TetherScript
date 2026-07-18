@@ -16,8 +16,12 @@ mod webgl_context;
 mod webgl_ext;
 #[path = "webgl_methods.rs"]
 mod webgl_methods;
+#[path = "webgl_named_constants.rs"]
+mod webgl_named_constants;
 #[path = "webgl_params.rs"]
 mod webgl_params;
+#[path = "webgl_read.rs"]
+mod webgl_read;
 #[path = "webgl_state.rs"]
 mod webgl_state;
 #[path = "webgl_store.rs"]
