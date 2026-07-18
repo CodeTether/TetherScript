@@ -6,8 +6,10 @@ var onpageshow=window.onpageshow;
 var onvisibilitychange=window.onvisibilitychange;
 var ononline=window.ononline;
 var onoffline=window.onoffline;
+var onorientationchange=window.onorientationchange;
 var onresize=window.onresize;
 var onscroll=window.onscroll;
+var orientation=window.orientation;
 var DOMException=window.DOMException;
 var Image=window.Image;var Option=window.Option;
 var DOMPoint=window.DOMPoint;var DOMRect=window.DOMRect;
@@ -24,6 +26,6 @@ function __tsSetScroll(x,y){x=x*1;y=y*1;window.scrollX=x;window.scrollY=y;window
 function scrollTo(x,y){return __tsSetScroll(x,y);}
 function scroll(x,y){return __tsSetScroll(x,y);}
 function scrollBy(dx,dy){return __tsSetScroll(scrollX+dx,scrollY+dy);}
-function resizeTo(width,height){width=width*1;height=height*1;window.innerWidth=width;window.innerHeight=height;innerWidth=width;innerHeight=height;window.__tsDispatchResize();return undefined;}
+function resizeTo(width,height){width=width*1;height=height*1;window.innerWidth=width;window.innerHeight=height;innerWidth=width;innerHeight=height;var changed=window.__tsSyncOrientation();orientation=window.orientation;if(changed){window.__tsDispatchOrientationChange();}window.__tsDispatchResize();return undefined;}
 window.scrollTo=scrollTo;window.scrollBy=scrollBy;window.scroll=scroll;window.resizeTo=resizeTo;
 "#;

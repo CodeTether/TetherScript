@@ -7,6 +7,7 @@ mod controls;
 mod dispatch;
 mod handlers;
 pub(in crate::browser_js) mod scroll;
+mod trusted_event;
 
 pub(super) fn install_event_handlers(window: &mut HashMap<String, JsValue>) {
     handlers::install(window);

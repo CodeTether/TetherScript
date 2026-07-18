@@ -37,10 +37,10 @@ pub(super) fn sync(
     object: &Rc<RefCell<HashMap<String, JsValue>>>,
     width: f64,
     height: f64,
-) -> Result<(), String> {
+) -> Result<bool, String> {
     viewport_state::remember(object, width, height);
     if state::follows_viewport(object) {
-        update::apply(object, value::viewport(width, height))?;
+        return update::apply(object, value::viewport(width, height));
     }
-    Ok(())
+    Ok(false)
 }

@@ -1,8 +1,8 @@
 use super::super::*;
 
-pub(super) fn sync(window: &JsValue) -> Result<(), String> {
+pub(super) fn sync(window: &JsValue) -> Result<bool, String> {
     let JsValue::Object(window) = window else {
-        return Ok(());
+        return Ok(false);
     };
     let (width, height, screen) = {
         let window = window.borrow();
@@ -13,13 +13,18 @@ pub(super) fn sync(window: &JsValue) -> Result<(), String> {
         )
     };
     let Some(JsValue::Object(screen)) = screen else {
-        return Ok(());
+        return Ok(false);
     };
     let orientation = screen.borrow().get("orientation").cloned();
     let Some(JsValue::Object(orientation)) = orientation else {
-        return Ok(());
+        return Ok(false);
     };
-    super::orientation::sync(&orientation, width, height)
+    let changed = super::orientation::sync(&orientation, width, height)?;
+    let angle = orientation.borrow().get("angle").cloned();
+    if let Some(angle) = angle {
+        window.borrow_mut().insert("orientation".into(), angle);
+    }
+    Ok(changed)
 }
 
 fn number(value: Option<&JsValue>) -> f64 {

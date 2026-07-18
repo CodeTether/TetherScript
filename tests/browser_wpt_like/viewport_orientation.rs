@@ -12,3 +12,11 @@ pub(super) fn locks_and_unlocks() {
         "fulfilled|rejected|landscape-secondary:180|portrait-primary:90|10|landscape-secondary:180;portrait-primary:90;"
     );
 }
+
+pub(super) fn exposes_legacy_window_orientation() {
+    let mut page = BrowserPage::from_html("mem://legacy-orientation", "<main>V</main>");
+    let value = page
+        .eval_js("let seen='';window.onorientationchange=e=>seen=e.type+':'+e.isTrusted+':'+orientation;resizeTo(10,200);[window.orientation,screen.orientation.angle,seen].join('|')")
+        .expect("legacy orientation evaluation should succeed");
+    assert_eq!(value.display(), "90|90|orientationchange:true:90");
+}
