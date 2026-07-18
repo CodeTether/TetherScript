@@ -35,7 +35,7 @@ mod point;
 #[path = "screen.rs"]
 mod screen;
 #[path = "visual_viewport.rs"]
-mod visual_viewport;
+pub(in crate::browser_js) mod visual_viewport;
 
 pub(super) fn install_document(document: &JsValue, root: Rc<RefCell<Node>>) {
     document::install(document, root);

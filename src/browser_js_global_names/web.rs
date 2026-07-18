@@ -19,6 +19,7 @@ pub(super) const ALL: &[&str] = &[
     "PerformanceObserver",
     "matchMedia",
     "screen",
+    "visualViewport",
     "innerWidth",
     "innerHeight",
     "devicePixelRatio",

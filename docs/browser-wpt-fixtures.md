@@ -46,7 +46,7 @@ The runner lives under `tests/browser_wpt_like/`. Each fixture records:
 | Selection/editing | `tests/browser_wpt_like/selection.rs` | multi-range selection, bidirectional text selection geometry |
 | Screenshots/visual diff | `tests/browser_wpt_like/visual_diff.rs` | font rasterization parity, anti-aliasing and subpixel paint model |
 | Trace/persistence | `tests/browser_wpt_like/trace_persistence.rs` | back-forward cache, complete session history serialization |
-| Viewport/media emulation | `tests/browser_wpt_like/viewport_media.rs` | matchMedia listener dispatch, continuous prefers-color-scheme transitions |
+| Viewport/media emulation | `tests/browser_wpt_like/viewport_media.rs` | pinch zoom, visualViewport scrollend events, continuous prefers-color-scheme transitions |
 | Wheel and element scrolling | `tests/browser_wpt_like/wheel_scroll.rs` | smooth scrolling, scrollbar hit testing |
 
 ## Current Negative/Error Fixtures

@@ -205,7 +205,8 @@ Completed tests:
 - Wheel input updates page scroll offsets.
 - Element `scroll`, `scrollTo`, `scrollBy`, property setters, and
   `scrollIntoView` clamp live offsets and update geometry and hit testing.
-- Viewport resize and media emulation expose page-visible state.
+- Viewport resize and scroll synchronize live `visualViewport` metrics and
+  dispatch trusted `resize`/`scroll` events; media emulation exposes state.
 - Resource-limit guard metadata and oversized-DOM rejection are covered.
 
 ## Immediate Next Item

@@ -1,0 +1,4 @@
+fn main() {
+    let script = "let v=visualViewport;let seen='';v.addEventListener('resize',e=>seen=seen+'R'+v.width+'x'+v.height+':'+e.isTrusted+';');v.addEventListener('scroll',e=>seen=seen+'S'+v.pageLeft+','+v.pageTop+':'+e.isTrusted+';');resizeTo(120,40);scrollTo(3,5);seen+'|'+[v.width,v.height,v.pageLeft,v.pageTop].join(':');"
+    println(browser_eval_js("", script).value)
+}

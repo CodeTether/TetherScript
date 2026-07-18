@@ -5,6 +5,8 @@ use crate::browser_agent::page::BrowserPage;
 
 #[path = "device.rs"]
 mod device;
+#[path = "viewport_resize.rs"]
+mod resize;
 pub use device::DeviceScale;
 
 /// Browser viewport dimensions and device metadata.
@@ -62,39 +64,6 @@ impl Viewport {
 }
 
 impl BrowserPage {
-    /// Set viewport dimensions in CSS pixels.
-    ///
-    /// # Arguments
-    ///
-    /// * `width` - New viewport width in CSS pixels.
-    /// * `height` - New viewport height in CSS pixels.
-    ///
-    /// # Returns
-    ///
-    /// `Ok(())` after updating the compatibility width and height fields.
-    ///
-    /// # Errors
-    ///
-    /// Returns `Err` when either dimension is less than or equal to zero.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use tetherscript::browser_agent::BrowserPage;
-    ///
-    /// let mut page = BrowserPage::from_html("mem://docs", "<main>Docs</main>");
-    /// page.set_viewport_size(320, 640).unwrap();
-    /// assert_eq!(page.viewport().width, 320);
-    /// ```
-    pub fn set_viewport_size(&mut self, width: i64, height: i64) -> Result<(), String> {
-        if width <= 0 || height <= 0 {
-            return Err("viewport width and height must be positive".into());
-        }
-        self.viewport_width = width;
-        self.viewport_height = height;
-        Ok(())
-    }
-
     /// Return the current viewport and device metadata snapshot.
     ///
     /// # Returns

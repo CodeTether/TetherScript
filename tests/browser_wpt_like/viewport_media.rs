@@ -3,17 +3,21 @@ use tetherscript::browser_agent::{
     BrowserPage, ColorScheme, ForcedColors, MediaEmulation, ReducedMotion,
 };
 
+#[path = "viewport_media_match.rs"]
+mod match_media;
+
 const CASE: Case = Case {
     area: "css/mediaqueries",
-    wpt_shape: "viewport resize and media emulation expose matchMedia objects and change listeners",
-    unsupported: &["continuous prefers-color-scheme transitions"],
+    wpt_shape: "viewport resize and scroll synchronize VisualViewport metrics and events",
+    unsupported: &["pinch zoom and visualViewport scrollend events"],
 };
 
 pub fn run() {
     assert_case(&CASE);
     viewport_and_media_state();
-    match_media_returns_media_query_list_shape();
-    match_media_change_listeners_and_removal();
+    visual_viewport_metrics_and_events();
+    match_media::object_shape();
+    match_media::listeners_and_removal();
 }
 
 fn viewport_and_media_state() {
@@ -35,23 +39,14 @@ fn viewport_and_media_state() {
     );
 }
 
-fn match_media_returns_media_query_list_shape() {
-    let mut page = BrowserPage::from_html("mem://match-media-shape", "<main>V</main>");
+fn visual_viewport_metrics_and_events() {
+    let mut page = BrowserPage::from_html("mem://visual-viewport", "<main>V</main>");
+    page.eval_js("let v=visualViewport;let seen='';v.addEventListener('resize',function(){seen+='R'+v.width+'x'+v.height+';';});v.addEventListener('scroll',function(){seen+='S'+v.pageLeft+','+v.pageTop+';';});")
+        .unwrap();
+    page.set_viewport_size(120, 40).unwrap();
     let value = page
-        .eval_js("let m=window.matchMedia('(min-width: 600px)'); typeof m + ':' + m.media + ':' + m.matches + ':' + typeof m.addEventListener + ':' + typeof m.removeEventListener")
+        .eval_js("scrollTo(3,5);[v.width,v.height,v.pageLeft,v.pageTop,seen].join('|')")
         .unwrap();
 
-    assert_eq!(
-        value.display(),
-        "object:(min-width: 600px):false:function:function"
-    );
-}
-
-fn match_media_change_listeners_and_removal() {
-    let mut page = BrowserPage::from_html("mem://match-media-change", "<main>V</main>");
-    let value = page
-        .eval_js("let m=matchMedia('(min-width: 600px)');let out='';let keep=function(e){out+='K'+e.matches+';';};let gone=function(){out+='G';};m.addEventListener('change',keep);m.addEventListener('change',gone);m.removeEventListener('change',gone);m.dispatchEvent({type:'change'});out")
-        .unwrap();
-
-    assert_eq!(value.display(), "Kfalse;");
+    assert_eq!(value.display(), "120|40|3|5|R120x40;S3,5;");
 }
