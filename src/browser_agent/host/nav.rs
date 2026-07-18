@@ -4,6 +4,8 @@ use crate::value::Value;
 
 use super::state::HostState;
 
+#[path = "nav_history.rs"]
+mod history;
 #[path = "tabs.rs"]
 mod tabs;
 
@@ -27,16 +29,7 @@ pub(super) fn invoke(
             let url = state.page.session.url.clone();
             super::nav_load::navigate(state, &url)
         }
-        "back" => {
-            state.focused = None;
-            state.page.go_back();
-            Ok(super::snapshot::value(&state.page))
-        }
-        "forward" => {
-            state.focused = None;
-            state.page.go_forward();
-            Ok(super::snapshot::value(&state.page))
-        }
+        "back" | "forward" => history::navigate(state, action),
         "tabs" | "tabs_new" | "tabs_select" | "tabs_close" => tabs::invoke(state, action, payload),
         _ => unreachable!(),
     }
