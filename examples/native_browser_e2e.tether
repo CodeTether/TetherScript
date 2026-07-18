@@ -63,6 +63,13 @@ fn main() {
     let component = browser."react.component_for_selector"("#root")?
     let diagnosis = browser.diagnose()?
     let indexed_db = browser.indexed_db_summary()?
+    browser.set_cookie("parity=1")?
+    browser.set_local_storage("parity", "1")?
+    let cookies_before = browser.cookies()?.len()
+    let local_before = browser.local_storage()?.len()
+    browser.clear_storage()?
+    let cookies_after = browser.cookies()?.len()
+    let local_after = browser.local_storage()?.len()
     browser.screenshot(args[1])?
     let full_shot = browser.screenshot()?
     let element_shot = browser.screenshot_element("#change")?
@@ -93,5 +100,6 @@ fn main() {
     println("native-browser-requests", fetched.status, axios.status, xhr.status, replayed.status)
     println("native-browser-diagnostics", console_logs.len(), console_errors.len(), frameworks.len(), react_detected, hydration.len(), component.tag, diagnosis.react_detected)
     println("native-browser-indexed-db", indexed_db.len())
+    println("native-browser-storage-clear", cookies_before, local_before, cookies_after, local_after)
     println("native-browser-visual", element_shot.len() < full_shot.len(), compared.matches, visual_diff.changed_bytes, asserted)
 }

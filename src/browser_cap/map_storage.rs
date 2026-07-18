@@ -8,43 +8,18 @@ use super::call::BrowserCall;
 mod indexed;
 #[path = "map_storage_js.rs"]
 mod js;
+#[path = "map_storage_read.rs"]
+mod read;
 #[path = "map_storage_write.rs"]
 mod write;
 
 pub(crate) fn prepare(method: &str, args: &[Value]) -> Result<BrowserCall, String> {
     match method {
-        "cookies" => eval_no_args(method, args, "document.cookie", "browser.inspect.storage"),
-        "local_storage" => eval_no_args(
-            method,
-            args,
-            js::storage_js("localStorage"),
-            "browser.inspect.storage",
-        ),
-        "session_storage" => eval_no_args(
-            method,
-            args,
-            js::storage_js("sessionStorage"),
-            "browser.inspect.storage",
-        ),
+        "cookies" | "local_storage" | "session_storage" => read::prepare(method, args),
         "indexed_db_summary" => indexed::prepare(args),
         "set_cookie" => write::set_cookie(args),
         "set_local_storage" => write::set_local(args),
-        "clear_storage" => eval_no_args(
-            method,
-            args,
-            "localStorage.clear();sessionStorage.clear();true",
-            "browser.mutate.storage",
-        ),
+        "clear_storage" => write::clear(args),
         _ => unreachable!(),
     }
-}
-
-fn eval_no_args(
-    method: &str,
-    args: &[Value],
-    expression: impl Into<String>,
-    scope: &'static str,
-) -> Result<BrowserCall, String> {
-    super::args::no_args(method, args)?;
-    Ok(js::eval(expression.into(), scope))
 }

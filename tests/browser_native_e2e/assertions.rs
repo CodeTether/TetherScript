@@ -76,6 +76,10 @@ pub fn check(output: Output, expected_url: &str, screenshot: &Path, upload_size:
     );
     assert!(stdout.contains("native-browser-indexed-db 0"), "{stdout}");
     assert!(
+        stdout.contains("native-browser-storage-clear 8 1 0 0"),
+        "{stdout}"
+    );
+    assert!(
         stdout.contains("native-browser-visual true true 0 true"),
         "{stdout}"
     );
