@@ -12,7 +12,7 @@ pub(super) fn context_object(handle: DomHandle, version: u8) -> JsValue {
 }
 
 fn install_constants(obj: &mut HashMap<String, JsValue>) {
-    for (name, value) in super::webgl_constants::NAMED {
+    for (name, value) in super::webgl_named_constants::ALL {
         obj.insert((*name).into(), JsValue::Number(*value as f64));
     }
 }

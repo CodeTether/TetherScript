@@ -1,5 +1,7 @@
 use super::*;
 
+#[path = "browser_js_webgl_read_pixels_tests.rs"]
+mod webgl_read_pixels_tests;
 #[path = "browser_js_webgl_tests.rs"]
 mod webgl_tests;
 

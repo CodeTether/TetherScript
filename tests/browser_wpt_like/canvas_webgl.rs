@@ -14,9 +14,11 @@ pub fn run() {
     let script = "let c=document.getElementById('c');let ctx=c.getContext('2d');\
         ctx.fillStyle='#f00';ctx.fillRect(1,1,2,1);\
         let gl=document.getElementById('gl').getContext('webgl2');\
-        gl.viewport(1,2,3,4);gl.clearColor(1,0,0,1);gl.clear(gl.COLOR_BUFFER_BIT);";
+        gl.viewport(1,2,3,4);gl.clearColor(1,0,0,1);gl.clear(gl.COLOR_BUFFER_BIT);\
+        let pixels=new Uint8Array(4);\
+        gl.readPixels(0,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,pixels);pixels.join(',');";
     let mut page = BrowserPage::from_html("mem://canvas", html);
-    page.eval_js(script).unwrap();
+    let readback = page.eval_js(script).unwrap();
     let surface = page.canvas_surface(&Locator::css("#c")).unwrap();
     let webgl = page.webgl_context(&Locator::css("#gl")).unwrap();
     assert_eq!((surface.width, surface.height), (4, 3));
@@ -28,4 +30,5 @@ pub fn run() {
     let gl_surface = page.canvas_surface(&Locator::css("#gl")).unwrap();
     let pixel = u32::from_be_bytes([255, 0, 0, 255]) as u64;
     assert_eq!(gl_surface.checksum, Some(528 * (pixel + 1)));
+    assert_eq!(readback.display(), "255,0,0,255");
 }
