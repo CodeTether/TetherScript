@@ -5,16 +5,12 @@ pub(super) fn insert_common(
     event_type: String,
     init: Option<&JsValue>,
 ) {
+    let flag = |name| JsValue::Bool(bool_prop(init, name));
     map.insert("type".into(), JsValue::String(event_type));
-    map.insert("bubbles".into(), JsValue::Bool(bool_prop(init, "bubbles")));
-    map.insert(
-        "cancelable".into(),
-        JsValue::Bool(bool_prop(init, "cancelable")),
-    );
-    map.insert(
-        "composed".into(),
-        JsValue::Bool(bool_prop(init, "composed")),
-    );
+    map.insert("bubbles".into(), flag("bubbles"));
+    map.insert("cancelable".into(), flag("cancelable"));
+    map.insert("composed".into(), flag("composed"));
+    map.insert("isTrusted".into(), JsValue::Bool(false));
     map.insert("defaultPrevented".into(), JsValue::Bool(false));
     map.insert("timeStamp".into(), JsValue::Number(0.0));
     map.insert("target".into(), JsValue::Null);

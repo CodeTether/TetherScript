@@ -12,7 +12,7 @@ fn event_constructors_initialize_common_and_specific_fields() {
          let i=InputEvent('input',{data:'x',inputType:'insertText'}); let s=SubmitEvent('submit',{submitter:b}); let f=FocusEvent('focus',{relatedTarget:b});\
          let p=PointerEvent('pointerdown',{pointerId:5,pointerType:'mouse'}); let w=WheelEvent('wheel',{deltaX:1,deltaY:-2});\
          typeof Event + ':' + e.type + ':' + e.bubbles + ':' + e.cancelable + ':' +\
-         e.composed + ':' + e.defaultPrevented + ':' + typeof e.timeStamp + ':' +\
+         e.composed + ':' + e.isTrusted + ':' + e.defaultPrevented + ':' + typeof e.timeStamp + ':' +\
          e.timeStamp + ':' + e.composedPath().length + ':' + c.detail + ':' +\
          typeof c.timeStamp + ':' + c.timeStamp + ':' +\
          m.clientX + ',' + m.clientY + ',' + m.button + ',' +\
@@ -25,7 +25,7 @@ fn event_constructors_initialize_common_and_specific_fields() {
     assert_eq!(
         result.value,
         JsValue::String(
-            "function:ready:true:true:true:true:number:0:0:payload:number:0:7,8,1,2:A,KeyA,true:x,insertText:go:go:5,mouse:1,-2"
+            "function:ready:true:true:true:false:true:number:0:0:payload:number:0:7,8,1,2:A,KeyA,true:x,insertText:go:go:5,mouse:1,-2"
                 .into()
         )
     );
