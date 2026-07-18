@@ -11,6 +11,7 @@ pub(crate) fn scope_for_action(action: &str) -> Option<&'static str> {
         "network_log" | "diagnose" => Some("browser.inspect.network"),
         "fetch" | "axios" | "xhr" | "replay" => Some("browser.replay.network"),
         "screenshot" => Some("browser.screenshot"),
+        "visual_compare" => Some("browser.visual"),
         "health" | "detect" => Some("browser.inspect.dom"),
         _ => None,
     }
@@ -29,6 +30,10 @@ mod tests {
     #[test]
     fn forward_is_a_mutating_navigation_action() {
         assert_eq!(super::scope_for_action("forward"), Some("browser.navigate"));
+        assert_eq!(
+            super::scope_for_action("visual_compare"),
+            Some("browser.visual")
+        );
         assert!(super::is_mutating("forward"));
         assert!(!super::is_mutating("tabs"));
     }

@@ -7,8 +7,14 @@ use crate::value::Value;
 
 use super::state::HostState;
 
+#[path = "screenshot_capture.rs"]
+mod capture;
+#[cfg(test)]
+#[path = "screenshot_tests.rs"]
+mod tests;
+
 pub(super) fn invoke(state: &HostState, payload: &Value) -> Result<Value, String> {
-    let image = state.page.screenshot()?;
+    let image = capture::image(state, payload)?;
     let (format, bytes) = encoded(
         &image,
         super::value::optional_string(payload, "path")?.as_deref(),

@@ -13,9 +13,24 @@ pub(crate) fn point_eval(args: &[Value]) -> Result<BrowserCall, String> {
     ))
 }
 
-pub(crate) fn raw_visual(method: &str, _: &[Value]) -> Result<BrowserCall, String> {
-    Err(format!(
-        "browser.{}: browserctl backend does not support visual diff actions",
-        method
+pub(crate) fn raw_visual(method: &str, args: &[Value]) -> Result<BrowserCall, String> {
+    let mut entries = vec![
+        ("action", super::super::value::str_value("visual_compare")),
+        ("mode", super::super::value::str_value(method)),
+        (
+            "before",
+            super::super::value::str_value(super::super::args::expect_str(method, args, 0)?),
+        ),
+    ];
+    if method != "assert_screenshot_matches" {
+        entries.push((
+            "after",
+            super::super::value::str_value(super::super::args::expect_str(method, args, 1)?),
+        ));
+    }
+    Ok(BrowserCall::new(
+        "visual_compare",
+        "browser.visual",
+        super::super::value::map_value(entries),
     ))
 }
