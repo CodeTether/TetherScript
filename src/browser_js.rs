@@ -644,6 +644,7 @@ fn reset_browser_js_state() {
     selection_host::reset();
     default_action_host::reset();
     dom_compat_host::document::commands::reset();
+    dom_compat_host::convenience::scroll_metrics::reset();
     dom_compat_host::form_validation::reset();
     compat_host::promise::reset();
     MUTATION_OBSERVERS.with(|observers| observers.borrow_mut().clear());
@@ -3822,6 +3823,7 @@ fn rekey_event_entry(old_key: &str, new_key: &str) {
     if old_key == new_key {
         return;
     }
+    dom_compat_host::convenience::scroll_metrics::rekey(old_key, new_key);
     EVENT_REGISTRY.with(|registry| {
         let mut registry = registry.borrow_mut();
         let Some(entry) = registry.remove(old_key) else {
@@ -4184,7 +4186,7 @@ fn layout_for_handle(handle: &DomHandle) -> browser::LayoutBox {
 fn element_rect(handle: &DomHandle) -> (i64, i64, i64, i64) {
     let layout = layout_for_handle(handle);
     browser::find_layout_box_at_path(&layout, &handle.path)
-        .map(|b| (b.x, b.y, b.width, b.height))
+        .map(|layout| dom_compat_host::convenience::scroll_metrics::scrolled_rect(handle, layout))
         .unwrap_or((0, 0, 0, 0))
 }
 

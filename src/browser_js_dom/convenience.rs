@@ -21,7 +21,8 @@ dom_mod!("path_shift.rs", path_shift);
 dom_mod!("reflected_attrs.rs", reflected_attrs);
 dom_mod!("replace_children.rs", replace_children);
 dom_mod!("replace_at.rs", replace_at);
-dom_mod!("scroll_metrics.rs", scroll_metrics);
+#[path = "scroll_metrics.rs"]
+pub(in crate::browser_js) mod scroll_metrics;
 dom_mod!("sibling.rs", sibling);
 dom_mod!("style.rs", style);
 dom_mod!("style_attr.rs", style_attr);
@@ -42,7 +43,6 @@ pub(super) fn install(obj: &mut HashMap<String, JsValue>, handle: &DomHandle, no
     sibling::install(obj, handle);
     adjacent::install(obj, handle);
     client_rects::install(obj, handle, node);
-    scroll_metrics::install(obj, handle, node);
     style::install(obj, handle, node);
 }
 

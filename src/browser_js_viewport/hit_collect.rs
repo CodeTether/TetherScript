@@ -15,7 +15,15 @@ pub(super) fn hits(root: &Rc<RefCell<Node>>, x: i64, y: i64) -> Vec<Hit> {
         .enumerate()
         .filter_map(|(order, path)| {
             let layout_box = browser::find_layout_box_at_path(&layout, &path)?;
-            hit_style::matches(layout_box, x, y).then_some(Hit {
+            let handle = DomHandle {
+                root: root.clone(),
+                path: path.clone(),
+            };
+            let (scroll_x, scroll_y) =
+                dom_compat_host::convenience::scroll_metrics::offset_for(&handle);
+            (hit_style::matches(layout_box, x + scroll_x, y + scroll_y)
+                && dom_compat_host::convenience::scroll_metrics::point_visible(&handle, x, y))
+            .then_some(Hit {
                 path,
                 z: hit_style::z_index(layout_box),
                 order,
