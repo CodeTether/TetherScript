@@ -22,7 +22,7 @@ pub(crate) fn prepare(auth: &BrowserAuthority, method: &str, args: &[Value]) -> 
         | "wait_for_selector" | "wait_for_text" | "wait_for_network_idle" => {
             super::extra::prepare(method, args)
         }
-        "console_logs" | "console_errors" | "unhandled_rejections" | "runtime_exceptions"
+        "console_logs" | "console_errors" | "unhandled_rejections" | "runtime_exceptions" | "network_har"
         | "source_mapped_stack_traces" | "frameworks" | "react.detect" | "react.version"
         | "react.component_tree" | "react.errors" | "react.hydration_warnings"
         | "react.suspense_boundaries" | "react.component_for_selector" | "react.props"

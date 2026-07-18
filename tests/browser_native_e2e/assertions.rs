@@ -67,6 +67,10 @@ pub fn check(output: Output, expected_url: &str, screenshot: &Path, upload_size:
     let network = line_value(&stdout, "native-browser-network");
     assert!(network.parse::<usize>().unwrap() > 0, "{stdout}");
     assert!(
+        stdout.contains("native-browser-network-har true"),
+        "{stdout}"
+    );
+    assert!(
         stdout.contains("native-browser-network-waits 1 1"),
         "{stdout}"
     );
