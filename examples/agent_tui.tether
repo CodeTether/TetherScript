@@ -567,14 +567,13 @@ fn tool_defs(kind) {
     defs.push(tool_for(kind, "powershell", "Run a command with PowerShell.", p, ["command"]))
     p = map(); p.command = prop("Bash command to run."); p.timeout_ms = prop("Optional timeout in milliseconds.")
     defs.push(tool_for(kind, "bash", "Run a command with bash.", p, ["command"]))
-    p = map(); p.html = prop("HTML document or fragment."); p.selector = prop("CSS selector.")
-    defs.push(tool_for(kind, "browser_text", "Return textContent for a selector in HTML.", p, ["html", "selector"]))
-    p = map(); p.html = prop("HTML document or fragment."); p.selector = prop("CSS selector.")
-    defs.push(tool_for(kind, "browser_query", "Return the matched element HTML for a selector.", p, ["html", "selector"]))
-    p = map(); p.html = prop("HTML document or fragment."); p.css = prop("CSS stylesheet."); p.width = prop("Render width in columns.")
-    defs.push(tool_for(kind, "browser_render", "Render HTML and CSS to a text browser view.", p, ["html"]))
-    p = map(); p.html = prop("HTML document containing scripts to execute.")
-    defs.push(tool_for(kind, "browser_run_scripts", "Execute scripts embedded in HTML and return the result.", p, ["html"]))
+    p = map(); p.url = prop("HTTP or HTTPS URL to navigate to.")
+    defs.push(tool_for(kind, "browser_goto", "Navigate the native browser to a granted URL.", p, ["url"]))
+    p = map(); p.selector = prop("CSS selector for the element to click.")
+    defs.push(tool_for(kind, "browser_click", "Click an element in the current native browser page.", p, ["selector"]))
+    p = map(); p.selector = prop("CSS selector for the text to read.")
+    defs.push(tool_for(kind, "browser_text", "Read element text from the current native browser page.", p, ["selector"]))
+    defs.push(tool_for(kind, "browser_snapshot", "Return URL, HTML, visible text, and viewport for the current page.", map(), []))
     p = map(); p.script = prop("JavaScript source to evaluate.")
     defs.push(tool_for(kind, "js_eval", "Evaluate JavaScript and return the result.", p, ["script"]))
     return defs
@@ -919,6 +918,10 @@ fn confirm_required(action, path) {
     return action + " blocked for " + path + ": set confirm=true or TETHERSCRIPT_AGENT_CONFIRM_DESTRUCTIVE=0"
 }
 // Execute a named tool. Tool outputs are returned as text for model/TUI consumption.
+fn browser_tool_result(name, result) {
+    if result.is_err() { return name + " failed: " + result.err() }
+    return json_encode(result.unwrap())
+}
 fn run_tool(name, args) {
     if name == "cwd" { return cwd().unwrap_or("cwd failed") }
     if name == "ls" { return json_encode(fs_list(arg(args, "path", ".")).unwrap_or([])) }
@@ -1012,10 +1015,10 @@ fn run_tool(name, args) {
     if name == "run" { return json_encode(shell(arg(args, "command", ""), tool_timeout_ms(args)).unwrap_or(map())) }
     if name == "powershell" { return json_encode(powershell(arg(args, "command", ""), tool_timeout_ms(args)).unwrap_or(map())) }
     if name == "bash" { return json_encode(bash(arg(args, "command", ""), tool_timeout_ms(args)).unwrap_or(map())) }
-    if name == "browser_text" { return browser_text_content(arg(args, "html", ""), arg(args, "selector", "body")) }
-    if name == "browser_query" { return browser_query_selector(arg(args, "html", ""), arg(args, "selector", "body")) }
-    if name == "browser_render" { return browser_render(arg(args, "html", ""), arg(args, "css", ""), parse_int(arg(args, "width", "80")).unwrap_or(80)) }
-    if name == "browser_run_scripts" { return json_encode(browser_run_scripts(arg(args, "html", ""))) }
+    if name == "browser_goto" { return browser_tool_result(name, browser.goto(arg(args, "url", ""))) }
+    if name == "browser_click" { return browser_tool_result(name, browser.click(arg(args, "selector", ""))) }
+    if name == "browser_text" { return browser_tool_result(name, browser.text(arg(args, "selector", ""))) }
+    if name == "browser_snapshot" { return browser_tool_result(name, browser.page_snapshot()) }
     if name == "js_eval" { return json_encode(js_eval(arg(args, "script", ""))) }
     return "unknown tool: " + name
 }
@@ -1042,7 +1045,7 @@ fn summarize_tool_output(output) {
 }
 // Convert simple string outputs into JSON-RPC tool error status.
 fn tool_failed(output) {
-    if output.starts_with("unknown tool:") { return true }
+    if output.starts_with("unknown tool:") || output.starts_with("browser_") && output.contains(" failed:") { return true }
     if output.starts_with("cwd failed") { return true }
     if output.starts_with("read failed") { return true }
     if output.starts_with("mkdir failed:") { return true }
@@ -1113,7 +1116,7 @@ fn base_messages() {
     let messages = []
     let sys = map()
     sys.role = "system"
-    sys.content = "You are a concise coding agent running in a local project workspace. For requests about the current project, repository, files, code, edits, diagnostics, or shell commands, use cwd, ls, read, write, and run tools to inspect and act locally. Do not ask the user to upload or paste files that the tools can read. Ask for content only when it is outside the accessible workspace or genuinely missing. Keep answers concise and report tool-backed changes clearly."
+    sys.content = "You are a concise coding agent running in a local project workspace. For requests about the current project, repository, files, code, edits, diagnostics, or shell commands, use cwd, ls, read, write, and run tools to inspect and act locally. For web tasks, use browser_goto before browser_text, browser_click, or browser_snapshot; these tools operate on one persistent native page. Do not ask the user to upload or paste files that the tools can read. Ask for content only when it is outside the accessible workspace or genuinely missing. Keep answers concise and report tool-backed changes clearly."
     messages.push(sys)
     return messages
 }
@@ -1694,10 +1697,7 @@ fn valid_tool(name) {
     if name == "run" { return true }
     if name == "powershell" { return true }
     if name == "bash" { return true }
-    if name == "browser_text" { return true }
-    if name == "browser_query" { return true }
-    if name == "browser_render" { return true }
-    if name == "browser_run_scripts" { return true }
+    if name == "browser_goto" || name == "browser_click" || name == "browser_text" || name == "browser_snapshot" { return true }
     if name == "js_eval" { return true }
     return false
 }

@@ -55,6 +55,26 @@ Inside the TUI, type prompts directly. Tool calls are sent to the model by
 default. Manual tool checks are available with `/tool cwd`, `/tool ls <path>`,
 `/tool read <path>`, and `/tool run <command>`.
 
+For persistent native browser tools, start the native host in one terminal:
+
+```bash
+tetherscript-browser-host 127.0.0.1:41707
+```
+
+Then grant it to the TUI in another terminal, narrowing origins in production:
+
+```bash
+tetherscript run \
+  --grant-browser http://127.0.0.1:41707/browser \
+  --browser-origin http://localhost:5173 \
+  --browser-scope all \
+  examples/agent_tui.tether
+```
+
+The model-visible browser tools are `browser_goto`, `browser_click`,
+`browser_text`, and `browser_snapshot`. They share one native page for the
+duration of the host process.
+
 If no `provider` capability is granted, prompts stay inside the TUI and render
 a provider-missing message instead of crashing the process.
 
@@ -71,5 +91,6 @@ Then send newline-delimited JSON-RPC on stdin:
 ```
 
 The script exposes `initialize`, `tools/list`, `tools/call`, and
-`agent/message`. Its built-in tools are `cwd`, `ls`, `read`, `write`, and
-`run`. Stdout is protocol-only so an external agent can parse it safely.
+`agent/message`. Its built-in tools include workspace, shell, native browser,
+and JavaScript operations. Stdout is protocol-only so an external agent can
+parse it safely.

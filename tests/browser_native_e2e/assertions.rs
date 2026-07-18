@@ -1,0 +1,16 @@
+use std::path::Path;
+use std::process::Output;
+
+pub fn check(output: Output, expected_url: &str, screenshot: &Path) {
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("native-browser-text clicked"), "{stdout}");
+    assert!(stdout.contains(expected_url), "{stdout}");
+    assert!(stdout.contains("native-browser-screenshot png"), "{stdout}");
+    let png = std::fs::read(screenshot).expect("native screenshot exists");
+    assert!(png.starts_with(b"\x89PNG\r\n\x1a\n"));
+}
