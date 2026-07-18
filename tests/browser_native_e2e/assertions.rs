@@ -18,6 +18,10 @@ pub fn check(output: Output, expected_url: &str, screenshot: &Path) {
     assert!(stdout.contains(expected_url), "{stdout}");
     assert!(stdout.contains("native-browser-screenshot png"), "{stdout}");
     assert!(stdout.contains("native-browser-trusted true"), "{stdout}");
+    assert!(
+        stdout.contains(&format!("native-browser-history {expected_url}second")),
+        "{stdout}"
+    );
     let png = std::fs::read(screenshot).expect("native screenshot exists");
     assert!(png.starts_with(b"\x89PNG\r\n\x1a\n"));
 }

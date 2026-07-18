@@ -130,6 +130,7 @@ fn is_browserctl_action(action: &str) -> bool {
             | "snapshot"
             | "goto"
             | "back"
+            | "forward"
             | "click"
             | "upload"
             | "fill"
@@ -257,6 +258,7 @@ fn high_level_methods_emit_only_browserctl_actions() {
         ("goto", vec![str_value("http://app.test/home")]),
         ("reload", vec![]),
         ("back", vec![]),
+        ("forward", vec![]),
         ("tabs", vec![]),
         ("tabs_select", vec![Value::Int(0)]),
         ("tabs_new", vec![str_value("http://app.test/new")]),
@@ -344,9 +346,6 @@ fn high_level_methods_emit_only_browserctl_actions() {
 #[test]
 fn unsupported_backend_methods_fail_before_network_io() {
     let auth = BrowserAuthority::new("http://127.0.0.1:1/browser", Vec::new(), all_scopes());
-    let forward = invoke(&auth, "forward", &[]).unwrap_err();
-    assert!(forward.contains("does not support forward"));
-
     let idle = invoke(&auth, "wait_for_network_idle", &[]).unwrap_err();
     assert!(idle.contains("does not support network idle waits"));
 

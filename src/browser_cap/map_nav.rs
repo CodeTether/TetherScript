@@ -11,10 +11,9 @@ mod nav_call;
 #[rustfmt::skip]
 pub(crate) fn prepare(auth: &BrowserAuthority, method: &str, args: &[Value]) -> Result<BrowserCall, String> {
     match method {
-        "health" | "detect" | "start" | "stop" | "reload" | "back" | "tabs" => {
+        "health" | "detect" | "start" | "stop" | "reload" | "back" | "forward" | "tabs" => {
             nav_call::simple(method, args)
         }
-        "forward" => Err("browser.forward: browserctl backend does not support forward".into()),
         "goto" => {
             let url = super::args::expect_str(method, args, 0)?;
             auth.require_origin_url(&url)?;
