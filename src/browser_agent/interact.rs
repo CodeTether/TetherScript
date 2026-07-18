@@ -27,7 +27,7 @@ impl BrowserPage {
     /// Fill an input-like element resolved by `locator`.
     pub fn fill(&mut self, locator: &Locator, text: &str) -> Result<ActionReport, String> {
         let (resolved, checks) =
-            retry::run(self, "fill", locator, |page| prepare::fill(page, locator))?;
+            retry::stable(self, "fill", locator, |page| prepare::fill(page, locator))?;
         self.eval_js(&script::fill(&resolved.dom.path, text))?;
         self.trace("fill", locator);
         Ok(ActionReport::new(

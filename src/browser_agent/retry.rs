@@ -3,6 +3,9 @@
 use crate::browser_agent::locator::Locator;
 use crate::browser_agent::page::BrowserPage;
 
+mod stable;
+pub(crate) use stable::run as stable;
+
 pub(crate) fn run<T>(
     page: &mut BrowserPage,
     action: &str,

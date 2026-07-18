@@ -4,13 +4,13 @@ use tetherscript::browser_agent::{BrowserPage, Locator};
 const CASE: Case = Case {
     area: "html/interaction/actionability",
     wpt_shape: "visible, enabled, attached, and stable hit-target checks gate actions",
-    unsupported: &["layout animation bounding-box stability beyond deterministic settle ticks"],
+    unsupported: &["continuous CSS/Web Animations stability sampling"],
 };
 
 pub fn run() {
     assert_case(&CASE);
     visible_enabled_hidden_and_disabled();
-    waits_for_async_visibility_before_action();
+    waits_for_stable_bounds_before_action();
     removed_during_wait_is_strict_locator_error();
     overlapping_z_index_resolves_before_click();
 }
@@ -31,16 +31,16 @@ fn visible_enabled_hidden_and_disabled() {
     assert!(dis.is_err(), "disabled button should fail actionability");
 }
 
-fn waits_for_async_visibility_before_action() {
-    let html = "<button id='later' style='display:none'>Later</button>\
-        <script>let b=document.getElementById('later');\
+fn waits_for_stable_bounds_before_action() {
+    let html = "<button id='later' style='position:absolute;left:0px'>Later</button>\
+        <script style='display:none'>let b=document.getElementById('later');\
         b.addEventListener('click',function(){window.clicked='yes';});\
-        setTimeout(function(){b.removeAttribute('style');},5);</script>";
+        setTimeout(function(){b.setAttribute('style','position:absolute;left:12px');},5);</script>";
     let mut page = BrowserPage::from_html("mem://actionability-visible", html);
-    page.run_scripts().unwrap();
 
-    page.click(&Locator::css("#later")).unwrap();
+    let report = page.click(&Locator::css("#later")).unwrap();
 
+    assert_eq!(report.bounds.x, 12);
     assert_eq!(page.eval_js("window.clicked").unwrap().display(), "yes");
 }
 
