@@ -37,6 +37,10 @@ mod visible_text;
 #[cfg(test)]
 mod visible_text_tests;
 mod wait;
+mod wait_poll;
+mod wait_selector;
+#[cfg(test)]
+mod wait_tests;
 
 /// Serve native browser action envelopes over blocking HTTP.
 ///

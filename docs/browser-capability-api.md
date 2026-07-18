@@ -98,6 +98,10 @@ The wait helpers are tetherscript convenience methods over the host
 - `wait_for_text(text, timeout_ms?)` sends `{"action":"wait","text":...,"timeout_ms":...}`.
 - `wait_for_url(url_substring, timeout_ms?)` sends `{"action":"wait","url_contains":...,"timeout_ms":...}`.
 
+The native host polls until the requested wall-clock timeout while settling the
+deterministic page runtime between attempts. Raw selector waits support
+`attached`, `detached`, `visible`, and `hidden` states.
+
 `wait_for_network_idle`, `compare_screenshots`, and `visual_diff` are reserved
 language-level methods. The current native host rejects them before network I/O
 until matching actions exist.
