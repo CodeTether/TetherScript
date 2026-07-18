@@ -26,6 +26,7 @@ tetherscript run --interp \
 
 The host owns one persistent `BrowserPage` and exits after `browser.stop()`.
 It executes actions through tetherscript's own DOM, JavaScript, layout, and rendering stack.
+Snapshot `visible_text` and text waits exclude non-rendered DOM subtrees.
 
 Default scopes, when `--browser-scope` is omitted, are enough for Milestone 1: navigate, interact, DOM inspect, console inspect, network inspect, screenshot.
 

@@ -1,6 +1,5 @@
 //! Compact native page snapshot values.
 
-use crate::browser::text_content;
 use crate::browser_agent::BrowserPage;
 use crate::value::Value;
 
@@ -18,10 +17,5 @@ pub(super) fn value(page: &BrowserPage) -> Value {
 }
 
 pub(super) fn document_text(page: &BrowserPage) -> String {
-    page.session
-        .document
-        .children
-        .iter()
-        .map(text_content)
-        .collect()
+    super::visible_text::value(page)
 }
