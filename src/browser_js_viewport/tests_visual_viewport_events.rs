@@ -27,11 +27,12 @@ fn browser_resize_and_scroll_dispatch_live_viewport_events() {
         resizeTo(120,40);resizeTo(140,50);\
         v.removeEventListener('resize',keep);resizeTo(160,60);\
         v.addEventListener('scroll',function(e){out=out+'scroll:'+v.pageLeft+','\
-        +v.pageTop+':'+e.isTrusted;});scrollTo(3,5);\
+        +v.pageTop+':'+e.isTrusted+';';});\
+        v.onscrollend=function(e){out=out+'scrollend:'+e.isTrusted;};scrollTo(3,5);\
         out+'|'+[v.width,v.height,v.pageLeft,v.pageTop].join(':');";
     let result = eval_with_dom("", script).unwrap();
 
     assert_eq!(result.value, JsValue::String(
-        "resize:true:true:true:120x40;once;resize:true:true:true:140x50;scroll:3,5:true|160:60:3:5".into()
+        "resize:true:true:true:120x40;once;resize:true:true:true:140x50;scroll:3,5:true;scrollend:true|160:60:3:5".into()
     ));
 }
