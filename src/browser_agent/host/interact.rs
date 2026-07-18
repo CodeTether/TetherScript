@@ -10,6 +10,11 @@ use super::state::HostState;
 mod type_tests;
 #[path = "type_text.rs"]
 mod type_text;
+#[path = "upload.rs"]
+mod upload;
+#[cfg(test)]
+#[path = "upload_tests.rs"]
+mod upload_tests;
 
 pub(super) fn invoke(
     state: &mut HostState,
@@ -25,6 +30,7 @@ pub(super) fn invoke(
             .click(&Locator::text(super::value::string_field(payload, "text")?))?,
         "fill" => fill(state, payload)?,
         "type" => type_text::invoke(state, payload)?,
+        "upload" => upload::invoke(state, payload)?,
         "hover" => state.page.hover(&Locator::css(super::value::string_field(
             payload, "selector",
         )?))?,

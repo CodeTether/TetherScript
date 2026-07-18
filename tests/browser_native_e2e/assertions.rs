@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::process::Output;
 
-pub fn check(output: Output, expected_url: &str, screenshot: &Path) {
+pub fn check(output: Output, expected_url: &str, screenshot: &Path, upload_size: u64) {
     assert!(
         output.status.success(),
         "stderr: {}",
@@ -33,6 +33,12 @@ pub fn check(output: Output, expected_url: &str, screenshot: &Path) {
         "{stdout}"
     );
     assert!(stdout.contains("native-browser-focus blurred"), "{stdout}");
+    assert!(
+        stdout.contains(&format!(
+            "native-browser-upload hello.tether:text/plain:{upload_size}:ic"
+        )),
+        "{stdout}"
+    );
     let selector_scroll = line_value(&stdout, "native-browser-selector-scroll");
     assert!(selector_scroll.parse::<i64>().unwrap() > 0, "{stdout}");
     assert!(
