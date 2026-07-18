@@ -182,7 +182,9 @@ key, and value fields from the native browser context.
 service-worker/cache state across every tab in the native browser context.
 
 React/framework hooks:
-Use string method syntax for dotted method names, e.g. `browser."react.detect"()?`, `browser."react.component_for_selector"("#root")?`, plus `frameworks()` for Next/Vite/Redux/Zustand/React Query detection returned by the host.
+Use string method syntax for dotted method names, e.g. `browser."react.detect"()?`,
+`browser."react.component_for_selector"("#root")?`, plus `frameworks()` for
+native React, Next, and Vite marker detection.
 Selector-based component queries return stable DOM-backed tag, component-name,
 text, attribute, and optional `data-react-*` diagnostic metadata.
 

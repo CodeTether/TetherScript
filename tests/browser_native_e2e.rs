@@ -37,7 +37,11 @@ fn tether_script_drives_native_browser_host_end_to_end() {
         ])
         .output()
         .expect("run native browser example");
-    host.stop();
+    if output.status.success() {
+        host.finish_after_script();
+    } else {
+        host.stop();
+    }
     fixture.stop();
     assertions::check(
         output,

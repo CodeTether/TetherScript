@@ -2,9 +2,16 @@ fn main() {
     let args = env_args()
     if args.len() != 3 { panic("native_browser_e2e expects URL, screenshot path, and upload path") }
 
+    let health = browser.health()?
+    let detected = browser.detect()?
     browser.start()?
     browser.goto(args[0])?
+    browser.reload()?
     let network_idle = browser.wait_for_network_idle()?
+    let waited_url = browser.wait_for_url(args[0], 50)?
+    let waited_text = browser.wait_for_text("ready", 50)?
+    browser.hover("#change")?
+    browser.click_text("ready")?
     browser.click("#change")?
     assert_text(browser, "clicked")?
     let waited = browser.wait_for_selector("#below", 50)?
@@ -12,8 +19,15 @@ fn main() {
     if !wait_timeout.is_err() { panic("browser wait did not time out") }
 
     let snapshot = browser.page_snapshot()?
+    let raw_snapshot = browser.snapshot()?
+    let dom_snapshot = browser.dom_snapshot()?
+    let button_text = browser.text("#change")?
+    let button_html = browser.html("#change")?
     let screenshot = browser.screenshot(args[1])?
     let trusted = browser.eval("window.lastTrusted")?
+    browser.focus("#entry")?
+    browser.fill("#fill", "filled")?
+    let filled = browser.eval("document.querySelector('#fill').value")?
     browser.focus("#entry")?
     browser.press("A")?
     let keyboard = browser.eval("document.querySelector('#entry').value")?
@@ -23,6 +37,7 @@ fn main() {
     let keyboard_typed = browser.eval("document.querySelector('#entry').value")?
     browser.fill_native("#entry", "native")?
     let native_filled = browser.eval("document.querySelector('#entry').value")?
+    let keyboard_press = browser.keyboard_press("Enter")?
     let key_events = browser.eval("document.querySelector('#entry').getAttribute('data-key-events')")?
     browser.upload("#upload", [args[2]])?
     let upload = browser.eval("let u=document.querySelector('#upload');let f=u.files[0];f.name+':'+f.type+':'+f.size+':'+u.getAttribute('data-events')")?
@@ -52,20 +67,34 @@ fn main() {
     if browser.page_snapshot()?.url != second { panic("browser.forward did not restore the second URL") }
     let network = browser.network_log(args[0])?
     let network_har = browser.network_har()?
+    let failed = browser.failed_requests()?
     let waited_request = browser.wait_for_request(args[0], 50)?
     let waited_response = browser.wait_for_response(args[0], 50)?
     let fetched = browser.fetch(args[0])?
     let axios = browser.axios(args[0])?
     let xhr = browser.xhr(args[0])?
     let replayed = browser.replay_request(args[0])?
+    let replay_alias = browser.replay(args[0])?
     let console_logs = browser.console_logs()?
     let console_errors = browser.console_errors()?
     let frameworks = browser.frameworks()?
     let react_detected = browser."react.detect"()?
     let hydration = browser."react.hydration_warnings"()?
     let component = browser."react.component_for_selector"("#root")?
+    let react_version = browser."react.version"()?
+    let component_tree = browser."react.component_tree"()?
+    let react_errors = browser."react.errors"()?
+    let suspense = browser."react.suspense_boundaries"()?
+    let react_props = browser."react.props"("#root")?
+    let react_state = browser."react.state"("#root")?
+    let react_hooks = browser."react.hooks"("#root")?
+    let react_owner = browser."react.owner_stack"("#root")?
+    let rejections = browser.unhandled_rejections()?
+    let exceptions = browser.runtime_exceptions()?
+    let stacks = browser.source_mapped_stack_traces()?
     let diagnosis = browser.diagnose()?
     let indexed_db = browser.indexed_db_summary()?
+    let session_storage = browser.session_storage()?
     browser.set_cookie("parity=1")?
     browser.set_local_storage("parity", "1")?
     let cookies_before = browser.cookies()?.len()
@@ -79,16 +108,34 @@ fn main() {
     let compared = browser.compare_screenshots(args[1], args[1])?
     let visual_diff = browser.visual_diff(args[1], args[1])?
     let asserted = assert_screenshot_matches(browser, args[1])?
+    let asserted_method = browser.assert_screenshot_matches(args[1])?
+    let visible = browser.is_visible("#change")?
+    let enabled = browser.is_enabled("#change")?
+    let visual_text = browser.find_visual_text("ready")?
+    let hit = browser.find_element_at(1, 1)?
+    let described = browser.describe()?
+    let raw_health = browser.raw("health", map())?
+    let trace = browser.trace()?
+    let trace_json = browser.export_trace_json()?
+    let exported_har = browser.export_har()?
+    let summary = browser.agent_summary()?
+    let reproduction = browser.minimal_reproduction_script()?
     println("native-browser-url", snapshot.url)
+    println("native-browser-health", health.started, detected.started, raw_health.started)
+    println("native-browser-wait-more", waited_url, waited_text)
+    println("native-browser-snapshots", raw_snapshot.url == snapshot.url, dom_snapshot.url == snapshot.url)
+    println("native-browser-query", button_text, button_html.len() > 0)
     println("native-browser-text", snapshot.visible_text)
     println("native-browser-screenshot", screenshot.format)
     println("native-browser-trusted", trusted)
     println("native-browser-history", second)
     println("native-browser-keyboard", keyboard)
+    println("native-browser-fill", filled)
     println("native-browser-type", typed)
     println("native-browser-key-events", key_events)
     println("native-browser-keyboard-type", keyboard_typed)
     println("native-browser-fill-native", native_filled)
+    println("native-browser-keyboard-press", keyboard_press.action)
     println("native-browser-upload", upload)
     println("native-browser-toggle", toggle_on, toggle)
     println("native-browser-mouse", mouse)
@@ -103,8 +150,16 @@ fn main() {
     println("native-browser-network-har", network_har.len() > 0)
     println("native-browser-network-waits", waited_request.len(), waited_response.len())
     println("native-browser-requests", fetched.status, axios.status, xhr.status, replayed.status)
-    println("native-browser-diagnostics", console_logs.len(), console_errors.len(), frameworks.len(), react_detected, hydration.len(), component.tag, diagnosis.react_detected)
+    println("native-browser-network-more", failed.len(), replay_alias.status)
+    println("native-browser-diagnostics", console_logs.len() > 0, console_errors.len() > 0, frameworks.len() > 0, react_detected, hydration.len() > 0, component.tag, diagnosis.react_detected)
+    println("native-browser-react-more", react_version, component_tree.len() > 0, react_errors.len() > 0, suspense.len() > 0, react_props.len() > 0, react_state, react_hooks, react_owner)
+    println("native-browser-runtime-diagnostics", rejections.len(), exceptions.len(), stacks.len())
     println("native-browser-indexed-db", indexed_db.len())
+    println("native-browser-session-storage", session_storage.len())
     println("native-browser-storage-clear", cookies_before, local_before, cookies_after, local_after)
-    println("native-browser-visual", element_shot.len() < full_shot.len(), compared.matches, visual_diff.changed_bytes, asserted)
+    println("native-browser-visual", element_shot.len() < full_shot.len(), compared.matches, visual_diff.changed_bytes, asserted, asserted_method.matches)
+    println("native-browser-visual-more", visible, enabled, visual_text, hit.len() > 0)
+    println("native-browser-trace", described.scopes.len() > 0, trace.actions.len() > 0, trace_json.actions.len() > 0, exported_har.log.entries.len() > 0, summary.action_count > 0, reproduction.len() > 0)
+    let stopped = browser.stop()?
+    println("native-browser-stop", !stopped.started)
 }

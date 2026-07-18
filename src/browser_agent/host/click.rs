@@ -5,6 +5,10 @@ use crate::value::Value;
 
 use super::super::state::HostState;
 
+#[cfg(test)]
+#[path = "click_text_tests.rs"]
+mod tests;
+
 pub(super) fn invoke(
     state: &mut HostState,
     action: &str,
@@ -13,7 +17,7 @@ pub(super) fn invoke(
     let locator = if action == "click" {
         Locator::css(super::super::value::string_field(payload, "selector")?)
     } else {
-        Locator::text(super::super::value::string_field(payload, "text")?)
+        Locator::text_exact(super::super::value::string_field(payload, "text")?)
     };
     state.page.click(&locator)
 }

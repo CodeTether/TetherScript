@@ -8,7 +8,7 @@ pub(super) fn locator(action: &str, payload: &Value) -> Result<Option<Locator>, 
         "click" | "fill" | "fill_native" | "type" => Ok(Some(Locator::css(
             super::value::string_field(payload, "selector")?,
         ))),
-        "click_text" => Ok(Some(Locator::text(super::value::string_field(
+        "click_text" => Ok(Some(Locator::text_exact(super::value::string_field(
             payload, "text",
         )?))),
         _ => Ok(None),

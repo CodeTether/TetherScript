@@ -36,4 +36,16 @@ impl NativeHost {
         super::ready::post(self.address, r#"{"action":"stop"}"#).unwrap();
         self.finish();
     }
+
+    pub fn finish_after_script(&mut self) {
+        for _ in 0..100 {
+            if let Some(status) = self.child.try_wait().expect("poll native browser host") {
+                assert!(status.success(), "native browser host failed: {status}");
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        self.stop();
+        panic!("native browser script did not stop its host");
+    }
 }
