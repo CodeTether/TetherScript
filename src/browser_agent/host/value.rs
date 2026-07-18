@@ -23,6 +23,10 @@ pub(super) fn string(value: impl Into<String>) -> Value {
     Value::Str(Rc::new(value.into()))
 }
 
+pub(super) fn list(values: Vec<Value>) -> Value {
+    Value::List(Rc::new(RefCell::new(values)))
+}
+
 pub(super) fn field(payload: &Value, name: &str) -> Result<Value, String> {
     let Value::Map(map) = payload else {
         return Err("browser host: action payload must be map".into());

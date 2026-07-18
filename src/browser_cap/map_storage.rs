@@ -4,6 +4,8 @@ use crate::value::Value;
 
 use super::call::BrowserCall;
 
+#[path = "map_storage_indexed.rs"]
+mod indexed;
 #[path = "map_storage_js.rs"]
 mod js;
 #[path = "map_storage_write.rs"]
@@ -24,12 +26,7 @@ pub(crate) fn prepare(method: &str, args: &[Value]) -> Result<BrowserCall, Strin
             js::storage_js("sessionStorage"),
             "browser.inspect.storage",
         ),
-        "indexed_db_summary" => eval_no_args(
-            method,
-            args,
-            "({unsupported:'indexed_db_summary'})",
-            "browser.inspect.storage",
-        ),
+        "indexed_db_summary" => indexed::prepare(args),
         "set_cookie" => write::set_cookie(args),
         "set_local_storage" => write::set_local(args),
         "clear_storage" => eval_no_args(

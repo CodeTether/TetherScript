@@ -163,6 +163,7 @@ fn is_browserctl_action(action: &str) -> bool {
             | "replay"
             | "diagnose"
             | "visual_compare"
+            | "indexed_db_summary"
     )
 }
 

@@ -10,7 +10,7 @@ mod bytes;
 #[path = "visual_compare_tests.rs"]
 mod tests;
 
-pub(super) fn invoke(state: &HostState, payload: &Value) -> Result<Value, String> {
+pub(in super::super) fn invoke(state: &HostState, payload: &Value) -> Result<Value, String> {
     let mode = super::super::value::string_field(payload, "mode")?;
     let before_path = super::super::value::string_field(payload, "before")?;
     let before = read(&before_path)?;

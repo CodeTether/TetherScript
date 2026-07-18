@@ -74,6 +74,7 @@ pub fn check(output: Output, expected_url: &str, screenshot: &Path, upload_size:
         stdout.contains("native-browser-diagnostics 2 1 1 true 1 div true"),
         "{stdout}"
     );
+    assert!(stdout.contains("native-browser-indexed-db 0"), "{stdout}");
     assert!(
         stdout.contains("native-browser-visual true true 0 true"),
         "{stdout}"

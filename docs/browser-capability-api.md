@@ -172,6 +172,8 @@ and HAR entries.
 
 Storage:
 `cookies`, `local_storage`, `session_storage`, `indexed_db_summary`, `set_cookie`, `set_local_storage`, `clear_storage`.
+`indexed_db_summary()` returns origin-scoped records with database, object-store,
+key, and value fields from the native browser context.
 
 React/framework hooks:
 Use string method syntax for dotted method names, e.g. `browser."react.detect"()?`, `browser."react.component_for_selector"("#root")?`, plus `frameworks()` for Next/Vite/Redux/Zustand/React Query detection returned by the host.

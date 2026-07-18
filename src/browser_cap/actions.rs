@@ -12,6 +12,7 @@ pub(crate) fn scope_for_action(action: &str) -> Option<&'static str> {
         "fetch" | "axios" | "xhr" | "replay" => Some("browser.replay.network"),
         "screenshot" => Some("browser.screenshot"),
         "visual_compare" => Some("browser.visual"),
+        "indexed_db_summary" => Some("browser.inspect.storage"),
         "health" | "detect" => Some("browser.inspect.dom"),
         _ => None,
     }
