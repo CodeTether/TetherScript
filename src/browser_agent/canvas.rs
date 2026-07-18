@@ -9,6 +9,8 @@ mod canvas_model;
 mod canvas_page;
 #[path = "canvas_parse.rs"]
 mod canvas_parse;
+#[path = "canvas_webgl_attrs.rs"]
+mod canvas_webgl_attrs;
 #[path = "canvas_webgl_commands.rs"]
 mod canvas_webgl_commands;
 #[path = "canvas_webgl_model.rs"]

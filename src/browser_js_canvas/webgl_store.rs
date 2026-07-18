@@ -1,4 +1,4 @@
-//! Runtime WebGL metadata store.
+//! Runtime WebGL rendering state store.
 
 use super::{webgl_state::WebGlState, *};
 

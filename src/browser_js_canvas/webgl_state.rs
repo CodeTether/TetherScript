@@ -1,4 +1,4 @@
-//! Deterministic WebGL metadata state.
+//! Deterministic WebGL rendering state.
 
 pub(super) const MAX_COMMANDS: usize = 64;
 

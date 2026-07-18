@@ -1,7 +1,7 @@
 use crate::browser_agent::{BrowserPage, Locator};
 
 #[test]
-fn webgl_context_snapshot_reports_metadata() {
+fn webgl_context_snapshot_reports_rendering_state() {
     let mut page = BrowserPage::from_html(
         "mem://webgl",
         "<canvas id='c' width='8' height='4'></canvas>",
@@ -18,8 +18,5 @@ fn webgl_context_snapshot_reports_metadata() {
     );
     assert_eq!(snapshot.viewport, [1, 2, 3, 4]);
     assert_eq!(snapshot.commands[1].operation, "clear");
-    assert!(snapshot
-        .supported_extensions
-        .iter()
-        .any(|name| name == "OES_texture_float"));
+    assert!(snapshot.supported_extensions.is_empty());
 }

@@ -27,6 +27,10 @@ pub(super) fn i64_value(value: Option<&JsValue>) -> i64 {
     }
 }
 
+pub(super) fn rgba8(values: [f64; 4]) -> [u8; 4] {
+    values.map(|value| (value.clamp(0.0, 1.0) * 255.0).round() as u8)
+}
+
 fn unit_value(value: Option<&JsValue>) -> f64 {
     let raw = match value.unwrap_or(&JsValue::Undefined) {
         JsValue::Number(n) if n.is_finite() => *n,
