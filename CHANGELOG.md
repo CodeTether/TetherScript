@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.0-alpha.20] - 2026-07-18
+
 ### Added
 
 - Added script CLI arguments via `env_args()` and `tetherscript run <file> -- [args...]`.
