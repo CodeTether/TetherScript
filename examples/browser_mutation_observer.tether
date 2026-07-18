@@ -1,0 +1,6 @@
+fn main() {
+    let html = "<main id='root'></main>"
+    let script = "let root=document.getElementById('root');let observer=MutationObserver(function(r)\{console.log(r.length+'|'+r[0].type+':'+r[0].attributeName+':'+r[0].oldValue+'|'+r[1].type+':'+r[1].attributeName+':'+r[1].oldValue+'|'+r[2].type+':'+r[2].addedNodes.length+':'+r[2].removedNodes.length);\});observer.observe(root,\{attributes:true,attributeOldValue:true,childList:true\});root.setAttribute('data-x','one');root.setAttribute('data-x','two');root.appendChild(document.createElement('span'));'sync';"
+    let result = browser_eval_js(html, script)
+    println(result.console.join("\n"))
+}
