@@ -21,7 +21,7 @@ pub struct WebGlCommand {
     pub args: Vec<String>,
 }
 
-/// Deterministic non-rendering snapshot of one WebGL canvas context.
+/// Deterministic state snapshot of one software-rendered WebGL canvas context.
 ///
 /// # Examples
 ///

@@ -6,17 +6,15 @@ fn webgl_context_records_metadata_commands_and_parameters() {
         "<canvas id='c' width='8' height='4'></canvas>",
         "let gl=document.getElementById('c').getContext('webgl'); \
          gl.viewport(1,2,3,4); gl.clearColor(0.25,0.5,0.75,1); gl.clear(gl.COLOR_BUFFER_BIT); \
-         gl.getParameter(gl.VENDOR)+':'+gl.getParameter(gl.VIEWPORT).join(',')+':'+\
+         gl.getParameter(gl.VENDOR)+':'+gl.getParameter(gl.RENDERER)+':'+\
+         gl.getParameter(gl.VIEWPORT).join(',')+':'+gl.getParameter(gl.MAX_TEXTURE_SIZE)+':'+\
+         (gl.getParameter(gl.SHADING_LANGUAGE_VERSION)===null)+':'+\
          gl.getSupportedExtensions().join('|');",
     )
     .unwrap();
     assert_eq!(
         result.value.display(),
-        concat!(
-            "tetherscript deterministic WebGL:1,2,3,4:",
-            "ANGLE_instanced_arrays|OES_element_index_uint|",
-            "OES_standard_derivatives|OES_texture_float|WEBGL_debug_renderer_info"
-        )
+        "tetherscript:tetherscript software rasterizer:1,2,3,4:0:true:"
     );
     let attrs = match &result.document.children[0] {
         Node::Element(el) => &el.attrs,
@@ -26,4 +24,7 @@ fn webgl_context_records_metadata_commands_and_parameters() {
         attrs.get("data-agent-webgl-commands").map(String::as_str),
         Some("viewport|1|2|3|4;clearColor|0.25|0.5|0.75|1;clear|16384")
     );
+    let checksum = attrs["data-agent-canvas-checksum"].parse::<u64>().unwrap();
+    let pixel = u32::from_be_bytes([64, 128, 191, 255]) as u64;
+    assert_eq!(checksum, (1_u64..=32).sum::<u64>() * (pixel + 1));
 }

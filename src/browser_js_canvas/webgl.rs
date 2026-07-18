@@ -1,9 +1,13 @@
-//! WebGL metadata host modules.
+//! WebGL software rendering and state-query modules.
 
 use super::*;
 
 #[path = "webgl_attrs.rs"]
 mod webgl_attrs;
+#[path = "webgl_clear.rs"]
+mod webgl_clear;
+#[path = "webgl_clear_color.rs"]
+mod webgl_clear_color;
 #[path = "webgl_constants.rs"]
 mod webgl_constants;
 #[path = "webgl_context.rs"]
@@ -20,6 +24,8 @@ mod webgl_state;
 mod webgl_store;
 #[path = "webgl_values.rs"]
 mod webgl_values;
+#[path = "webgl_viewport.rs"]
+mod webgl_viewport;
 
 pub(super) fn context_object(handle: DomHandle, version: u8) -> JsValue {
     webgl_context::context_object(handle, version)

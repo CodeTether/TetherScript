@@ -8,7 +8,7 @@ use super::canvas_webgl_model::WebGlContextSnapshot;
 use super::canvas_webgl_parse::snapshot_from_element;
 
 impl BrowserPage {
-    /// Return the deterministic WebGL metadata snapshot for one canvas.
+    /// Return the deterministic WebGL rendering-state snapshot for one canvas.
     ///
     /// # Errors
     ///
