@@ -1,33 +1,48 @@
 use super::*;
 
+#[path = "visual_viewport_event_methods.rs"]
+mod event_methods;
 #[path = "visual_viewport_event_object.rs"]
 mod event_object;
 #[path = "visual_viewport_events.rs"]
 mod events;
+#[path = "visual_viewport_metrics.rs"]
+mod metrics;
 #[cfg(test)]
 #[path = "tests_visual_viewport_events.rs"]
 mod tests_visual_viewport_events;
+#[cfg(test)]
+#[path = "tests_visual_viewport_listener_mutation.rs"]
+mod tests_visual_viewport_listener_mutation;
 
 pub(super) fn install(window: &mut HashMap<String, JsValue>) {
     let object = Rc::new(RefCell::new(HashMap::new()));
-    {
-        let mut map = object.borrow_mut();
-        install_metrics(&mut map);
-    }
+    metrics::install(&mut object.borrow_mut());
     events::install(&object);
     window.insert("visualViewport".into(), JsValue::Object(object));
 }
 
-fn install_metrics(map: &mut HashMap<String, JsValue>) {
-    for (name, value) in [
-        ("width", constants::DEFAULT_VIEWPORT_WIDTH as f64),
-        ("height", constants::DEFAULT_VIEWPORT_HEIGHT as f64),
-        ("scale", constants::DEVICE_PIXEL_RATIO),
-        ("offsetLeft", 0.0),
-        ("offsetTop", 0.0),
-        ("pageLeft", 0.0),
-        ("pageTop", 0.0),
-    ] {
-        map.insert(name.into(), JsValue::Number(value));
+pub(in crate::browser_js) fn sync(window: &JsValue) {
+    if let Some((window, viewport)) = objects(window) {
+        metrics::sync(&window, &viewport);
     }
 }
+
+pub(in crate::browser_js) fn dispatch(window: &JsValue, event_type: &str) -> Result<(), String> {
+    let Some((_, viewport)) = objects(window) else {
+        return Ok(());
+    };
+    events::dispatch_type(&viewport, event_type)
+}
+
+fn objects(window: &JsValue) -> Option<(Object, Object)> {
+    let JsValue::Object(window) = window else {
+        return None;
+    };
+    let JsValue::Object(viewport) = window.borrow().get("visualViewport")?.clone() else {
+        return None;
+    };
+    Some((window.clone(), viewport))
+}
+
+type Object = Rc<RefCell<HashMap<String, JsValue>>>;

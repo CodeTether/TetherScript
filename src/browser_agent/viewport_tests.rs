@@ -14,6 +14,21 @@ fn set_viewport_updates_compat_fields() {
 }
 
 #[test]
+fn set_viewport_updates_js_metrics_and_dispatches_resize() {
+    let mut page = BrowserPage::from_html("mem://viewport-js", "<main>Viewport</main>");
+    page.eval_js("let seen='';visualViewport.addEventListener('resize',function(e){seen=e.type+':'+e.isTrusted;});").unwrap();
+
+    page.set_viewport_size(320, 640).unwrap();
+    let value = page
+        .eval_js(
+            "[innerWidth,innerHeight,visualViewport.width,visualViewport.height,seen].join(':')",
+        )
+        .unwrap();
+
+    assert_eq!(value.display(), "320:640:320:640:resize:true");
+}
+
+#[test]
 fn clone_debug_and_eq_preserve_device_metadata() {
     let mut page = BrowserPage::from_html("mem://device", "<main>Device</main>");
     page.set_viewport_size(390, 844).unwrap();

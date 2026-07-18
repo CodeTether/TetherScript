@@ -13,26 +13,28 @@ fn deterministic_window_metrics_are_exposed() {
 }
 
 #[test]
-fn visual_viewport_exposes_deterministic_metrics_and_noop_events() {
+fn visual_viewport_exposes_initial_metrics_and_event_methods() {
     let script = "let v=window.visualViewport;\
         let resize=v.dispatchEvent({type:'resize'});\
-        v.addEventListener('scroll', function(){});\
-        v.removeEventListener('scroll', function(){});\
         [v.width,v.height,v.scale,v.offsetLeft,v.offsetTop,\
-        v.pageLeft,v.pageTop,resize].join(':');";
+        v.pageLeft,v.pageTop,resize,typeof v.addEventListener,\
+        typeof v.removeEventListener].join(':');";
     let result = eval_with_dom("", script).unwrap();
 
-    assert_eq!(result.value, JsValue::String("80:24:1:0:0:0:0:true".into()));
+    assert_eq!(
+        result.value,
+        JsValue::String("80:24:1:0:0:0:0:true:function:function".into())
+    );
 }
 
 #[test]
-fn resize_to_leaves_scoped_outer_and_visual_metrics_static() {
+fn resize_to_updates_visual_metrics_without_changing_outer_size() {
     let script = "resizeTo(120,40);\
         [window.innerWidth,window.outerWidth,\
         window.visualViewport.width,window.visualViewport.height].join(':');";
     let result = eval_with_dom("", script).unwrap();
 
-    assert_eq!(result.value, JsValue::String("120:80:80:24".into()));
+    assert_eq!(result.value, JsValue::String("120:80:120:40".into()));
 }
 
 #[test]

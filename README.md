@@ -115,7 +115,7 @@ tetherscript currently includes:
   construction, form defaults, navigation history, context storage/cookies,
   keyboard/pointer interaction, focus order, and file upload/download behavior,
   realtime channels, permissions/media APIs, and dialog/clipboard behavior,
-  frames/window messaging, security policy, canvas/WebGL, and accessibility
+  frames/window messaging, security policy, viewport/media state, canvas/WebGL, and accessibility
   snapshots, service workers/cache storage, IndexedDB, selection,
   screenshots/visual diff, and page trace/persistence behavior, including
   negative/error cases, through `cargo test --test browser_wpt_like`.
