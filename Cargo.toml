@@ -2,7 +2,7 @@
 name = "tetherscript"
 version = "0.1.0-alpha.20"
 authors = ["Riley Seaburg <riley@rileyseaburg.com>"]
-edition = "2021"
+edition = "2024"
 description = "A dynamically-typed scripting language with Rust-style ownership, implemented as a bytecode VM in Rust"
 license = "MIT"
 repository = "https://github.com/codetether/tetherscript"
@@ -33,3 +33,6 @@ path = "src/lib.rs"
 [[bin]]
 name = "tetherscript"
 path = "src/main.rs"
+
+[lints.clippy]
+collapsible_if = "allow"

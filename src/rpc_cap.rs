@@ -305,7 +305,7 @@ impl RpcAuthority {
         // Check for error
         if let Value::Map(ref map) = response {
             let map = map.borrow();
-            if let Some(Value::Map(ref error)) = map.get("error") {
+            if let Some(Value::Map(error)) = map.get("error") {
                 let error = error.borrow();
                 let code = error
                     .get("code")
@@ -336,7 +336,7 @@ impl RpcAuthority {
 
     /// Extract the result field from a JSON-RPC response.
     fn extract_result(&self, response: &Value) -> Result<Value, String> {
-        if let Value::Map(ref map) = response {
+        if let Value::Map(map) = response {
             let map = map.borrow();
             if let Some(result) = map.get("result") {
                 return Ok(result.clone());
@@ -625,11 +625,11 @@ impl Authority for RpcAuthority {
     }
 
     fn narrow(&self, params: &Value) -> Result<Rc<dyn Authority>, String> {
-        if let Value::Map(ref map) = params {
+        if let Value::Map(map) = params {
             let map = map.borrow();
 
             let mut methods = self.methods.clone();
-            if let Some(Value::List(ref list)) = map.get("methods") {
+            if let Some(Value::List(list)) = map.get("methods") {
                 let list = list.borrow();
                 methods.clear();
                 for item in list.iter() {
