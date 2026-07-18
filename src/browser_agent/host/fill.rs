@@ -5,6 +5,10 @@ use crate::value::Value;
 
 use super::super::state::HostState;
 
+#[cfg(test)]
+#[path = "fill_native_tests.rs"]
+mod native_tests;
+
 pub(super) fn invoke(state: &mut HostState, payload: &Value) -> Result<ActionReport, String> {
     state.page.fill(
         &Locator::css(super::super::value::string_field(payload, "selector")?),

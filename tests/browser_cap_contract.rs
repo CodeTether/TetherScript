@@ -290,7 +290,10 @@ fn high_level_methods_emit_only_browserctl_actions() {
         ("scroll", vec![str_value("#panel")]),
         ("scroll", vec![Value::Int(0), Value::Int(400)]),
         ("click_text", vec![str_value("Save")]),
-        ("fill_native", vec![str_value("#email")]),
+        (
+            "fill_native",
+            vec![str_value("#email"), str_value("native")],
+        ),
         ("toggle", vec![str_value("#enabled")]),
         ("mouse_click", vec![Value::Int(1), Value::Int(2)]),
         ("keyboard_type", vec![str_value("hello")]),

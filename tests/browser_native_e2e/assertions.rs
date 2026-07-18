@@ -32,6 +32,10 @@ pub fn check(output: Output, expected_url: &str, screenshot: &Path, upload_size:
         stdout.contains("native-browser-keyboard-type ABCDE"),
         "{stdout}"
     );
+    assert!(
+        stdout.contains("native-browser-fill-native native"),
+        "{stdout}"
+    );
     assert!(stdout.contains("native-browser-focus blurred"), "{stdout}");
     assert!(
         stdout.contains(&format!(

@@ -13,9 +13,8 @@ mod motion;
 
 pub(crate) fn prepare(method: &str, args: &[Value]) -> Result<BrowserCall, String> {
     match method {
-        "click" | "hover" | "focus" | "blur" | "fill_native" | "toggle" => {
-            basic::selector_action(method, args)
-        }
+        "click" | "hover" | "focus" | "blur" | "toggle" => basic::selector_action(method, args),
+        "fill_native" => basic::pair(method, args, "selector", "value"),
         "upload" => more::upload(args),
         "fill" => basic::pair("fill", args, "selector", "value"),
         "type" => basic::pair("type", args, "selector", "text"),
