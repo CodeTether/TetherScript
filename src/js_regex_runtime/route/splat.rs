@@ -8,10 +8,9 @@ pub(super) fn finish(
     let tail = &text[index..];
     if tail.is_empty() || tail.chars().all(|ch| ch == '/') {
         captures.push(None);
-    } else if let Some(rest) = tail.strip_prefix('/') {
-        captures.push(Some(rest.into()));
     } else {
-        return None;
+        let rest = tail.strip_prefix('/')?;
+        captures.push(Some(rest.into()));
     }
     Some((0, text.len(), captures))
 }
