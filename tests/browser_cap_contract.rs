@@ -311,6 +311,7 @@ fn high_level_methods_emit_only_browserctl_actions() {
         ("console_logs", vec![]),
         ("react.detect", vec![]),
         ("network_log", vec![str_value("/api")]),
+        ("network_har", vec![]),
         ("failed_requests", vec![]),
         ("fetch", vec![str_value("http://app.test/api")]),
         ("axios", vec![str_value("http://app.test/api")]),

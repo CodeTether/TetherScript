@@ -51,6 +51,7 @@ fn main() {
     browser.forward()?
     if browser.page_snapshot()?.url != second { panic("browser.forward did not restore the second URL") }
     let network = browser.network_log(args[0])?
+    let network_har = browser.network_har()?
     let waited_request = browser.wait_for_request(args[0], 50)?
     let waited_response = browser.wait_for_response(args[0], 50)?
     let fetched = browser.fetch(args[0])?
@@ -99,6 +100,7 @@ fn main() {
     println("native-browser-network-idle", network_idle)
     println("native-browser-wait-timeout", wait_timeout.is_err())
     println("native-browser-network", network.len())
+    println("native-browser-network-har", network_har.len() > 0)
     println("native-browser-network-waits", waited_request.len(), waited_response.len())
     println("native-browser-requests", fetched.status, axios.status, xhr.status, replayed.status)
     println("native-browser-diagnostics", console_logs.len(), console_errors.len(), frameworks.len(), react_detected, hydration.len(), component.tag, diagnosis.react_detected)

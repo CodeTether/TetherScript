@@ -26,6 +26,7 @@ fn scope(method: &str) -> &'static str {
         | "unhandled_rejections"
         | "runtime_exceptions"
         | "source_mapped_stack_traces" => "browser.inspect.console",
+        "network_har" => "browser.inspect.network",
         _ => "browser.inspect.react",
     }
 }

@@ -8,6 +8,8 @@ use super::super::state::HostState;
 mod console;
 #[path = "diagnose_element.rs"]
 mod element;
+#[path = "diagnose_har.rs"]
+mod har;
 #[path = "diagnose_react.rs"]
 mod react;
 #[path = "diagnose_report.rs"]
@@ -28,6 +30,7 @@ pub(super) fn invoke(state: &mut HostState, payload: &Value) -> Result<Value, St
         "unhandled_rejections" => Ok(console::rejections(&state.page)),
         "runtime_exceptions" => Ok(report::exceptions(&state.page)),
         "source_mapped_stack_traces" => Ok(report::stacks(&state.page)),
+        "network_har" => Ok(har::value(&state.page)),
         "frameworks" => Ok(value::strings(
             state.page.production_debug_report().frameworks,
         )),

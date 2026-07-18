@@ -156,7 +156,9 @@ Tabs retain independent page, history, scroll, and runtime state; selecting or
 closing a tab swaps the active host page without reloading it.
 
 Network:
-`network_log`, `network_har`, `failed_requests`, `request`, `response`, `replay_request`, `wait_for_request`, `wait_for_response`.
+`network_log`, `network_har`, `failed_requests`, `replay_request`, `wait_for_request`, `wait_for_response`.
+`network_har()` returns native request/response headers, bodies, status, route
+result, sequence, timestamp, and deterministic timing fields.
 The native host returns captured request method, URL, status, and route result;
 `failed_requests` restricts the result to missing or error statuses.
 `wait_for_request` and `wait_for_response` poll captured events while settling
