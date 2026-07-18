@@ -1,12 +1,15 @@
 //! Native locator-backed click, fill, type, and hover actions.
 
-use crate::browser_agent::Locator;
 use crate::value::Value;
 
 use super::state::HostState;
 
+#[path = "click.rs"]
+mod click;
 #[path = "fill.rs"]
 mod fill;
+#[path = "mouse_click.rs"]
+mod mouse_click;
 #[path = "toggle.rs"]
 mod toggle;
 #[cfg(test)]
@@ -26,19 +29,15 @@ pub(super) fn invoke(
     payload: &Value,
 ) -> Result<Value, String> {
     let report = match action {
-        "click" => state.page.click(&Locator::css(super::value::string_field(
-            payload, "selector",
-        )?))?,
-        "click_text" => state
-            .page
-            .click(&Locator::text(super::value::string_field(payload, "text")?))?,
+        "click" | "click_text" => click::invoke(state, action, payload)?,
         "fill" => fill::invoke(state, payload)?,
         "type" => type_text::invoke(state, payload)?,
         "upload" => upload::invoke(state, payload)?,
         "toggle" => toggle::invoke(state, payload)?,
-        "hover" => state.page.hover(&Locator::css(super::value::string_field(
-            payload, "selector",
-        )?))?,
+        "mouse_click" => mouse_click::invoke(state, payload)?,
+        "hover" => state.page.hover(&crate::browser_agent::Locator::css(
+            super::value::string_field(payload, "selector")?,
+        ))?,
         _ => unreachable!(),
     };
     if let Some(locator) = super::interact_focus::locator(action, payload)? {

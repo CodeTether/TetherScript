@@ -12,7 +12,7 @@ pub fn check(output: Output, expected_url: &str, screenshot: &Path, upload_size:
     assert!(
         stdout
             .lines()
-            .any(|line| line == "native-browser-text clicked below"),
+            .any(|line| line == "native-browser-text clicked mouse below"),
         "{stdout}"
     );
     assert!(stdout.contains(expected_url), "{stdout}");
@@ -43,6 +43,7 @@ pub fn check(output: Output, expected_url: &str, screenshot: &Path, upload_size:
         stdout.contains("native-browser-toggle true false:cihcih"),
         "{stdout}"
     );
+    assert!(stdout.contains("native-browser-mouse true:"), "{stdout}");
     let selector_scroll = line_value(&stdout, "native-browser-selector-scroll");
     assert!(selector_scroll.parse::<i64>().unwrap() > 0, "{stdout}");
     assert!(

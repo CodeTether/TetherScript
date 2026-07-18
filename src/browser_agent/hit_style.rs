@@ -3,6 +3,15 @@
 use crate::browser::LayoutBox;
 use crate::browser_agent::action::BoundingBox;
 
+#[path = "hit_z.rs"]
+mod z;
+
+pub(crate) use z::z_index;
+
+const NON_RENDERED: [&str; 9] = [
+    "base", "head", "link", "meta", "noscript", "script", "style", "template", "title",
+];
+
 pub(crate) fn bounds_for(layout: &LayoutBox) -> BoundingBox {
     BoundingBox {
         x: layout.x,
@@ -13,7 +22,11 @@ pub(crate) fn bounds_for(layout: &LayoutBox) -> BoundingBox {
 }
 
 pub(crate) fn pointer_enabled(layout: &LayoutBox) -> bool {
-    visible(layout)
+    !layout
+        .tag
+        .as_deref()
+        .is_some_and(|tag| NON_RENDERED.contains(&tag))
+        && visible(layout)
         && !layout
             .styles
             .get("pointer-events")
@@ -32,17 +45,4 @@ fn matches_hidden(value: &str) -> bool {
         value.trim().to_ascii_lowercase().as_str(),
         "hidden" | "collapse"
     )
-}
-
-pub(crate) fn z_index(layout: &LayoutBox) -> i64 {
-    px(layout.styles.get("z-index")).unwrap_or(0)
-}
-
-fn px(value: Option<&String>) -> Option<i64> {
-    value?
-        .trim()
-        .strip_suffix("px")
-        .unwrap_or(value?.trim())
-        .parse()
-        .ok()
 }
