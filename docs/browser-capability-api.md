@@ -144,6 +144,8 @@ retained by the latest focusable action.
 `upload` reads the supplied host paths, exposes deterministic file metadata to
 an `input[type=file]`, and dispatches input and change events.
 `toggle` inverts a checkbox or radio through its click, input, and change path.
+`mouse_click` hit-tests viewport coordinates and dispatches a trusted pointer and
+mouse sequence at the requested point.
 
 Network:
 `network_log`, `network_har`, `failed_requests`, `request`, `response`, `replay_request`, `wait_for_request`, `wait_for_response`.

@@ -17,9 +17,8 @@ pub(super) fn invoke(state: &mut HostState, payload: &Value) -> (Result<Value, S
         "snapshot" => Ok(super::snapshot::value(&state.page)),
         "text" | "html" | "eval" => super::query::invoke(state, &action, payload),
         "wait" => super::wait::invoke(state, payload),
-        "click" | "click_text" | "fill" | "type" | "upload" | "toggle" | "hover" => {
-            super::interact::invoke(state, &action, payload)
-        }
+        "click" | "click_text" | "fill" | "type" | "upload" | "toggle" | "mouse_click"
+        | "hover" => super::interact::invoke(state, &action, payload),
         "focus" | "blur" => super::focus::invoke(state, &action, payload),
         "press" | "keyboard_press" | "keyboard_type" => {
             super::keyboard::invoke(state, &action, payload)
