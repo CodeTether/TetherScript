@@ -20,6 +20,8 @@ pub(super) fn invoke(state: &mut HostState, payload: &Value) -> (Result<Value, S
         "click" | "click_text" | "fill" | "type" | "hover" => {
             super::interact::invoke(state, &action, payload)
         }
+        "focus" | "blur" => super::focus::invoke(state, &action, payload),
+        "press" | "keyboard_press" => super::keyboard::invoke(state, payload),
         "screenshot" => super::screenshot::invoke(state, payload),
         _ => Err(format!(
             "browser host: native action `{}` is not implemented",

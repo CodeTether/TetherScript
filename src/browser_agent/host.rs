@@ -3,9 +3,14 @@
 mod dispatch;
 mod fetch;
 mod fetch_response;
+mod focus;
 mod health;
+#[cfg(test)]
+mod input_tests;
 mod interact;
+mod interact_focus;
 mod interact_value;
+mod keyboard;
 mod nav;
 mod nav_load;
 mod png;

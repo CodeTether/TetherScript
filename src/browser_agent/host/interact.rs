@@ -23,6 +23,9 @@ pub(super) fn invoke(
         )?))?,
         _ => unreachable!(),
     };
+    if let Some(locator) = super::interact_focus::locator(action, payload)? {
+        state.focused = Some(locator);
+    }
     Ok(super::interact_value::report(report))
 }
 

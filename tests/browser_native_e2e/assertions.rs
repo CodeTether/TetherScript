@@ -22,6 +22,8 @@ pub fn check(output: Output, expected_url: &str, screenshot: &Path) {
         stdout.contains(&format!("native-browser-history {expected_url}second")),
         "{stdout}"
     );
+    assert!(stdout.contains("native-browser-keyboard A"), "{stdout}");
+    assert!(stdout.contains("native-browser-focus blurred"), "{stdout}");
     let png = std::fs::read(screenshot).expect("native screenshot exists");
     assert!(png.starts_with(b"\x89PNG\r\n\x1a\n"));
 }
