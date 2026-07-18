@@ -7,6 +7,7 @@ use super::super::super::state::HostState;
 pub(super) fn open(state: &mut HostState, url: &str) -> Result<(), String> {
     let loaded = super::super::super::fetch::load(url)?;
     let mut page = BrowserPage::new(Default::default());
+    page.attach_context_state(state.context_state.clone(), false);
     page.goto_html(loaded.url, loaded.body);
     page.run_scripts()?;
     let old = std::mem::replace(&mut state.page, page);

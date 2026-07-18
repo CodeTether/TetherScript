@@ -12,6 +12,8 @@ mod capture;
 #[cfg(test)]
 #[path = "screenshot_tests.rs"]
 mod tests;
+#[path = "visual_compare.rs"]
+pub(super) mod visual_compare;
 
 pub(super) fn invoke(state: &HostState, payload: &Value) -> Result<Value, String> {
     let image = capture::image(state, payload)?;
