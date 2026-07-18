@@ -5,7 +5,7 @@ mod base;
 #[path = "events/class.rs"]
 mod class;
 #[path = "events/data_transfer.rs"]
-mod data_transfer;
+pub(in crate::browser_js) mod data_transfer;
 #[path = "events/fields.rs"]
 mod fields;
 #[path = "events/methods.rs"]

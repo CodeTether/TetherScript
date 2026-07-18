@@ -1,0 +1,5 @@
+fn main() {
+    let html = "<input id='source' value='native browser'><input id='target' value=''>"
+    let script = "let source=document.getElementById('source');let target=document.getElementById('target');source.focus();source.setSelectionRange(7,14);let copied=document.execCommand('copy');target.focus();let pasted=document.execCommand('paste');let pastedValue=document.getElementById('target').value;let selected=document.execCommand('selectAll');document.execCommand('insertText',false,'ready');copied+':'+pasted+':'+pastedValue+':'+selected+':'+document.getElementById('target').value;"
+    println(browser_eval_js(html, script).value)
+}

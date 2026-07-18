@@ -43,7 +43,7 @@ The runner lives under `tests/browser_wpt_like/`. Each fixture records:
 | Drag and pointer capture | `tests/browser_wpt_like/drag_pointer_capture.rs` | DataTransfer object construction, real OS drag source negotiation |
 | Service workers/cache storage | `tests/browser_wpt_like/service_worker_cache.rs` | real worker thread execution, complete fetch event lifecycle |
 | IndexedDB | `tests/browser_wpt_like/indexed_db.rs` | transaction scheduling, structured clone value storage |
-| Selection | `tests/browser_wpt_like/selection.rs` | multi-range selection, bidirectional text selection geometry |
+| Selection/editing | `tests/browser_wpt_like/selection.rs` | multi-range selection, bidirectional text selection geometry |
 | Screenshots/visual diff | `tests/browser_wpt_like/visual_diff.rs` | font rasterization parity, anti-aliasing and subpixel paint model |
 | Trace/persistence | `tests/browser_wpt_like/trace_persistence.rs` | back-forward cache, complete session history serialization |
 | Viewport/media emulation | `tests/browser_wpt_like/viewport_media.rs` | matchMedia listener dispatch, continuous prefers-color-scheme transitions |

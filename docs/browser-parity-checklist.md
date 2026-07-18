@@ -189,7 +189,8 @@ Completed tests:
 - Accessibility names, states, hidden filtering, and focus order are visible.
 - Active service workers can fulfill pass-through fetches from CacheStorage.
 - Same-origin pages share IndexedDB records while separate contexts do not.
-- Element selection and focused input ranges expose selected text.
+- Element selection and focused input ranges expose selected text; legacy
+  copy, cut, paste, delete, insertText, and selectAll commands perform edits.
 - Screenshots and visual diff reflect deterministic DOM mutation.
 - Page action traces and snapshot restore preserve observable state.
 - Failed realtime connections dispatch error/close metadata.

@@ -643,6 +643,7 @@ fn reset_browser_js_state() {
     media_host::reset_all();
     selection_host::reset();
     default_action_host::reset();
+    dom_compat_host::document::commands::reset();
     dom_compat_host::form_validation::reset();
     compat_host::promise::reset();
     MUTATION_OBSERVERS.with(|observers| observers.borrow_mut().clear());
@@ -4837,22 +4838,7 @@ fn document_reference_object(root: Rc<RefCell<Node>>) -> JsValue {
             Ok(detached_node_object(Node::Text(text)))
         }),
     );
-    obj.insert(
-        "execCommand".into(),
-        native("document.execCommand", None, |_| Ok(JsValue::Bool(false))),
-    );
-    obj.insert(
-        "queryCommandSupported".into(),
-        native("document.queryCommandSupported", None, |_| {
-            Ok(JsValue::Bool(false))
-        }),
-    );
-    obj.insert(
-        "queryCommandEnabled".into(),
-        native("document.queryCommandEnabled", None, |_| {
-            Ok(JsValue::Bool(false))
-        }),
-    );
+    dom_compat_host::document::commands::install(&mut obj, &handle);
     let h = handle.clone();
     obj.insert(
         "addEventListener".into(),

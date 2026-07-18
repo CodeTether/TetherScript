@@ -17,7 +17,7 @@ mod dom_constructors;
 #[path = "browser_js_compat/dom_exception.rs"]
 mod dom_exception;
 #[path = "browser_js_compat/events.rs"]
-mod events;
+pub(super) mod events;
 #[path = "browser_js_compat/file_picker.rs"]
 mod file_picker;
 #[path = "browser_js_compat/file_reader.rs"]

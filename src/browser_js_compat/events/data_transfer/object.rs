@@ -1,15 +1,19 @@
 use super::*;
 
 pub(super) fn create() -> JsValue {
+    create_state().0
+}
+
+pub(super) fn create_state() -> (JsValue, model::SharedStrings, model::SharedArray) {
     let strings = Rc::new(RefCell::new(Vec::new()));
     let types = model::array();
     let object = Rc::new(RefCell::new(HashMap::new()));
     {
         let mut map = object.borrow_mut();
         insert_defaults(&mut map, types.clone());
-        data::install(&mut map, strings, types);
+        data::install(&mut map, strings.clone(), types.clone());
     }
-    JsValue::Object(object)
+    (JsValue::Object(object), strings, types)
 }
 
 fn insert_defaults(map: &mut HashMap<String, JsValue>, types: model::SharedArray) {
