@@ -4,6 +4,8 @@ use super::*;
 mod anchors;
 #[path = "document/collections.rs"]
 mod collections;
+#[path = "document/commands.rs"]
+pub(in crate::browser_js) mod commands;
 #[path = "document/events.rs"]
 mod events;
 #[path = "document/implementation.rs"]
@@ -34,6 +36,7 @@ pub(super) fn install(obj: &mut HashMap<String, JsValue>, handle: &DomHandle, no
     obj.insert("body".into(), lookup::element_or_first(handle, "body"));
     anchors::install(obj, handle);
     collections::install(obj, handle);
+    commands::install(obj, handle);
     metadata::install(obj);
     events::install(obj);
     legacy::install(obj, handle);

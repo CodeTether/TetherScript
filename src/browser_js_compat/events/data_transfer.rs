@@ -22,6 +22,10 @@ mod items_remove;
 mod model;
 #[path = "data_transfer/object.rs"]
 mod object;
+#[path = "data_transfer/transfer.rs"]
+mod transfer;
+
+pub(in crate::browser_js) use transfer::Transfer;
 
 pub(super) fn install(window: &mut HashMap<String, JsValue>) {
     window.insert(

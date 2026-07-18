@@ -12,7 +12,7 @@ mod convenience;
 #[path = "browser_js_dom/dialog/mod.rs"]
 mod dialog;
 #[path = "browser_js_dom/document.rs"]
-mod document;
+pub(in crate::browser_js) mod document;
 #[path = "browser_js_dom/file_input/mod.rs"]
 mod file_input;
 #[path = "browser_js_dom/form_validation/mod.rs"]

@@ -2,6 +2,7 @@
 
 use super::*;
 
+pub(in crate::browser_js) mod command;
 mod common;
 mod control;
 mod edit;

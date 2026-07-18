@@ -51,7 +51,8 @@ keyboard/pointer interaction (including composition/touch/pointerType), actionab
 have fixture coverage too. Realtime channels, permissions/media APIs, and
 dialog/clipboard behavior are now locked in the same runner. Frames/window
 messaging, security policy, canvas/WebGL, and accessibility snapshots now have
-fixture coverage too. Service workers/cache storage, IndexedDB, selection,
+fixture coverage too. Service workers/cache storage, IndexedDB, selection and
+legacy editing commands,
 screenshots/visual diff, viewport matchMedia listener dispatch, quota/resource guards, drag DataTransfer payloads, and page trace/persistence behavior are now covered in
 the same fixture runner. Negative/error fixtures lock invalid selector, blocked
 CORS, missing module chunk, unsupported HTML parser behavior, failed realtime
