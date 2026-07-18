@@ -49,7 +49,7 @@ to tetherscript bytecode on startup before VM execution.
 
 ## Status
 
-tetherscript `0.1.0-alpha.18` is the current release candidate for crates.io.
+tetherscript `0.1.0-alpha.20` is the current release candidate for crates.io.
 
 tetherscript currently includes:
 
@@ -156,7 +156,7 @@ command creates a standalone bytecode launcher; it does not yet emit native code
 ## Quick start
 
 ```bash
-cargo install tetherscript --version 0.1.0-alpha.18
+cargo install tetherscript --version 0.1.0-alpha.20
 
 cargo build --release
 
