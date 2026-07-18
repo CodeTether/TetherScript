@@ -10,6 +10,10 @@ pub(super) fn u32(element: &Element, name: &str) -> Option<u32> {
     element.attrs.get(name).and_then(|value| value.parse().ok())
 }
 
+pub(super) fn boolean(element: &Element, name: &str) -> bool {
+    element.attrs.get(name).is_some_and(|value| value == "true")
+}
+
 pub(super) fn array<T: Copy + std::str::FromStr>(
     element: &Element,
     name: &str,

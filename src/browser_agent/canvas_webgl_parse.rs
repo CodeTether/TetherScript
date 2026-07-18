@@ -17,6 +17,9 @@ pub(super) fn snapshot_from_element(element: &Element) -> Option<WebGlContextSna
             .unwrap_or(150),
         viewport: attr::array(element, "data-agent-webgl-viewport", 0),
         clear_color: attr::array(element, "data-agent-webgl-clear-color", 0.0),
+        scissor_box: attr::array(element, "data-agent-webgl-scissor-box", 0),
+        scissor_test: attr::boolean(element, "data-agent-webgl-scissor-test"),
+        color_mask: attr::array(element, "data-agent-webgl-color-mask", true),
         supported_extensions: attr::list(element, "data-agent-webgl-extensions"),
         commands: commands_from_attr(element),
     })

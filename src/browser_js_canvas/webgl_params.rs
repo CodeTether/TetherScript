@@ -2,7 +2,7 @@
 
 use super::{webgl_constants as c, webgl_state::WebGlState, *};
 
-pub(super) fn get(state: &WebGlState, param: &JsValue) -> JsValue {
+pub(super) fn get(state: &mut WebGlState, param: &JsValue) -> JsValue {
     match number(param) {
         c::VENDOR => JsValue::String("tetherscript".into()),
         c::RENDERER => JsValue::String("tetherscript software rasterizer".into()),
@@ -14,13 +14,25 @@ pub(super) fn get(state: &WebGlState, param: &JsValue) -> JsValue {
         c::COLOR_CLEAR_VALUE => array(&state.clear_color),
         c::DEPTH_CLEAR_VALUE => JsValue::Number(1.0),
         c::STENCIL_CLEAR_VALUE => JsValue::Number(0.0),
+        c::SCISSOR_BOX => array(&state.scissor_box.map(|value| value as f64)),
+        c::SCISSOR_TEST => JsValue::Bool(state.scissor_test),
+        c::COLOR_WRITEMASK => bool_array(&state.color_mask),
         c::ALIASED_LINE_WIDTH_RANGE | c::ALIASED_POINT_SIZE_RANGE => array(&[0.0, 0.0]),
         c::MAX_VERTEX_ATTRIBS
         | c::MAX_COMBINED_TEXTURE_IMAGE_UNITS
         | c::MAX_TEXTURE_IMAGE_UNITS
         | c::MAX_VERTEX_TEXTURE_IMAGE_UNITS => JsValue::Number(0.0),
-        _ => JsValue::Null,
+        _ => {
+            super::webgl_error::record(state, c::INVALID_ENUM);
+            JsValue::Null
+        }
     }
+}
+
+fn bool_array(values: &[bool]) -> JsValue {
+    JsValue::Array(Rc::new(RefCell::new(
+        values.iter().map(|value| JsValue::Bool(*value)).collect(),
+    )))
 }
 
 fn number(value: &JsValue) -> u32 {

@@ -23,7 +23,7 @@ fn install_metadata(obj: &mut HashMap<String, JsValue>, handle: DomHandle, versi
         "getParameter".into(),
         native("WebGLRenderingContext.getParameter", Some(1), move |args| {
             let param = args.first().unwrap_or(&JsValue::Undefined).clone();
-            Ok(super::webgl_store::with_state(&h, version, |state| {
+            Ok(super::webgl_store::mutate(&h, version, |state| {
                 super::webgl_params::get(state, &param)
             }))
         }),
