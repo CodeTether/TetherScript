@@ -1,0 +1,9 @@
+fn main() {
+    let pid = process_pid()
+    let mut found_self = false
+    for process in process_list().unwrap() {
+        if process.pid == pid { found_self = true }
+    }
+    println("found self", found_self)
+    println("invalid pid rejected", process_kill(-1).is_err())
+}

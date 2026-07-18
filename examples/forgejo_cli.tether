@@ -1,0 +1,105 @@
+// Forgejo API CLI for https://forgejo.quantum-forge.io/api/swagger
+// Build: tetherscript build examples/forgejo_cli.tether -o target/forgejo
+// Auth: pass --token <token> or set FORGEJO_TOKEN.
+
+fn default_base() { return "https://forgejo.quantum-forge.io/api/v1" }
+
+fn usage() {
+    println("forgejo-cli <command> [args]")
+    println("")
+    println("global flags: --base <api-base> --token <token>")
+    println("commands:")
+    println("  version")
+    println("  user")
+    println("  repos <owner>")
+    println("  repo <owner> <repo>")
+    println("  issues <owner> <repo>")
+    println("  get <api-path>")
+    println("  post <api-path> <json-body>")
+}
+
+fn cfg(args) {
+    let out = map()
+    out.base = default_base()
+    let raw_token = env_get("FORGEJO_TOKEN").unwrap_or("")
+    if type_of(raw_token) == "str" { out.token = raw_token } else { out.token = "" }
+    out.rest = []
+    let mut i = 0
+    while i < args.len() {
+        if args[i] == "--base" {
+            i = i + 1
+            if i < args.len() { out.base = args[i] }
+        } else if args[i] == "--token" {
+            i = i + 1
+            if i < args.len() { out.token = args[i] }
+        } else {
+            out.rest.push(args[i])
+        }
+        i = i + 1
+    }
+    return out
+}
+
+fn join_url(base, path) {
+    if path.starts_with("http://") || path.starts_with("https://") { return path }
+    if path.starts_with("/") { return base + path }
+    return base + "/" + path
+}
+
+fn headers(c) {
+    let h = map()
+    h["Accept"] = "application/json"
+    h["Content-Type"] = "application/json"
+    if c.token != "" && c.token != "nil" { h["Authorization"] = "token " + c.token }
+    return h
+}
+
+fn request(c, method, path, body) {
+    let resp = http_request(method, join_url(c.base, path), body, headers(c))
+    if resp.is_err() {
+        println("request failed: " + resp.err())
+        return 1
+    }
+    let r = resp.unwrap()
+    if r.status < 200 || r.status >= 300 {
+        println("HTTP " + r.status + " " + r.reason)
+        println(r.body)
+        return 1
+    }
+    println(r.body)
+    return 0
+}
+
+fn need(rest, n) {
+    if rest.len() >= n { return true }
+    usage()
+    return false
+}
+
+fn main() {
+    let c = cfg(env_args())
+    let a = c.rest
+    if a.len() == 0 || a[0] == "help" || a[0] == "--help" {
+        usage()
+        return
+    }
+    let cmd = a[0]
+    if cmd == "version" {
+        request(c, "GET", "/version", nil)
+    } else if cmd == "user" {
+        request(c, "GET", "/user", nil)
+    } else if cmd == "repos" {
+        if need(a, 2) { request(c, "GET", "/users/" + a[1] + "/repos", nil) }
+    } else if cmd == "repo" {
+        if need(a, 3) { request(c, "GET", "/repos/" + a[1] + "/" + a[2], nil) }
+    } else if cmd == "issues" {
+        if need(a, 3) { request(c, "GET", "/repos/" + a[1] + "/" + a[2] + "/issues", nil) }
+    } else if cmd == "get" {
+        if need(a, 2) { request(c, "GET", a[1], nil) }
+    } else if cmd == "post" {
+        if need(a, 3) { request(c, "POST", a[1], a[2]) }
+    } else {
+        println("unknown command: " + cmd)
+        usage()
+    }
+}

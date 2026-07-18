@@ -31,7 +31,7 @@ TetherScript's trusted CLI/runtime should include these scripting primitives. Ho
 
 - Time: `time_now_ms()`, `sleep_ms(ms)`.
 - Environment: `env_get(name)`.
-- Process metadata: `process_args()`, `process_pid()`, `process_platform()`, `process_arch()`.
+- Process control: `process_args()`, `process_pid()`, `process_platform()`, `process_arch()`, `process_list()`, `process_kill(pid[, force])`.
 - OS metadata: `os_platform()`, `os_arch()`, `os_tmpdir()`, `os_homedir()`, `os_eol()`.
 - Working directory: `cwd()`, `chdir(path)`.
 - Filesystem: `fs_read(path)`, `fs_write(path, body)`, `fs_exists(path)`, `fs_list(path)`, `fs_mkdir(path)`, `fs_stat(path)`, `fs_remove(path)`, `fs_rename(from, to)`, `fs_copy(from, to)`.
@@ -83,6 +83,7 @@ specific provider id.
 
 - Fallible host tools return TetherScript `Result` values so scripts can use `?`, `.unwrap()`, `.is_ok()`, and `.err()`.
 - `process_run` executes a command plus argv directly; it does not invoke a shell unless the script explicitly runs one.
+- `process_list` returns PID/name maps; `process_kill` may fail when the OS denies access or the PID no longer exists.
 - File and process output are bounded to keep accidental large reads from consuming unbounded memory.
 - Std-only HTTP supports plain `http://`; `https://` requires TLS and is rejected explicitly.
 - The standard-tool implementation itself uses Rust `std` only. It does not add or depend on external crates for JSON, LSP JSON-RPC framing, SMTP DKIM signing, path, filesystem, process, Base64, SHA-256, or URL parsing.

@@ -505,9 +505,9 @@ mod tests {
 
     #[test]
     fn parse_float() {
-        let v = parse(&Value::Str(Rc::new("3.14".into()))).unwrap();
+        let v = parse(&Value::Str(Rc::new("1.25".into()))).unwrap();
         match v {
-            Value::Float(f) => assert!((f - 3.14).abs() < 1e-10),
+            Value::Float(f) => assert!((f - 1.25).abs() < 1e-10),
             other => panic!("expected Float, got {:?}", other),
         }
     }
@@ -641,9 +641,9 @@ mod tests {
 
     #[test]
     fn encode_float() {
-        let v = encode(&Value::Float(3.14)).unwrap();
+        let v = encode(&Value::Float(1.25)).unwrap();
         match v {
-            Value::Str(s) => assert!(s.contains("3.14")),
+            Value::Str(s) => assert!(s.contains("1.25")),
             other => panic!("expected Str, got {:?}", other),
         }
     }

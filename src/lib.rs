@@ -27,6 +27,7 @@ pub mod output;
 pub mod ownership;
 pub mod parser;
 pub mod plugin;
+pub(crate) mod process_control;
 pub mod provider_cap;
 pub mod rpc_cap;
 pub mod scheduler;

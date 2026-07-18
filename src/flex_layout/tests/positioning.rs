@@ -2,17 +2,24 @@ use super::*;
 
 #[test]
 fn justify_center_offsets_items() {
-    let mut c = FlexContainer::default();
-    c.justify_content = JustifyContent::Center;
+    let c = FlexContainer {
+        justify_content: JustifyContent::Center,
+        ..Default::default()
+    };
     let r = layout_flex(&c, &[item(20.0, 10.0)], cons(100.0, 20.0));
     assert_eq!(r[0].rect.x, 40.0);
 }
 
 #[test]
 fn wrap_creates_multiple_lines() {
-    let mut c = FlexContainer::default();
-    c.wrap = FlexWrap::Wrap;
-    c.gap.row_gap = 5.0;
+    let c = FlexContainer {
+        wrap: FlexWrap::Wrap,
+        gap: Gap {
+            row_gap: 5.0,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
     let r = layout_flex(
         &c,
         &[item(60.0, 10.0), item(60.0, 20.0)],
