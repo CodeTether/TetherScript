@@ -136,7 +136,9 @@ Native page actions are expected to exercise production form code paths:
 user-like pointer/mouse/focus/click sequence, prevented submits do not navigate,
 and Enter on an input submits its containing form. The native host retains the
 focused locator across action envelopes so `focus`, `click`, or `fill` can be
-followed by `press`; `blur` and navigation clear that host focus.
+followed by `press`; `blur` and navigation clear that host focus. `type` appends
+printable characters one at a time with cancelable keydown, input, and keyup
+events, while `fill` replaces the existing value.
 
 Network:
 `network_log`, `network_har`, `failed_requests`, `request`, `response`, `replay_request`, `wait_for_request`, `wait_for_response`.

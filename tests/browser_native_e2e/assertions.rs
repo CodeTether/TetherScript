@@ -23,6 +23,11 @@ pub fn check(output: Output, expected_url: &str, screenshot: &Path) {
         "{stdout}"
     );
     assert!(stdout.contains("native-browser-keyboard A"), "{stdout}");
+    assert!(stdout.contains("native-browser-type ABC"), "{stdout}");
+    assert!(
+        stdout.contains("native-browser-key-events dAiuAdBiuBdCiuC"),
+        "{stdout}"
+    );
     assert!(stdout.contains("native-browser-focus blurred"), "{stdout}");
     let selector_scroll = line_value(&stdout, "native-browser-selector-scroll");
     assert!(selector_scroll.parse::<i64>().unwrap() > 0, "{stdout}");

@@ -5,6 +5,12 @@ use crate::value::Value;
 
 use super::state::HostState;
 
+#[cfg(test)]
+#[path = "type_tests.rs"]
+mod type_tests;
+#[path = "type_text.rs"]
+mod type_text;
+
 pub(super) fn invoke(
     state: &mut HostState,
     action: &str,
@@ -17,7 +23,8 @@ pub(super) fn invoke(
         "click_text" => state
             .page
             .click(&Locator::text(super::value::string_field(payload, "text")?))?,
-        "fill" | "type" => fill(state, payload, action)?,
+        "fill" => fill(state, payload)?,
+        "type" => type_text::invoke(state, payload)?,
         "hover" => state.page.hover(&Locator::css(super::value::string_field(
             payload, "selector",
         )?))?,
@@ -29,10 +36,9 @@ pub(super) fn invoke(
     Ok(super::interact_value::report(report))
 }
 
-fn fill(state: &mut HostState, payload: &Value, action: &str) -> Result<ActionReport, String> {
-    let key = if action == "fill" { "value" } else { "text" };
+fn fill(state: &mut HostState, payload: &Value) -> Result<ActionReport, String> {
     state.page.fill(
         &Locator::css(super::value::string_field(payload, "selector")?),
-        &super::value::string_field(payload, key)?,
+        &super::value::string_field(payload, "value")?,
     )
 }

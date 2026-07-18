@@ -16,6 +16,9 @@ fn main() {
     browser.focus("#entry")?
     browser.press("A")?
     let keyboard = browser.eval("document.querySelector('#entry').value")?
+    browser.type("#entry", "BC")?
+    let typed = browser.eval("document.querySelector('#entry').value")?
+    let key_events = browser.eval("document.querySelector('#entry').getAttribute('data-key-events')")?
     browser.blur("#entry")?
     let focus = browser.eval("document.querySelector('#entry').getAttribute('data-focus')")?
     browser.scroll("#below")?
@@ -34,6 +37,8 @@ fn main() {
     println("native-browser-trusted", trusted)
     println("native-browser-history", second)
     println("native-browser-keyboard", keyboard)
+    println("native-browser-type", typed)
+    println("native-browser-key-events", key_events)
     println("native-browser-focus", focus)
     println("native-browser-selector-scroll", selector_scroll)
     println("native-browser-coordinate-scroll", coordinate_scroll)
