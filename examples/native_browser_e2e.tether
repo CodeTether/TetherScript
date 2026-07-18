@@ -54,6 +54,13 @@ fn main() {
     let axios = browser.axios(args[0])?
     let xhr = browser.xhr(args[0])?
     let replayed = browser.replay_request(args[0])?
+    let console_logs = browser.console_logs()?
+    let console_errors = browser.console_errors()?
+    let frameworks = browser.frameworks()?
+    let react_detected = browser."react.detect"()?
+    let hydration = browser."react.hydration_warnings"()?
+    let component = browser."react.component_for_selector"("#root")?
+    let diagnosis = browser.diagnose()?
     println("native-browser-url", snapshot.url)
     println("native-browser-text", snapshot.visible_text)
     println("native-browser-screenshot", screenshot.format)
@@ -75,4 +82,5 @@ fn main() {
     println("native-browser-network", network.len())
     println("native-browser-network-waits", waited_request.len(), waited_response.len())
     println("native-browser-requests", fetched.status, axios.status, xhr.status, replayed.status)
+    println("native-browser-diagnostics", console_logs.len(), console_errors.len(), frameworks.len(), react_detected, hydration.len(), component.tag, diagnosis.react_detected)
 }

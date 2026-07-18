@@ -117,6 +117,8 @@ Snapshots:
 
 Diagnostics:
 `console_logs`, `console_errors`, `unhandled_rejections`, `runtime_exceptions`, `source_mapped_stack_traces`.
+The native host returns captured console levels/messages, classified runtime
+exceptions, and generated source locations with source-map frame counts.
 
 Native page diagnostics:
 `BrowserPage::production_debug_report()` returns a single structured report for
@@ -171,6 +173,8 @@ Storage:
 
 React/framework hooks:
 Use string method syntax for dotted method names, e.g. `browser."react.detect"()?`, `browser."react.component_for_selector"("#root")?`, plus `frameworks()` for Next/Vite/Redux/Zustand/React Query detection returned by the host.
+Selector-based component queries return stable DOM-backed tag, component-name,
+text, attribute, and optional `data-react-*` diagnostic metadata.
 
 Trace/export:
 `trace`, `export_trace_json`, `export_har`, `agent_summary`, `minimal_reproduction_script`.

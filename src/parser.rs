@@ -368,7 +368,7 @@ impl Parser {
             Token::Dot => {
                 self.bump();
                 let name = match self.bump().token {
-                    Token::Ident(s) => s,
+                    Token::Ident(s) | Token::Str(s) => s,
                     Token::Join => "join".to_string(),
                     other => {
                         return Err(self.error(format!("expected field name, got {:?}", other)))
