@@ -12,7 +12,7 @@ pub fn check(output: Output, expected_url: &str, screenshot: &Path) {
     assert!(
         stdout
             .lines()
-            .any(|line| line == "native-browser-text clicked"),
+            .any(|line| line == "native-browser-text clicked below"),
         "{stdout}"
     );
     assert!(stdout.contains(expected_url), "{stdout}");
@@ -24,6 +24,19 @@ pub fn check(output: Output, expected_url: &str, screenshot: &Path) {
     );
     assert!(stdout.contains("native-browser-keyboard A"), "{stdout}");
     assert!(stdout.contains("native-browser-focus blurred"), "{stdout}");
+    let selector_scroll = line_value(&stdout, "native-browser-selector-scroll");
+    assert!(selector_scroll.parse::<i64>().unwrap() > 0, "{stdout}");
+    assert!(
+        stdout.contains("native-browser-coordinate-scroll 7,11"),
+        "{stdout}"
+    );
     let png = std::fs::read(screenshot).expect("native screenshot exists");
     assert!(png.starts_with(b"\x89PNG\r\n\x1a\n"));
+}
+
+fn line_value<'a>(stdout: &'a str, label: &str) -> &'a str {
+    stdout
+        .lines()
+        .find_map(|line| line.strip_prefix(&format!("{label} ")))
+        .unwrap()
 }

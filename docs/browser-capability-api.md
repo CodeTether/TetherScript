@@ -104,7 +104,9 @@ until matching actions exist.
 
 `scroll` accepts `scroll(selector)`, `scroll(x, y)`, or
 `scroll(selector, x, y)` and sends a `scroll` action envelope with the matching
-fields.
+fields. The native host brings a selector into view, treats bare coordinates as
+absolute window offsets, and treats coordinates paired with a selector as an
+offset from the resulting in-view position.
 
 Snapshots:
 `screenshot`, `screenshot_element`, `dom_snapshot`, `page_snapshot`.

@@ -22,6 +22,7 @@ pub(super) fn invoke(state: &mut HostState, payload: &Value) -> (Result<Value, S
         }
         "focus" | "blur" => super::focus::invoke(state, &action, payload),
         "press" | "keyboard_press" => super::keyboard::invoke(state, payload),
+        "scroll" => super::scroll::invoke(state, payload),
         "screenshot" => super::screenshot::invoke(state, payload),
         _ => Err(format!(
             "browser host: native action `{}` is not implemented",

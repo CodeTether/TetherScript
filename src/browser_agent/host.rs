@@ -23,6 +23,10 @@ mod request;
 mod request_headers;
 mod response;
 mod screenshot;
+mod scroll;
+mod scroll_target;
+#[cfg(test)]
+mod scroll_tests;
 mod server;
 mod snapshot;
 mod state;
