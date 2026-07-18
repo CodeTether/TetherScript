@@ -42,6 +42,7 @@ fn main() {
     if browser.page_snapshot()?.url != args[0] { panic("browser.back did not restore the first URL") }
     browser.forward()?
     if browser.page_snapshot()?.url != second { panic("browser.forward did not restore the second URL") }
+    let network = browser.network_log(args[0])?
     println("native-browser-url", snapshot.url)
     println("native-browser-text", snapshot.visible_text)
     println("native-browser-screenshot", screenshot.format)
@@ -59,4 +60,5 @@ fn main() {
     println("native-browser-coordinate-scroll", coordinate_scroll)
     println("native-browser-wait", waited)
     println("native-browser-wait-timeout", wait_timeout.is_err())
+    println("native-browser-network", network.len())
 }

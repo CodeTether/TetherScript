@@ -149,6 +149,8 @@ mouse sequence at the requested point.
 
 Network:
 `network_log`, `network_har`, `failed_requests`, `request`, `response`, `replay_request`, `wait_for_request`, `wait_for_response`.
+The native host returns captured request method, URL, status, and route result;
+`failed_requests` restricts the result to missing or error statuses.
 Native fetch/XHR networking follows redirects, emits CORS preflights, validates
 `Access-Control-Allow-*` headers, and models credential modes for cross-origin
 cookies. External page resources use the same route-visible network model for
