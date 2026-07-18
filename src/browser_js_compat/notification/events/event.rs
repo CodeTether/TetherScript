@@ -18,13 +18,12 @@ pub(super) fn kind(event: &JsValue) -> String {
     let Some(object) = object(event) else {
         return "event".into();
     };
-    let kind = object
+    object
         .borrow()
         .get("type")
         .map(JsValue::display)
         .filter(|kind| !kind.is_empty())
-        .unwrap_or_else(|| "event".into());
-    kind
+        .unwrap_or_else(|| "event".into())
 }
 
 pub(super) fn prepare(event: &JsValue, target: &Rc<RefCell<HashMap<String, JsValue>>>, kind: &str) {
