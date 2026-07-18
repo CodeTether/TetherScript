@@ -13,3 +13,13 @@ fn resize_updates_live_media_query_and_dispatches_change() {
         JsValue::String("true|true:(min-width:100px):true".into())
     );
 }
+
+#[test]
+fn resize_projects_width_media_into_computed_styles() {
+    let html = "<style>#box{color:black}@media (min-width:100px){#box{color:purple}}</style>\
+        <main id='box'></main>";
+    let script = "resizeTo(120,40);getComputedStyle(document.getElementById('box')).color;";
+    let result = eval_with_dom(html, script).unwrap();
+
+    assert_eq!(result.value, JsValue::String("purple".into()));
+}

@@ -1,7 +1,7 @@
 use std::process::Command;
 
 #[test]
-fn standalone_browser_eval_css_media_gap_is_retained() {
+fn standalone_browser_eval_projects_width_media_rules() {
     let output = Command::new(env!("CARGO_BIN_EXE_tetherscript"))
         .args(["run", "examples/browser_css_media.tether"])
         .output()
