@@ -63,7 +63,6 @@ use crate::tls::TlsConnector;
 use crate::capability::Authority;
 use crate::json;
 use crate::value::{Runtime, Value};
-
 #[path = "provider_options.rs"]
 mod provider_options;
 #[path = "provider_responses.rs"]

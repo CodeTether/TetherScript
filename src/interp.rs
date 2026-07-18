@@ -17,6 +17,7 @@ use crate::http;
 use crate::js;
 use crate::json;
 use crate::output;
+use crate::process_control;
 use crate::value::{Env, FnObj, NativeFn, NativeFunc, Runtime, Slot, Value};
 use crate::{lexer::Lexer, parser::Parser};
 use crate::{smtp, system};
@@ -1267,33 +1268,7 @@ pub(crate) fn install_builtins(env: &Rc<RefCell<Env>>) {
         pure_native("fs_mkdir", Some(1), |args| Ok(system::fs_mkdir(&args[0]))),
         false,
     );
-    e.define(
-        "process_run",
-        pure_native("process_run", None, |args| Ok(system::process_run(args))),
-        false,
-    );
-    e.define(
-        "process_args",
-        pure_native("process_args", Some(0), |_args| Ok(system::process_args())),
-        false,
-    );
-    e.define(
-        "process_pid",
-        pure_native("process_pid", Some(0), |_args| Ok(system::process_pid())),
-        false,
-    );
-    e.define(
-        "process_platform",
-        pure_native("process_platform", Some(0), |_args| {
-            Ok(system::process_platform())
-        }),
-        false,
-    );
-    e.define(
-        "process_arch",
-        pure_native("process_arch", Some(0), |_args| Ok(system::process_arch())),
-        false,
-    );
+    process_control::install(&mut e);
     e.define(
         "os_platform",
         pure_native("os_platform", Some(0), |_args| Ok(system::os_platform())),

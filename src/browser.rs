@@ -3861,7 +3861,7 @@ mod tests {
             styled[0].children[2].styles.get("color"),
             Some(&"blue".into())
         );
-        assert!(styled[0].children[1].styles.get("color").is_none());
+        assert!(!styled[0].children[1].styles.contains_key("color"));
     }
 
     #[test]

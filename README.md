@@ -1,5 +1,9 @@
 # tetherscript
 
+[![crates.io](https://img.shields.io/crates/v/tetherscript.svg)](https://crates.io/crates/tetherscript)
+[![crates.io downloads](https://img.shields.io/crates/d/tetherscript.svg)](https://crates.io/crates/tetherscript)
+[![docs.rs](https://img.shields.io/docsrs/tetherscript.svg)](https://docs.rs/tetherscript)
+
 tetherscript is a dynamically typed, ownership-aware language for portable tools,
 AI-agent workflows, and embeddable application logic. It uses Rust-like syntax and
 is currently implemented in Rust with a tree-walking reference interpreter and a
@@ -282,7 +286,7 @@ including:
 - `fs_read`, `fs_write`, `fs_exists`, `fs_list`, `fs_mkdir`, `fs_stat`,
   `fs_remove`, `fs_rename`, `fs_copy`
 - `process_run`, `process_args`, `process_pid`, `process_platform`,
-  `process_arch`
+  `process_arch`, `process_list`, `process_kill`
 - `tui_size`, `tui_render`, `tui_present`, `tui_read_event`,
   `tui_clear`, `tui_cursor`, `tui_alt_screen`, `tui_move_to`
 - `stdio_read`, `stdio_write`, `stdio_write_err`, `jsonrpc_request`,

@@ -69,7 +69,7 @@ fn main() -> Result<(), String> {
 
     for (i, msg) in messages.borrow().iter().enumerate() {
         let call = plugin
-            .call("repair_msg", &[msg.clone()])
+            .call("repair_msg", std::slice::from_ref(msg))
             .map_err(|e| format!("repair_msg #{}: {}", i + 1, e))?;
 
         results.push(call.value);

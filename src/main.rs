@@ -21,8 +21,7 @@
 //! tetherscript --version                      show version
 //! ```
 
-#![allow(dead_code)]
-#![allow(clippy::too_many_arguments)]
+#![allow(dead_code, clippy::too_many_arguments)]
 
 mod ast;
 mod browser;
@@ -58,6 +57,7 @@ mod main_usage;
 mod output;
 mod ownership;
 mod parser;
+mod process_control;
 mod provider_cap;
 mod provider_env;
 mod provider_vault;

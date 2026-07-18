@@ -13,11 +13,13 @@ fn default_limits_expose_guard_metadata() {
 #[test]
 fn custom_limits_are_stored() {
     let mut page = BrowserPage::from_html("mem://limits", "<main>ok</main>");
-    let mut limits = BrowserResourceLimits::default();
-    limits.max_action_attempts = 2;
-    limits.max_action_ticks = 8;
-    limits.max_dom_bytes = 64;
-    limits.max_trace_entries = 3;
+    let limits = BrowserResourceLimits {
+        max_action_attempts: 2,
+        max_action_ticks: 8,
+        max_dom_bytes: 64,
+        max_trace_entries: 3,
+        ..Default::default()
+    };
 
     page.set_resource_limits(limits);
 
