@@ -1,6 +1,6 @@
 fn main() {
     let args = env_args()
-    if args.len() != 2 { panic("native_browser_e2e expects URL and screenshot path") }
+    if args.len() != 3 { panic("native_browser_e2e expects URL, screenshot path, and upload path") }
 
     browser.start()?
     browser.goto(args[0])?
@@ -21,6 +21,8 @@ fn main() {
     browser.keyboard_type("DE")?
     let keyboard_typed = browser.eval("document.querySelector('#entry').value")?
     let key_events = browser.eval("document.querySelector('#entry').getAttribute('data-key-events')")?
+    browser.upload("#upload", [args[2]])?
+    let upload = browser.eval("let u=document.querySelector('#upload');let f=u.files[0];f.name+':'+f.type+':'+f.size+':'+u.getAttribute('data-events')")?
     browser.blur("#entry")?
     let focus = browser.eval("document.querySelector('#entry').getAttribute('data-focus')")?
     browser.scroll("#below")?
@@ -42,6 +44,7 @@ fn main() {
     println("native-browser-type", typed)
     println("native-browser-key-events", key_events)
     println("native-browser-keyboard-type", keyboard_typed)
+    println("native-browser-upload", upload)
     println("native-browser-focus", focus)
     println("native-browser-selector-scroll", selector_scroll)
     println("native-browser-coordinate-scroll", coordinate_scroll)

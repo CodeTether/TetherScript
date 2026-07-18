@@ -18,6 +18,7 @@ fn tether_script_drives_native_browser_host_end_to_end() {
     let evidence = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/browser-e2e");
     std::fs::create_dir_all(&evidence).expect("create browser E2E evidence directory");
     let screenshot = evidence.join("native-browser-e2e.png");
+    let upload = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/hello.tether");
     let mut host = host::NativeHost::start();
     let output = Command::new(env!("CARGO_BIN_EXE_tetherscript"))
         .args([
@@ -32,10 +33,16 @@ fn tether_script_drives_native_browser_host_end_to_end() {
             "--",
             &fixture.url,
             screenshot.to_str().unwrap(),
+            upload.to_str().unwrap(),
         ])
         .output()
         .expect("run native browser example");
     host.stop();
     fixture.stop();
-    assertions::check(output, &expected_url, &screenshot);
+    assertions::check(
+        output,
+        &expected_url,
+        &screenshot,
+        upload.metadata().unwrap().len(),
+    );
 }
