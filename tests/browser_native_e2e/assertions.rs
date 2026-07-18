@@ -55,6 +55,8 @@ pub fn check(output: Output, expected_url: &str, screenshot: &Path, upload_size:
         stdout.contains("native-browser-wait-timeout true"),
         "{stdout}"
     );
+    let network = line_value(&stdout, "native-browser-network");
+    assert!(network.parse::<usize>().unwrap() > 0, "{stdout}");
     let png = std::fs::read(screenshot).expect("native screenshot exists");
     assert!(png.starts_with(b"\x89PNG\r\n\x1a\n"));
 }

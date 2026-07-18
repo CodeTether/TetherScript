@@ -15,7 +15,7 @@ pub(super) fn invoke(state: &mut HostState, payload: &Value) -> (Result<Value, S
             super::nav::invoke(state, &action, payload)
         }
         "snapshot" => Ok(super::snapshot::value(&state.page)),
-        "text" | "html" | "eval" => super::query::invoke(state, &action, payload),
+        "text" | "html" | "eval" | "network_log" => super::query::invoke(state, &action, payload),
         "wait" => super::wait::invoke(state, payload),
         "click" | "click_text" | "fill" | "type" | "upload" | "toggle" | "mouse_click"
         | "hover" => super::interact::invoke(state, &action, payload),

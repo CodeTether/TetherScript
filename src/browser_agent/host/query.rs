@@ -5,6 +5,9 @@ use crate::value::Value;
 
 use super::state::HostState;
 
+#[path = "network_log.rs"]
+mod network_log;
+
 pub(super) fn invoke(
     state: &mut HostState,
     action: &str,
@@ -14,6 +17,7 @@ pub(super) fn invoke(
         "text" => text(state, super::value::optional_string(payload, "selector")?),
         "html" => html(state, super::value::optional_string(payload, "selector")?),
         "eval" => eval(state, &super::value::string_field(payload, "expression")?),
+        "network_log" => network_log::invoke(state, payload),
         _ => unreachable!(),
     }
 }

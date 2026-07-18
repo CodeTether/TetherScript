@@ -14,7 +14,7 @@ pub(crate) fn prepare(
     args: &[Value],
 ) -> Result<BrowserCall, String> {
     match method {
-        "network_log" | "failed_requests" => network_log(args),
+        "network_log" | "failed_requests" => network_log(method, args),
         "fetch" | "axios" | "xhr" => requests::request(auth, method, args),
         "replay" | "replay_request" => requests::replay(method, args),
         "diagnose" => no_arg_action("diagnose", args),
@@ -23,8 +23,11 @@ pub(crate) fn prepare(
     }
 }
 
-fn network_log(args: &[Value]) -> Result<BrowserCall, String> {
+fn network_log(method: &str, args: &[Value]) -> Result<BrowserCall, String> {
     let mut entries = Vec::new();
+    if method == "failed_requests" {
+        entries.push(("failed_only", Value::Bool(true)));
+    }
     if let Some(v) = args.first() {
         entries.push(("url_contains", v.clone()));
     }
