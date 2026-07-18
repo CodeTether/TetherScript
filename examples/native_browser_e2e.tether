@@ -30,6 +30,11 @@ fn main() {
     let mouse_box = browser.bounding_box("#mouse")?
     browser.mouse_click(mouse_box.x, mouse_box.y)?
     let mouse = browser.eval("document.querySelector('#mouse').getAttribute('data-hit')")?
+    browser.tabs_new(args[0] + "tab")?
+    let tabs_open = browser.tabs()?
+    browser.tabs_select(0)?
+    browser.tabs_close(1)?
+    let tabs_closed = browser.tabs()?
     browser.blur("#entry")?
     let focus = browser.eval("document.querySelector('#entry').getAttribute('data-focus')")?
     browser.scroll("#below")?
@@ -55,6 +60,7 @@ fn main() {
     println("native-browser-upload", upload)
     println("native-browser-toggle", toggle_on, toggle)
     println("native-browser-mouse", mouse)
+    println("native-browser-tabs", tabs_open.len(), tabs_closed.len())
     println("native-browser-focus", focus)
     println("native-browser-selector-scroll", selector_scroll)
     println("native-browser-coordinate-scroll", coordinate_scroll)

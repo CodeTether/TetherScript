@@ -4,6 +4,9 @@ use crate::value::Value;
 
 use super::state::HostState;
 
+#[path = "tabs.rs"]
+mod tabs;
+
 pub(super) fn invoke(
     state: &mut HostState,
     action: &str,
@@ -34,6 +37,7 @@ pub(super) fn invoke(
             state.page.go_forward();
             Ok(super::snapshot::value(&state.page))
         }
+        "tabs" | "tabs_new" | "tabs_select" | "tabs_close" => tabs::invoke(state, action, payload),
         _ => unreachable!(),
     }
 }

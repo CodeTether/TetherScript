@@ -44,6 +44,7 @@ pub fn check(output: Output, expected_url: &str, screenshot: &Path, upload_size:
         "{stdout}"
     );
     assert!(stdout.contains("native-browser-mouse true:"), "{stdout}");
+    assert!(stdout.contains("native-browser-tabs 2 1"), "{stdout}");
     let selector_scroll = line_value(&stdout, "native-browser-selector-scroll");
     assert!(selector_scroll.parse::<i64>().unwrap() > 0, "{stdout}");
     assert!(

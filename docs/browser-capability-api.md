@@ -146,6 +146,8 @@ an `input[type=file]`, and dispatches input and change events.
 `toggle` inverts a checkbox or radio through its click, input, and change path.
 `mouse_click` hit-tests viewport coordinates and dispatches a trusted pointer and
 mouse sequence at the requested point.
+Tabs retain independent page, history, scroll, and runtime state; selecting or
+closing a tab swaps the active host page without reloading it.
 
 Network:
 `network_log`, `network_har`, `failed_requests`, `request`, `response`, `replay_request`, `wait_for_request`, `wait_for_response`.
