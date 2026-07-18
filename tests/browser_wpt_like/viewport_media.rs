@@ -13,10 +13,7 @@ mod visual;
 const CASE: Case = Case {
     area: "css/mediaqueries, css/cssom-view, screen-orientation",
     wpt_shape: "viewport metrics, events, media queries, and screen orientation locks",
-    unsupported: &[
-        "pinch zoom and visualViewport scrollend events",
-        "device sensor-driven orientation changes",
-    ],
+    unsupported: &["pinch zoom", "device sensor-driven orientation changes"],
 };
 
 pub fn run() {

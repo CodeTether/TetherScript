@@ -38,6 +38,9 @@ fn install_one(
             viewport_host::visual_viewport::sync(&window);
             super::trusted_event::dispatch(&window, event_type)?;
             viewport_host::visual_viewport::dispatch(&window, event_type)?;
+            if event_type == "scroll" {
+                viewport_host::visual_viewport::dispatch(&window, "scrollend")?;
+            }
             Ok(JsValue::Undefined)
         }),
     );

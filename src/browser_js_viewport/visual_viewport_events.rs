@@ -19,6 +19,9 @@ pub(super) fn install(object: &Rc<RefCell<HashMap<String, JsValue>>>) {
     let registry = model::new_registry();
     object.borrow_mut().insert("onresize".into(), JsValue::Null);
     object.borrow_mut().insert("onscroll".into(), JsValue::Null);
+    object
+        .borrow_mut()
+        .insert("onscrollend".into(), JsValue::Null);
     listeners::install(object, registry.clone());
     dispatch::install(object, registry);
 }
