@@ -1,0 +1,5 @@
+fn main() {
+    let html = "<canvas id='c' width='2' height='1'></canvas>"
+    let script = "let ctx=document.getElementById('c').getContext('2d');let image=ctx.createImageData(2,1);image.data.set([255,0,0,255,0,255,0,255]);ctx.putImageData(image,0,0);ctx.getImageData(0,0,2,1).data.join(',');"
+    println(browser_eval_js(html, script).value)
+}

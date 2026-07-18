@@ -32,6 +32,7 @@ compat_test!(tests_structured, "tests_structured.rs");
 compat_test!(tests_text, "tests_text.rs");
 compat_test!(tests_text_decoder, "tests_text_decoder.rs");
 compat_test!(tests_typed_array, "tests_typed_array.rs");
+compat_test!(tests_typed_array_clamped, "tests_typed_array_clamped.rs");
 compat_test!(tests_typed_array_uint16, "tests_typed_array_uint16.rs");
 compat_test!(tests_url_search_params, "tests_url_search_params.rs");
 compat_test!(usp_init, "tests_url_search_params_init.rs");

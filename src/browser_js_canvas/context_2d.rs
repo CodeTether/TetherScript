@@ -12,7 +12,7 @@ pub(super) fn context_object(handle: DomHandle) -> JsValue {
     );
     install_fill_style(&mut obj, fill_style.clone());
     super::context_rect::install(&mut obj, handle.clone(), fill_style);
-    install_image_methods(&mut obj, handle);
+    super::image::install(&mut obj, handle);
     JsValue::Object(Rc::new(RefCell::new(obj)))
 }
 
@@ -28,23 +28,5 @@ fn install_fill_style(obj: &mut HashMap<String, JsValue>, fill_style: Rc<RefCell
                 Ok(JsValue::String(value))
             },
         ),
-    );
-}
-
-fn install_image_methods(obj: &mut HashMap<String, JsValue>, handle: DomHandle) {
-    let h = handle.clone();
-    obj.insert(
-        "getImageData".into(),
-        native(
-            "CanvasRenderingContext2D.getImageData",
-            Some(4),
-            move |args| Ok(super::image::image_data(&h, super::geometry::rect(args))),
-        ),
-    );
-    obj.insert(
-        "__summary".into(),
-        native("CanvasRenderingContext2D.__summary", Some(0), move |_| {
-            Ok(JsValue::String(super::image::summary(&handle)))
-        }),
     );
 }

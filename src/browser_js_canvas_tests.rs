@@ -1,5 +1,9 @@
 use super::*;
 
+#[path = "browser_js_canvas_image_data_error_tests.rs"]
+mod image_data_error_tests;
+#[path = "browser_js_canvas_image_data_tests.rs"]
+mod image_data_tests;
 #[path = "browser_js_webgl_read_pixels_tests.rs"]
 mod webgl_read_pixels_tests;
 #[path = "browser_js_webgl_tests.rs"]

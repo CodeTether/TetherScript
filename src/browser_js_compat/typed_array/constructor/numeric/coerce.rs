@@ -1,5 +1,9 @@
 use super::*;
 
+pub(super) fn uint8_clamped(value: &JsValue) -> JsValue {
+    super::super::super::clamped::value(value)
+}
+
 pub(super) fn uint32(value: &JsValue) -> JsValue {
     JsValue::Number(uint32_number(value))
 }

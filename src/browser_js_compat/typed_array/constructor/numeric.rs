@@ -9,6 +9,10 @@ pub(super) fn uint32_array(args: &[JsValue]) -> JsValue {
     array(args, 4, coerce::uint32)
 }
 
+pub(super) fn uint8_clamped_array(args: &[JsValue]) -> JsValue {
+    array(args, 1, coerce::uint8_clamped)
+}
+
 pub(super) fn uint16_array(args: &[JsValue]) -> JsValue {
     array(args, 2, coerce::uint16)
 }

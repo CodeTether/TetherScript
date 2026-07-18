@@ -11,6 +11,15 @@ pub(super) fn uint8(prototype: JsValue) -> JsValue {
     build::constructor("Uint8Array", 1, prototype, byte::uint8_array)
 }
 
+pub(super) fn uint8_clamped(prototype: JsValue) -> JsValue {
+    build::constructor(
+        "Uint8ClampedArray",
+        1,
+        prototype,
+        numeric::uint8_clamped_array,
+    )
+}
+
 pub(super) fn uint32(prototype: JsValue) -> JsValue {
     build::constructor("Uint32Array", 4, prototype, numeric::uint32_array)
 }
