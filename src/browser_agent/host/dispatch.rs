@@ -11,7 +11,8 @@ pub(super) fn invoke(state: &mut HostState, payload: &Value) -> (Result<Value, S
     };
     let stop = action == "stop";
     let result = match action.as_str() {
-        "health" | "detect" | "start" | "stop" | "goto" | "reload" | "back" | "forward" => {
+        "health" | "detect" | "start" | "stop" | "goto" | "reload" | "back" | "forward"
+        | "tabs" | "tabs_new" | "tabs_select" | "tabs_close" => {
             super::nav::invoke(state, &action, payload)
         }
         "snapshot" => Ok(super::snapshot::value(&state.page)),

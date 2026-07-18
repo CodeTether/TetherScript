@@ -7,6 +7,8 @@ pub(super) struct HostState {
     pub(super) page: BrowserPage,
     pub(super) started: bool,
     pub(super) focused: Option<Locator>,
+    pub(super) tabs: Vec<Option<BrowserPage>>,
+    pub(super) active_tab: usize,
 }
 
 impl HostState {
@@ -15,6 +17,8 @@ impl HostState {
             page: BrowserPage::new(Default::default()),
             started: false,
             focused: None,
+            tabs: vec![None],
+            active_tab: 0,
         }
     }
 }
