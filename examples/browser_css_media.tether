@@ -1,0 +1,5 @@
+fn main() {
+    let html = "<style>#box\{color:black\}@media (min-width:70px)\{#box\{color:purple\}\}</style><main id='box'></main>"
+    let script = "matchMedia('(min-width:70px)').matches+':'+getComputedStyle(document.getElementById('box')).color;"
+    println(browser_eval_js(html, script).value)
+}
