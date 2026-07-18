@@ -202,6 +202,8 @@ Completed tests:
   or disabled controls and require two matching layout observations.
 - Drag/drop events and pointer-capture ownership are observable.
 - Wheel input updates page scroll offsets.
+- Element `scroll`, `scrollTo`, `scrollBy`, property setters, and
+  `scrollIntoView` clamp live offsets and update geometry and hit testing.
 - Viewport resize and media emulation expose page-visible state.
 - Resource-limit guard metadata and oversized-DOM rejection are covered.
 

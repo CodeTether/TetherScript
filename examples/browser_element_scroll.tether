@@ -1,0 +1,5 @@
+fn main() {
+    let html = "<div id='box' style='width:10px;height:4px;overflow:auto'><div id='content' style='width:25px;height:12px'></div></div>"
+    let script = "let b=document.getElementById('box');b.scrollTo(99,3);b.scrollBy(-4,99);let r=document.getElementById('content').getBoundingClientRect();[b.scrollLeft,b.scrollTop,b.scrollWidth,b.scrollHeight,r.x,r.y].join(':');"
+    println(browser_eval_js(html, script).value)
+}

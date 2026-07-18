@@ -6,12 +6,14 @@ mod bootstrap;
 mod controls;
 mod dispatch;
 mod handlers;
+pub(in crate::browser_js) mod scroll;
 
 pub(super) fn install_event_handlers(window: &mut HashMap<String, JsValue>) {
     handlers::install(window);
 }
 
 pub(super) fn install_dispatchers(window: &JsValue) {
+    scroll::register(window);
     dispatch::install(window);
     controls::install(window);
 }
