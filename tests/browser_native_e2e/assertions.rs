@@ -25,7 +25,11 @@ pub fn check(output: Output, expected_url: &str, screenshot: &Path) {
     assert!(stdout.contains("native-browser-keyboard A"), "{stdout}");
     assert!(stdout.contains("native-browser-type ABC"), "{stdout}");
     assert!(
-        stdout.contains("native-browser-key-events dAiuAdBiuBdCiuC"),
+        stdout.contains("native-browser-key-events dAiuAdBiuBdCiuCdDiuDdEiuE"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("native-browser-keyboard-type ABCDE"),
         "{stdout}"
     );
     assert!(stdout.contains("native-browser-focus blurred"), "{stdout}");

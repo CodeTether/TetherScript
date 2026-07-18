@@ -18,6 +18,8 @@ fn main() {
     let keyboard = browser.eval("document.querySelector('#entry').value")?
     browser.type("#entry", "BC")?
     let typed = browser.eval("document.querySelector('#entry').value")?
+    browser.keyboard_type("DE")?
+    let keyboard_typed = browser.eval("document.querySelector('#entry').value")?
     let key_events = browser.eval("document.querySelector('#entry').getAttribute('data-key-events')")?
     browser.blur("#entry")?
     let focus = browser.eval("document.querySelector('#entry').getAttribute('data-focus')")?
@@ -39,6 +41,7 @@ fn main() {
     println("native-browser-keyboard", keyboard)
     println("native-browser-type", typed)
     println("native-browser-key-events", key_events)
+    println("native-browser-keyboard-type", keyboard_typed)
     println("native-browser-focus", focus)
     println("native-browser-selector-scroll", selector_scroll)
     println("native-browser-coordinate-scroll", coordinate_scroll)

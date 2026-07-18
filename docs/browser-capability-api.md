@@ -139,6 +139,8 @@ focused locator across action envelopes so `focus`, `click`, or `fill` can be
 followed by `press`; `blur` and navigation clear that host focus. `type` appends
 printable characters one at a time with cancelable keydown, input, and keyup
 events, while `fill` replaces the existing value.
+`keyboard_type` applies the same incremental event semantics to the element
+retained by the latest focusable action.
 
 Network:
 `network_log`, `network_har`, `failed_requests`, `request`, `response`, `replay_request`, `wait_for_request`, `wait_for_response`.

@@ -10,7 +10,7 @@ fn focus_press_and_blur_share_host_state() {
 
     super::focus::invoke(&mut state, "focus", &selector).unwrap();
     assert_eq!(attribute(&mut state), "focused");
-    super::keyboard::invoke(&mut state, &key).unwrap();
+    super::keyboard::invoke(&mut state, "press", &key).unwrap();
     let value = state
         .page
         .eval_js("document.querySelector('#entry').value")
@@ -18,7 +18,7 @@ fn focus_press_and_blur_share_host_state() {
     assert_eq!(value.display(), "A");
     super::focus::invoke(&mut state, "blur", &selector).unwrap();
     assert_eq!(attribute(&mut state), "blurred");
-    assert!(super::keyboard::invoke(&mut state, &key).is_err());
+    assert!(super::keyboard::invoke(&mut state, "press", &key).is_err());
 }
 
 fn attribute(state: &mut super::state::HostState) -> String {
