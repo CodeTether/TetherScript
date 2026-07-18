@@ -55,3 +55,7 @@ pub(super) fn reset_all() {
 pub(super) fn reset_surface(handle: &DomHandle) {
     store::reset_surface(handle);
 }
+
+pub(super) fn image_data_constructor() -> JsValue {
+    image::constructor()
+}

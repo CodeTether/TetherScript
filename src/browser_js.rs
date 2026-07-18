@@ -39,6 +39,8 @@ mod dom_compat_host;
 mod event_path_host;
 #[path = "browser_js_fullscreen.rs"]
 mod fullscreen_host;
+#[path = "browser_js_global_names.rs"]
+mod global_names;
 #[path = "browser_js_http_status.rs"]
 mod http_status_host;
 #[path = "browser_js_inline_preflight.rs"]
@@ -923,84 +925,7 @@ fn install_dom_globals(
                 .borrow_mut()
                 .insert("defaultView".into(), window.clone());
         }
-        for name in [
-            "getComputedStyle",
-            "getBoundingClientRect",
-            "getAccessibilityTree",
-            "fetch",
-            "XMLHttpRequest",
-            "WebSocket",
-            "EventSource",
-            "Event",
-            "CustomEvent",
-            "MouseEvent",
-            "KeyboardEvent",
-            "InputEvent",
-            "SubmitEvent",
-            "FocusEvent",
-            "PointerEvent",
-            "WheelEvent",
-            "MutationObserver",
-            "IntersectionObserver",
-            "ResizeObserver",
-            "ReportingObserver",
-            "DOMMatrix",
-            "DOMMatrixReadOnly",
-            "URL",
-            "URLPattern",
-            "URLSearchParams",
-            "AbortController",
-            "Request",
-            "Response",
-            "Headers",
-            "atob",
-            "btoa",
-            "Uint8Array",
-            "Uint32Array",
-            "Uint16Array",
-            "Int32Array",
-            "Float32Array",
-            "ArrayBuffer",
-            "SharedArrayBuffer",
-            "TextEncoder",
-            "TextDecoder",
-            "Blob",
-            "File",
-            "FormData",
-            "FileReader",
-            "structuredClone",
-            "crypto",
-            "trustedTypes",
-            "CSS",
-            "CSSStyleSheet",
-            "performance",
-            "scheduler",
-            "requestIdleCallback",
-            "cancelIdleCallback",
-            "PerformanceObserver",
-            "customElements",
-            "MessageChannel",
-            "BroadcastChannel",
-            "Worker",
-            "registerWorkerScript",
-            "DOMParser",
-            "XMLSerializer",
-            "Node",
-            "Element",
-            "HTMLElement",
-            "Document",
-            "DocumentFragment",
-            "NodeFilter",
-            "matchMedia",
-            "screen",
-            "innerWidth",
-            "innerHeight",
-            "devicePixelRatio",
-            "scrollX",
-            "scrollY",
-            "pageXOffset",
-            "pageYOffset",
-        ] {
+        for name in global_names::all() {
             if let Some(value) = obj.borrow().get(name).cloned() {
                 engine.set_global(name, value);
             }

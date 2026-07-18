@@ -4,6 +4,8 @@ use super::*;
 mod args;
 #[path = "dom_constructors/image.rs"]
 mod image;
+#[path = "dom_constructors/image_data.rs"]
+mod image_data;
 #[path = "dom_constructors/json.rs"]
 mod json;
 #[path = "dom_constructors/matrix.rs"]
@@ -36,6 +38,7 @@ mod tests_geometry_constructors;
 pub(super) fn install(window: &mut HashMap<String, JsValue>) {
     window.insert("Node".into(), node::create());
     window.insert("Image".into(), native("Image", None, image::create));
+    window.insert("ImageData".into(), image_data::constructor());
     window.insert("Option".into(), native("Option", None, option::create));
     window.insert("DOMPoint".into(), point::constructor());
     window.insert("DOMRect".into(), rect::constructor());

@@ -1,16 +1,6 @@
 //! Canvas pixel object helpers.
 
 use super::surface::Surface;
-use super::*;
-
-pub(super) fn object(width: usize, height: usize, bytes: Vec<JsValue>, checksum: u64) -> JsValue {
-    let mut obj = HashMap::new();
-    obj.insert("width".into(), JsValue::Number(width as f64));
-    obj.insert("height".into(), JsValue::Number(height as f64));
-    obj.insert("data".into(), JsValue::Array(Rc::new(RefCell::new(bytes))));
-    obj.insert("checksum".into(), JsValue::String(checksum.to_string()));
-    JsValue::Object(Rc::new(RefCell::new(obj)))
-}
 
 pub(super) fn at(surface: &Surface, x: i64, y: i64) -> [u8; 4] {
     if x < 0 || y < 0 || x >= surface.width as i64 || y >= surface.height as i64 {

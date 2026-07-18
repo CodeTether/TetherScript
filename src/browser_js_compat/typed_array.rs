@@ -2,6 +2,8 @@ use super::*;
 
 #[path = "typed_array/buffer.rs"]
 mod buffer;
+#[path = "typed_array/clamped.rs"]
+pub(in crate::browser_js) mod clamped;
 #[path = "typed_array/constructor.rs"]
 mod constructor;
 #[path = "typed_array/number.rs"]
@@ -10,6 +12,7 @@ mod number;
 mod prototype;
 
 pub(super) fn install(window: &mut HashMap<String, JsValue>) {
+    clamped::install(window);
     window.insert(
         "Uint8Array".into(),
         constructor::uint8(prototype::object("Uint8Array", 1)),

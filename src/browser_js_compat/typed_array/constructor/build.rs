@@ -12,6 +12,7 @@ pub(super) fn constructor(
             let array = make(args);
             js::set_host_property(&array, "__proto__", proto.clone())?;
             js::set_host_property(&array, "__typed_array", JsValue::Bool(true))?;
+            js::set_host_property(&array, "__typed_array_name", JsValue::String(name.into()))?;
             Ok(array)
         })
         .with_property(

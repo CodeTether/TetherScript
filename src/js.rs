@@ -51,6 +51,8 @@ mod js_string;
 mod js_string_prototype;
 #[path = "js_trace.rs"]
 mod js_trace;
+#[path = "js_typed_array.rs"]
+mod js_typed_array;
 #[path = "js_uri.rs"]
 mod js_uri;
 #[path = "js_regex_rewrite.rs"]
@@ -58,6 +60,7 @@ mod regex_rewrite;
 #[path = "js_syntax_preflight.rs"]
 mod syntax_preflight;
 pub(crate) use js_await::with_drain as with_await_drain;
+pub(crate) use js_typed_array::uint8_clamp;
 pub(crate) use syntax_preflight::reject as reject_unsupported_syntax;
 
 type NativeCallback = dyn Fn(&[JsValue]) -> Result<JsValue, String>;
@@ -5121,6 +5124,7 @@ fn native_call_receives_this_arg(function: &JsValue) -> bool {
         || native.name.starts_with("Function.prototype.")
         || native.name == "Object.hasOwnProperty"
         || native.name.starts_with("Uint8Array.prototype.")
+        || native.name.starts_with("Uint8ClampedArray.prototype.")
         || native.name.starts_with("Uint32Array.prototype.")
         || native.name.starts_with("Uint16Array.prototype.")
         || native.name.starts_with("Int32Array.prototype.")
@@ -6022,6 +6026,10 @@ fn set_property(value: &JsValue, prop: &str, new_value: JsValue) -> Result<(), S
                 set_array_extra_property(items, prop, new_value);
                 return Ok(());
             };
+            if idx >= items.borrow().len() && js_typed_array::fixed_length(items) {
+                return Ok(());
+            }
+            let new_value = js_typed_array::assigned_value(items, new_value);
             let mut items = items.borrow_mut();
             if idx >= items.len() {
                 items.resize(idx + 1, JsValue::Undefined);

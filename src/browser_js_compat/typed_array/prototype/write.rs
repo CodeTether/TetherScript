@@ -6,7 +6,10 @@ pub(super) fn set(args: &[JsValue]) -> Result<JsValue, String> {
         .get(1)
         .ok_or_else(|| "Uint8Array.set: expected source".to_string())?;
     let offset = number::usize(args.get(2), 0);
-    for (index, byte) in bytes::bytes_from_value(source).into_iter().enumerate() {
+    for (index, byte) in super::source::bytes(&args[0], source)
+        .into_iter()
+        .enumerate()
+    {
         if let Some(slot) = target.borrow_mut().get_mut(offset + index) {
             *slot = JsValue::Number(byte as f64);
         }
@@ -16,7 +19,7 @@ pub(super) fn set(args: &[JsValue]) -> Result<JsValue, String> {
 
 pub(super) fn fill(args: &[JsValue]) -> Result<JsValue, String> {
     let target = receiver(args, "fill")?;
-    let value = JsValue::Number(number::byte(args.get(1)) as f64);
+    let value = JsValue::Number(super::source::byte(&args[0], args.get(1)) as f64);
     for slot in target.borrow_mut().iter_mut() {
         *slot = value.clone();
     }

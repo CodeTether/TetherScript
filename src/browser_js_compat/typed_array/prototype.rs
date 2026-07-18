@@ -1,5 +1,7 @@
 use super::*;
 
+#[path = "prototype/source.rs"]
+mod source;
 #[path = "prototype/view.rs"]
 mod view;
 #[path = "prototype/write.rs"]

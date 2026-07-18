@@ -26,7 +26,7 @@ pub(super) fn clip(
     (x1 > x0 && y1 > y0).then_some((x0, y0, x1, y1))
 }
 
-fn i64_value(value: Option<&JsValue>) -> i64 {
+pub(super) fn i64_value(value: Option<&JsValue>) -> i64 {
     match value.unwrap_or(&JsValue::Undefined) {
         JsValue::Number(n) if n.is_finite() => *n as i64,
         other => other.display().parse().unwrap_or(0),

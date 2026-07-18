@@ -35,7 +35,7 @@ mod structured;
 #[path = "browser_js_compat/text.rs"]
 mod text;
 #[path = "browser_js_compat/typed_array.rs"]
-mod typed_array;
+pub(super) mod typed_array;
 #[path = "browser_js_compat/url_pattern.rs"]
 mod url_pattern;
 
