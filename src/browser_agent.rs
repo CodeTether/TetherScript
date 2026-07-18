@@ -19,6 +19,7 @@ pub mod hit;
 pub mod hit_layout;
 mod hit_style;
 mod hit_target;
+pub mod host;
 mod idrefs;
 pub mod interact;
 pub mod keyboard;

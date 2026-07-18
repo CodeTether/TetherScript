@@ -8,7 +8,13 @@ audit and replay.
 
 ## Granting
 
-CLI example:
+Start the in-tree native browser action host:
+
+```bash
+cargo run --bin tetherscript-browser-host -- 127.0.0.1:41707
+```
+
+Then grant its endpoint to a script:
 
 ```bash
 tetherscript run --interp \
@@ -17,6 +23,9 @@ tetherscript run --interp \
   --browser-scope all \
   examples/browser_agentic_debug.tether
 ```
+
+The host owns one persistent `BrowserPage` and exits after `browser.stop()`.
+It executes actions through tetherscript's own DOM, JavaScript, layout, and rendering stack.
 
 Default scopes, when `--browser-scope` is omitted, are enough for Milestone 1: navigate, interact, DOM inspect, console inspect, network inspect, screenshot.
 

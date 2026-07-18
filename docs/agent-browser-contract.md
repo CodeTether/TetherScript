@@ -10,6 +10,8 @@ It has two stable entry points:
   HTML/CSS rendering.
 - `tetherscript::browser_agent::BrowserPage` for embedded observe, act, assert,
   screenshot, event-log, trace, and deterministic resource-validation workflows.
+- `tetherscript-browser-host` for capability-gated `.tether` and agent-TUI
+  access to one persistent native `BrowserPage` over `/browser` action envelopes.
 
 Browser control remains capability-gated through `BrowserAuthority` and
 tetherscript browser action endpoints. Scripts must be granted origins and
@@ -23,6 +25,10 @@ behavior belongs in `tests/browser_cap_contract.rs`, and endpoint smoke tests
 remain opt-in through `TETHERSCRIPT_BROWSERCTL_ENDPOINT`.
 Current parity work is tracked in `docs/browser-parity-checklist.md`; use that
 checklist before choosing the next browser task.
+
+The non-skipping host path is covered by `tests/browser_native_e2e.rs`, while
+`tests/browser_agent_e2e.rs` proves the TUI tool path through navigation,
+interaction, DOM observation, and snapshot retrieval.
 
 The browser track must not depend on external browser engines or automation
 adapters. Production UI validation is done by closing gaps in tetherscript's

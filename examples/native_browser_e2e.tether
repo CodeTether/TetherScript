@@ -1,0 +1,15 @@
+fn main() {
+    let args = env_args()
+    if args.len() != 2 { panic("native_browser_e2e expects URL and screenshot path") }
+
+    browser.start()?
+    browser.goto(args[0])?
+    browser.click("#change")?
+    assert_text(browser, "clicked")?
+
+    let snapshot = browser.page_snapshot()?
+    let screenshot = browser.screenshot(args[1])?
+    println("native-browser-url", snapshot.url)
+    println("native-browser-text", snapshot.visible_text)
+    println("native-browser-screenshot", screenshot.format)
+}
