@@ -102,9 +102,9 @@ The native host polls until the requested wall-clock timeout while settling the
 deterministic page runtime between attempts. Raw selector waits support
 `attached`, `detached`, `visible`, and `hidden` states.
 
-`wait_for_network_idle`, `compare_screenshots`, and `visual_diff` are reserved
-language-level methods. The current native host rejects them before network I/O
-until matching actions exist.
+`wait_for_network_idle` remains reserved. `compare_screenshots` and `visual_diff`
+compare deterministic native screenshot files and report match state, encoded
+byte counts, and changed encoded bytes.
 
 `scroll` accepts `scroll(selector)`, `scroll(x, y)`, or
 `scroll(selector, x, y)` and sends a `scroll` action envelope with the matching
@@ -198,9 +198,8 @@ Runtime assertion helpers return `Result` values suitable for `?` propagation:
 - `assert_route(browser, path_or_url_substring)`
 - `assert_react_component(browser, name)`
 
-`assert_screenshot_matches(browser, name)` is reserved until the native host has
-a baseline-image comparison action. Today it returns a clear unsupported-backend
-error before network I/O.
+`assert_screenshot_matches(browser, path)` compares the current native viewport
+against a PNG baseline and returns an error naming the differing byte count.
 
 ## Embedded resource validation
 

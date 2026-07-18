@@ -10,6 +10,8 @@ mod diagnose;
 mod network_replay;
 #[path = "network_request.rs"]
 mod network_request;
+#[path = "visual_compare.rs"]
+mod visual_compare;
 
 pub(super) fn invoke(state: &mut HostState, payload: &Value) -> (Result<Value, String>, bool) {
     let action = match super::value::string_field(payload, "action") {
@@ -27,6 +29,7 @@ pub(super) fn invoke(state: &mut HostState, payload: &Value) -> (Result<Value, S
         "fetch" | "axios" | "xhr" => network_request::invoke(state, &action, payload),
         "replay" => network_replay::invoke(state, payload),
         "diagnose" => diagnose::invoke(state, payload),
+        "visual_compare" => visual_compare::invoke(state, payload),
         "wait" => super::wait::invoke(state, payload),
         "click" | "click_text" | "fill" | "type" | "upload" | "toggle" | "mouse_click"
         | "hover" => super::interact::invoke(state, &action, payload),

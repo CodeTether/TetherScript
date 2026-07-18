@@ -162,6 +162,7 @@ fn is_browserctl_action(action: &str) -> bool {
             | "xhr"
             | "replay"
             | "diagnose"
+            | "visual_compare"
     )
 }
 
@@ -323,6 +324,15 @@ fn high_level_methods_emit_only_browserctl_actions() {
         ("screenshot_element", vec![str_value("#save")]),
         ("find_visual_text", vec![str_value("Save")]),
         ("find_element_at", vec![Value::Int(1), Value::Int(2)]),
+        (
+            "compare_screenshots",
+            vec![str_value("before.png"), str_value("after.png")],
+        ),
+        (
+            "visual_diff",
+            vec![str_value("before.png"), str_value("after.png")],
+        ),
+        ("assert_screenshot_matches", vec![str_value("baseline.png")]),
     ];
 
     for (method, args) in cases {
@@ -344,16 +354,8 @@ fn high_level_methods_emit_only_browserctl_actions() {
 }
 
 #[test]
-fn unsupported_backend_methods_fail_before_network_io() {
+fn unsupported_network_idle_fails_before_network_io() {
     let auth = BrowserAuthority::new("http://127.0.0.1:1/browser", Vec::new(), all_scopes());
     let idle = invoke(&auth, "wait_for_network_idle", &[]).unwrap_err();
     assert!(idle.contains("does not support network idle waits"));
-
-    let diff = invoke(
-        &auth,
-        "visual_diff",
-        &[str_value("before.png"), str_value("after.png")],
-    )
-    .unwrap_err();
-    assert!(diff.contains("does not support visual diff actions"));
 }
