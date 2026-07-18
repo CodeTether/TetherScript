@@ -27,3 +27,5 @@ pub(super) const UNSIGNED_BYTE: u32 = 0x1401;
 pub(super) const NO_ERROR: u32 = 0;
 pub(super) const INVALID_ENUM: u32 = 0x0500;
 pub(super) const INVALID_VALUE: u32 = 0x0501;
+pub(super) const INVALID_OPERATION: u32 = 0x0502;
+pub(super) const OUT_OF_MEMORY: u32 = 0x0505;

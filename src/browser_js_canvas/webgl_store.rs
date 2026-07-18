@@ -13,13 +13,17 @@ pub(super) fn ensure(handle: &DomHandle, version: u8) {
     let (width, height) = super::dimensions::dimensions(handle);
     let state = STATES.with(|states| {
         let mut states = states.borrow_mut();
-        let refresh = states.get(&key).is_none_or(|state| {
-            state.version != version || state.width != width || state.height != height
-        });
-        if refresh {
-            states.insert(key.clone(), WebGlState::new(version, width, height));
-        }
-        states.get(&key).cloned().expect("webgl state exists")
+        states
+            .entry(key.clone())
+            .and_modify(|state| {
+                if state.version == version {
+                    state.resize(width, height);
+                } else {
+                    *state = WebGlState::new(version, width, height);
+                }
+            })
+            .or_insert_with(|| WebGlState::new(version, width, height))
+            .clone()
     });
     super::webgl_attrs::sync_attrs(handle, &state);
 }

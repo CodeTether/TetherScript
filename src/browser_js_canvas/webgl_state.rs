@@ -14,6 +14,7 @@ pub(super) struct WebGlState {
     pub color_mask: [bool; 4],
     pub errors: Vec<u32>,
     pub commands: Vec<String>,
+    pub pipeline: super::webgl_pipeline::State,
 }
 
 impl WebGlState {
@@ -29,6 +30,7 @@ impl WebGlState {
             color_mask: [true; 4],
             errors: Vec::new(),
             commands: Vec::new(),
+            pipeline: super::webgl_pipeline::State::default(),
         }
     }
 
@@ -36,5 +38,10 @@ impl WebGlState {
         if self.commands.len() < MAX_COMMANDS {
             self.commands.push(command);
         }
+    }
+
+    pub fn resize(&mut self, width: u32, height: u32) {
+        self.width = width;
+        self.height = height;
     }
 }

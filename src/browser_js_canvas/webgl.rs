@@ -22,7 +22,9 @@ webgl_mod!("webgl_error.rs", webgl_error);
 webgl_mod!("webgl_ext.rs", webgl_ext);
 webgl_mod!("webgl_methods.rs", webgl_methods);
 webgl_mod!("webgl_named_constants.rs", webgl_named_constants);
+webgl_mod!("webgl_param_value.rs", webgl_param_value);
 webgl_mod!("webgl_params.rs", webgl_params);
+webgl_mod!("webgl_pipeline.rs", webgl_pipeline);
 webgl_mod!("webgl_read.rs", webgl_read);
 webgl_mod!("webgl_scissor.rs", webgl_scissor);
 webgl_mod!("webgl_state.rs", webgl_state);
@@ -39,5 +41,5 @@ pub(super) fn reset_all() {
 }
 
 #[cfg(test)]
-#[path = "webgl_tests_state.rs"]
-mod tests_state;
+#[path = "webgl_tests.rs"]
+mod tests;

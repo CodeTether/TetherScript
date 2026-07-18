@@ -37,7 +37,7 @@ The runner lives under `tests/browser_wpt_like/`. Each fixture records:
 | Dialogs/clipboard | `tests/browser_wpt_like/dialog_clipboard.rs` | modal event-loop blocking, system clipboard and user activation gating |
 | Frames/window messaging | `tests/browser_wpt_like/frames.rs` | script-visible WindowProxy objects, nested event-loop dispatch timing |
 | Security policy | `tests/browser_wpt_like/security_policy.rs` | full CSP parser, COOP/COEP and mixed-content enforcement |
-| Canvas/WebGL | `tests/browser_wpt_like/canvas_webgl.rs` | shaders, buffers, textures, draw calls, GPU acceleration |
+| Canvas/WebGL | `tests/browser_wpt_like/canvas_webgl.rs` | textures, indexed drawing, depth/stencil, blending, general GLSL ES, GPU acceleration |
 | Accessibility snapshots | `tests/browser_wpt_like/accessibility.rs` | platform accessibility tree adapters, complete ARIA role mapping |
 | Locator/actionability | `tests/browser_wpt_like/actionability.rs` | continuous animation sampling, attached-to-document check |
 | Drag and pointer capture | `tests/browser_wpt_like/drag_pointer_capture.rs` | DataTransfer object construction, real OS drag source negotiation |

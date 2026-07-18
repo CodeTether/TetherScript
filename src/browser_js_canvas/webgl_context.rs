@@ -15,6 +15,7 @@ fn install_constants(obj: &mut HashMap<String, JsValue>) {
     for (name, value) in super::webgl_named_constants::ALL {
         obj.insert((*name).into(), JsValue::Number(*value as f64));
     }
+    super::webgl_pipeline::install_constants(obj);
 }
 
 fn install_metadata(obj: &mut HashMap<String, JsValue>, handle: DomHandle, version: u8) {

@@ -8,13 +8,13 @@ fn webgl_context_records_metadata_commands_and_parameters() {
          gl.viewport(1,2,3,4); gl.clearColor(0.25,0.5,0.75,1); gl.clear(gl.COLOR_BUFFER_BIT); \
          gl.getParameter(gl.VENDOR)+':'+gl.getParameter(gl.RENDERER)+':'+\
          gl.getParameter(gl.VIEWPORT).join(',')+':'+gl.getParameter(gl.MAX_TEXTURE_SIZE)+':'+\
-         (gl.getParameter(gl.SHADING_LANGUAGE_VERSION)===null)+':'+\
+         gl.getParameter(gl.SHADING_LANGUAGE_VERSION)+':'+gl.getParameter(gl.MAX_VERTEX_ATTRIBS)+':'+\
          gl.getSupportedExtensions().join('|');",
     )
     .unwrap();
     assert_eq!(
         result.value.display(),
-        "tetherscript:tetherscript software rasterizer:1,2,3,4:0:true:"
+        "tetherscript:tetherscript software rasterizer:1,2,3,4:0:WebGL GLSL ES 1.0 (tetherscript):16:"
     );
     let attrs = match &result.document.children[0] {
         Node::Element(el) => &el.attrs,
