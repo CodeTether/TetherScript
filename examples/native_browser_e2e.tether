@@ -48,6 +48,8 @@ fn main() {
     browser.forward()?
     if browser.page_snapshot()?.url != second { panic("browser.forward did not restore the second URL") }
     let network = browser.network_log(args[0])?
+    let waited_request = browser.wait_for_request(args[0], 50)?
+    let waited_response = browser.wait_for_response(args[0], 50)?
     println("native-browser-url", snapshot.url)
     println("native-browser-text", snapshot.visible_text)
     println("native-browser-screenshot", screenshot.format)
@@ -67,4 +69,5 @@ fn main() {
     println("native-browser-wait", waited)
     println("native-browser-wait-timeout", wait_timeout.is_err())
     println("native-browser-network", network.len())
+    println("native-browser-network-waits", waited_request.len(), waited_response.len())
 }

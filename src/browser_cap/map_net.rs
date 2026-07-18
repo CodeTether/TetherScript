@@ -7,6 +7,8 @@ use super::call::BrowserCall;
 
 #[path = "map_net_requests.rs"]
 mod requests;
+#[path = "map_net_wait.rs"]
+mod waits;
 
 pub(crate) fn prepare(
     auth: &BrowserAuthority,
@@ -18,7 +20,7 @@ pub(crate) fn prepare(
         "fetch" | "axios" | "xhr" => requests::request(auth, method, args),
         "replay" | "replay_request" => requests::replay(method, args),
         "diagnose" => no_arg_action("diagnose", args),
-        "wait_for_request" | "wait_for_response" => requests::wait_network(method, args),
+        "wait_for_request" | "wait_for_response" => waits::prepare(method, args),
         _ => unreachable!(),
     }
 }

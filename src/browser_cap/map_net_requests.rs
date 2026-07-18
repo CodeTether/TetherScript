@@ -32,16 +32,3 @@ pub(crate) fn replay(method: &str, args: &[Value]) -> Result<BrowserCall, String
     }
     Ok(super::call("replay", entries))
 }
-
-pub(crate) fn wait_network(method: &str, args: &[Value]) -> Result<BrowserCall, String> {
-    Ok(super::call(
-        "network_log",
-        vec![
-            (
-                "url_contains",
-                super::super::value::str_value(super::super::args::expect_str(method, args, 0)?),
-            ),
-            ("limit", Value::Int(1)),
-        ],
-    ))
-}

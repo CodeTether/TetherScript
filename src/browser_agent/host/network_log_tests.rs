@@ -13,9 +13,9 @@ fn network_queries_filter_captured_events_and_failures() {
         super::super::super::value::string("/api"),
     )]);
 
-    let all = super::invoke(&state, &payload).unwrap();
+    let all = super::invoke(&mut state, &payload).unwrap();
     let failed_payload = super::super::super::value::map(vec![("failed_only", Value::Bool(true))]);
-    let failed = super::invoke(&state, &failed_payload).unwrap();
+    let failed = super::invoke(&mut state, &failed_payload).unwrap();
 
     assert_eq!(length(all), 1);
     assert_eq!(length(failed), 1);

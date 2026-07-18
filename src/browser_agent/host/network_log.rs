@@ -14,8 +14,11 @@ mod filter;
 mod tests;
 #[path = "network_log_value.rs"]
 mod value;
+#[path = "network_log_wait.rs"]
+mod wait;
 
-pub(super) fn invoke(state: &HostState, payload: &Value) -> Result<Value, String> {
+pub(super) fn invoke(state: &mut HostState, payload: &Value) -> Result<Value, String> {
+    wait::until(state, payload)?;
     let contains = super::super::value::optional_string(payload, "url_contains")?;
     let limit = super::super::value::optional_int(payload, "limit")?
         .map(|value| {
