@@ -19,6 +19,9 @@ fn install_one(
     obj.borrow_mut().insert(
         name.into(),
         native(name, Some(0), move |_| {
+            if event_type == "resize" {
+                viewport_host::screen::sync_orientation(&window)?;
+            }
             viewport_host::visual_viewport::sync(&window);
             dispatch_window_lifecycle(&window, event_type)?;
             viewport_host::visual_viewport::dispatch(&window, event_type)?;
