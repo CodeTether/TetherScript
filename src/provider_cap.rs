@@ -670,10 +670,9 @@ fn extract_stream_deltas(chunk: &Value) -> (Option<String>, Option<String>) {
 fn parse_endpoint(endpoint: &str) -> Option<(Scheme, String, u16)> {
     let (scheme, rest) = if let Some(r) = endpoint.strip_prefix("https://") {
         (Scheme::Https, r)
-    } else if let Some(r) = endpoint.strip_prefix("http://") {
-        (Scheme::Http, r)
     } else {
-        return None;
+        let r = endpoint.strip_prefix("http://")?;
+        (Scheme::Http, r)
     };
     if rest.is_empty() {
         return None;
