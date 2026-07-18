@@ -6,6 +6,7 @@ use super::state::HostState;
 
 pub(super) fn navigate(state: &mut HostState, url: &str) -> Result<Value, String> {
     let loaded = super::fetch::load(url)?;
+    state.focused = None;
     state.page.goto_html(loaded.url, loaded.body);
     state.page.run_scripts()?;
     state.started = true;

@@ -25,10 +25,12 @@ pub(super) fn invoke(
             super::nav_load::navigate(state, &url)
         }
         "back" => {
+            state.focused = None;
             state.page.go_back();
             Ok(super::snapshot::value(&state.page))
         }
         "forward" => {
+            state.focused = None;
             state.page.go_forward();
             Ok(super::snapshot::value(&state.page))
         }

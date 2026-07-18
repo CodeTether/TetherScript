@@ -10,6 +10,11 @@ fn main() {
     let snapshot = browser.page_snapshot()?
     let screenshot = browser.screenshot(args[1])?
     let trusted = browser.eval("window.lastTrusted")?
+    browser.focus("#entry")?
+    browser.press("A")?
+    let keyboard = browser.eval("document.querySelector('#entry').value")?
+    browser.blur("#entry")?
+    let focus = browser.eval("document.querySelector('#entry').getAttribute('data-focus')")?
     let second = args[0] + "second"
     browser.goto(second)?
     browser.back()?
@@ -21,4 +26,6 @@ fn main() {
     println("native-browser-screenshot", screenshot.format)
     println("native-browser-trusted", trusted)
     println("native-browser-history", second)
+    println("native-browser-keyboard", keyboard)
+    println("native-browser-focus", focus)
 }
