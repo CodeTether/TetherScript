@@ -24,6 +24,9 @@ mod state;
 mod url;
 mod value;
 mod value_optional;
+mod visible_text;
+#[cfg(test)]
+mod visible_text_tests;
 mod wait;
 
 /// Serve native browser action envelopes over blocking HTTP.

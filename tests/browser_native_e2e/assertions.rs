@@ -9,7 +9,12 @@ pub fn check(output: Output, expected_url: &str, screenshot: &Path) {
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
     std::fs::write(screenshot.with_extension("stdout"), stdout.as_bytes()).unwrap();
-    assert!(stdout.contains("native-browser-text clicked"), "{stdout}");
+    assert!(
+        stdout
+            .lines()
+            .any(|line| line == "native-browser-text clicked"),
+        "{stdout}"
+    );
     assert!(stdout.contains(expected_url), "{stdout}");
     assert!(stdout.contains("native-browser-screenshot png"), "{stdout}");
     assert!(stdout.contains("native-browser-trusted true"), "{stdout}");
