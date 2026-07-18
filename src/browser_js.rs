@@ -5670,9 +5670,9 @@ fn response_parts(url: &str) -> (u16, &'static str, String) {
         } else {
             (200, "OK", String::new())
         }
-    } else if url.contains("404") || url.contains("not-found") {
+    } else if http_status_host::is_not_found_target(url) {
         (404, "Not Found", "not found".to_string())
-    } else if url.contains("500") {
+    } else if http_status_host::status_target(url).contains("500") {
         (500, "Internal Server Error", "server error".to_string())
     } else {
         (
