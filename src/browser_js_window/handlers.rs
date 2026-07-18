@@ -8,6 +8,7 @@ const HANDLER_PROPS: &[&str] = &[
     "onvisibilitychange",
     "ononline",
     "onoffline",
+    "onorientationchange",
     "onresize",
     "onscroll",
 ];

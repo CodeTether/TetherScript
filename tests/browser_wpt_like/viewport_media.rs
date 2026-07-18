@@ -24,6 +24,7 @@ pub fn run() {
     viewport_and_media_state();
     visual::metrics_and_events();
     orientation::locks_and_unlocks();
+    orientation::exposes_legacy_window_orientation();
     match_media::object_shape();
     match_media::listeners_and_removal();
 }

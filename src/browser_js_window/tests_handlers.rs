@@ -7,6 +7,7 @@ fn window_lifecycle_handler_properties_have_global_shape() {
         "<main></main>",
         "[typeof window.onpagehide,typeof onpagehide,typeof window.onpageshow,\
          typeof window.onvisibilitychange,typeof window.ononline,typeof window.onoffline,\
+         typeof window.onorientationchange,typeof onorientationchange,\
          typeof window.onresize,typeof window.onscroll,typeof scrollTo,typeof window.scrollBy].join('|');",
     )
     .unwrap();
@@ -14,7 +15,7 @@ fn window_lifecycle_handler_properties_have_global_shape() {
     assert_eq!(
         result.value,
         JsValue::String(
-            "object|object|object|object|object|object|object|object|function|function".into()
+            "object|object|object|object|object|object|object|object|object|object|function|function".into()
         )
     );
 }

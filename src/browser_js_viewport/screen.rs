@@ -22,7 +22,7 @@ pub(super) fn install(window: &mut HashMap<String, JsValue>) {
     window.insert("screen".into(), screen_object());
 }
 
-pub(in crate::browser_js) fn sync_orientation(window: &JsValue) -> Result<(), String> {
+pub(in crate::browser_js) fn sync_orientation(window: &JsValue) -> Result<bool, String> {
     orientation_sync::sync(window)
 }
 
