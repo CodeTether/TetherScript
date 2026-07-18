@@ -7,6 +7,8 @@ fn main() {
     browser.start()?
     browser.goto(args[0])?
     browser.reload()?
+    let viewport = browser.set_viewport(120, 40)?
+    let viewport_media = browser.eval("innerWidth+','+innerHeight+','+matchMedia('(min-width:100px)').matches")?
     let network_idle = browser.wait_for_network_idle()?
     let waited_url = browser.wait_for_url(args[0], 50)?
     let waited_text = browser.wait_for_text("ready", 50)?
@@ -123,6 +125,7 @@ fn main() {
     println("native-browser-url", snapshot.url)
     println("native-browser-health", health.started, detected.started, raw_health.started)
     println("native-browser-wait-more", waited_url, waited_text)
+    println("native-browser-viewport", viewport.width, viewport.height, viewport_media)
     println("native-browser-snapshots", raw_snapshot.url == snapshot.url, dom_snapshot.url == snapshot.url)
     println("native-browser-query", button_text, button_html.len() > 0)
     println("native-browser-text", snapshot.visible_text)

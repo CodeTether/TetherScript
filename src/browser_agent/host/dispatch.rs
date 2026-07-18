@@ -41,6 +41,7 @@ pub(super) fn invoke(state: &mut HostState, payload: &Value) -> (Result<Value, S
             super::keyboard::invoke(state, &action, payload)
         }
         "scroll" => super::scroll::invoke(state, payload),
+        "set_viewport" => super::viewport::invoke(state, payload),
         "screenshot" => super::screenshot::invoke(state, payload),
         _ => unsupported::action(&action),
     };

@@ -2,6 +2,10 @@
 
 use crate::browser::RasterImage;
 
+#[cfg(test)]
+#[path = "png_tests.rs"]
+mod tests;
+
 const SIGNATURE: &[u8; 8] = b"\x89PNG\r\n\x1a\n";
 
 pub(super) fn encode(image: &RasterImage) -> Vec<u8> {

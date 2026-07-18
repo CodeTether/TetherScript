@@ -18,6 +18,8 @@ mod net;
 mod raw;
 #[path = "map_storage.rs"]
 mod storage;
+#[path = "map_viewport.rs"]
+mod viewport;
 #[path = "map_visual.rs"]
 mod visual;
 
