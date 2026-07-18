@@ -10,8 +10,15 @@ fn main() {
     let snapshot = browser.page_snapshot()?
     let screenshot = browser.screenshot(args[1])?
     let trusted = browser.eval("window.lastTrusted")?
+    let second = args[0] + "second"
+    browser.goto(second)?
+    browser.back()?
+    if browser.page_snapshot()?.url != args[0] { panic("browser.back did not restore the first URL") }
+    browser.forward()?
+    if browser.page_snapshot()?.url != second { panic("browser.forward did not restore the second URL") }
     println("native-browser-url", snapshot.url)
     println("native-browser-text", snapshot.visible_text)
     println("native-browser-screenshot", screenshot.format)
     println("native-browser-trusted", trusted)
+    println("native-browser-history", second)
 }

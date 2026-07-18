@@ -87,7 +87,7 @@ stop.
 ## MVP methods
 
 Navigation/interaction:
-`goto`, `reload`, `back`, `click`, `click_text`, `type`, `press`,
+`goto`, `reload`, `back`, `forward`, `click`, `click_text`, `type`, `press`,
 `hover`, `focus`, `blur`, `scroll`, `wait_for_selector`, `wait_for_text`,
 `wait_for_url`, `wait_for_network_idle`.
 
@@ -101,9 +101,6 @@ The wait helpers are tetherscript convenience methods over the host
 `wait_for_network_idle`, `compare_screenshots`, and `visual_diff` are reserved
 language-level methods. The current native host rejects them before network I/O
 until matching actions exist.
-
-`forward` is also reserved until the native host exposes a forward history
-action.
 
 `scroll` accepts `scroll(selector)`, `scroll(x, y)`, or
 `scroll(selector, x, y)` and sends a `scroll` action envelope with the matching
