@@ -4,6 +4,11 @@ use crate::value::Value;
 
 use super::state::HostState;
 
+#[path = "network_replay.rs"]
+mod network_replay;
+#[path = "network_request.rs"]
+mod network_request;
+
 pub(super) fn invoke(state: &mut HostState, payload: &Value) -> (Result<Value, String>, bool) {
     let action = match super::value::string_field(payload, "action") {
         Ok(action) => action,
@@ -17,6 +22,8 @@ pub(super) fn invoke(state: &mut HostState, payload: &Value) -> (Result<Value, S
         }
         "snapshot" => Ok(super::snapshot::value(&state.page)),
         "text" | "html" | "eval" | "network_log" => super::query::invoke(state, &action, payload),
+        "fetch" | "axios" | "xhr" => network_request::invoke(state, &action, payload),
+        "replay" => network_replay::invoke(state, payload),
         "wait" => super::wait::invoke(state, payload),
         "click" | "click_text" | "fill" | "type" | "upload" | "toggle" | "mouse_click"
         | "hover" => super::interact::invoke(state, &action, payload),

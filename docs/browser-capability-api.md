@@ -155,6 +155,9 @@ The native host returns captured request method, URL, status, and route result;
 `failed_requests` restricts the result to missing or error statuses.
 `wait_for_request` and `wait_for_response` poll captured events while settling
 the page runtime until a URL match appears or the requested timeout expires.
+`fetch`, `axios`, and `xhr` execute through that same page network runtime and
+return a normalized status, URL, method, body, success flag, and transport map.
+`replay_request` reissues the latest URL match and can replace its request body.
 Native fetch/XHR networking follows redirects, emits CORS preflights, validates
 `Access-Control-Allow-*` headers, and models credential modes for cross-origin
 cookies. External page resources use the same route-visible network model for
