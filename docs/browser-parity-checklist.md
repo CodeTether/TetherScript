@@ -185,8 +185,9 @@ Completed tests:
 - Dialog decisions and clipboard text APIs update page state.
 - Iframe `postMessage` delivery follows target-origin metadata.
 - Same-origin and cross-origin allowlist security metadata is explicit.
-- 2D canvas pixels and WebGL software color clears are observable; WebGL
-  scissor tests, color masks, sticky errors, and state snapshots are live.
+- 2D canvas pixels and WebGL software rendering are observable; shader/program
+  lifecycle, typed vertex buffers, uniform colors, triangle draws, scissor
+  tests, color masks, sticky errors, and state snapshots are live.
 - Accessibility names, states, hidden filtering, and focus order are visible.
 - Active service workers can fulfill pass-through fetches from CacheStorage.
 - Same-origin pages share IndexedDB records while separate contexts do not.

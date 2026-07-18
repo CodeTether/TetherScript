@@ -3,23 +3,34 @@
 use super::{webgl_constants as c, webgl_state::WebGlState, *};
 
 pub(super) fn get(state: &mut WebGlState, param: &JsValue) -> JsValue {
-    match number(param) {
+    let param = super::webgl_param_value::number(param);
+    if let Some(value) = super::webgl_pipeline::parameter(state, param) {
+        return value;
+    }
+    match param {
         c::VENDOR => JsValue::String("tetherscript".into()),
         c::RENDERER => JsValue::String("tetherscript software rasterizer".into()),
         c::VERSION => JsValue::String(format!("WebGL {}.0 (tetherscript)", state.version)),
-        c::SHADING_LANGUAGE_VERSION => JsValue::Null,
+        c::SHADING_LANGUAGE_VERSION => {
+            JsValue::String(super::webgl_param_value::shader_version(state.version))
+        }
         c::MAX_TEXTURE_SIZE => JsValue::Number(0.0),
-        c::MAX_VIEWPORT_DIMS => array(&[state.width as f64, state.height as f64]),
-        c::VIEWPORT => array(&state.viewport.map(|value| value as f64)),
-        c::COLOR_CLEAR_VALUE => array(&state.clear_color),
+        c::MAX_VIEWPORT_DIMS => {
+            super::webgl_param_value::array(&[state.width as f64, state.height as f64])
+        }
+        c::VIEWPORT => super::webgl_param_value::array(&state.viewport.map(|value| value as f64)),
+        c::COLOR_CLEAR_VALUE => super::webgl_param_value::array(&state.clear_color),
         c::DEPTH_CLEAR_VALUE => JsValue::Number(1.0),
         c::STENCIL_CLEAR_VALUE => JsValue::Number(0.0),
-        c::SCISSOR_BOX => array(&state.scissor_box.map(|value| value as f64)),
+        c::SCISSOR_BOX => {
+            super::webgl_param_value::array(&state.scissor_box.map(|value| value as f64))
+        }
         c::SCISSOR_TEST => JsValue::Bool(state.scissor_test),
-        c::COLOR_WRITEMASK => bool_array(&state.color_mask),
-        c::ALIASED_LINE_WIDTH_RANGE | c::ALIASED_POINT_SIZE_RANGE => array(&[0.0, 0.0]),
-        c::MAX_VERTEX_ATTRIBS
-        | c::MAX_COMBINED_TEXTURE_IMAGE_UNITS
+        c::COLOR_WRITEMASK => super::webgl_param_value::bool_array(&state.color_mask),
+        c::ALIASED_LINE_WIDTH_RANGE => super::webgl_param_value::array(&[1.0, 1.0]),
+        c::ALIASED_POINT_SIZE_RANGE => super::webgl_param_value::array(&[1.0, 64.0]),
+        c::MAX_VERTEX_ATTRIBS => JsValue::Number(16.0),
+        c::MAX_COMBINED_TEXTURE_IMAGE_UNITS
         | c::MAX_TEXTURE_IMAGE_UNITS
         | c::MAX_VERTEX_TEXTURE_IMAGE_UNITS => JsValue::Number(0.0),
         _ => {
@@ -27,23 +38,4 @@ pub(super) fn get(state: &mut WebGlState, param: &JsValue) -> JsValue {
             JsValue::Null
         }
     }
-}
-
-fn bool_array(values: &[bool]) -> JsValue {
-    JsValue::Array(Rc::new(RefCell::new(
-        values.iter().map(|value| JsValue::Bool(*value)).collect(),
-    )))
-}
-
-fn number(value: &JsValue) -> u32 {
-    match value {
-        JsValue::Number(n) if n.is_finite() && *n >= 0.0 => *n as u32,
-        other => other.display().parse().unwrap_or(0),
-    }
-}
-
-fn array(values: &[f64]) -> JsValue {
-    JsValue::Array(Rc::new(RefCell::new(
-        values.iter().map(|value| JsValue::Number(*value)).collect(),
-    )))
 }

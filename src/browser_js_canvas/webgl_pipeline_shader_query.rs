@@ -1,0 +1,13 @@
+//! WebGL shader query method installation.
+
+use super::*;
+
+#[path = "webgl_pipeline_shader_info.rs"]
+mod info;
+#[path = "webgl_pipeline_shader_parameter.rs"]
+mod parameter;
+
+pub(super) fn install(obj: &mut HashMap<String, JsValue>, handle: DomHandle, version: u8) {
+    parameter::install(obj, handle.clone(), version);
+    info::install(obj, handle, version);
+}

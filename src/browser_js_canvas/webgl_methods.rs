@@ -10,5 +10,6 @@ pub(super) fn install(obj: &mut HashMap<String, JsValue>, handle: DomHandle, ver
     super::webgl_capability::install(obj, handle.clone(), version);
     super::webgl_error::install(obj, handle.clone(), version);
     super::webgl_clear::install(obj, handle.clone(), version);
+    super::webgl_pipeline::install(obj, handle.clone(), version);
     super::webgl_read::install(obj, handle, version);
 }

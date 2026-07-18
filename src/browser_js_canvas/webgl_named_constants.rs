@@ -36,4 +36,6 @@ pub(super) const ALL: &[(&str, u32)] = &[
     ("NO_ERROR", c::NO_ERROR),
     ("INVALID_ENUM", c::INVALID_ENUM),
     ("INVALID_VALUE", c::INVALID_VALUE),
+    ("INVALID_OPERATION", c::INVALID_OPERATION),
+    ("OUT_OF_MEMORY", c::OUT_OF_MEMORY),
 ];
