@@ -3,7 +3,7 @@ use super::*;
 #[path = "promise/aggregate.rs"]
 mod aggregate;
 #[path = "promise/api.rs"]
-pub(super) mod api;
+pub(in crate::browser_js) mod api;
 #[path = "promise/catch.rs"]
 mod catch;
 #[path = "promise/constructor.rs"]

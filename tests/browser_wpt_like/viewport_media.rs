@@ -5,17 +5,25 @@ use tetherscript::browser_agent::{
 
 #[path = "viewport_media_match.rs"]
 mod match_media;
+#[path = "viewport_orientation.rs"]
+mod orientation;
+#[path = "viewport_visual.rs"]
+mod visual;
 
 const CASE: Case = Case {
-    area: "css/mediaqueries",
-    wpt_shape: "viewport resize and scroll synchronize VisualViewport metrics and events",
-    unsupported: &["pinch zoom and visualViewport scrollend events"],
+    area: "css/mediaqueries, css/cssom-view, screen-orientation",
+    wpt_shape: "viewport metrics, events, media queries, and screen orientation locks",
+    unsupported: &[
+        "pinch zoom and visualViewport scrollend events",
+        "device sensor-driven orientation changes",
+    ],
 };
 
 pub fn run() {
     assert_case(&CASE);
     viewport_and_media_state();
-    visual_viewport_metrics_and_events();
+    visual::metrics_and_events();
+    orientation::locks_and_unlocks();
     match_media::object_shape();
     match_media::listeners_and_removal();
 }
@@ -37,16 +45,4 @@ fn viewport_and_media_state() {
             forced_colors: ForcedColors::Active,
         }
     );
-}
-
-fn visual_viewport_metrics_and_events() {
-    let mut page = BrowserPage::from_html("mem://visual-viewport", "<main>V</main>");
-    page.eval_js("let v=visualViewport;let seen='';v.addEventListener('resize',function(){seen+='R'+v.width+'x'+v.height+';';});v.addEventListener('scroll',function(){seen+='S'+v.pageLeft+','+v.pageTop+';';});")
-        .unwrap();
-    page.set_viewport_size(120, 40).unwrap();
-    let value = page
-        .eval_js("scrollTo(3,5);[v.width,v.height,v.pageLeft,v.pageTop,seen].join('|')")
-        .unwrap();
-
-    assert_eq!(value.display(), "120|40|3|5|R120x40;S3,5;");
 }

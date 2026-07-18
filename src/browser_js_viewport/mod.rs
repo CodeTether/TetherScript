@@ -33,7 +33,7 @@ mod metrics;
 #[path = "point.rs"]
 mod point;
 #[path = "screen.rs"]
-mod screen;
+pub(in crate::browser_js) mod screen;
 #[path = "visual_viewport.rs"]
 pub(in crate::browser_js) mod visual_viewport;
 

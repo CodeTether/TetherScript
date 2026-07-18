@@ -1,0 +1,4 @@
+fn main() {
+    let script = "resizeTo(20,100);let o=screen.orientation;let seen='';o.addEventListener('change',e=>seen=seen+o.type+':'+o.angle+':'+e.isTrusted+';');let p=o.lock('landscape-secondary');let locked=o.type+':'+o.angle;resizeTo(10,200);o.unlock();p.__promise_state+'|'+locked+'|'+o.type+':'+o.angle+'|'+seen;"
+    println(browser_eval_js("", script).value)
+}

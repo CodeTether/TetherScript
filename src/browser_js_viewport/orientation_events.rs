@@ -12,3 +12,20 @@ pub(super) fn install(object: &Rc<RefCell<HashMap<String, JsValue>>>) {
     listeners::install(object, listeners.clone());
     dispatch::install(object, listeners);
 }
+
+pub(super) fn dispatch_change(
+    object: &Rc<RefCell<HashMap<String, JsValue>>>,
+) -> Result<(), String> {
+    let dispatcher = object
+        .borrow()
+        .get("__tsDispatchOrientationChange")
+        .cloned();
+    if let Some(dispatcher) = dispatcher {
+        js::call_function_with_this(
+            dispatcher,
+            JsValue::Object(object.clone()),
+            &[JsValue::String("change".into())],
+        )?;
+    }
+    Ok(())
+}

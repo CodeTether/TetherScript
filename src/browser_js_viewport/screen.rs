@@ -2,6 +2,8 @@ use super::*;
 
 #[path = "orientation.rs"]
 mod orientation;
+#[path = "screen_orientation_sync.rs"]
+mod orientation_sync;
 
 pub(super) fn install(window: &mut HashMap<String, JsValue>) {
     window.insert(
@@ -18,6 +20,10 @@ pub(super) fn install(window: &mut HashMap<String, JsValue>) {
     );
     window.insert("orientation".into(), JsValue::Number(0.0));
     window.insert("screen".into(), screen_object());
+}
+
+pub(in crate::browser_js) fn sync_orientation(window: &JsValue) -> Result<(), String> {
+    orientation_sync::sync(window)
 }
 
 fn screen_object() -> JsValue {

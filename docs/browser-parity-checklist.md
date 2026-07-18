@@ -206,7 +206,8 @@ Completed tests:
 - Element `scroll`, `scrollTo`, `scrollBy`, property setters, and
   `scrollIntoView` clamp live offsets and update geometry and hit testing.
 - Viewport resize and scroll synchronize live `visualViewport` metrics and
-  dispatch trusted `resize`/`scroll` events; media emulation exposes state.
+  dispatch trusted `resize`/`scroll` events; screen orientation locks update
+  type/angle state and restore viewport orientation on unlock.
 - Resource-limit guard metadata and oversized-DOM rejection are covered.
 
 ## Immediate Next Item

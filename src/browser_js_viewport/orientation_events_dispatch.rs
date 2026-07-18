@@ -1,26 +1,20 @@
 use super::super::event;
 use super::*;
 
+#[path = "orientation_events_dispatch_bindings.rs"]
+mod bindings;
+
 pub(super) fn install(object: &Rc<RefCell<HashMap<String, JsValue>>>, listeners: Listeners) {
-    let target = object.clone();
-    object.borrow_mut().insert(
-        "dispatchEvent".into(),
-        native("screen.orientation.dispatchEvent", Some(1), move |args| {
-            dispatch(
-                &target,
-                &listeners,
-                args.first().cloned().unwrap_or(JsValue::Undefined),
-            )
-        }),
-    );
+    bindings::install(object, listeners);
 }
 
-fn dispatch(
+pub(super) fn run(
     object: &Rc<RefCell<HashMap<String, JsValue>>>,
     listeners: &Listeners,
     raw: JsValue,
+    trusted: bool,
 ) -> Result<JsValue, String> {
-    let event = event::create(object, raw);
+    let event = event::create(object, raw, trusted);
     if event::event_type(&event) == "change" {
         let this_value = JsValue::Object(object.clone());
         for listener in listeners.borrow().clone() {
@@ -38,5 +32,8 @@ fn dispatch(
 }
 
 fn callable(value: &JsValue) -> bool {
-    !matches!(value, JsValue::Undefined | JsValue::Null)
+    matches!(
+        value,
+        JsValue::Function(_) | JsValue::BoundFunction(_) | JsValue::Native(_)
+    )
 }
