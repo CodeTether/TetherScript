@@ -21,6 +21,8 @@ fn main() {
     let typed = browser.eval("document.querySelector('#entry').value")?
     browser.keyboard_type("DE")?
     let keyboard_typed = browser.eval("document.querySelector('#entry').value")?
+    browser.fill_native("#entry", "native")?
+    let native_filled = browser.eval("document.querySelector('#entry').value")?
     let key_events = browser.eval("document.querySelector('#entry').getAttribute('data-key-events')")?
     browser.upload("#upload", [args[2]])?
     let upload = browser.eval("let u=document.querySelector('#upload');let f=u.files[0];f.name+':'+f.type+':'+f.size+':'+u.getAttribute('data-events')")?
@@ -85,6 +87,7 @@ fn main() {
     println("native-browser-type", typed)
     println("native-browser-key-events", key_events)
     println("native-browser-keyboard-type", keyboard_typed)
+    println("native-browser-fill-native", native_filled)
     println("native-browser-upload", upload)
     println("native-browser-toggle", toggle_on, toggle)
     println("native-browser-mouse", mouse)

@@ -145,6 +145,8 @@ printable characters one at a time with cancelable keydown, input, and keyup
 events, while `fill` replaces the existing value.
 `keyboard_type` applies the same incremental event semantics to the element
 retained by the latest focusable action.
+`fill_native(selector, value)` replaces a form value through the native page
+action path and dispatches the same input/change events as `fill`.
 `upload` reads the supplied host paths, exposes deterministic file metadata to
 an `input[type=file]`, and dispatches input and change events.
 `toggle` inverts a checkbox or radio through its click, input, and change path.

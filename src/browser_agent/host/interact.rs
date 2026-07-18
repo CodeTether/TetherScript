@@ -30,7 +30,7 @@ pub(super) fn invoke(
 ) -> Result<Value, String> {
     let report = match action {
         "click" | "click_text" => click::invoke(state, action, payload)?,
-        "fill" => fill::invoke(state, payload)?,
+        "fill" | "fill_native" => fill::invoke(state, payload)?,
         "type" => type_text::invoke(state, payload)?,
         "upload" => upload::invoke(state, payload)?,
         "toggle" => toggle::invoke(state, payload)?,

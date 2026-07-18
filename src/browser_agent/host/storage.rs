@@ -14,6 +14,13 @@ mod read;
 #[path = "storage_tests.rs"]
 mod tests;
 
+pub(super) fn handles(action: &str) -> bool {
+    matches!(
+        action,
+        "cookies" | "local_storage" | "session_storage" | "indexed_db_summary" | "clear_storage"
+    )
+}
+
 pub(super) fn invoke(state: &mut HostState, action: &str) -> Result<Value, String> {
     match action {
         "indexed_db_summary" => indexed::invoke(state),
