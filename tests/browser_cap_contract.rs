@@ -164,6 +164,10 @@ fn is_browserctl_action(action: &str) -> bool {
             | "diagnose"
             | "visual_compare"
             | "indexed_db_summary"
+            | "clear_storage"
+            | "cookies"
+            | "local_storage"
+            | "session_storage"
     )
 }
 

@@ -6,12 +6,14 @@ use super::state::HostState;
 
 #[path = "diagnose.rs"]
 mod diagnose;
-#[path = "indexed_db_summary.rs"]
-mod indexed_db_summary;
 #[path = "network_replay.rs"]
 mod network_replay;
 #[path = "network_request.rs"]
 mod network_request;
+#[path = "storage.rs"]
+mod storage;
+#[path = "dispatch_error.rs"]
+mod unsupported;
 
 pub(super) fn invoke(state: &mut HostState, payload: &Value) -> (Result<Value, String>, bool) {
     let action = match super::value::string_field(payload, "action") {
@@ -30,7 +32,8 @@ pub(super) fn invoke(state: &mut HostState, payload: &Value) -> (Result<Value, S
         "replay" => network_replay::invoke(state, payload),
         "diagnose" => diagnose::invoke(state, payload),
         "visual_compare" => super::screenshot::visual_compare::invoke(state, payload),
-        "indexed_db_summary" => indexed_db_summary::invoke(state),
+        "cookies" | "local_storage" | "session_storage" | "indexed_db_summary"
+        | "clear_storage" => storage::invoke(state, &action),
         "wait" => super::wait::invoke(state, payload),
         "click" | "click_text" | "fill" | "type" | "upload" | "toggle" | "mouse_click"
         | "hover" => super::interact::invoke(state, &action, payload),
@@ -40,10 +43,7 @@ pub(super) fn invoke(state: &mut HostState, payload: &Value) -> (Result<Value, S
         }
         "scroll" => super::scroll::invoke(state, payload),
         "screenshot" => super::screenshot::invoke(state, payload),
-        _ => Err(format!(
-            "browser host: native action `{}` is not implemented",
-            action
-        )),
+        _ => unsupported::action(&action),
     };
     (result, stop)
 }

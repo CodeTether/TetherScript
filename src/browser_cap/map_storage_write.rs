@@ -24,3 +24,15 @@ pub(crate) fn set_local(args: &[Value]) -> Result<BrowserCall, String> {
         "browser.mutate.storage",
     ))
 }
+
+pub(crate) fn clear(args: &[Value]) -> Result<BrowserCall, String> {
+    super::super::args::no_args("clear_storage", args)?;
+    Ok(BrowserCall::new(
+        "clear_storage",
+        "browser.mutate.storage",
+        super::super::value::map_value(vec![(
+            "action",
+            super::super::value::str_value("clear_storage"),
+        )]),
+    ))
+}

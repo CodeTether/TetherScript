@@ -13,6 +13,8 @@ pub(crate) fn scope_for_action(action: &str) -> Option<&'static str> {
         "screenshot" => Some("browser.screenshot"),
         "visual_compare" => Some("browser.visual"),
         "indexed_db_summary" => Some("browser.inspect.storage"),
+        "cookies" | "local_storage" | "session_storage" => Some("browser.inspect.storage"),
+        "clear_storage" => Some("browser.mutate.storage"),
         "health" | "detect" => Some("browser.inspect.dom"),
         _ => None,
     }
