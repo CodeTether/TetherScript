@@ -23,10 +23,7 @@ pub(crate) fn text(args: &[Value]) -> Result<BrowserCall, String> {
 
 pub(crate) fn idle(args: &[Value]) -> Result<BrowserCall, String> {
     crate::browser_cap::args::no_args("wait_for_network_idle", args)?;
-    Err(
-        "browser.wait_for_network_idle: browserctl backend does not support network idle waits"
-            .into(),
-    )
+    Ok(call("wait", vec![("network_idle", Value::Bool(true))]))
 }
 
 fn push_timeout(

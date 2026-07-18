@@ -30,6 +30,23 @@ fn wait_polls_scripts_and_honors_timeout_and_state() {
     assert!(error.contains("#missing") && error.contains("10ms"));
 }
 
+#[test]
+fn network_idle_wait_runs_pending_page_work() {
+    let mut state = super::state::HostState::new();
+    state.page = BrowserPage::from_html("mem://idle", "<script>fetch('/settled');</script>");
+    let idle = payload(vec![("network_idle", crate::value::Value::Bool(true))]);
+    assert!(super::wait::invoke(&mut state, &idle).unwrap().truthy());
+    assert_eq!(
+        state.page.load_state(),
+        crate::browser_agent::PageLoadState::NetworkIdle
+    );
+    assert!(state
+        .page
+        .network_events()
+        .iter()
+        .any(|event| event.url.ends_with("/settled")));
+}
+
 pub(super) fn payload(entries: Vec<(&str, crate::value::Value)>) -> crate::value::Value {
     super::value::map(entries)
 }

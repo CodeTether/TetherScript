@@ -4,6 +4,7 @@ fn main() {
 
     browser.start()?
     browser.goto(args[0])?
+    let network_idle = browser.wait_for_network_idle()?
     browser.click("#change")?
     assert_text(browser, "clicked")?
     let waited = browser.wait_for_selector("#below", 50)?
@@ -84,6 +85,7 @@ fn main() {
     println("native-browser-selector-scroll", selector_scroll)
     println("native-browser-coordinate-scroll", coordinate_scroll)
     println("native-browser-wait", waited)
+    println("native-browser-network-idle", network_idle)
     println("native-browser-wait-timeout", wait_timeout.is_err())
     println("native-browser-network", network.len())
     println("native-browser-network-waits", waited_request.len(), waited_response.len())
