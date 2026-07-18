@@ -5,6 +5,7 @@ pub fn check(stdout: &str, expected_url: &str) {
     super::expect(stdout, "native-browser-trusted true");
     super::expect(stdout, "native-browser-health false false true");
     super::expect(stdout, "native-browser-wait-more true true");
+    super::expect(stdout, "native-browser-viewport 120 40 120,40,true");
     super::expect(stdout, "native-browser-snapshots true true");
     super::expect(stdout, "native-browser-query clicked true");
     super::expect(

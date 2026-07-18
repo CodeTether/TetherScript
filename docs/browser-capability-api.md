@@ -89,7 +89,7 @@ stop.
 Navigation/interaction:
 `goto`, `reload`, `back`, `forward`, `click`, `click_text`, `type`, `press`,
 `hover`, `focus`, `blur`, `scroll`, `wait_for_selector`, `wait_for_text`,
-`wait_for_url`, `wait_for_network_idle`.
+`wait_for_url`, `wait_for_network_idle`, `set_viewport`.
 
 The wait helpers are tetherscript convenience methods over the host
 `wait` action:
@@ -113,6 +113,9 @@ files and report match state, encoded byte counts, and changed encoded bytes.
 fields. The native host brings a selector into view, treats bare coordinates as
 absolute window offsets, and treats coordinates paired with a selector as an
 offset from the resulting in-view position.
+`set_viewport(width, height)` synchronizes native layout dimensions, JavaScript
+viewport globals, screen orientation, visual viewport metrics, and media-query
+listeners. It returns the applied `width` and `height`.
 
 Snapshots:
 `screenshot`, `screenshot_element`, `dom_snapshot`, `page_snapshot`.

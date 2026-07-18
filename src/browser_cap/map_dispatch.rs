@@ -40,6 +40,7 @@ pub(crate) fn prepare(auth: &BrowserAuthority, method: &str, args: &[Value]) -> 
         "is_visible" | "is_enabled" | "bounding_box" | "screenshot_element"
         | "find_visual_text" | "find_element_at" | "compare_screenshots" | "visual_diff"
         | "assert_screenshot_matches" => super::visual::prepare(method, args),
+        "set_viewport" => super::viewport::prepare(args),
         "screenshot" => super::extra::screenshot(args),
         _ => Err(format!("browser: no method `{}`", method)),
     }

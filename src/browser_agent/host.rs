@@ -15,8 +15,6 @@ mod nav;
 mod nav_load;
 mod png;
 mod png_chunk;
-#[cfg(test)]
-mod png_tests;
 mod png_zlib;
 mod query;
 mod request;
@@ -33,6 +31,7 @@ mod state;
 mod url;
 mod value;
 mod value_optional;
+mod viewport;
 mod visible_text;
 #[cfg(test)]
 mod visible_text_tests;

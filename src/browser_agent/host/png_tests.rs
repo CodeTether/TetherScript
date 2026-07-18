@@ -4,7 +4,7 @@ use crate::browser::{RasterImage, Rgba};
 fn png_contains_inflatable_rgba_scanlines() {
     let mut image = RasterImage::new(2, 1, Rgba::WHITE);
     image.pixels[0..4].copy_from_slice(&[1, 2, 3, 4]);
-    let png = super::png::encode(&image);
+    let png = super::encode(&image);
     assert!(png.starts_with(b"\x89PNG\r\n\x1a\n"));
     let idat = chunk(&png, b"IDAT");
     let rows = crate::zlib::inflate_zlib(idat).unwrap();
