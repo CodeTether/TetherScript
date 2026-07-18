@@ -1,10 +1,14 @@
 //! Native locator-backed click, fill, type, and hover actions.
 
-use crate::browser_agent::{ActionReport, Locator};
+use crate::browser_agent::Locator;
 use crate::value::Value;
 
 use super::state::HostState;
 
+#[path = "fill.rs"]
+mod fill;
+#[path = "toggle.rs"]
+mod toggle;
 #[cfg(test)]
 #[path = "type_tests.rs"]
 mod type_tests;
@@ -28,9 +32,10 @@ pub(super) fn invoke(
         "click_text" => state
             .page
             .click(&Locator::text(super::value::string_field(payload, "text")?))?,
-        "fill" => fill(state, payload)?,
+        "fill" => fill::invoke(state, payload)?,
         "type" => type_text::invoke(state, payload)?,
         "upload" => upload::invoke(state, payload)?,
+        "toggle" => toggle::invoke(state, payload)?,
         "hover" => state.page.hover(&Locator::css(super::value::string_field(
             payload, "selector",
         )?))?,
@@ -40,11 +45,4 @@ pub(super) fn invoke(
         state.focused = Some(locator);
     }
     Ok(super::interact_value::report(report))
-}
-
-fn fill(state: &mut HostState, payload: &Value) -> Result<ActionReport, String> {
-    state.page.fill(
-        &Locator::css(super::value::string_field(payload, "selector")?),
-        &super::value::string_field(payload, "value")?,
-    )
 }

@@ -23,6 +23,10 @@ fn main() {
     let key_events = browser.eval("document.querySelector('#entry').getAttribute('data-key-events')")?
     browser.upload("#upload", [args[2]])?
     let upload = browser.eval("let u=document.querySelector('#upload');let f=u.files[0];f.name+':'+f.type+':'+f.size+':'+u.getAttribute('data-events')")?
+    browser.toggle("#toggle")?
+    let toggle_on = browser.eval("document.querySelector('#toggle').checked")?
+    browser.toggle("#toggle")?
+    let toggle = browser.eval("let n=document.querySelector('#toggle');n.checked+':'+n.getAttribute('data-events')")?
     browser.blur("#entry")?
     let focus = browser.eval("document.querySelector('#entry').getAttribute('data-focus')")?
     browser.scroll("#below")?
@@ -45,6 +49,7 @@ fn main() {
     println("native-browser-key-events", key_events)
     println("native-browser-keyboard-type", keyboard_typed)
     println("native-browser-upload", upload)
+    println("native-browser-toggle", toggle_on, toggle)
     println("native-browser-focus", focus)
     println("native-browser-selector-scroll", selector_scroll)
     println("native-browser-coordinate-scroll", coordinate_scroll)
