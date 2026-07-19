@@ -10,6 +10,13 @@ All notable changes to this project will be documented in this file.
 
 - Added `tera_render(template, context[, autoescape])` for rendering Tera
   templates from tetherscript maps in both execution engines.
+- Added the optional `actix-web` feature for registering sandboxed tetherscript
+  hooks as Actix Web routes, with request/response conversion, blocking-pool
+  execution, per-thread runtime caching, and explicit Rust capability injection.
+- Added opt-in file-backed Actix controllers with validated hot reload,
+  generation-aware cache invalidation, and last-good fallback after invalid edits.
+- Added an Actix integration test suite and a standalone native-versus-tetherscript
+  PostgreSQL demo with a dependency-free benchmark client.
 
 ## [0.1.0-alpha.20] - 2026-07-18
 

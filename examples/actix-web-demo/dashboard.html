@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Actix Web × tetherscript routes</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; background:#09111f; color:#e8eef9; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:radial-gradient(circle at 20% 0,#18315e 0,transparent 35%),#09111f; }
+    main { width:min(1120px,calc(100% - 32px)); margin:auto; padding:64px 0; }
+    h1 { font-size:clamp(2.4rem,7vw,5.5rem); line-height:.95; margin:12px 0 24px; letter-spacing:-.06em; }
+    h2 { margin-top:0; }
+    .eyebrow,.badge { color:#78a9ff; text-transform:uppercase; letter-spacing:.14em; font-weight:800; font-size:.75rem; }
+    .lede { max-width:760px; color:#aebbd0; font-size:1.15rem; line-height:1.7; }
+    .panel { background:#101b2eeb; border:1px solid #263854; border-radius:18px; padding:24px; box-shadow:0 20px 60px #0005; }
+    .controls { display:flex; gap:12px; margin:32px 0; flex-wrap:wrap; }
+    input { flex:1; min-width:220px; border:1px solid #385174; background:#09111f; color:white; border-radius:10px; padding:13px 15px; font:inherit; }
+    button,a.button { border:0; border-radius:10px; padding:13px 18px; font-weight:800; cursor:pointer; text-decoration:none; background:#78a9ff; color:#07101e; }
+    button.secondary { background:#66e0b6; }
+    button:disabled { opacity:.55; cursor:wait; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+    .route { min-height:260px; }
+    .route header { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+    code,pre { font-family:"SFMono-Regular",Consolas,monospace; }
+    code { color:#a8c7ff; }
+    pre { background:#08101d; border:1px solid #253752; border-radius:10px; padding:16px; overflow:auto; color:#c8d6ed; line-height:1.5; }
+    .result { white-space:pre-wrap; color:#66e0b6; min-height:72px; }
+    .metric { font-size:2rem; font-weight:900; margin:8px 0; }
+    table { width:100%; border-collapse:collapse; }
+    th,td { text-align:left; padding:12px; border-bottom:1px solid #293b57; }
+    .docs { margin-top:18px; }
+    .flow { color:#aebbd0; line-height:1.8; }
+    @media(max-width:760px) { .grid { grid-template-columns:1fr; } main { padding-top:36px; } }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">Executable integration guide</div>
+  <h1>One Actix app.<br>Two controller paths.</h1>
+  <p class="lede">Both controllers query the same indexed World Bank GDP dataset in remote PostgreSQL through the same r2d2 pool. One is compiled Rust; the other is a hot-reloaded, sandboxed tetherscript hook.</p>
+
+  <section class="panel">
+    <div class="controls">
+      <input id="code" value="USA" maxlength="3" aria-label="ISO-3 country code">
+      <button onclick="invoke('rust')">Call native Rust</button>
+      <button class="secondary" onclick="invoke('tether')">Call tetherscript</button>
+      <button id="bench" onclick="benchmarkRoutes()">Benchmark both</button>
+    </div>
+    <div class="grid">
+      <article class="panel route">
+        <header><div><div class="badge">Native</div><h2>Rust controller</h2></div><code>GET /rust/country/{code}</code></header>
+        <div class="metric" id="rust-time">—</div>
+        <pre class="result" id="rust-result">Press “Call native Rust”</pre>
+      </article>
+      <article class="panel route">
+        <header><div><div class="badge">Dynamic</div><h2>tetherscript controller</h2></div><code>GET /tether/country/{code}</code></header>
+        <div class="metric" id="tether-time">—</div>
+        <pre class="result" id="tether-result">Press “Call tetherscript”</pre>
+      </article>
+    </div>
+  </section>
+
+  <section class="panel docs">
+    <h2>What is routed where?</h2>
+    <table>
+      <thead><tr><th>Concern</th><th>Native route</th><th>tetherscript route</th></tr></thead>
+      <tbody>
+        <tr><td>Actix registration</td><td><code>web::get().to(rust_route)</code></td><td><code>plugin.configure(config)</code></td></tr>
+        <tr><td>Controller</td><td>Async Rust function</td><td><code>fn handle(request)</code></td></tr>
+        <tr><td>Execution</td><td>Actix async worker</td><td><code>web::block</code> + thread-local runtime</td></tr>
+        <tr><td>Response</td><td><code>HttpResponse</code></td><td>Validated status/headers/body map</td></tr>
+        <tr><td>Database work</td><td>Shared r2d2 pool + ranked SQL</td><td>Same pool/query through explicit <code>db</code> capability</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="grid docs">
+    <article class="panel">
+      <h2>Native Rust handler</h2>
+      <pre>async fn country(pool: Data&lt;DbPool&gt;, code: Path&lt;String&gt;) {
+    web::block(move || database::country(&amp;pool, &amp;code)).await
+}</pre>
+    </article>
+    <article class="panel">
+      <h2>tetherscript handler</h2>
+      <pre>fn handle(request) {
+    let response = map()
+    response.body = db.country(request.params.code).unwrap()
+    return response
+}</pre>
+    </article>
+  </section>
+
+  <section class="panel docs flow">
+    <h2>Request and safety model</h2>
+    <p>The script receives <code>method</code>, <code>path</code>, <code>query</code>, <code>headers</code>, <code>params</code>, and <code>body</code>. Its response status, headers, and body are checked before Actix sends them.</p>
+    <p>Scripts are validated at startup, execute with instruction/output budgets, and have no ambient database or network authority. Rust grants those explicitly through a <code>PluginHost</code>, which is where an application can inject a repository or connection pool.</p>
+    <p>The in-page benchmark performs 250 requests per route at concurrency 16 after a warm-up. For longer, alternating multi-round measurements, use the documented <code>benchmark.js</code> CLI.</p>
+  </section>
+</main>
+<script>
+  const byId = id => document.getElementById(id);
+  const safeCode = () => encodeURIComponent((byId('code').value || 'USA').toUpperCase());
+
+  async function invoke(kind) {
+    const path = kind === 'rust' ? '/rust/country/' : '/tether/country/';
+    const started = performance.now();
+    const response = await fetch(path + safeCode(), { cache: 'no-store' });
+    const body = await response.text();
+    const elapsed = performance.now() - started;
+    byId(kind + '-time').textContent = elapsed.toFixed(2) + ' ms';
+    byId(kind + '-result').textContent = `HTTP ${response.status}\nx-controller: ${response.headers.get('x-controller')}\n\n${body}`;
+  }
+
+  async function sample(kind, requests = 250, concurrency = 16) {
+    let next = 0, failed = 0;
+    const path = (kind === 'rust' ? '/rust/country/' : '/tether/country/') + safeCode();
+    const started = performance.now();
+    async function worker() {
+      while (next < requests) {
+        next++;
+        const response = await fetch(path, { cache: 'no-store' });
+        await response.arrayBuffer();
+        if (!response.ok) failed++;
+      }
+    }
+    await Promise.all(Array.from({ length: concurrency }, worker));
+    const seconds = (performance.now() - started) / 1000;
+    return { failed, rps: requests / seconds, avg: seconds * 1000 / requests };
+  }
+
+  async function benchmarkRoutes() {
+    const button = byId('bench');
+    button.disabled = true;
+    button.textContent = 'Benchmarking…';
+    try {
+      await sample('rust', 32, 8); await sample('tether', 32, 8);
+      const rust = await sample('rust');
+      const tether = await sample('tether');
+      byId('rust-time').textContent = `${rust.rps.toFixed(0)} req/s`;
+      byId('tether-time').textContent = `${tether.rps.toFixed(0)} req/s`;
+      byId('rust-result').textContent = `250 requests · 16 concurrent\n${rust.avg.toFixed(2)} ms mean · ${rust.failed} failed`;
+      byId('tether-result').textContent = `250 requests · 16 concurrent\n${tether.avg.toFixed(2)} ms mean · ${tether.failed} failed`;
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Benchmark both';
+    }
+  }
+</script>
+</body>
+</html>
