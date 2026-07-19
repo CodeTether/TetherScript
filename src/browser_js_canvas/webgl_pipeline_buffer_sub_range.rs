@@ -2,13 +2,13 @@
 
 use super::*;
 
-pub(super) fn write(state: &mut WebGlState, offset: i64, bytes: &[u8]) {
+pub(super) fn write(state: &mut WebGlState, target: u32, offset: i64, bytes: &[u8]) {
     if offset < 0 {
         invalid(state);
         return;
     }
     let start = offset as usize;
-    let Some(bound) = validation::bound(state) else {
+    let Some(bound) = validation::bound(state, target) else {
         return;
     };
     let Some(end) = start

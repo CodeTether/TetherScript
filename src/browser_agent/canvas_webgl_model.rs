@@ -15,7 +15,7 @@
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WebGlCommand {
-    /// WebGL operation name such as `viewport`, `clearColor`, or `clear`.
+    /// WebGL operation name such as `viewport`, `clear`, or `drawElements`.
     pub operation: String,
     /// Stringified command arguments in call order.
     pub args: Vec<String>,

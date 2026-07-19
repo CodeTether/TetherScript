@@ -1,4 +1,4 @@
-//! `ARRAY_BUFFER` binding validation and mutation.
+//! Buffer-target binding validation and mutation.
 
 use super::*;
 
@@ -13,11 +13,11 @@ pub(super) fn install(obj: &mut HashMap<String, JsValue>, handle: DomHandle, ver
 }
 
 fn bind(state: &mut WebGlState, args: &[JsValue]) {
-    if !validation::target(state, args.first()) {
+    let Some(target) = validation::target(state, args.first()) else {
         return;
-    }
+    };
     if matches!(args.get(1), None | Some(JsValue::Null)) {
-        state.pipeline.bound_array_buffer = None;
+        set(state, target, None);
         return;
     }
     let Some(id) = resource::id(&state.pipeline, args.get(1), "buffer") else {
@@ -30,8 +30,16 @@ fn bind(state: &mut WebGlState, args: &[JsValue]) {
         .get(&id)
         .is_some_and(|buffer| !buffer.deleted)
     {
-        state.pipeline.bound_array_buffer = Some(id);
+        set(state, target, Some(id));
     } else {
         buffer::invalid(state);
+    }
+}
+
+fn set(state: &mut WebGlState, target: u32, id: Option<u32>) {
+    match target {
+        constants::ARRAY_BUFFER => state.pipeline.bound_array_buffer = id,
+        constants::ELEMENT_ARRAY_BUFFER => state.pipeline.bound_element_array_buffer = id,
+        _ => unreachable!("validated WebGL buffer target"),
     }
 }
