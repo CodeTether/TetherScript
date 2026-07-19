@@ -11,6 +11,7 @@ pub(in crate::browser_js::canvas_host::webgl) struct State {
     pub(super) buffers: HashMap<u32, buffer_state::Buffer>,
     pub(super) attributes: HashMap<u32, buffer_state::Attribute>,
     pub(super) bound_array_buffer: Option<u32>,
+    pub(super) bound_element_array_buffer: Option<u32>,
     pub(super) current_program: Option<u32>,
     pub(super) uniform_locations: HashMap<(u32, String), JsValue>,
 }

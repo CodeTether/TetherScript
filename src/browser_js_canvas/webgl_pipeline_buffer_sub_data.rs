@@ -17,9 +17,9 @@ pub(super) fn install(obj: &mut HashMap<String, JsValue>, handle: DomHandle, ver
 }
 
 fn replace(state: &mut WebGlState, args: &[JsValue]) {
-    if !validation::target(state, args.first()) {
+    let Some(target) = validation::target(state, args.first()) else {
         return;
-    }
+    };
     let bytes = match source::data(args.get(2)) {
         Ok(bytes) => bytes,
         Err(error) => {
@@ -27,5 +27,5 @@ fn replace(state: &mut WebGlState, args: &[JsValue]) {
             return;
         }
     };
-    sub_range::write(state, webgl_values::i64_value(args.get(1)), &bytes);
+    sub_range::write(state, target, webgl_values::i64_value(args.get(1)), &bytes);
 }

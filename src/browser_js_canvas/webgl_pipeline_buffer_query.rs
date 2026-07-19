@@ -18,11 +18,10 @@ pub(super) fn install(obj: &mut HashMap<String, JsValue>, handle: DomHandle, ver
 }
 
 fn parameter(state: &mut WebGlState, args: &[JsValue]) -> JsValue {
-    if webgl_values::u32_value(args.first()) != constants::ARRAY_BUFFER {
-        webgl_error::record(state, webgl_constants::INVALID_ENUM);
+    let Some(target) = validation::target(state, args.first()) else {
         return JsValue::Null;
-    }
-    let Some(id) = state.pipeline.bound_array_buffer else {
+    };
+    let Some(id) = validation::binding(state, target) else {
         buffer::invalid(state);
         return JsValue::Null;
     };

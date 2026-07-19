@@ -13,9 +13,9 @@ pub(super) fn install(obj: &mut HashMap<String, JsValue>, handle: DomHandle, ver
 }
 
 fn upload(state: &mut WebGlState, args: &[JsValue]) {
-    if !validation::target(state, args.first()) {
+    let Some(target) = validation::target(state, args.first()) else {
         return;
-    }
+    };
     let usage = webgl_values::u32_value(args.get(2));
     if !constants::usage(usage) {
         webgl_error::record(state, webgl_constants::INVALID_ENUM);
@@ -28,7 +28,7 @@ fn upload(state: &mut WebGlState, args: &[JsValue]) {
             return;
         }
     };
-    let Some(bound) = validation::bound(state) else {
+    let Some(bound) = validation::bound(state, target) else {
         return;
     };
     bound.bytes = bytes;

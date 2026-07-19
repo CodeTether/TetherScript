@@ -7,6 +7,11 @@ pub(super) fn get(state: &WebGlState, param: u32) -> Option<JsValue> {
         constants::ARRAY_BUFFER_BINDING => {
             Some(state.pipeline.object(state.pipeline.bound_array_buffer))
         }
+        constants::ELEMENT_ARRAY_BUFFER_BINDING => Some(
+            state
+                .pipeline
+                .object(state.pipeline.bound_element_array_buffer),
+        ),
         constants::CURRENT_PROGRAM => Some(state.pipeline.object(state.pipeline.current_program)),
         _ => None,
     }

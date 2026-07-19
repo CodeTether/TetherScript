@@ -41,4 +41,7 @@ fn delete(state: &mut WebGlState, value: Option<&JsValue>) {
     if state.pipeline.bound_array_buffer == Some(id) {
         state.pipeline.bound_array_buffer = None;
     }
+    if state.pipeline.bound_element_array_buffer == Some(id) {
+        state.pipeline.bound_element_array_buffer = None;
+    }
 }
