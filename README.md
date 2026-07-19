@@ -47,6 +47,57 @@ The built launcher forwards its own process arguments to `env_args()`. It is a
 self-contained runner for the script; internally it compiles the embedded source
 to tetherscript bytecode on startup before VM execution.
 
+## Actix Web plugin beta
+
+The optional `actix-web` feature registers a sandboxed tetherscript hook as an
+Actix route while Actix retains ownership of networking, middleware, routing,
+and deployment:
+
+```toml
+[dependencies]
+actix-web = "=4.11.0"
+tetherscript = { version = "0.1.0-alpha.21", features = ["actix-web"] }
+```
+
+```rust,no_run
+use actix_web::{http::Method, App};
+use tetherscript::actix_web::ActixPlugin;
+
+let source = r#"fn handle(request) {
+    let response = map()
+    response.status = 200
+    response.body = "hello from tetherscript"
+    return response
+}"#;
+let plugin = ActixPlugin::builder("/hello", Method::GET, source).build()?;
+let app = App::new().configure(|config| plugin.configure(config));
+# Ok::<_, tetherscript::actix_web::ActixPluginError>(app)
+```
+
+Scripts receive request method, path, query, headers, route parameters, and
+body. Responses may set status, headers, and string, byte, or `nil` bodies.
+Execution runs through Actix's blocking pool with one cached runtime per thread.
+
+Use `host_factory` to grant narrow Rust capabilities backed by repositories or
+database pools. Scripts receive no ambient database, filesystem, network, or
+subprocess authority.
+
+File-backed controllers support validated hot reload:
+
+```rust,no_run
+# use actix_web::http::Method;
+# use tetherscript::actix_web::ActixPlugin;
+let plugin = ActixPlugin::from_file("/agent", Method::POST, "agent.tether")
+    .hot_reload(true)
+    .build()?;
+# Ok::<_, tetherscript::actix_web::ActixPluginError>(plugin)
+```
+
+This integration is an invite-only beta. Pin exact crate versions, place Actix
+authentication, payload limits, rate limits, and timeouts in front of plugin
+routes, grant least-privilege capabilities, and deploy with a rollback path.
+See [`examples/actix-web-demo`](examples/actix-web-demo) for a complete project.
+
 ## Status
 
 tetherscript `0.1.0-alpha.21` is the current release candidate for crates.io.

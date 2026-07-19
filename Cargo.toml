@@ -37,5 +37,10 @@ path = "src/main.rs"
 [lints.clippy]
 collapsible_if = "allow"
 
+[features]
+default = []
+actix-web = ["dep:actix-web"]
+
 [dependencies]
+actix-web = { version = "=4.11.0", optional = true, default-features = false, features = ["macros"] }
 tera = "1.20.0"

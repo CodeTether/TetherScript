@@ -17,11 +17,7 @@ pub fn check(output: Output, expected_url: &str, screenshot: &Path, upload_size:
     let stderr = String::from_utf8_lossy(&output.stderr);
     std::fs::write(screenshot.with_extension("stdout"), stdout.as_bytes()).unwrap();
     std::fs::write(screenshot.with_extension("stderr"), stderr.as_bytes()).unwrap();
-    assert!(
-        output.status.success(),
-        "stderr: {}",
-        stderr
-    );
+    assert!(output.status.success(), "stderr: {}", stderr);
     core::check(&stdout, expected_url);
     input::check(&stdout, upload_size);
     network::check(&stdout);

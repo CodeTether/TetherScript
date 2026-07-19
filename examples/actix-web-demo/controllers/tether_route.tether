@@ -1,0 +1,13 @@
+// Actix calls `handle` with an immutable snapshot of the HTTP request.
+fn handle(request) {
+    // `db` is an explicit Rust capability backed by the shared r2d2 pool.
+    let body = db.country(request.params.code).unwrap()
+    let response = map()
+
+    response.status = 200
+    response.headers = map()
+    response.headers["content-type"] = "application/json"
+    response.headers["x-controller"] = "tetherscript"
+    response.body = body
+    return response
+}

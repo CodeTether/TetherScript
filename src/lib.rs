@@ -1,5 +1,7 @@
 //! TetherScript library surface for embedding the language in host Rust projects.
 
+#[cfg(feature = "actix-web")]
+pub mod actix_web;
 pub mod ast;
 pub mod browser;
 pub mod browser_agent;

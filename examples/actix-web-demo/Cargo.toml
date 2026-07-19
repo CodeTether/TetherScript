@@ -1,0 +1,15 @@
+[package]
+name = "tetherscript-actix-web-demo"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+actix-web = "=4.11.0"
+postgres = "0.19"
+r2d2 = "0.8"
+r2d2_postgres = "0.18"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tetherscript = { path = "../..", features = ["actix-web"] }
+ureq = { version = "2.12", features = ["json"] }
