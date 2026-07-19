@@ -4,9 +4,12 @@ The native browser parity suite now has a small executable fixture runner:
 
 ```bash
 cargo test --test browser_wpt_like
+cargo test --test browser_wpt_json
 ```
 
-The runner lives under `tests/browser_wpt_like/`. Each fixture records:
+The Rust fixture runner lives under `tests/browser_wpt_like/`. The normalized
+JSON adapter loads every `.json` case under `tests/browser_wpt_json/fixtures/`.
+Each fixture records:
 
 - the closest WPT area;
 - the behavior shape being checked;

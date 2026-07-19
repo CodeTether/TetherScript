@@ -1,0 +1,8 @@
+{
+  "area": "dom/events",
+  "wpt_shape": "dispatchEvent invokes a listener with target and this",
+  "html": "<button id='go'>old</button>",
+  "script": "let b=document.getElementById('go');let seen='';b.addEventListener('click',function(e){seen=e.type+':'+e.target.id+':'+this.id;});b.click();seen;",
+  "expect": { "value": "click:go:go" },
+  "unsupported": ["complete trusted UIEvent subclass coverage"]
+}
