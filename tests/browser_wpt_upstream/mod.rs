@@ -6,16 +6,30 @@ use tetherscript::js::JsValue;
 
 const DOCUMENT_FRAGMENT_QUERY: &str =
     include_str!("fixtures/dom/nodes/DocumentFragment-querySelectorAll-after-modification.html");
+const CHILD_ELEMENT_COUNT: &str =
+    include_str!("fixtures/dom/nodes/Element-childElementCount-dynamic-add.html");
 
 #[test]
 fn upstream_document_fragment_query_survives_mutation() {
-    let scripts = extract::inline_scripts(DOCUMENT_FRAGMENT_QUERY);
-    assert_eq!(scripts.len(), 1, "expected one upstream inline test script");
+    assert_upstream(DOCUMENT_FRAGMENT_QUERY);
+}
+
+#[test]
+fn upstream_child_element_count_updates_after_append() {
+    assert_upstream(CHILD_ELEMENT_COUNT);
+}
+
+fn assert_upstream(source: &str) {
+    let scripts = extract::inline_scripts(source);
+    assert!(
+        !scripts.is_empty(),
+        "expected an upstream inline test script"
+    );
     let script = format!(
         "{}\n{}\n__wpt_failures.join('|');",
         harness::SOURCE,
         scripts.join("\n")
     );
-    let result = eval_with_dom(DOCUMENT_FRAGMENT_QUERY, &script).unwrap();
+    let result = eval_with_dom(source, &script).unwrap();
     assert_eq!(result.value, JsValue::String(String::new()));
 }
