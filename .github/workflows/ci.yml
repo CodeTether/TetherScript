@@ -24,6 +24,7 @@ jobs:
       - run: cargo clippy -- -D warnings
       - run: cargo test --test browser_wpt_like
       - run: cargo test --test browser_wpt_json
+      - run: cargo test --test browser_wpt_upstream
       - run: cargo test
       - run: cargo test --doc
       - run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
