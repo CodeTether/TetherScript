@@ -34,7 +34,7 @@ local unit tests and fixtures into WPT-like compliance cases.
 | Timers and microtasks | Deterministic `setTimeout`, `clearTimeout`, `setInterval`, `queueMicrotask`, `requestAnimationFrame`, Promise reactions, and callback args drained after script execution | `html/webappapis/timers`, `html/webappapis/microtask-queuing` | `src/browser_js.rs::microtasks_animation_frames_and_timers_have_deterministic_order`, `tests/browser_js_promise_await.rs` | WPT-like deterministic subset | No wall-clock scheduling, clamping/nesting behavior, full task-source model, or worker timers |
 | Web Storage/resource guards | In-memory `localStorage`/`sessionStorage` with `getItem`, `setItem`, `removeItem`, `clear`, `key`, `length`, `navigator.storage.estimate()`, quota rejection, and deterministic memory-pressure cache trimming | `webstorage`, storage quota/resource pressure smoke | `src/browser_js.rs::local_storage_implements_minimal_storage_api`, `tests/browser_wpt_like/resource_guard.rs` | WPT-like deterministic subset | Property-indexed access and real OS memory-pressure signals remain unsupported |
 | JavaScript integration | Inline `<script>` execution, expression return value, console log capture, functions/classes, loops, modern expression syntax, `typeof`, `this` in supported callbacks, deterministic module resource expansion for default/named imports and dynamic imports, Promise adoption, `await`, `fetch`, and `XMLHttpRequest` response lifecycle fields | `html/semantics/scripting-1`, `console`, `ecmascript` host smoke, `xhr`, `fetch` | `src/browser_js.rs` unit tests, `tests/agent_browser_react_render.rs`, `tests/browser_js_promise_await.rs`, `tests/browser_js_xhr_parity.rs` | Project-specific | No full ESM loader, complete Test262 semantics, complete XHR/fetch error taxonomy, exceptions parity, async stack traces, or external WPT harness |
-| Runtime builtins | `browser_parse_html`, `browser_parse_css`, `browser_styles`, `browser_query_selector`, `browser_text_content`, `browser_snapshot`, `browser_display_list`, `browser_render`, `browser_layout`, `browser_run_scripts`, `browser_eval_js`, compatibility report | Project API contract; WPT harness adapter candidates | `src/browser.rs::browser_builtins_return_values`, `browser_variadics_reject_extra_args`; `src/browser_js.rs::compatibility_report_lists_storage_apis` | Local API covered | Need stable JSON fixture format and harness glue before importing external WPT data |
+| Runtime builtins | `browser_parse_html`, `browser_parse_css`, `browser_styles`, `browser_query_selector`, `browser_text_content`, `browser_snapshot`, `browser_display_list`, `browser_render`, `browser_layout`, `browser_run_scripts`, `browser_eval_js`, compatibility report | Project API contract; WPT harness adapter candidates | `src/browser.rs::browser_builtins_return_values`, `tests/browser_wpt_json.rs` | Local API plus normalized JSON adapter | Need external WPT data import and upstream `testharness.js` compatibility |
 | Production diagnostics | Console/page errors, HAR-style network entries, source-mapped error locations and generated stack frames, failed requests, source-map references, classified runtime exceptions, React roots and hydration warnings | `console`, `fetch`, source maps, framework integration smoke | `tests/agent_browser_production_debug.rs` | Agent-debug subset | Needs async stack frames and framework component stack reconstruction |
 
 ## Executable WPT-like fixture layout
@@ -62,15 +62,12 @@ connections, denied media permissions, blocked frame messages, missing persisted
 records, and invalid visual/selection locators. Unsupported behavior for each
 family is documented in `docs/browser-wpt-fixtures.md`.
 
-Future fixture families can add cases without importing WPT itself:
+Normalized JSON fixtures run separately with
+`cargo test --test browser_wpt_json`. New data-only cases live under:
 
 ```text
-tests/browser_wpt_like/
-  dom-query-basic.json          # html, script/query, expected text/counts
-  events-click-basic.json       # html, script, expected value/console/dom text
-  storage-basic.json            # script, expected value
-  timers-deterministic.json     # script, expected console/order
-  css-cascade-basic.json        # html, css, selector, expected computed fields
+tests/browser_wpt_json/fixtures/
+  dom-events-basic.json
 ```
 
 Each fixture should use a small normalized schema:
@@ -81,7 +78,8 @@ Each fixture should use a small normalized schema:
   "wpt_shape": "dispatchEvent invokes listener with target and this",
   "html": "<button id='go'>old</button>",
   "script": "let b=document.getElementById('go'); let seen=''; b.addEventListener('click', function(e){ seen=e.type + ':' + e.target.id + ':' + this.id; }); b.click(); seen;",
-  "expect": { "value": "click:go:go" }
+  "expect": { "value": "click:go:go" },
+  "unsupported": ["complete trusted UIEvent subclass coverage"]
 }
 ```
 
