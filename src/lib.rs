@@ -33,6 +33,7 @@ pub mod rpc_cap;
 pub mod scheduler;
 pub mod smtp;
 pub mod system;
+mod template;
 pub mod tls;
 pub mod token;
 pub mod value;

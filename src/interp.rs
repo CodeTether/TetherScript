@@ -15,7 +15,6 @@ use crate::browser;
 use crate::browser_js;
 use crate::http;
 use crate::js;
-use crate::json;
 use crate::output;
 use crate::process_control;
 use crate::value::{Env, FnObj, NativeFn, NativeFunc, Runtime, Slot, Value};
@@ -1400,21 +1399,22 @@ pub(crate) fn install_builtins(env: &Rc<RefCell<Env>>) {
 
     e.define(
         "json_parse",
-        pure_native("json_parse", Some(1), |args| json::parse(&args[0])),
+        pure_native("json_parse", Some(1), |args| crate::json::parse(&args[0])),
         false,
     );
     e.define(
         "json_encode",
-        pure_native("json_encode", Some(1), |args| json::encode(&args[0])),
+        pure_native("json_encode", Some(1), |args| crate::json::encode(&args[0])),
         false,
     );
     e.define(
         "json_encode_pretty",
         pure_native("json_encode_pretty", Some(1), |args| {
-            json::encode_pretty(&args[0])
+            crate::json::encode_pretty(&args[0])
         }),
         false,
     );
+    crate::template::install(&mut e);
 
     e.define(
         "eval",

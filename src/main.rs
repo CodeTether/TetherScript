@@ -66,6 +66,7 @@ mod run_reload;
 mod scheduler;
 mod smtp;
 mod system;
+mod template;
 mod tls;
 mod token;
 mod value;
@@ -77,13 +78,12 @@ use std::fs;
 use std::io::{self, Write};
 use std::process;
 
-use compiler::Compiler;
-use interp::Interpreter;
 use lexer::Lexer;
 use main_caps::RunCaps;
 use main_usage::print_usage;
 use parser::Parser;
 use vm::VM;
+use {compiler::Compiler, interp::Interpreter};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 

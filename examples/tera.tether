@@ -1,0 +1,10 @@
+// Render a Tera template from a tetherscript map.
+
+fn main() {
+    let context = map()
+    context.title = "Tera in tetherscript"
+    context.users = ["Ada", "Linus"]
+
+    let template = "<h1>\{\{ title \}\}</h1>\{% for user in users %\}<p>\{\{ user \}\}</p>\{% endfor %\}"
+    println(tera_render(template, context).unwrap())
+}

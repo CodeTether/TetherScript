@@ -49,7 +49,7 @@ to tetherscript bytecode on startup before VM execution.
 
 ## Status
 
-tetherscript `0.1.0-alpha.20` is the current release candidate for crates.io.
+tetherscript `0.1.0-alpha.21` is the current release candidate for crates.io.
 
 tetherscript currently includes:
 
@@ -69,6 +69,7 @@ tetherscript currently includes:
 - `Result` values and `?` propagation for expected failures.
 - Method calls on built-in values.
 - JSON parsing/encoding implemented in-tree.
+- Tera template rendering from tetherscript maps with `tera_render`.
 - Blocking HTTP client helpers, a blocking HTTP/1.1 handler server, and a
   native cached static-file server.
 - Experimental browser primitives for parsing small HTML fragments, applying
@@ -156,7 +157,7 @@ command creates a standalone bytecode launcher; it does not yet emit native code
 ## Quick start
 
 ```bash
-cargo install tetherscript --version 0.1.0-alpha.20
+cargo install tetherscript --version 0.1.0-alpha.21
 
 cargo build --release
 
