@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.0-alpha.21] - 2026-07-19
+
+### Added
+
+- Added `tera_render(template, context[, autoescape])` for rendering Tera
+  templates from tetherscript maps in both execution engines.
+
 ## [0.1.0-alpha.20] - 2026-07-18
 
 ### Added

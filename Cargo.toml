@@ -1,6 +1,6 @@
 [package]
 name = "tetherscript"
-version = "0.1.0-alpha.20"
+version = "0.1.0-alpha.21"
 authors = ["Riley Seaburg <riley@rileyseaburg.com>"]
 edition = "2024"
 description = "A dynamically-typed scripting language with Rust-style ownership, implemented as a bytecode VM in Rust"
@@ -36,3 +36,6 @@ path = "src/main.rs"
 
 [lints.clippy]
 collapsible_if = "allow"
+
+[dependencies]
+tera = "1.20.0"
