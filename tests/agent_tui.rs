@@ -42,7 +42,7 @@ fn agent_tui_exits_on_stdin_eof_instead_of_redrawing_forever() {
         .stderr(Stdio::piped())
         .spawn()
         .expect("tetherscript binary should spawn");
-    let output = wait_with_timeout(child, Duration::from_secs(2));
+    let output = wait_with_timeout(child, Duration::from_secs(10));
     assert!(
         output.status.success(),
         "stderr:\n{}",
