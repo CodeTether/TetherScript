@@ -12,12 +12,18 @@ pub(super) fn inside_scissor(x: usize, y: usize, scissor: Option<[i64; 4]>) -> b
     })
 }
 
-pub(super) fn write(surface: &mut Surface, x: usize, bottom_y: usize, call: &DrawCall) {
+pub(super) fn write(
+    surface: &mut Surface,
+    x: usize,
+    bottom_y: usize,
+    call: &DrawCall,
+    color: [u8; 4],
+) {
     let top_y = surface.height as usize - 1 - bottom_y;
     let pixel = &mut surface.pixels[top_y * surface.width as usize + x];
     for (channel, target) in pixel.iter_mut().enumerate() {
         if call.channels[channel] {
-            *target = call.color[channel];
+            *target = color[channel];
         }
     }
 }

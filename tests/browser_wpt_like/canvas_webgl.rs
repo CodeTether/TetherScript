@@ -8,11 +8,15 @@ mod draw;
 mod indexed;
 #[path = "canvas_webgl_state.rs"]
 mod state;
+#[path = "canvas_webgl_texture.rs"]
+mod texture;
 
 const CASE: Case = Case {
     area: "html/canvas/offscreen/webgl",
-    wpt_shape: "2D ImageData and array/index-buffer WebGL triangles update native raster pixels",
-    unsupported: &["WebGL textures, depth/stencil, blending, and general GLSL ES"],
+    wpt_shape: "2D ImageData and array/index/texture-backed WebGL triangles update native raster pixels",
+    unsupported: &[
+        "WebGL HTML media texture sources, mipmaps, cube/3D textures, depth/stencil, blending, and general GLSL ES",
+    ],
 };
 
 pub fn run() {
@@ -21,4 +25,5 @@ pub fn run() {
     state::run();
     draw::run();
     indexed::run();
+    texture::run();
 }

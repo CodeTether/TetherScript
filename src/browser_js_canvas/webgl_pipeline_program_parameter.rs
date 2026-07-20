@@ -33,7 +33,9 @@ fn get(state: &mut WebGlState, args: &[JsValue]) -> JsValue {
             (linked.vertex.is_some() as u8 + linked.fragment.is_some() as u8) as f64,
         ),
         constants::ACTIVE_ATTRIBUTES => JsValue::Number(linked.attributes.len() as f64),
-        constants::ACTIVE_UNIFORMS => JsValue::Number(linked.uniforms.len() as f64),
+        constants::ACTIVE_UNIFORMS => {
+            JsValue::Number((linked.uniforms.len() + linked.samplers.len()) as f64)
+        }
         _ => {
             webgl_error::record(state, webgl_constants::INVALID_ENUM);
             JsValue::Null

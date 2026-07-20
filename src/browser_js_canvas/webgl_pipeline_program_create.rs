@@ -18,6 +18,7 @@ pub(super) fn install(obj: &mut HashMap<String, JsValue>, handle: DomHandle, ver
                         log: String::new(),
                         attributes: HashMap::new(),
                         uniforms: HashMap::new(),
+                        samplers: HashMap::new(),
                         color: shader_state::ColorSource::Constant([0.0; 4]),
                     },
                 );

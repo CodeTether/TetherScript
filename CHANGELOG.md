@@ -17,6 +17,13 @@ All notable changes to this project will be documented in this file.
   generation-aware cache invalidation, and last-good fallback after invalid edits.
 - Added an Actix integration test suite and a standalone native-versus-tetherscript
   PostgreSQL demo with a dependency-free benchmark client.
+- Added deterministic WebGL texture objects, texture uploads and sub-image
+  updates, sampler state, texture-backed rasterization, integer sampler
+  uniforms, varying interpolation, and focused texture/error parity tests.
+- Added DOM `CharacterData` behavior with UTF-16-compatible offsets for
+  `substringData`, `appendData`, `insertData`, `deleteData`, and `replaceData`.
+- Added runnable textured-WebGL examples and WPT-like validation coverage for
+  texture sampling, filtering, unpack state, DOM image sources, and errors.
 
 ## [0.1.0-alpha.20] - 2026-07-18
 

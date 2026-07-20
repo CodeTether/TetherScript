@@ -27,7 +27,10 @@ fn get(state: &mut WebGlState, args: &[JsValue]) -> JsValue {
         .pipeline
         .programs
         .get(&id)
-        .is_some_and(|program| program.linked && program.uniforms.contains_key(&name));
+        .is_some_and(|program| {
+            program.linked
+                && (program.uniforms.contains_key(&name) || program.samplers.contains_key(&name))
+        });
     if exists {
         uniform_resource::object(&mut state.pipeline, id, &name)
     } else {

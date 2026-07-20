@@ -15,6 +15,10 @@ pub(super) struct Shader {
 pub(super) enum ColorSource {
     Constant([f64; 4]),
     Uniform(String),
+    Texture {
+        sampler: String,
+        coordinates: String,
+    },
 }
 
 #[derive(Clone)]
@@ -26,5 +30,6 @@ pub(super) struct Program {
     pub log: String,
     pub attributes: HashMap<String, u32>,
     pub uniforms: HashMap<String, [f64; 4]>,
+    pub samplers: HashMap<String, i32>,
     pub color: ColorSource,
 }

@@ -4784,6 +4784,7 @@ fn node_reference_object(handle: DomHandle) -> JsValue {
     );
     obj.insert("nodeName".into(), JsValue::String(node_name(&node)));
     install_node_text_getters(&mut obj, &handle);
+    dom_compat_host::install_character_data(&mut obj, &handle, &node);
     if let Node::Element(el) = &node {
         obj.insert(
             "id".into(),

@@ -16,5 +16,5 @@ pub(super) fn read(
         let raw: [u8; 4] = bytes.get(offset..offset + 4)?.try_into().ok()?;
         *value = f32::from_le_bytes(raw) as f64;
     }
-    Some(Vertex(values))
+    Some(Vertex(values, None))
 }

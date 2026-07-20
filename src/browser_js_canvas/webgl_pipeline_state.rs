@@ -9,6 +9,8 @@ pub(in crate::browser_js::canvas_host::webgl) struct State {
     pub(super) shaders: HashMap<u32, shader_state::Shader>,
     pub(super) programs: HashMap<u32, shader_state::Program>,
     pub(super) buffers: HashMap<u32, buffer_state::Buffer>,
+    pub(super) textures: HashMap<u32, texture_state::Texture>,
+    pub(super) texture_bindings: texture_state::Bindings,
     pub(super) attributes: HashMap<u32, buffer_state::Attribute>,
     pub(super) bound_array_buffer: Option<u32>,
     pub(super) bound_element_array_buffer: Option<u32>,

@@ -14,7 +14,7 @@ fn webgl_context_records_metadata_commands_and_parameters() {
     .unwrap();
     assert_eq!(
         result.value.display(),
-        "tetherscript:tetherscript software rasterizer:1,2,3,4:0:WebGL GLSL ES 1.0 (tetherscript):16:"
+        "tetherscript:tetherscript software rasterizer:1,2,3,4:2048:WebGL GLSL ES 1.0 (tetherscript):16:"
     );
     let attrs = match &result.document.children[0] {
         Node::Element(el) => &el.attrs,

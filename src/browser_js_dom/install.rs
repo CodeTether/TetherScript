@@ -11,6 +11,7 @@ pub(in crate::browser_js) fn install_node(
     handle: &DomHandle,
     node: &Node,
 ) {
+    character_data::install(obj, handle, node);
     document::install(obj, handle, node);
     template::install(obj, node);
     dialog::install(obj, handle, node);
@@ -18,6 +19,14 @@ pub(in crate::browser_js) fn install_node(
     file_input::install(obj, node);
     convenience::install(obj, handle, node);
     traversal::install_node(obj, handle, node);
+}
+
+pub(in crate::browser_js) fn install_character_data(
+    obj: &mut HashMap<String, JsValue>,
+    handle: &DomHandle,
+    node: &Node,
+) {
+    character_data::install(obj, handle, node);
 }
 
 pub(in crate::browser_js) fn install_live_node(

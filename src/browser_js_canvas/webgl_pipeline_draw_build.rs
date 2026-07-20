@@ -4,7 +4,7 @@ use super::*;
 
 pub(super) fn call(
     state: &mut WebGlState,
-    Source(program, attribute, buffer): Source,
+    Source(program, attribute, buffer, coordinates, texture): Source,
     count: usize,
     mut index_at: impl FnMut(usize) -> Option<usize>,
 ) -> Option<DrawCall> {
@@ -18,25 +18,18 @@ pub(super) fn call(
             draw::invalid(state);
             return None;
         };
-        let Some(vertex) = vertex_data::read(&buffer.bytes, &attribute, index) else {
+        let Some(mut vertex) = vertex_data::read(&buffer.bytes, &attribute, index) else {
             draw::invalid(state);
             return None;
         };
+        if let Some((attribute, buffer)) = &coordinates {
+            let Some(values) = vertex_data::read(&buffer.bytes, attribute, index) else {
+                draw::invalid(state);
+                return None;
+            };
+            vertex.1 = Some([values.0[0], values.0[1]]);
+        }
         vertices.push(vertex);
     }
-    Some(assemble(state, program, vertices))
-}
-
-fn assemble(state: &WebGlState, program: shader_state::Program, vertices: Vec<Vertex>) -> DrawCall {
-    let color = match &program.color {
-        shader_state::ColorSource::Constant(color) => *color,
-        shader_state::ColorSource::Uniform(name) => *program.uniforms.get(name).unwrap_or(&[0.0; 4]),
-    };
-    DrawCall {
-        vertices,
-        viewport: state.viewport,
-        scissor: state.scissor_test.then_some(state.scissor_box),
-        channels: state.color_mask,
-        color: webgl_values::rgba8(color),
-    }
+    Some(assemble::call(state, program, vertices, texture))
 }

@@ -5,6 +5,8 @@ use super::*;
 #[allow(dead_code)]
 #[path = "browser_js_dom/attr_update.rs"]
 mod attr_update;
+#[path = "browser_js_dom/character_data.rs"]
+mod character_data;
 #[path = "browser_js_dom/construct.rs"]
 mod construct;
 #[path = "browser_js_dom/convenience.rs"]
@@ -34,4 +36,4 @@ mod template;
 #[path = "browser_js_dom/traversal/mod.rs"]
 mod traversal;
 
-pub(super) use install::{install_live_node, install_node, install_window};
+pub(super) use install::{install_character_data, install_live_node, install_node, install_window};
