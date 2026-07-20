@@ -1,6 +1,6 @@
 [package]
 name = "tetherscript"
-version = "0.1.0-alpha.21"
+version = "0.1.0-alpha.22"
 authors = ["Riley Seaburg <riley@rileyseaburg.com>"]
 edition = "2024"
 description = "A dynamically-typed scripting language with Rust-style ownership, implemented as a bytecode VM in Rust"
@@ -33,6 +33,11 @@ path = "src/lib.rs"
 [[bin]]
 name = "tetherscript"
 path = "src/main.rs"
+
+[[example]]
+name = "actix_plugin_server"
+path = "examples/actix_plugin_server.rs"
+required-features = ["actix-web"]
 
 [lints.clippy]
 collapsible_if = "allow"

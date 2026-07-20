@@ -56,7 +56,7 @@ and deployment:
 ```toml
 [dependencies]
 actix-web = "=4.11.0"
-tetherscript = { version = "0.1.0-alpha.21", features = ["actix-web"] }
+tetherscript = { version = "0.1.0-alpha.22", features = ["actix-web"] }
 ```
 
 ```rust,no_run
@@ -100,7 +100,7 @@ See [`examples/actix-web-demo`](examples/actix-web-demo) for a complete project.
 
 ## Status
 
-tetherscript `0.1.0-alpha.21` is the current release candidate for crates.io.
+tetherscript `0.1.0-alpha.22` is the current release candidate for crates.io.
 
 tetherscript currently includes:
 
@@ -208,7 +208,7 @@ command creates a standalone bytecode launcher; it does not yet emit native code
 ## Quick start
 
 ```bash
-cargo install tetherscript --version 0.1.0-alpha.21
+cargo install tetherscript --version 0.1.0-alpha.22
 
 cargo build --release
 

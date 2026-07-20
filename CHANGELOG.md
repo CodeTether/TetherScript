@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.0-alpha.22] - 2026-07-20
+
+### Fixed
+
+- Declared the standalone Actix server example's required feature so default
+  `cargo test` and crates.io package verification do not compile it without Actix.
+
 ## [0.1.0-alpha.21] - 2026-07-19
 
 ### Added
