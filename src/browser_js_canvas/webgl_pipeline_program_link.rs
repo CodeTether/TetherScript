@@ -26,9 +26,10 @@ fn link(state: &mut WebGlState, value: Option<&JsValue>) {
         return;
     };
     match result {
-        Ok((attributes, uniforms, color)) => {
+        Ok((attributes, uniforms, samplers, color)) => {
             program.attributes = attributes;
             program.uniforms = uniforms;
+            program.samplers = samplers;
             program.color = color;
             program.linked = true;
             program.log.clear();

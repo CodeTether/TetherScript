@@ -8,11 +8,16 @@ pub(super) fn draw(surface: &mut Surface, call: &DrawCall) {
         let Some(points) = geometry::screen_triangle(triangle, call.viewport) else {
             continue;
         };
-        raster_triangle(surface, points, call);
+        raster_triangle(surface, triangle, points, call);
     }
 }
 
-fn raster_triangle(surface: &mut Surface, points: [[f64; 2]; 3], call: &DrawCall) {
+fn raster_triangle(
+    surface: &mut Surface,
+    triangle: &[Vertex],
+    points: [[f64; 2]; 3],
+    call: &DrawCall,
+) {
     let area = geometry::edge(points[0], points[1], points[2]);
     if area == 0.0 || surface.pixels.is_empty() {
         return;
@@ -29,7 +34,13 @@ fn raster_triangle(surface: &mut Surface, points: [[f64; 2]; 3], call: &DrawCall
                 geometry::edge(points[2], points[0], point),
             ];
             if edges.iter().all(|value| *value >= 0.0) || edges.iter().all(|value| *value <= 0.0) {
-                pixels::write(surface, x, y, call)
+                let color = texture_draw::color(
+                    call,
+                    triangle,
+                    points,
+                    geometry::weights(edges, area),
+                );
+                pixels::write(surface, x, y, call, color)
             }
         }
     }

@@ -20,3 +20,7 @@ pub(super) fn screen_triangle(vertices: &[Vertex], viewport: [i64; 4]) -> Option
 pub(super) fn edge(a: [f64; 2], b: [f64; 2], point: [f64; 2]) -> f64 {
     (point[0] - a[0]) * (b[1] - a[1]) - (point[1] - a[1]) * (b[0] - a[0])
 }
+
+pub(super) fn weights(edges: [f64; 3], area: f64) -> [f64; 3] {
+    [edges[1] / area, edges[2] / area, edges[0] / area]
+}

@@ -14,7 +14,9 @@ pub(super) fn get(state: &mut WebGlState, param: &JsValue) -> JsValue {
         c::SHADING_LANGUAGE_VERSION => {
             JsValue::String(super::webgl_param_value::shader_version(state.version))
         }
-        c::MAX_TEXTURE_SIZE => JsValue::Number(0.0),
+        c::MAX_TEXTURE_SIZE => JsValue::Number(
+            super::webgl_pipeline::constants::MAX_TEXTURE_SIZE as f64,
+        ),
         c::MAX_VIEWPORT_DIMS => {
             super::webgl_param_value::array(&[state.width as f64, state.height as f64])
         }
@@ -30,9 +32,10 @@ pub(super) fn get(state: &mut WebGlState, param: &JsValue) -> JsValue {
         c::ALIASED_LINE_WIDTH_RANGE => super::webgl_param_value::array(&[1.0, 1.0]),
         c::ALIASED_POINT_SIZE_RANGE => super::webgl_param_value::array(&[1.0, 64.0]),
         c::MAX_VERTEX_ATTRIBS => JsValue::Number(16.0),
-        c::MAX_COMBINED_TEXTURE_IMAGE_UNITS
-        | c::MAX_TEXTURE_IMAGE_UNITS
-        | c::MAX_VERTEX_TEXTURE_IMAGE_UNITS => JsValue::Number(0.0),
+        c::MAX_COMBINED_TEXTURE_IMAGE_UNITS | c::MAX_TEXTURE_IMAGE_UNITS => JsValue::Number(
+            super::webgl_pipeline::constants::MAX_TEXTURE_UNITS as f64,
+        ),
+        c::MAX_VERTEX_TEXTURE_IMAGE_UNITS => JsValue::Number(0.0),
         _ => {
             super::webgl_error::record(state, c::INVALID_ENUM);
             JsValue::Null

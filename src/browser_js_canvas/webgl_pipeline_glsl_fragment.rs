@@ -2,7 +2,14 @@
 
 use super::super::shader_state::ColorSource;
 
-pub(crate) fn color(source: &str, uniforms: &[String]) -> Result<ColorSource, String> {
+pub(crate) fn color(
+    source: &str,
+    uniforms: &[String],
+    samplers: &[String],
+) -> Result<ColorSource, String> {
+    if let Some(texture) = super::texture::color(source, samplers) {
+        return Ok(texture);
+    }
     if let Some(values) = constant(source) {
         return Ok(ColorSource::Constant(values));
     }
@@ -11,7 +18,7 @@ pub(crate) fn color(source: &str, uniforms: &[String]) -> Result<ColorSource, St
             return Ok(ColorSource::Uniform(name));
         }
     }
-    Err("link: fragment output must be a constant vec4 or uniform vec4".into())
+    Err("link: fragment output must be a constant, uniform, or sampled RGBA value".into())
 }
 
 fn constant(source: &str) -> Option<[f64; 4]> {

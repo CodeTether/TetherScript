@@ -2,6 +2,8 @@
 
 use super::*;
 
+#[path = "webgl_pipeline_draw_assemble.rs"]
+mod assemble;
 #[path = "webgl_pipeline_draw_build.rs"]
 mod build;
 #[path = "webgl_pipeline_draw_element_prepare.rs"]
@@ -22,27 +24,16 @@ mod prepare;
 mod raster;
 #[path = "webgl_pipeline_draw_source.rs"]
 mod source;
-#[path = "webgl_pipeline_draw_vertex.rs"]
-mod vertex_data;
+#[path = "webgl_pipeline_draw_texture.rs"]
+mod texture_draw;
+#[path = "webgl_pipeline_draw_types.rs"]
+mod types;
 #[path = "webgl_pipeline_draw_validation.rs"]
 mod validation;
+#[path = "webgl_pipeline_draw_vertex.rs"]
+mod vertex_data;
 
-#[derive(Clone, Copy)]
-struct Vertex([f64; 4]);
-
-struct DrawCall {
-    vertices: Vec<Vertex>,
-    viewport: [i64; 4],
-    scissor: Option<[i64; 4]>,
-    channels: [bool; 4],
-    color: [u8; 4],
-}
-
-struct Source(
-    shader_state::Program,
-    buffer_state::Attribute,
-    buffer_state::Buffer,
-);
+use types::{DrawCall, Fragment, Source, Vertex};
 
 pub(super) fn install(obj: &mut HashMap<String, JsValue>, handle: DomHandle, version: u8) {
     let arrays_handle = handle.clone();

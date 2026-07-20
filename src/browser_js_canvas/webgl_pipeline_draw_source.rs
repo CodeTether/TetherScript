@@ -40,5 +40,6 @@ pub(super) fn resolve(state: &mut WebGlState) -> Option<Source> {
         draw::invalid(state);
         return None;
     };
-    Some(Source(program, attribute, buffer))
+    let (coordinates, texture) = texture_draw::source(state, &program)?;
+    Some(Source(program, attribute, buffer, coordinates, texture))
 }

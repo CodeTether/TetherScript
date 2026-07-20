@@ -23,6 +23,24 @@ pub(super) const UNSIGNED_INT: u32 = 0x1405;
 pub(super) const STREAM_DRAW: u32 = 0x88E0;
 pub(super) const STATIC_DRAW: u32 = 0x88E4;
 pub(super) const DYNAMIC_DRAW: u32 = 0x88E8;
+pub(super) const TEXTURE_2D: u32 = 0x0DE1;
+pub(super) const TEXTURE0: u32 = 0x84C0;
+pub(super) const ACTIVE_TEXTURE: u32 = 0x84E0;
+pub(super) const TEXTURE_BINDING_2D: u32 = 0x8069;
+pub(super) const TEXTURE_MAG_FILTER: u32 = 0x2800;
+pub(super) const TEXTURE_MIN_FILTER: u32 = 0x2801;
+pub(super) const TEXTURE_WRAP_S: u32 = 0x2802;
+pub(super) const TEXTURE_WRAP_T: u32 = 0x2803;
+pub(super) const NEAREST: u32 = 0x2600;
+pub(super) const LINEAR: u32 = 0x2601;
+pub(super) const REPEAT: u32 = 0x2901;
+pub(super) const CLAMP_TO_EDGE: u32 = 0x812F;
+pub(super) const UNPACK_ALIGNMENT: u32 = 0x0CF5;
+pub(super) const UNPACK_FLIP_Y_WEBGL: u32 = 0x9240;
+pub(super) const UNPACK_PREMULTIPLY_ALPHA_WEBGL: u32 = 0x9241;
+
+pub(in crate::browser_js::canvas_host::webgl) const MAX_TEXTURE_UNITS: usize = 8;
+pub(in crate::browser_js::canvas_host::webgl) const MAX_TEXTURE_SIZE: usize = 2048;
 
 pub(super) fn usage(value: u32) -> bool {
     matches!(value, STREAM_DRAW | STATIC_DRAW | DYNAMIC_DRAW)

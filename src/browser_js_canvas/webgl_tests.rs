@@ -10,5 +10,13 @@ mod elements_webgl2;
 mod resize;
 #[path = "webgl_tests_state.rs"]
 mod state;
+#[path = "webgl_tests_texture_errors.rs"]
+mod texture_errors;
+#[path = "webgl_tests_texture_filter.rs"]
+mod texture_filter;
+#[path = "webgl_tests_texture_unpack.rs"]
+mod texture_unpack;
+#[path = "webgl_tests_textures.rs"]
+mod textures;
 #[path = "webgl_tests_uniform.rs"]
 mod uniform;
