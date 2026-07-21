@@ -6,12 +6,16 @@ use std::rc::Rc;
 
 use crate::value::{Env, Value};
 
-use super::{factory_memory as memory, factory_os as os, factory_render as render, native};
+use super::{
+    factory_memory as memory, factory_os as os, factory_process as process,
+    factory_render as render, native,
+};
 
 pub(crate) fn install(env: &Rc<RefCell<Env>>) {
     let mut module = HashMap::new();
     native::insert(&mut module, "file", 2, os::file);
     native::insert(&mut module, "child_process", 2, os::child);
+    native::insert(&mut module, "child_process_bounded", 3, process::child);
     native::insert(&mut module, "tcp_connect", 3, os::tcp_connect);
     native::insert(&mut module, "tcp_listen", 2, os::tcp_listen);
     native::insert(&mut module, "request_body", 2, memory::request_body);

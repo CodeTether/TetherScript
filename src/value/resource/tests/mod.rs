@@ -3,6 +3,7 @@
 mod buffers;
 mod lifecycle;
 mod os;
+mod process_streams;
 mod render_surface;
 mod transfer;
 mod transfer_nested;

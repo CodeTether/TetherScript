@@ -1,0 +1,15 @@
+// Supervised child processes expose bounded, piped standard streams.
+fn main() {
+    let child = if process_platform() == "windows" {
+        resource.child_process_bounded("cmd", ["/C", "echo stream-ok"], 64).unwrap()
+    } else {
+        resource.child_process_bounded("sh", ["-c", "printf stream-ok"], 64).unwrap()
+    }
+    println(type_of(child))
+    println("capacity: " + str(child.stream_capacity()))
+    println("success: " + str(child.wait().unwrap().success))
+    while child.stdout_eof() == false {}
+    println("stdout: " + child.read_stdout(64).unwrap().decode_utf8().trim())
+    child.close().unwrap()
+    println("closed: " + str(child.is_closed()))
+}

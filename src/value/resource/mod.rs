@@ -18,6 +18,7 @@
 mod args;
 mod availability;
 mod channel_queue;
+mod child_construct;
 mod construct;
 mod control;
 mod deadline;
@@ -26,6 +27,7 @@ mod display;
 mod factory;
 mod factory_memory;
 mod factory_os;
+mod factory_process;
 mod factory_render;
 mod install;
 mod kind;
