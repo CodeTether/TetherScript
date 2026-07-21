@@ -14,8 +14,9 @@ syntax highlighting plus live diagnostics from the built-in LSP server.
 - `tetherscript: Run File` command for the active `.tether` file
 - `tetherscript: Show Tokens`, `Show AST`, and `Show Bytecode` commands
 - `tetherscript: Run Agent TUI` command for `examples/agent_tui.tether`
-- Completion suggestions for keywords, constants, built-ins, methods, and `db.query`
-- Hover docs for common built-ins, keywords, constants, methods, and SQL capabilities
+- Completion suggestions for all runtime tools, owned-resource factories and
+  methods, keywords, constants, and `db.query`
+- Hover docs for runtime tools, owned resources, language words, and SQL capabilities
 - Document outline for `fn` declarations
 - Same-file go-to-definition for function calls
 - Run CodeLens on `fn main`

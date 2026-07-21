@@ -1,4 +1,6 @@
-const { builtins, constants, keywords, methods } = require('./language-data');
+const {
+  builtins, constants, factories, keywords, methods, namespaces,
+} = require('./language-data');
 
 const wordPattern = /[A-Za-z_][A-Za-z0-9_]*/;
 
@@ -15,15 +17,18 @@ function wordAt(document, position) {
   return { range, text: document.getText(range) };
 }
 
-function hasDotBefore(vscode, document, range) {
-  if (range.start.character === 0) return false;
-  const before = range.start.translate(0, -1);
-  return document.getText(new vscode.Range(before, range.start)) === '.';
+function qualifierBefore(document, range) {
+  const prefix = document.lineAt(range.start).text.slice(0, range.start.character);
+  const match = prefix.match(/([A-Za-z_][A-Za-z0-9_]*)\.$/);
+  return match ? match[1] : undefined;
 }
 
-function hoverData(vscode, document, word) {
-  if (hasDotBefore(vscode, document, word.range) && methods[word.text]) return methods[word.text];
+function hoverData(document, word) {
+  const qualifier = qualifierBefore(document, word.range);
+  if (qualifier === 'resource' && factories[word.text]) return factories[word.text];
+  if (qualifier && methods[word.text]) return methods[word.text];
   if (builtins[word.text]) return builtins[word.text];
+  if (namespaces[word.text]) return namespaces[word.text];
   if (keywords.includes(word.text)) return [word.text, 'tetherscript language keyword.'];
   if (constants.includes(word.text)) return [word.text, 'Built-in tetherscript constant.'];
   if (methods[word.text]) return methods[word.text];
@@ -36,11 +41,11 @@ function registerHovers(vscode, context) {
     provideHover(document, position) {
       const word = wordAt(document, position);
       if (!word) return undefined;
-      const data = hoverData(vscode, document, word);
+      const data = hoverData(document, word);
       if (!data) return undefined;
       return new vscode.Hover(markdown(vscode, data[0], data[1]), word.range);
     },
   }));
 }
 
-module.exports = { registerHovers };
+module.exports = { hoverData, registerHovers };
