@@ -132,6 +132,21 @@ Use `host_factory` to grant narrow Rust capabilities backed by repositories or
 database pools. Scripts receive no ambient database, filesystem, network, or
 subprocess authority.
 
+The standalone Actix demo includes a SQL-first `db` capability backed by SQLx:
+
+```tether
+let rows = db.query(
+    "SELECT id, name FROM users WHERE id = $1",
+    [request.params.id],
+)?
+```
+
+SQL parameters are bound separately, and result rows are returned as a list of
+tetherscript maps. SQLx and Tokio remain dependencies of the demo crate only;
+the main tetherscript package sees the database solely through the host-granted
+[`Authority`](src/capability.rs) boundary. Grant `db` using a least-privilege
+database role because its SQL permissions are the role's permissions.
+
 File-backed controllers support validated hot reload:
 
 ```rust,no_run
