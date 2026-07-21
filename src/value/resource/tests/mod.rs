@@ -5,6 +5,7 @@ mod lifecycle;
 mod os;
 mod process_streams;
 mod render_surface;
+mod render_view;
 mod transfer;
 mod transfer_nested;
 

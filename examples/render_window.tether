@@ -1,0 +1,26 @@
+// Run with: cargo run --features native-window --bin tetherscript -- run examples/render_window.tether
+fn main() {
+    let surface = resource.render_surface(320, 180, 2, 230400).unwrap()
+    let opened = surface.open_window("tetherscript native UI")
+    if opened.is_err() {
+        println("native presentation requires the native-window feature")
+        return
+    }
+
+    let mut clicks = 0
+    let mut left_was_down = false
+    while surface.is_window_open() {
+        let html = "<main><h1>Native UI</h1><section><p>Interactive RGBA surface</p><button>Clicks: " + str(clicks) + "</button></section><footer>Click anywhere or press Escape</footer></main>"
+        let css = "main \{ background: #102030; color: white; width: 320px; height: 180px; padding: 12px \} h1 \{ color: #66ccff; height: 28px \} section \{ background: #203850; padding: 10px; height: 90px \} button \{ background: #2878b8; color: white; width: 120px; height: 32px \} footer \{ background: #081018; height: 22px \}"
+        surface.render(html, css).unwrap()
+        surface.present().unwrap()
+
+        let input = surface.poll_input().unwrap()
+        if input.left_down && !left_was_down { clicks = clicks + 1 }
+        left_was_down = input.left_down
+        for key in input.keys_pressed {
+            if key == "escape" { surface.close_window().unwrap() }
+        }
+        sleep_ms(16).unwrap()
+    }
+}

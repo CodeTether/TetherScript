@@ -32,6 +32,7 @@ impl Handle {
             scale,
             max_pixels,
             frame: None,
+            window: Default::default(),
         })
     }
 }

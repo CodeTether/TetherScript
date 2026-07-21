@@ -1,0 +1,45 @@
+fn make_view(status) {
+    let view = map()
+    view["title"] = "dual-backend UI"
+    view["width"] = 80
+    view["height"] = 24
+    view["status"] = status
+    view["items"] = [
+        "One view map drives both renderers.",
+        "Terminal: tui_present(view)",
+        "Native: surface.render_view(view) then surface.present()"
+    ]
+    return view
+}
+
+fn native_requested() {
+    for arg in env_args() {
+        if arg == "--native" { return true }
+    }
+    return false
+}
+
+fn main() {
+    let view = make_view("ready")
+    if !native_requested() {
+        tui_present(view)
+        return
+    }
+
+    let surface = resource.render_surface(640, 384, 1, 245760).unwrap()
+    let opened = surface.open_window("tetherscript dual UI")
+    if opened.is_err() {
+        println("native presentation requires the native-window feature")
+        return
+    }
+    while surface.is_window_open() {
+        surface.render_view(view).unwrap()
+        surface.present().unwrap()
+        let input = surface.poll_input().unwrap()
+        view["status"] = "mouse " + str(input.mouse_x) + "," + str(input.mouse_y)
+        for key in input.keys_pressed {
+            if key == "escape" { surface.close_window().unwrap() }
+        }
+        sleep_ms(16).unwrap()
+    }
+}

@@ -25,8 +25,27 @@ fn surface_owns_one_bounded_frame() {
         panic!("rendered pixels should be bytes");
     };
     assert_eq!(pixels.borrow().len(), 128);
+    assert!(!surface.call("is_window_open", &[]).unwrap().truthy());
     ok(surface.call("clear", &[]).unwrap());
     assert!(error(surface.call("pixels", &[]).unwrap()).contains("no frame"));
+}
+
+#[test]
+fn surface_requires_a_frame_before_presenting() {
+    let mut surface = OwnedResource::render_surface(8, 4, 1, 32).unwrap();
+    let error = error(surface.call("present", &[]).unwrap());
+    assert!(error.contains("no frame has been rendered"), "{error}");
+    ok(surface.call("close_window", &[]).unwrap());
+}
+
+#[cfg(not(feature = "native-window"))]
+#[test]
+fn surface_explains_how_to_enable_native_windows() {
+    let mut surface = OwnedResource::render_surface(8, 4, 1, 32).unwrap();
+    let error = error(surface.call("open_window", &[text("test")]).unwrap());
+    assert!(error.contains("`native-window` feature"), "{error}");
+    let error = error(surface.call("poll_input", &[]).unwrap());
+    assert!(error.contains("no native window is open"), "{error}");
 }
 
 #[test]
