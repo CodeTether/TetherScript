@@ -1,0 +1,25 @@
+const terminal = {
+  jsonrpc_error: ['jsonrpc_error(id, code, message[, data])', 'Create a JSON-RPC error response.'],
+  jsonrpc_notify: ['jsonrpc_notify(method, params)', 'Create a JSON-RPC notification.'],
+  jsonrpc_request: ['jsonrpc_request(id, method, params)', 'Create a JSON-RPC request.'],
+  jsonrpc_response: ['jsonrpc_response(id, result)', 'Create a JSON-RPC success response.'],
+  stdio_read: ['stdio_read()', 'Read one framed standard-input message.'],
+  stdio_write: ['stdio_write(value)', 'Write one framed standard-output message.'],
+  stdio_write_err: ['stdio_write_err(text)', 'Write text to standard error.'],
+  tui_alt_screen: ['tui_alt_screen(enabled)', 'Return an alternate-screen control sequence.'],
+  tui_clear: ['tui_clear()', 'Return a terminal clear-screen sequence.'],
+  tui_cursor: ['tui_cursor(visible)', 'Return a cursor visibility sequence.'],
+  tui_enter: ['tui_enter()', 'Return the TUI entry control sequence.'],
+  tui_leave: ['tui_leave()', 'Return the TUI exit control sequence.'],
+  tui_move_to: ['tui_move_to(row, col)', 'Return a cursor-position sequence.'],
+  tui_present: ['tui_present(view)', 'Clear and draw a terminal UI view.'],
+  tui_read_event: ['tui_read_event([prompt])', 'Read one terminal input event.'],
+  tui_read_key: ['tui_read_key()', 'Read one parsed terminal key event.'],
+  tui_render: ['tui_render(view)', 'Render a terminal UI view to text.'],
+  tui_size: ['tui_size()', 'Return terminal rows and columns.'],
+  tui_span_render: ['tui_span_render(span)', 'Render one styled text span.'],
+  tui_style_open: ['tui_style_open(style)', 'Return the ANSI sequence for a style.'],
+  tui_style_reset: ['tui_style_reset()', 'Return the ANSI style reset sequence.'],
+};
+
+module.exports = { terminal };
