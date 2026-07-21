@@ -4,9 +4,7 @@
 //! This module is dependency-free and implements the JSON subset needed by
 //! TetherScript and the LSP server directly.
 
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::rc::Rc;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::value::Value;
 
@@ -347,13 +345,12 @@ fn write_json(value: &Value, out: &mut String, pretty: Option<usize>) -> Result<
         Value::Fn(_) | Value::VmFn(_) | Value::Native(_) => {
             return Err("json_encode: cannot encode function value as JSON".to_string())
         }
-        Value::Result(_) => {
-            return Err(
-                "json_encode: cannot encode Result value as JSON (unwrap it first)".to_string(),
-            )
-        }
-        Value::Capability(_) => {
-            return Err("json_encode: cannot encode a capability value as JSON".to_string())
+        Value::Result(_) => return Err("json_encode: unwrap Result before encoding as JSON".into()),
+        Value::Capability(_) | Value::Resource(_) => {
+            return Err(format!(
+                "json_encode: cannot encode {} as JSON",
+                value.type_name()
+            ))
         }
     }
     Ok(())

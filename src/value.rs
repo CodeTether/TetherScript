@@ -17,13 +17,11 @@
 //! invariant. Aliasing-xor-mutability via `&mut` is a TODO — today `&mut`
 //! parses but behaves like an implicit mutable alias.
 
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::fmt;
-use std::rc::Rc;
+use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
-use crate::ast::Block;
-use crate::bytecode::VmFnObj;
+use crate::{ast::Block, bytecode::VmFnObj};
+
+pub mod resource;
 
 /// A TetherScript value. Heap-backed payloads are Rc'd so cloning is cheap and
 /// aliasing is shared by default.
@@ -45,10 +43,12 @@ pub enum Value {
     Result(Rc<ResultValue>),
     /// First-class capability (authority grant). See src/capability.rs.
     Capability(Rc<crate::capability::Capability>),
+    /// Move-only host resource with explicit lifecycle control.
+    Resource(Rc<RefCell<resource::OwnedResource>>),
 }
 
 /// `Ok(v)` or `Err(message)`. Held by `Value::Result`.
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum ResultValue {
     Ok(Value),
     Err(String),
@@ -114,6 +114,9 @@ impl Value {
             Value::Fn(_) | Value::VmFn(_) | Value::Native(_) => "fn",
             Value::Result(_) => "result",
             Value::Capability(_) => "capability",
+            Value::Resource(resource) => resource
+                .try_borrow()
+                .map_or("resource", |resource| resource.kind().type_name()),
         }
     }
 
@@ -127,7 +130,7 @@ impl Value {
             Value::Bytes(b) => !b.borrow().is_empty(),
             Value::List(xs) => !xs.borrow().is_empty(),
             Value::Map(m) => !m.borrow().is_empty(),
-            Value::Fn(_) | Value::VmFn(_) | Value::Native(_) => true,
+            Value::Fn(_) | Value::VmFn(_) | Value::Native(_) | Value::Resource(_) => true,
             Value::Result(r) => matches!(r.as_ref(), ResultValue::Ok(_)),
             Value::Capability(c) => !c.is_revoked(),
         }
@@ -159,16 +162,7 @@ impl PartialEq for Value {
             (VmFn(a), VmFn(b)) => Rc::ptr_eq(a, b),
             (Native(a), Native(b)) => Rc::ptr_eq(a, b),
             (Capability(a), Capability(b)) => Rc::ptr_eq(a, b),
-            _ => false,
-        }
-    }
-}
-
-impl PartialEq for ResultValue {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (ResultValue::Ok(a), ResultValue::Ok(b)) => a == b,
-            (ResultValue::Err(a), ResultValue::Err(b)) => a == b,
+            (Resource(a), Resource(b)) => Rc::ptr_eq(a, b),
             _ => false,
         }
     }
@@ -240,6 +234,7 @@ impl fmt::Display for Value {
                     write!(f, "<capability {}>", c.kind)
                 }
             }
+            Value::Resource(resource) => write!(f, "{}", resource.borrow()),
         }
     }
 }

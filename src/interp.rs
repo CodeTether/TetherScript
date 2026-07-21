@@ -25,6 +25,8 @@ use crate::{smtp, system};
 mod http_builtins;
 #[path = "interp/module_method.rs"]
 mod module_method;
+#[path = "interp/result_method.rs"]
+mod result_method;
 #[path = "tui/mod.rs"]
 mod tui;
 
@@ -863,7 +865,8 @@ pub(crate) fn call_method(target: &Value, name: &str, args: &[Value]) -> Result<
             let values = m.borrow().values().cloned().collect();
             Ok(Value::List(Rc::new(RefCell::new(values))))
         }
-        (Value::Result(r), name, args) => call_result_method(r, name, args),
+        (Value::Result(r), name, args) => result_method::call(r, name, args),
+        (Value::Resource(resource), name, args) => resource.borrow_mut().call(name, args),
         (t, n, _) => Err(format!("no method `{}` on {}", n, t.type_name())),
     }
 }
@@ -900,29 +903,6 @@ pub(crate) fn call_capability_method(
                 Err(e) => Ok(Value::Result(Rc::new(crate::value::ResultValue::Err(e)))),
             }
         }
-    }
-}
-
-fn call_result_method(
-    r: &Rc<crate::value::ResultValue>,
-    name: &str,
-    args: &[Value],
-) -> Result<Value, String> {
-    use crate::value::ResultValue;
-    match (r.as_ref(), name, args) {
-        (ResultValue::Ok(_), "is_ok", []) => Ok(Value::Bool(true)),
-        (ResultValue::Err(_), "is_ok", []) => Ok(Value::Bool(false)),
-        (ResultValue::Ok(_), "is_err", []) => Ok(Value::Bool(false)),
-        (ResultValue::Err(_), "is_err", []) => Ok(Value::Bool(true)),
-        (ResultValue::Ok(v), "unwrap", []) => Ok(v.clone()),
-        (ResultValue::Err(e), "unwrap", []) => Err(format!("called unwrap on Err({:?})", e)),
-        (ResultValue::Ok(v), "unwrap_or", [_]) => Ok(v.clone()),
-        (ResultValue::Err(_), "unwrap_or", [d]) => Ok(d.clone()),
-        (ResultValue::Ok(v), "ok", []) => Ok(v.clone()),
-        (ResultValue::Err(_), "ok", []) => Ok(Value::Nil),
-        (ResultValue::Ok(_), "err", []) => Ok(Value::Nil),
-        (ResultValue::Err(e), "err", []) => Ok(Value::Str(Rc::new(e.clone()))),
-        (_, n, _) => Err(format!("no method `{}` on result", n)),
     }
 }
 
@@ -1095,6 +1075,7 @@ pub(crate) fn install_builtins(env: &Rc<RefCell<Env>>) {
     install_pure_builtins(env);
     install_browser_builtins(env);
     http_builtins::install(env);
+    crate::value::resource::install(env);
     let mut e = env.borrow_mut();
 
     e.define(
