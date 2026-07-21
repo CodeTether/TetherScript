@@ -3,6 +3,17 @@
 use std::path::{Path, PathBuf};
 
 /// A concrete source entry and its package root, when package-backed.
+///
+/// # Examples
+///
+/// ```no_run
+/// let target = tetherscript::package::resolve_target(
+///     Some(std::path::Path::new(".")),
+///     std::path::Path::new("."),
+/// )?;
+/// assert!(target.entry().is_absolute());
+/// # Ok::<(), String>(())
+/// ```
 #[derive(Debug, Clone)]
 pub struct ResolvedTarget {
     entry: PathBuf,
@@ -10,9 +21,11 @@ pub struct ResolvedTarget {
 }
 
 impl ResolvedTarget {
+    /// Return the canonical `.tether` entry file.
     pub fn entry(&self) -> &Path {
         &self.entry
     }
+    /// Return the canonical package root, or `None` for an explicit source file.
     pub fn root(&self) -> Option<&Path> {
         self.root.as_deref()
     }
@@ -25,9 +38,24 @@ impl ResolvedTarget {
 /// * `explicit` — Optional source file or package directory.
 /// * `cwd` — Base for relative targets and package discovery.
 ///
+/// # Returns
+///
+/// A canonical source entry and optional package root.
+///
 /// # Errors
 ///
 /// Returns an error for missing targets, invalid manifests, or unsafe entries.
+///
+/// # Examples
+///
+/// ```no_run
+/// let target = tetherscript::package::resolve_target(
+///     Some(std::path::Path::new("examples/hello.tether")),
+///     std::path::Path::new("."),
+/// )?;
+/// assert!(target.entry().ends_with("hello.tether"));
+/// # Ok::<(), String>(())
+/// ```
 pub fn resolve_target(explicit: Option<&Path>, cwd: &Path) -> Result<ResolvedTarget, String> {
     let target = explicit.map(|path| absolute(path, cwd));
     if let Some(path) = target.as_deref().filter(|path| path.is_file()) {

@@ -1,8 +1,8 @@
 {
   "name": "tetherscript",
   "displayName": "tetherscript",
-  "description": "Language support for tetherscript (.tether): syntax highlighting plus lex and parse diagnostics via LSP.",
-  "version": "0.0.9",
+  "description": "Language support for tetherscript with module auto-imports, navigation, completion, and diagnostics.",
+  "version": "0.0.10",
   "publisher": "tetherscript-rs",
   "repository": {
     "type": "git",
@@ -14,6 +14,10 @@
   "categories": [
     "Programming Languages"
   ],
+  "scripts": {
+    "test": "node test/run.js",
+    "test:integration": "node test/integration/launch.js"
+  },
   "activationEvents": [
     "onLanguage:tetherscript",
     "onCommand:tetherscript.runFile",

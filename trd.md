@@ -109,10 +109,12 @@ A Rust application developer who needs an extension language with stronger safet
 
 ### CLI
 
-- `tetherscript run <file>`
+- `tetherscript run [file-or-package]`
 - `tetherscript repl`
-- `tetherscript check <file>` — parse plus ownership analysis where statically resolvable
-- No package manager in v1. Module imports are file-relative. Defer package management until there is pull from real users.
+- `tetherscript check [file-or-package]` — resolve imports, parse, and run ownership analysis
+- `tetherscript init [directory]` — create a local manifest and starter entry file
+- Local packages use file-relative imports and explicit exports. Remote registries,
+  dependency downloads, lockfiles, and publishing remain deferred.
 
 ---
 

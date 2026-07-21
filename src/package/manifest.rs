@@ -25,9 +25,27 @@ pub struct Manifest {
 impl Manifest {
     /// Load and validate a JSON manifest.
     ///
+    /// # Arguments
+    ///
+    /// * `path` — Existing `tetherscript.json` file.
+    ///
+    /// # Returns
+    ///
+    /// Validated package metadata with a safe relative entry path.
+    ///
     /// # Errors
     ///
     /// Returns a path-qualified I/O, JSON, or schema error.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// let manifest = tetherscript::package::Manifest::load(
+    ///     std::path::Path::new("tetherscript.json"),
+    /// )?;
+    /// assert!(!manifest.name().is_empty());
+    /// # Ok::<(), String>(())
+    /// ```
     pub fn load(path: &Path) -> Result<Self, String> {
         let source = std::fs::read_to_string(path)
             .map_err(|error| format!("{}: {error}", path.display()))?;
