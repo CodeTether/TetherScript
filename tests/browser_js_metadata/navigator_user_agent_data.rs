@@ -15,7 +15,13 @@ fn navigator_user_agent_data_is_deterministic() {
 
     assert_eq!(
         result.value,
-        JsValue::String("TetherScript|0.1|false|TetherScript|x86|0.1|false".into())
+        JsValue::String(
+            format!(
+                "TetherScript|{0}|false|TetherScript|x86|{0}|false",
+                env!("CARGO_PKG_VERSION")
+            )
+            .into()
+        )
     );
 }
 

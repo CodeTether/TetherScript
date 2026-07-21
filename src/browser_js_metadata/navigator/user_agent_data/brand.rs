@@ -2,7 +2,7 @@ use super::*;
 
 pub(super) fn list() -> JsValue {
     JsValue::Array(Rc::new(RefCell::new(vec![
-        item("TetherScript", "0.1"),
+        item("TetherScript", env!("CARGO_PKG_VERSION")),
         item("BrowserCompat", "0"),
     ])))
 }

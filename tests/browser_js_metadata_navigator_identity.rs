@@ -23,7 +23,12 @@ fn navigator_legacy_identity_fields_are_deterministic() {
     assert_eq!(
         result.value,
         JsValue::String(
-            "Mozilla|Netscape|TetherScript/0.1 BrowserCompat||false|false|false|0|0|false".into()
+            concat!(
+                "Mozilla|Netscape|TetherScript/",
+                env!("CARGO_PKG_VERSION"),
+                " BrowserCompat||false|false|false|0|0|false"
+            )
+            .into()
         )
     );
 }

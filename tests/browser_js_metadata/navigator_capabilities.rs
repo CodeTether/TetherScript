@@ -13,7 +13,12 @@ fn navigator_common_capability_probes_are_deterministic() {
     assert_eq!(
         result.value,
         JsValue::String(
-            "4|8|en-US|en-US,en|true|true|TetherScript|TetherScript/0.1 BrowserCompat".into()
+            concat!(
+                "4|8|en-US|en-US,en|true|true|TetherScript|TetherScript/",
+                env!("CARGO_PKG_VERSION"),
+                " BrowserCompat"
+            )
+            .into()
         )
     );
 }

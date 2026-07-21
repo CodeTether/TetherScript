@@ -6,7 +6,7 @@ pub(super) fn insert(object: &mut HashMap<String, JsValue>, hint: &str) {
         "bitness" => set_str(object, hint, "64"),
         "model" => set_str(object, hint, ""),
         "platformVersion" => set_str(object, hint, "0"),
-        "uaFullVersion" => set_str(object, hint, "0.1"),
+        "uaFullVersion" => set_str(object, hint, env!("CARGO_PKG_VERSION")),
         "fullVersionList" => {
             object.insert(hint.into(), brand::list());
         }

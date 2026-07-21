@@ -1577,7 +1577,7 @@ fn navigator_object() -> JsValue {
     let mut obj = HashMap::new();
     obj.insert(
         "userAgent".into(),
-        JsValue::String("TetherScript/0.1 BrowserCompat".into()),
+        JsValue::String(["TetherScript/", env!("CARGO_PKG_VERSION"), " BrowserCompat"].concat()),
     );
     obj.insert("language".into(), JsValue::String("en-US".into()));
     obj.insert(

@@ -19,10 +19,18 @@ pub(super) fn install(navigator: &mut HashMap<String, JsValue>) {
     );
     set_str(navigator, "language", "en-US");
     set_str(navigator, "platform", "TetherScript");
-    set_str(navigator, "userAgent", "TetherScript/0.1 BrowserCompat");
+    set_str(
+        navigator,
+        "userAgent",
+        concat!("TetherScript/", env!("CARGO_PKG_VERSION"), " BrowserCompat"),
+    );
     set_str(navigator, "appCodeName", "Mozilla");
     set_str(navigator, "appName", "Netscape");
-    set_str(navigator, "appVersion", "TetherScript/0.1 BrowserCompat");
+    set_str(
+        navigator,
+        "appVersion",
+        concat!("TetherScript/", env!("CARGO_PKG_VERSION"), " BrowserCompat"),
+    );
     navigator.insert(
         "languages".into(),
         JsValue::Array(Rc::new(RefCell::new(vec![
