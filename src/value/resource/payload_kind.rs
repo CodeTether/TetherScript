@@ -14,6 +14,7 @@ impl Payload {
             Self::Task(_) => ResourceKind::Task,
             Self::Timer(_) => ResourceKind::Timer,
             Self::Channel(_) => ResourceKind::Channel,
+            Self::RenderSurface(_) => ResourceKind::RenderSurface,
         }
     }
 }

@@ -23,6 +23,7 @@ impl Payload {
             Self::Task(handle) => handle.call(name, args),
             Self::Timer(handle) => handle.call(name, args),
             Self::Channel(handle) => handle.call(name, args),
+            Self::RenderSurface(handle) => handle.call(name, args),
         }
     }
 }

@@ -1,0 +1,8 @@
+render_surface
+frame before render: false
+rendered pixels: 32
+dimensions: 8x4
+rgba bytes: 128
+over quota rejected: true
+frame after clear: false
+closed: true

@@ -23,6 +23,7 @@ one-shot `task.result` transfer stored ownership back to the caller.
 | `resource.task` | `task` | none |
 | `resource.timer` | `timer` | delay milliseconds |
 | `resource.channel` | `channel` | capacity |
+| `resource.render_surface` | `render_surface` | width, height, scale, maximum pixels |
 
 Every factory returns `Result`, and every recoverable I/O or readiness operation
 does too. Shared controls are `close`, `cancel`, `is_closed`, `is_cancelled`,
@@ -41,9 +42,15 @@ Resource-specific operations are:
 - `task`: `complete`, `result`, `is_complete`
 - `timer`: `ready`, `remaining_ms`, `reset`
 - `channel`: `send`, `recv`, `len`, `capacity`, `is_full`
+- `render_surface`: `render`, `pixels`, `ppm`, `clear`, `has_frame`, `width`, `height`, `pixel_count`, `capacity`
 
 TCP handles are nonblocking. `accept`, socket reads/writes, pending task results,
 empty channel receives, full channel sends, and full response writes report
 `backpressure` in their recoverable error. See
 [`examples/owned_resources.tether`](../examples/owned_resources.tether) for a
 cross-platform end-to-end example.
+
+Rendering surfaces hold at most one RGBA frame. Creation rejects dimensions
+that exceed the explicit pixel capacity, while `clear` releases the frame
+without closing the reusable surface. See
+[`examples/render_surface.tether`](../examples/render_surface.tether).

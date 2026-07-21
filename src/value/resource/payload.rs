@@ -1,8 +1,8 @@
 //! Concrete handle storage and type-directed dispatch.
 
 use super::{
-    channel, child_process, file, request_body, response_writer, task, tcp_listener, tcp_stream,
-    timer,
+    channel, child_process, file, render_surface, request_body, response_writer, task,
+    tcp_listener, tcp_stream, timer,
 };
 
 pub(super) enum Payload {
@@ -15,4 +15,5 @@ pub(super) enum Payload {
     Task(task::Handle),
     Timer(timer::Handle),
     Channel(channel::Handle),
+    RenderSurface(render_surface::Handle),
 }
