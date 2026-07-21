@@ -4,10 +4,11 @@ use std::rc::Rc;
 
 use actix_web::http::Method;
 use tetherscript::actix_web::ActixPlugin;
+use tetherscript::database::DatabaseAuthority;
 use tetherscript::plugin::PluginHost;
 use tokio::runtime::Handle;
 
-use crate::db_authority::DatabaseAuthority;
+use crate::db_authority::SqlxQueryHandler;
 use crate::db_pool::DbPool;
 
 const CONTROLLER: &str = concat!(
@@ -20,7 +21,8 @@ pub fn build(pool: DbPool, runtime: Handle) -> ActixPlugin {
         .plugin_name("country-database-controller")
         .host_factory(move || {
             let mut host = PluginHost::new();
-            let authority = DatabaseAuthority::new(pool.clone(), runtime.clone());
+            let handler = SqlxQueryHandler::new(pool.clone(), runtime.clone());
+            let authority = DatabaseAuthority::new(handler);
             host.grant("db", Rc::new(authority));
             host
         })
