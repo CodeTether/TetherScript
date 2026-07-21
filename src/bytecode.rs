@@ -7,10 +7,13 @@
 //! keeps semantics one-to-one with the reference interpreter. Fast local
 //! slots are a later optimization.
 
-use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::value::{Env, Value};
+use crate::value::Value;
+
+mod vm_fn;
+
+pub use vm_fn::VmFnObj;
 
 #[derive(Debug, Clone)]
 pub enum Instr {
@@ -78,6 +81,9 @@ pub enum Instr {
     // Calls: stack: callee, arg1..argN -> result
     Call(u8),
     Return,
+    Spawn,
+    Await,
+    Join(u16),
 
     // Function literals / declarations (emits a VmFn wrapping proto + env)
     MakeFn(u16),
@@ -109,12 +115,6 @@ pub struct Chunk {
 pub struct FnProto {
     pub name: Option<String>,
     pub params: Vec<String>,
+    pub is_async: bool,
     pub chunk: Chunk,
-}
-
-/// A bytecode function value: prototype + captured closure env.
-pub struct VmFnObj {
-    pub proto: Rc<FnProto>,
-    pub closure: Rc<RefCell<Env>>,
-    pub name: Option<String>,
 }

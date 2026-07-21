@@ -13,6 +13,8 @@ use crate::ast::*;
 use crate::bytecode::*;
 use crate::value::Value;
 
+mod async_compile;
+
 pub struct Compiler {
     chunk: Chunk,
 }
@@ -30,12 +32,18 @@ impl Compiler {
     pub fn compile_program(program: &Program) -> Chunk {
         let mut c = Compiler::new();
         for stmt in &program.stmts {
-            if let Stmt::FnDecl { name, params, body } = stmt {
-                c.compile_fn_decl(name, params, body);
+            match stmt {
+                Stmt::FnDecl { name, params, body } => c.compile_fn_decl(name, params, body),
+                Stmt::Let {
+                    name,
+                    value: Expr::AsyncFn { params, body },
+                    ..
+                } => c.compile_named_fn(name, params, body, true),
+                _ => {}
             }
         }
         for stmt in &program.stmts {
-            if matches!(stmt, Stmt::FnDecl { .. }) {
+            if matches!(stmt, Stmt::FnDecl { .. }) || async_compile::is_declaration(stmt) {
                 continue;
             }
             c.compile_stmt(stmt);
@@ -84,7 +92,17 @@ impl Compiler {
     }
 
     fn compile_fn_decl(&mut self, name: &str, params: &[String], body: &Rc<Block>) {
-        let proto = Self::compile_fn(Some(name.to_string()), params, body);
+        self.compile_named_fn(name, params, body, false);
+    }
+
+    fn compile_named_fn(
+        &mut self,
+        name: &str,
+        params: &[String],
+        body: &Rc<Block>,
+        is_async: bool,
+    ) {
+        let proto = Self::compile_fn(Some(name.to_string()), params, body, is_async);
         let proto_idx = self.chunk.protos.len() as u16;
         self.chunk.protos.push(Rc::new(proto));
         self.emit(Instr::MakeFn(proto_idx));
@@ -92,7 +110,12 @@ impl Compiler {
         self.emit(Instr::DefLet(name_idx, false));
     }
 
-    fn compile_fn(name: Option<String>, params: &[String], body: &Rc<Block>) -> FnProto {
+    fn compile_fn(
+        name: Option<String>,
+        params: &[String],
+        body: &Rc<Block>,
+        is_async: bool,
+    ) -> FnProto {
         let mut inner = Compiler::new();
         inner.compile_block(body);
         inner.emit(Instr::Return);
@@ -100,6 +123,7 @@ impl Compiler {
         FnProto {
             name,
             params: params.to_vec(),
+            is_async,
             chunk: inner.chunk,
         }
     }
@@ -363,7 +387,7 @@ impl Compiler {
             }
 
             Expr::Fn { params, body } => {
-                let proto = Self::compile_fn(None, params, body);
+                let proto = Self::compile_fn(None, params, body, false);
                 let idx = self.chunk.protos.len() as u16;
                 self.chunk.protos.push(Rc::new(proto));
                 self.emit(Instr::MakeFn(idx));
@@ -389,21 +413,10 @@ impl Compiler {
                 self.emit(Instr::Try);
             }
 
-            Expr::AsyncFn { params, body } => {
-                let proto = Self::compile_fn(None, params, body);
-                let idx = self.chunk.protos.len() as u16;
-                self.chunk.protos.push(Rc::new(proto));
-                self.emit(Instr::MakeFn(idx));
-            }
-            Expr::Await(inner) | Expr::Spawn(inner) => {
-                self.compile_expr(inner);
-            }
-            Expr::Join(handles) => {
-                for h in handles {
-                    self.compile_expr(h);
-                }
-                self.emit(Instr::BuildList(handles.len() as u16));
-            }
+            Expr::AsyncFn { params, body } => self.compile_async_fn(params, body),
+            Expr::Await(inner) => self.compile_await(inner),
+            Expr::Spawn(inner) => self.compile_spawn(inner),
+            Expr::Join(handles) => self.compile_join(handles),
 
             Expr::StringInterp(parts) => {
                 // Compile as: push empty string, then for each part,

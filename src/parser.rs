@@ -9,6 +9,10 @@ use std::rc::Rc;
 use crate::ast::*;
 use crate::token::{Spanned, Token};
 
+mod async_control;
+mod async_expr;
+#[cfg(test)]
+mod async_tests;
 mod program;
 
 pub struct Parser {
@@ -100,8 +104,7 @@ impl Parser {
                     Some(Token::Ident(_))
                 ) =>
             {
-                self.bump();
-                self.parse_fn_decl()
+                self.parse_async_fn_decl()
             }
             // `fn` followed by an identifier is a declaration; `fn (` is an
             // anonymous function expression (e.g. returned from a block).
@@ -500,43 +503,6 @@ impl Parser {
             _ => Some(Box::new(self.parse_expr()?)),
         };
         Ok(Expr::Return(expr))
-    }
-
-    fn parse_async_fn(&mut self) -> Result<Expr, ParseError> {
-        self.bump();
-        self.expect(&Token::Fn, "`fn` after `async`")?;
-        let params = self.parse_params()?;
-        let body = Rc::new(self.parse_block()?);
-        Ok(Expr::AsyncFn { params, body })
-    }
-
-    fn parse_await(&mut self) -> Result<Expr, ParseError> {
-        self.bump();
-        let expr = self.parse_expr()?;
-        Ok(Expr::Await(Box::new(expr)))
-    }
-
-    fn parse_spawn(&mut self) -> Result<Expr, ParseError> {
-        self.bump();
-        let expr = self.parse_expr()?;
-        Ok(Expr::Spawn(Box::new(expr)))
-    }
-
-    fn parse_join(&mut self) -> Result<Expr, ParseError> {
-        self.bump();
-        self.expect(&Token::LParen, "`(` after `join`")?;
-        let mut handles = Vec::new();
-        self.skip_newlines();
-        while !self.check(&Token::RParen) {
-            handles.push(self.parse_expr()?);
-            self.skip_newlines();
-            if !self.eat(&Token::Comma) {
-                break;
-            }
-            self.skip_newlines();
-        }
-        self.expect(&Token::RParen, "`)`")?;
-        Ok(Expr::Join(handles))
     }
 
     fn parse_panic(&mut self) -> Result<Expr, ParseError> {

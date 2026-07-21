@@ -1,0 +1,7 @@
+scheduled: scheduled,scheduled
+trace before await: 0
+joined: 4,6
+trace after join: 2,3
+selected: 1:99
+trace after select: 2,3
+cancelled: true
