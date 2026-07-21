@@ -97,6 +97,32 @@ implemented.
 Standalone `build` currently rejects imported entry files until module bundling
 is added, rather than producing a launcher with unresolved imports.
 
+## Database capability
+
+Database access is framework-neutral. Hosts implement
+[`QueryHandler`](src/database/query_handler.rs), wrap it in
+[`DatabaseAuthority`](src/database/authority.rs), and grant it as `db` through
+`PluginHost`. The contract depends on neither Actix nor a database driver:
+
+```rust,ignore
+let database = DatabaseAuthority::new(SqlxQueryHandler::new(pool, runtime));
+host.grant("db", Rc::new(database));
+```
+
+Scripts remain SQL-first and supply parameters separately:
+
+```tether
+let rows = db.query(
+    "SELECT id, name FROM users WHERE id = $1",
+    [request.params.id],
+)?
+```
+
+An adapter may use SQLx, another Rust client, or an application repository.
+Drivers remain outside tetherscript, preserving the library's zero-dependency
+core. The granted database role defines the SQL permissions available to the
+script.
+
 ## Actix Web plugin beta
 
 The optional `actix-web` feature registers a sandboxed tetherscript hook as an
@@ -129,23 +155,9 @@ body. Responses may set status, headers, and string, byte, or `nil` bodies.
 Execution runs through Actix's blocking pool with one cached runtime per thread.
 
 Use `host_factory` to grant narrow Rust capabilities backed by repositories or
-database pools. Scripts receive no ambient database, filesystem, network, or
-subprocess authority.
-
-The standalone Actix demo includes a SQL-first `db` capability backed by SQLx:
-
-```tether
-let rows = db.query(
-    "SELECT id, name FROM users WHERE id = $1",
-    [request.params.id],
-)?
-```
-
-SQL parameters are bound separately, and result rows are returned as a list of
-tetherscript maps. SQLx and Tokio remain dependencies of the demo crate only;
-the main tetherscript package sees the database solely through the host-granted
-[`Authority`](src/capability.rs) boundary. Grant `db` using a least-privilege
-database role because its SQL permissions are the role's permissions.
+database pools. The standalone demo composes the host-neutral database contract
+with a SQLx adapter; Actix does not own or define that contract. Scripts receive
+no ambient database, filesystem, network, or subprocess authority.
 
 File-backed controllers support validated hot reload:
 

@@ -17,6 +17,7 @@ pub mod capability;
 pub(crate) mod cli_args;
 pub mod compiler;
 pub mod computer_cap;
+pub mod database;
 pub mod fs_cap;
 pub mod git_tui;
 pub mod http;

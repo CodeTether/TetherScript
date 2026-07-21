@@ -1,45 +1,32 @@
-//! SQL-first tetherscript capability backed by the shared SQLx pool.
+//! SQLx implementation of tetherscript's host-neutral query contract.
 
-use std::any::Any;
+use std::cell::RefCell;
 use std::rc::Rc;
 
-use tetherscript::capability::Authority;
-use tetherscript::value::{Runtime, Value};
+use tetherscript::database::QueryHandler;
+use tetherscript::value::Value;
 use tokio::runtime::Handle;
 
 use crate::db_pool::DbPool;
 
-pub struct DatabaseAuthority {
+pub(crate) struct SqlxQueryHandler {
     pool: DbPool,
     runtime: Handle,
 }
 
-impl DatabaseAuthority {
-    pub fn new(pool: DbPool, runtime: Handle) -> Self {
+impl SqlxQueryHandler {
+    pub(crate) fn new(pool: DbPool, runtime: Handle) -> Self {
         Self { pool, runtime }
     }
 }
 
-impl Authority for DatabaseAuthority {
-    fn narrow(&self, _params: &Value) -> Result<Rc<dyn Authority>, String> {
-        Err("db: SQL authority does not support narrowing".into())
-    }
-
-    fn invoke(
-        &self,
-        _runtime: &mut dyn Runtime,
-        method: &str,
-        arguments: &[Value],
-    ) -> Result<Value, String> {
-        match method {
-            "query" => self
-                .runtime
-                .block_on(crate::db_query::query(&self.pool, arguments)),
-            _ => Err(format!("db: unsupported method `{method}` (have: query)")),
-        }
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
+impl QueryHandler for SqlxQueryHandler {
+    fn query(&self, sql: &str, parameters: &[Value]) -> Result<Value, String> {
+        let arguments = [
+            Value::Str(Rc::new(sql.into())),
+            Value::List(Rc::new(RefCell::new(parameters.to_vec()))),
+        ];
+        self.runtime
+            .block_on(crate::db_query::query(&self.pool, &arguments))
     }
 }
