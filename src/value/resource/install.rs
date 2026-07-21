@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use crate::value::{Env, Value};
 
-use super::{factory_memory as memory, factory_os as os, native};
+use super::{factory_memory as memory, factory_os as os, factory_render as render, native};
 
 pub(crate) fn install(env: &Rc<RefCell<Env>>) {
     let mut module = HashMap::new();
@@ -19,6 +19,7 @@ pub(crate) fn install(env: &Rc<RefCell<Env>>) {
     native::insert(&mut module, "task", 0, memory::task);
     native::insert(&mut module, "timer", 1, memory::timer);
     native::insert(&mut module, "channel", 1, memory::channel);
+    native::insert(&mut module, "render_surface", 4, render::surface);
     env.borrow_mut()
         .define("resource", Value::Map(Rc::new(RefCell::new(module))), false);
 }

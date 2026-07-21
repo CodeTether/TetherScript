@@ -33,6 +33,8 @@ pub enum ResourceKind {
     Timer,
     /// Bounded first-in, first-out value channel.
     Channel,
+    /// Quota-bound raster rendering surface.
+    RenderSurface,
 }
 
 impl ResourceKind {
@@ -48,6 +50,7 @@ impl ResourceKind {
             Self::Task => "task",
             Self::Timer => "timer",
             Self::Channel => "channel",
+            Self::RenderSurface => "render_surface",
         }
     }
 }
