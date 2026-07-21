@@ -85,9 +85,11 @@ specific provider id.
 - `process_run` executes a command plus argv directly; it does not invoke a shell unless the script explicitly runs one.
 - `process_list` returns PID/name maps; `process_kill` may fail when the OS denies access or the PID no longer exists.
 - File and process output are bounded to keep accidental large reads from consuming unbounded memory.
-- HTTPS uses vendored OpenSSL in-process with TLS 1.2 or newer, platform trust
+- The default core has no third-party dependencies. The optional `openssl-tls`
+  feature uses vendored OpenSSL in-process with TLS 1.2 or newer, platform trust
   anchors, certificate-chain validation, and hostname validation. It never
-  shells out to an `openssl` executable.
+  shells out to an `openssl` executable; builds without it return a clear error
+  for HTTPS while retaining plain HTTP.
 - `https_serve(port, certificate_pem, private_key_pem, handler)` validates the
   identity before binding; scripts can source PEM values through a scoped `fs`
   capability.

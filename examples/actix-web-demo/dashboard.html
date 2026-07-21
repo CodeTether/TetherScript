@@ -38,7 +38,7 @@
 <main>
   <div class="eyebrow">Executable integration guide</div>
   <h1>One Actix app.<br>Two controller paths.</h1>
-  <p class="lede">Both controllers query the same indexed World Bank GDP dataset in remote PostgreSQL through the same r2d2 pool. One is compiled Rust; the other is a hot-reloaded, sandboxed tetherscript hook.</p>
+  <p class="lede">Both controllers query the same indexed World Bank GDP dataset in remote PostgreSQL through the same SQLx pool. One is compiled Rust; the other is a hot-reloaded, sandboxed tetherscript hook.</p>
 
   <section class="panel">
     <div class="controls">
@@ -70,7 +70,7 @@
         <tr><td>Controller</td><td>Async Rust function</td><td><code>fn handle(request)</code></td></tr>
         <tr><td>Execution</td><td>Actix async worker</td><td><code>web::block</code> + thread-local runtime</td></tr>
         <tr><td>Response</td><td><code>HttpResponse</code></td><td>Validated status/headers/body map</td></tr>
-        <tr><td>Database work</td><td>Shared r2d2 pool + ranked SQL</td><td>Same pool/query through explicit <code>db</code> capability</td></tr>
+        <tr><td>Database work</td><td>Shared SQLx pool + ranked SQL</td><td>Parameterized SQL through explicit <code>db</code> capability</td></tr>
       </tbody>
     </table>
   </section>
@@ -79,14 +79,16 @@
     <article class="panel">
       <h2>Native Rust handler</h2>
       <pre>async fn country(pool: Data&lt;DbPool&gt;, code: Path&lt;String&gt;) {
-    web::block(move || database::country(&amp;pool, &amp;code)).await
+    database::country(pool.get_ref(), &amp;code).await
 }</pre>
     </article>
     <article class="panel">
       <h2>tetherscript handler</h2>
       <pre>fn handle(request) {
+    let sql = "SELECT ... WHERE code = UPPER($1)"
+    let rows = db.query(sql, [request.params.code]).unwrap()
     let response = map()
-    response.body = db.country(request.params.code).unwrap()
+    response.body = json_encode(rows[0])
     return response
 }</pre>
     </article>

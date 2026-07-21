@@ -23,6 +23,8 @@ use crate::{smtp, system};
 
 #[path = "http_builtins.rs"]
 mod http_builtins;
+#[path = "interp/module_method.rs"]
+mod module_method;
 #[path = "tui/mod.rs"]
 mod tui;
 
@@ -292,22 +294,7 @@ impl Interpreter {
                 field_value(&t, name).map_err(Unwind::Error)
             }
 
-            Expr::Method { target, name, args } => {
-                let t = self.eval(target, env)?;
-                let mut arg_vals = Vec::with_capacity(args.len());
-                for a in args {
-                    arg_vals.push(self.eval(a, env)?);
-                }
-                // Capabilities dispatch through their Authority trait and
-                // need a Runtime so they can invoke TetherScript callables. All
-                // other method calls go through the flat `call_method`.
-                if let Value::Capability(c) = &t {
-                    let mut rt = InterpRuntime { interp: self };
-                    return call_capability_method(c, name, &arg_vals, &mut rt)
-                        .map_err(Unwind::Error);
-                }
-                call_method(&t, name, &arg_vals).map_err(Unwind::Error)
-            }
+            Expr::Method { target, name, args } => self.eval_method(target, name, args, env),
 
             Expr::If {
                 cond,

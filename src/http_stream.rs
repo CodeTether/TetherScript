@@ -4,13 +4,16 @@ use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::time::Duration;
 
-use crate::tls::{TlsConnector, TlsStream};
+use crate::tls::TlsConnector;
+#[cfg(feature = "openssl-tls")]
+use crate::tls::TlsStream;
 
 use super::http_url::ParsedHttpUrl;
 
 pub(crate) trait HttpStream: Read + Write {}
 
 impl HttpStream for TcpStream {}
+#[cfg(feature = "openssl-tls")]
 impl HttpStream for TlsStream {}
 
 pub(crate) fn connect(

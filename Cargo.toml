@@ -45,11 +45,13 @@ collapsible_if = "allow"
 [features]
 default = []
 actix-web = ["dep:actix-web"]
+openssl-tls = ["dep:openssl", "dep:rustls-native-certs"]
+tera = ["dep:tera"]
 
 [dependencies]
 actix-web = { version = "=4.11.0", optional = true, default-features = false, features = ["macros"] }
 # HTTPS runs in-process and ships without a runtime OpenSSL installation.
-openssl = { version = "0.10.81", features = ["vendored"] }
+openssl = { version = "0.10.81", optional = true, features = ["vendored"] }
 # Supplies platform trust anchors to OpenSSL, including the Windows cert store.
-rustls-native-certs = "0.8.4"
-tera = "1.20.0"
+rustls-native-certs = { version = "0.8.4", optional = true }
+tera = { version = "1.20.0", optional = true }

@@ -1,24 +1,22 @@
-//! Remote PostgreSQL connection configuration.
+//! Remote PostgreSQL connection options shared by the server and bootstrap.
 
-use postgres::Config;
+use sqlx::postgres::PgConnectOptions;
 
 pub const DATABASE_NAME: &str = "tetherscript_actix_demo";
 
-pub fn config(database: &str) -> Result<Config, Box<dyn std::error::Error>> {
+pub fn config(database: &str) -> Result<PgConnectOptions, Box<dyn std::error::Error>> {
     let host = std::env::var("DATABASE_HOST").unwrap_or_else(|_| "127.0.0.1".into());
     let port = std::env::var("DATABASE_PORT")
         .unwrap_or_else(|_| "5432".into())
         .parse()?;
     let user = std::env::var("DATABASE_USER").unwrap_or_else(|_| "postgres".into());
     let password = password()?;
-    let mut config = Config::new();
-    config
+    Ok(PgConnectOptions::new()
         .host(&host)
         .port(port)
-        .user(&user)
-        .password(password)
-        .dbname(database);
-    Ok(config)
+        .username(&user)
+        .password(&password)
+        .database(database))
 }
 
 fn password() -> Result<String, Box<dyn std::error::Error>> {

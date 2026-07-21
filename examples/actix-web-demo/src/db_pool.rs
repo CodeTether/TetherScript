@@ -1,14 +1,15 @@
-//! Shared r2d2 PostgreSQL connection pool.
+//! Shared asynchronous SQLx PostgreSQL connection pool.
 
-use postgres::NoTls;
-use r2d2::Pool;
-use r2d2_postgres::PostgresConnectionManager;
+use sqlx::postgres::PgPoolOptions;
 
 use crate::db_config::{self, DATABASE_NAME};
 
-pub type DbPool = Pool<PostgresConnectionManager<NoTls>>;
+pub type DbPool = sqlx::PgPool;
 
-pub fn create() -> Result<DbPool, Box<dyn std::error::Error>> {
-    let manager = PostgresConnectionManager::new(db_config::config(DATABASE_NAME)?, NoTls);
-    Ok(Pool::builder().max_size(16).build(manager)?)
+pub async fn create() -> Result<DbPool, Box<dyn std::error::Error>> {
+    let options = db_config::config(DATABASE_NAME)?;
+    Ok(PgPoolOptions::new()
+        .max_connections(16)
+        .connect_with(options)
+        .await?)
 }

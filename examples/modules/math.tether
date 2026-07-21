@@ -1,0 +1,10 @@
+fn add(left, right) {
+    left + right
+}
+
+fn double(value) {
+    add(value, value)
+}
+
+export add
+export double

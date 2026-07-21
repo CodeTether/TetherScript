@@ -7,7 +7,9 @@ aligned with the runtime semantics already in the repository.
 
 - Use lowercase `tetherscript` in user-facing language copy.
 - Keep the language dynamically typed and runtime ownership checked.
-- Do not add dependencies without a concrete design reason.
+- Keep the default core crate free of third-party dependencies. External crates
+  belong behind explicit features or in separate adapters/examples, and every
+  exception requires a concrete design reason.
 - Do not replace the native browser agent path with Chromium, Chrome DevTools,
   or Playwright.
 - Add tests for every behavior change.
@@ -15,8 +17,10 @@ aligned with the runtime semantics already in the repository.
 
 ## Build Prerequisites
 
-The HTTPS transport vendors OpenSSL. Building from source therefore requires
-Perl plus the platform C toolchain; no OpenSSL installation is needed at runtime.
+The default build requires only Rust. The optional `openssl-tls` feature vendors
+OpenSSL and therefore requires Perl plus the platform C toolchain when built
+from source; no OpenSSL installation is needed at runtime. On Windows, use a
+native Windows Perl distribution rather than MSYS Perl.
 
 ## Required Checks
 
@@ -27,9 +31,12 @@ bash ./check_file_limits.sh
 cargo fmt --check
 cargo clippy -- -D warnings
 cargo test
+cargo test --features tera
 cargo test --doc
 RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
 cargo package
+# Requires Perl and a platform C toolchain:
+cargo test --features openssl-tls
 ```
 
 On Windows without Bash, run the equivalent PowerShell checker:

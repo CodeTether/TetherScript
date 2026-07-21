@@ -33,7 +33,7 @@ cargo run --manifest-path examples/actix-web-demo/Cargo.toml --bin bootstrap
 The bootstrap creates only `tetherscript_actix_demo` on the configured host, checks
 `current_database()` before schema changes, and imports the World Bank 2022 GDP
 feed transactionally. It does not connect to or modify `a2a_server`. Both HTTP
-routes use the same r2d2 pool, ranked SQL query, and JSON response shape.
+routes use the same SQLx pool, ranked SQL workload, and JSON response shape.
 
 ## Run it
 
@@ -108,11 +108,11 @@ node examples/actix-web-demo/benchmark.js 10000 32 5 > benchmark-results.json
 
 ## Native route
 
-The regular route checks out a pooled connection on Actix's blocking pool:
+The regular route awaits the shared asynchronous SQLx pool directly:
 
 ```rust
 async fn country(pool: Data<DbPool>, code: Path<String>) -> HttpResponse {
-    web::block(move || database::country(&pool, &code)).await
+    database::country(pool.get_ref(), &code).await
 }
 ```
 
@@ -149,12 +149,13 @@ The hook returns an HTTP response map:
 
 ```tether
 fn handle(request) {
-    let body = db.country(request.params.code).unwrap()
+    let sql = "SELECT country_code AS code, country_name AS name FROM country_gdp WHERE country_code = UPPER($1)"
+    let rows = db.query(sql, [request.params.code]).unwrap()
     let response = map()
     response.status = 200
     response.headers = map()
     response.headers["content-type"] = "application/json"
-    response.body = body
+    response.body = json_encode(rows[0])
     return response
 }
 ```
@@ -180,19 +181,33 @@ capabilities inside the blocking thread:
 let route = ActixPlugin::builder("/users/{id}", Method::GET, source)
     .host_factory({
         let pool = pool.clone();
+        let runtime = runtime.clone();
         move || {
             let mut host = PluginHost::new();
-            host.grant("db", Rc::new(DatabaseAuthority::new(pool.clone())));
+            let db = DatabaseAuthority::new(pool.clone(), runtime.clone());
+            host.grant("db", Rc::new(db));
             host
         }
     })
     .build()?;
 ```
 
-This demo calls `db.country(request.params.code).unwrap()`. Synchronous
-repositories and pools fit the current capability interface directly. Async DB
-clients should be placed behind a synchronous repository/queue bridge because
-the tetherscript `Authority::invoke` contract is synchronous.
+This demo calls `db.query(sql, parameters).unwrap()`. SQL text belongs to the
+hot-reloaded controller, values are bound separately by SQLx, and rows return as
+tetherscript lists of maps. The authority captures Actix's Tokio runtime handle
+and bridges the synchronous `Authority::invoke` call from the existing
+`web::block` worker to the asynchronous SQLx pool.
+
+The demo binds `nil`, booleans, integers, floats, strings, and bytes. It decodes
+PostgreSQL boolean, integer, float, text-like, and byte-array columns; SQL `NULL`
+becomes tetherscript `nil`. Other result types fail with the column name and
+PostgreSQL type instead of being coerced silently.
+
+Granting `db` grants the PostgreSQL role's SQL permissions. The demo authority
+does not pretend to narrow arbitrary SQL, so `db.narrow(...)` fails closed. Use
+a least-privilege or read-only database role for untrusted controller source.
+SQLx and Tokio are dependencies of this standalone demo crate only; the main
+tetherscript package continues to interact with it solely through `Authority`.
 
 ## Project layout
 

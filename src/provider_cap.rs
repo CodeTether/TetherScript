@@ -83,6 +83,7 @@ enum Scheme {
 /// Trait object for a stream that supports both Read and Write.
 trait NetStream: Read + Write {}
 impl NetStream for TcpStream {}
+#[cfg(feature = "openssl-tls")]
 impl NetStream for crate::tls::TlsStream {}
 
 pub struct ProviderAuthority {

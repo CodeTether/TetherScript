@@ -227,27 +227,7 @@ impl<'a> Lexer<'a> {
             .expect("ASCII ident")
             .to_string();
 
-        let tok = match s.as_str() {
-            "fn" => Token::Fn,
-            "let" => Token::Let,
-            "mut" => Token::Mut,
-            "move" => Token::Move,
-            "if" => Token::If,
-            "else" => Token::Else,
-            "while" => Token::While,
-            "for" => Token::For,
-            "in" => Token::In,
-            "return" => Token::Return,
-            "true" => Token::Bool(true),
-            "false" => Token::Bool(false),
-            "nil" => Token::Nil,
-            "panic" => Token::Panic,
-            "async" => Token::Async,
-            "await" => Token::Await,
-            "spawn" => Token::Spawn,
-            "join" => Token::Join,
-            _ => Token::Ident(s),
-        };
+        let tok = crate::lexer_keyword::token(&s).unwrap_or(Token::Ident(s));
 
         self.make(tok, line, col)
     }

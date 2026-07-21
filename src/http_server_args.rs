@@ -23,6 +23,7 @@ pub(super) fn handler(value: &Value, builtin: &str) -> Result<(), String> {
     ))
 }
 
+#[cfg(feature = "openssl-tls")]
 pub(super) fn pem<'a>(value: &'a Value, builtin: &str, label: &str) -> Result<&'a str, String> {
     match value {
         Value::Str(value) if !value.is_empty() => Ok(value),

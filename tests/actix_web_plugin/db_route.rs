@@ -12,7 +12,8 @@ use super::authority::DbAuthority;
 const SOURCE: &str = r#"
 fn handle(request) {
     let response = map()
-    response.body = db.lookup(request.params.id).unwrap()
+    let rows = db.query("SELECT value FROM records WHERE id = $1", [request.params.id]).unwrap()
+    response.body = rows[0].value
     return response
 }
 "#;

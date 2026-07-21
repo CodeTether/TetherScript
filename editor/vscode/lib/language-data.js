@@ -1,6 +1,6 @@
 const keywords = [
-  'async', 'await', 'else', 'fn', 'for', 'if', 'in', 'join', 'let', 'move',
-  'mut', 'panic', 'return', 'spawn', 'while',
+  'as', 'async', 'await', 'else', 'export', 'fn', 'for', 'if', 'import', 'in',
+  'join', 'let', 'move', 'mut', 'panic', 'return', 'spawn', 'while',
 ];
 
 const constants = ['true', 'false', 'nil'];

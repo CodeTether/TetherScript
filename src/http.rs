@@ -39,7 +39,11 @@ mod http_status;
 mod http_stream;
 #[path = "http_url.rs"]
 mod http_url;
+#[cfg(feature = "openssl-tls")]
 #[path = "https_server.rs"]
+mod https_server;
+#[cfg(not(feature = "openssl-tls"))]
+#[path = "https_server_disabled.rs"]
 mod https_server;
 
 pub(crate) use http_client::client_request;
@@ -52,9 +56,9 @@ pub(crate) use https_server::serve as serve_tls;
 #[path = "http_tests.rs"]
 mod tests;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "openssl-tls"))]
 #[path = "tls_http_tests.rs"]
 mod tls_http_tests;
-#[cfg(test)]
+#[cfg(all(test, feature = "openssl-tls"))]
 #[path = "tls_https_server_vm_tests.rs"]
 mod tls_https_server_vm_tests;

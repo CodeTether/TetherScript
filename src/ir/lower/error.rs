@@ -6,7 +6,8 @@ use std::fmt::{self, Display};
 ///
 /// ```
 /// use tetherscript::{ast::{Expr, Program, Stmt}, ir};
-/// let program = Program { stmts: vec![Stmt::Expr {
+/// let program = Program { imports: vec![], exports: vec![],
+///     stmts: vec![Stmt::Expr {
 ///     expr: Expr::Int(1), terminated: false,
 /// }] };
 /// assert!(ir::lower_program(&program).is_err());

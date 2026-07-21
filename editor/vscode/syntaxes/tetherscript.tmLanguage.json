@@ -67,7 +67,7 @@
       "patterns": [
         {
           "name": "keyword.control.tetherscript",
-          "match": "\\b(if|else|while|for|in|return|panic|move|async|await|spawn|join)\\b"
+          "match": "\\b(if|else|while|for|in|return|panic|move|async|await|spawn|join|import|export|as)\\b"
         },
         {
           "name": "storage.type.tetherscript",

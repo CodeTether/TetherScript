@@ -9,6 +9,8 @@ use std::rc::Rc;
 use crate::ast::*;
 use crate::token::{Spanned, Token};
 
+mod program;
+
 pub struct Parser {
     tokens: Vec<Spanned>,
     pos: usize,
@@ -24,16 +26,6 @@ pub struct ParseError {
 impl Parser {
     pub fn new(tokens: Vec<Spanned>) -> Self {
         Self { tokens, pos: 0 }
-    }
-
-    pub fn parse_program(&mut self) -> Result<Program, ParseError> {
-        let mut stmts = Vec::new();
-        self.skip_newlines();
-        while !self.at_end() {
-            stmts.push(self.parse_stmt()?);
-            self.skip_newlines();
-        }
-        Ok(Program { stmts })
     }
 
     // ---------- helpers ----------

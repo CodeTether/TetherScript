@@ -1,7 +1,5 @@
 //! Tokens — the atomic units the parser consumes.
 
-use std::fmt;
-
 /// A segment inside an interpolated string literal.
 #[derive(Debug, Clone, PartialEq)]
 pub enum InterpSegment {
@@ -40,6 +38,9 @@ pub enum Token {
     Await,
     Spawn,
     Join,
+    Import,
+    Export,
+    As,
 
     // Punctuation
     LParen,   // (
@@ -79,11 +80,7 @@ pub enum Token {
     Eof,
 }
 
-impl fmt::Display for Token {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
+mod display;
 
 /// A token with source position, so error messages can point at something useful.
 #[derive(Debug, Clone)]

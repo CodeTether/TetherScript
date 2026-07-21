@@ -1,13 +1,19 @@
 // Actix calls `handle` with an immutable snapshot of the HTTP request.
 fn handle(request) {
-    // `db` is an explicit Rust capability backed by the shared r2d2 pool.
-    let body = db.country(request.params.code).unwrap()
+    // `db` executes parameterized SQL through the host's shared SQLx pool.
+    let sql = "WITH ranked AS (SELECT country_code AS code, country_name AS name, year, gdp_usd, RANK() OVER (ORDER BY gdp_usd DESC) AS rank, COUNT(*) OVER () AS dataset_rows FROM country_gdp) SELECT code, name, year, gdp_usd, rank, dataset_rows FROM ranked WHERE code = UPPER($1)"
+    let rows = db.query(sql, [request.params.code]).unwrap()
     let response = map()
 
+    if rows.len() == 0 {
+        response.status = 404
+        response.body = "country not found"
+        return response
+    }
     response.status = 200
     response.headers = map()
     response.headers["content-type"] = "application/json"
     response.headers["x-controller"] = "tetherscript"
-    response.body = body
+    response.body = json_encode(rows[0])
     return response
 }

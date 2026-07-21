@@ -4,7 +4,8 @@ pub(crate) fn print() {
     println!("tetherscript run -- Run a TetherScript program");
     println!();
     println!("USAGE:");
-    println!("    tetherscript run [options] <file.tether> [--] [args...]");
+    println!("    tetherscript run [options] [file.tether|package-directory] [--] [args...]");
+    println!("    With no target, the nearest tetherscript.json package is used.");
     println!();
     println!("OPTIONS:");
     for line in OPTIONS {

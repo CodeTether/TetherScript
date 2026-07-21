@@ -159,7 +159,16 @@ pub struct Block {
     pub stmts: Vec<Stmt>,
 }
 
+/// A file-relative module import with a local namespace alias.
+#[derive(Debug, Clone)]
+pub struct ImportDecl {
+    pub path: String,
+    pub alias: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct Program {
+    pub imports: Vec<ImportDecl>,
+    pub exports: Vec<String>,
     pub stmts: Vec<Stmt>,
 }

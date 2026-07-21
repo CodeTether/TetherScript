@@ -4,7 +4,10 @@ pub(crate) fn print_usage() {
     eprintln!("Usage: tetherscript <command> [options]");
     eprintln!();
     eprintln!("Commands:");
-    eprintln!("  run <file>           Run a TetherScript program");
+    eprintln!("  run [target]         Run a source file or local package");
+    eprintln!("  build <file>         Build a standalone launcher");
+    eprintln!("  check [target]       Analyze a source file or local package");
+    eprintln!("  init [directory]     Create a local package");
     eprintln!("  inspect <file>       Inspect source (tokens, AST, IR, bytecode)");
     eprintln!("  render <html>        Render HTML/CSS display list");
     eprintln!("  raster <html> <ppm>  Render HTML/CSS to a PPM image");
