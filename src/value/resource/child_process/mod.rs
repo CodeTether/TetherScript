@@ -1,48 +1,49 @@
-//! Owned child-process handles.
+//! Supervised child processes with bounded standard streams.
 
+mod buffer;
+mod buffer_read;
+mod buffer_write;
+mod call;
+mod lifecycle;
+mod pumps;
 mod spawn;
 mod status;
+mod streams;
 mod wait;
 
 use std::process::Child;
-use std::time::Instant;
+use std::thread::JoinHandle;
 
-use crate::value::Value;
-
-use super::result;
+use buffer::Buffer;
 
 pub(super) struct Handle {
     child: Child,
+    stdin: Buffer,
+    stdout: Buffer,
+    stderr: Buffer,
+    workers: Vec<JoinHandle<()>>,
 }
 
 impl Handle {
-    pub(super) fn spawn(command: &str, args: &[String]) -> Result<Self, String> {
-        spawn::child(command, args).map(|child| Self { child })
-    }
-
-    pub(super) fn call(
-        &mut self,
-        name: &str,
-        args: &[Value],
-        deadline: Option<Instant>,
-    ) -> Result<Value, String> {
-        match (name, args) {
-            ("id", []) => Ok(Value::Int(self.child.id() as i64)),
-            ("try_wait", []) => Ok(result::value(wait::try_once(&mut self.child))),
-            ("wait", []) => Ok(result::value(wait::until_exit(&mut self.child, deadline))),
-            ("kill", []) => Ok(result::nil(self.cancel())),
-            _ => Err(format!(
-                "child_process: no method `{name}` accepting {} arguments",
-                args.len()
-            )),
-        }
-    }
-
-    pub(super) fn cancel(&mut self) -> Result<(), String> {
-        if self.child.try_wait().map_err(status::wait_error)?.is_none() {
-            self.child.kill().map_err(status::kill_error)?;
-            self.child.wait().map_err(status::wait_error)?;
-        }
-        Ok(())
+    pub(super) fn spawn(command: &str, args: &[String], capacity: usize) -> Result<Self, String> {
+        let stdin = Buffer::new(capacity, "child_process.stdin")?;
+        let stdout = Buffer::new(capacity, "child_process.stdout")?;
+        let stderr = Buffer::new(capacity, "child_process.stderr")?;
+        let mut child = spawn::child(command, args)?;
+        let input = child.stdin.take().expect("piped child stdin must exist");
+        let output = child.stdout.take().expect("piped child stdout must exist");
+        let errors = child.stderr.take().expect("piped child stderr must exist");
+        let workers = vec![
+            pumps::input(input, stdin.clone()),
+            pumps::output(output, stdout.clone(), "child_process.stdout"),
+            pumps::output(errors, stderr.clone(), "child_process.stderr"),
+        ];
+        Ok(Self {
+            child,
+            stdin,
+            stdout,
+            stderr,
+            workers,
+        })
     }
 }

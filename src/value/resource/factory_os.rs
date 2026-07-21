@@ -15,13 +15,7 @@ pub(super) fn file(values: &[Value]) -> Result<Value, String> {
     })))
 }
 
-pub(super) fn child(values: &[Value]) -> Result<Value, String> {
-    let command = args::string(&values[0], "resource.child_process command");
-    let arguments = args::strings(&values[1], "resource.child_process arguments");
-    Ok(factory::resource(command.and_then(|command| {
-        arguments.and_then(|arguments| OwnedResource::child_process(&command, &arguments))
-    })))
-}
+pub(super) use super::factory_process::child_default as child;
 
 pub(super) fn tcp_connect(values: &[Value]) -> Result<Value, String> {
     let host = args::string(&values[0], "resource.tcp_connect host");

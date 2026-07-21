@@ -1,0 +1,5 @@
+child_process
+capacity: 64
+success: true
+stdout: stream-ok
+closed: true

@@ -4,8 +4,8 @@ use std::path::Path;
 use std::time::Duration;
 
 use super::{
-    channel, child_process, file, payload::Payload, request_body, response_writer, task,
-    tcp_listener, tcp_stream, timer, OwnedResource,
+    channel, file, payload::Payload, request_body, response_writer, task, tcp_listener, tcp_stream,
+    timer, OwnedResource,
 };
 
 impl OwnedResource {
@@ -25,24 +25,6 @@ impl OwnedResource {
     /// ```
     pub fn file(path: &Path, mode: &str) -> Result<Self, String> {
         file::Handle::open(path, mode).map(|handle| Self::new(Payload::File(handle)))
-    }
-
-    /// Spawn an owned child process with null standard streams.
-    ///
-    /// # Errors
-    ///
-    /// Returns a command-qualified host spawn error.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use tetherscript::value::resource::OwnedResource;
-    /// let child = OwnedResource::child_process("worker", &["--once".into()])?;
-    /// # Ok::<(), String>(())
-    /// ```
-    pub fn child_process(command: &str, args: &[String]) -> Result<Self, String> {
-        child_process::Handle::spawn(command, args)
-            .map(|handle| Self::new(Payload::ChildProcess(handle)))
     }
 
     /// Connect an owned nonblocking TCP stream within `timeout`.

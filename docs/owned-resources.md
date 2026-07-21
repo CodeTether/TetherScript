@@ -16,6 +16,7 @@ one-shot `task.result` transfer stored ownership back to the caller.
 |---|---|---|
 | `resource.file` | `file` | path, mode (`read`, `write`, `append`, `read_write`) |
 | `resource.child_process` | `child_process` | command, string argument list |
+| `resource.child_process_bounded` | `child_process` | command, argument list, per-stream byte capacity |
 | `resource.tcp_connect` | `tcp_stream` | host, port, connect timeout milliseconds |
 | `resource.tcp_listen` | `tcp_listener` | host, port |
 | `resource.request_body` | `request_body` | string/bytes, capacity |
@@ -34,7 +35,7 @@ kind-and-method-qualified `Err`.
 Resource-specific operations are:
 
 - `file`: `read`, `write`, `flush`
-- `child_process`: `id`, `try_wait`, `wait`, `kill`
+- `child_process`: `id`, `try_wait`, `wait`, `kill`, `write_stdin`, `close_stdin`, `read_stdout`, `read_stderr`, `stdout_eof`, `stderr_eof`, `stream_capacity`
 - `tcp_stream`: `read`, `write`, `peer_addr`, `shutdown`
 - `tcp_listener`: `accept`, `local_addr`, `port`
 - `request_body`: `read`, `remaining`, `capacity`
@@ -49,6 +50,12 @@ empty channel receives, full channel sends, and full response writes report
 `backpressure` in their recoverable error. See
 [`examples/owned_resources.tether`](../examples/owned_resources.tether) for a
 cross-platform end-to-end example.
+
+Child processes are supervised: all standard streams use bounded background
+pumps, and closing or dropping the resource terminates and reaps a live child.
+Stream reads and writes never wait on the operating-system pipe; they return a
+recoverable `backpressure` error when no data or capacity is available. See
+[`examples/process_streams.tether`](../examples/process_streams.tether).
 
 Rendering surfaces hold at most one RGBA frame. Creation rejects dimensions
 that exceed the explicit pixel capacity, while `clear` releases the frame
