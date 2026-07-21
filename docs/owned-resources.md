@@ -5,6 +5,13 @@ heap values, so `move handle` transfers ownership and tombstones the source
 binding. Ordinary reads borrow the same lifecycle state. The sandboxed `eval`
 runtime does not install these ambient host factories.
 
+Every persistent boundary rejects borrowed resources and requires `move`. This
+includes bindings, assignments, list/map storage, `Ok`, function returns,
+`channel.send`, and `task.complete`. Validation follows resources nested inside
+lists, maps, and results, and a rejected transfer leaves the original owner
+live when the rejected value was borrowed. `channel.recv`, `list.pop`, and the
+one-shot `task.result` transfer stored ownership back to the caller.
+
 | Factory | Result type | Arguments |
 |---|---|---|
 | `resource.file` | `file` | path, mode (`read`, `write`, `append`, `read_write`) |

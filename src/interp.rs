@@ -11,13 +11,8 @@ use std::fmt::Write as _;
 use std::rc::Rc;
 
 use crate::ast::*;
-use crate::browser;
-use crate::browser_js;
-use crate::http;
-use crate::js;
-use crate::output;
-use crate::process_control;
 use crate::value::{Env, FnObj, NativeFn, NativeFunc, Runtime, Slot, Value};
+use crate::{browser, browser_js, http, js, output, process_control};
 use crate::{lexer::Lexer, parser::Parser};
 use crate::{smtp, system};
 
@@ -25,6 +20,8 @@ use crate::{smtp, system};
 mod http_builtins;
 #[path = "interp/module_method.rs"]
 mod module_method;
+#[path = "interp/resource_transfer.rs"]
+mod resource_transfer;
 #[path = "interp/result_method.rs"]
 mod result_method;
 #[path = "tui/mod.rs"]
@@ -170,8 +167,7 @@ impl Interpreter {
                 value,
             } => {
                 let v = self.eval(value, env)?;
-                env.borrow_mut().define(name, v, *mutable);
-                Ok(Value::Nil)
+                resource_transfer::define(env, name, v, *mutable)
             }
             Stmt::Expr { expr, .. } => self.eval(expr, env),
             Stmt::FnDecl { name, params, body } => {
@@ -273,7 +269,7 @@ impl Interpreter {
                 for it in items {
                     xs.push(self.eval(it, env)?);
                 }
-                Ok(Value::List(Rc::new(RefCell::new(xs))))
+                resource_transfer::list(xs, "list literal")
             }
 
             Expr::Call { callee, args } => {
@@ -282,7 +278,7 @@ impl Interpreter {
                 for a in args {
                     arg_vals.push(self.eval(a, env)?);
                 }
-                self.call(&callee, &arg_vals)
+                self.call_owned(&callee, arg_vals)
             }
 
             Expr::Index { target, index } => {
@@ -376,7 +372,7 @@ impl Interpreter {
                 for expr in exprs {
                     out.push(self.eval(expr, env)?);
                 }
-                Ok(Value::List(Rc::new(RefCell::new(out))))
+                resource_transfer::list(out, "join result")
             }
 
             Expr::Try(inner) => {
@@ -411,6 +407,7 @@ impl Interpreter {
 
     fn eval_assign(&self, lhs: &Expr, rhs: &Expr, env: &Rc<RefCell<Env>>) -> EvalResult {
         let value = self.eval(rhs, env)?;
+        resource_transfer::validate(&value, "assignment")?;
         match lhs {
             Expr::Ident(name) => {
                 env.borrow_mut().assign(name, value.clone())?;
@@ -487,6 +484,10 @@ impl Interpreter {
     }
 
     pub fn call(&self, callee: &Value, args: &[Value]) -> EvalResult {
+        self.call_owned(callee, args.to_vec())
+    }
+
+    fn call_owned(&self, callee: &Value, args: Vec<Value>) -> EvalResult {
         match callee {
             Value::Fn(f) => {
                 if args.len() != f.params.len() {
@@ -500,19 +501,18 @@ impl Interpreter {
                 let scope = Env::child(&f.closure);
                 {
                     let mut s = scope.borrow_mut();
-                    for (name, val) in f.params.iter().zip(args.iter()) {
+                    for (name, val) in f.params.iter().zip(args) {
                         s.slots.insert(
                             name.clone(),
                             Slot::Live {
-                                value: val.clone(),
+                                value: val,
                                 mutable: true,
                             },
                         );
                     }
                 }
                 match self.exec_block(&f.body, &scope) {
-                    Ok(v) => Ok(v),
-                    Err(Unwind::Return(v)) => Ok(v),
+                    Ok(v) | Err(Unwind::Return(v)) => resource_transfer::returned(v),
                     // `expr?` inside `f` short-circuited with an Err — lift
                     // it to the function's return value so callers see an
                     // Err Result, not a runtime error.
@@ -534,10 +534,10 @@ impl Interpreter {
                     }
                 }
                 match &n.func {
-                    NativeFunc::Pure(f) => f(args).map_err(Unwind::Error),
+                    NativeFunc::Pure(f) => f(&args).map_err(Unwind::Error),
                     NativeFunc::Runtime(f) => {
                         let mut rt = InterpRuntime { interp: self };
-                        f(&mut rt, args).map_err(Unwind::Error)
+                        f(&mut rt, &args).map_err(Unwind::Error)
                     }
                 }
             }
@@ -707,7 +707,8 @@ pub(crate) fn call_method(target: &Value, name: &str, args: &[Value]) -> Result<
     match (target, name, args) {
         (Value::List(xs), "len", []) => Ok(Value::Int(xs.borrow().len() as i64)),
         (Value::List(xs), "push", [v]) => {
-            xs.borrow_mut().push(v.clone());
+            xs.borrow_mut()
+                .push(crate::value::resource::transfer::retained(v, "list.push")?);
             Ok(Value::Nil)
         }
         (Value::List(xs), "pop", []) => Ok(xs.borrow_mut().pop().unwrap_or(Value::Nil)),
@@ -1621,7 +1622,7 @@ fn install_pure_builtins(env: &Rc<RefCell<Env>>) {
         "Ok",
         pure_native("Ok", Some(1), |args| {
             Ok(Value::Result(Rc::new(crate::value::ResultValue::Ok(
-                args[0].clone(),
+                crate::value::resource::transfer::retained(&args[0], "Ok")?,
             ))))
         }),
         false,

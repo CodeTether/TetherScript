@@ -9,6 +9,10 @@ task: done
 timer: true
 channel backpressure: true
 channel value: one
+borrowed transfer rejected: true
+transferred resource: timer
+task resource result: timer
+task result consumed: true
 deadline expired: false
 closed: true
 cancelled: true
