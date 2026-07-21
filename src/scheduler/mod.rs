@@ -6,6 +6,7 @@
 mod finish;
 mod join;
 mod queue;
+pub(crate) mod runtime;
 mod spawn;
 mod task;
 

@@ -20,10 +20,14 @@ use crate::interp::{
 };
 use crate::value::{Env, NativeFunc, Runtime, Value};
 
+#[path = "vm/async_ops.rs"]
+mod async_ops;
 #[path = "vm/module_method.rs"]
 mod module_method;
 #[path = "vm/resource_transfer.rs"]
 mod resource_transfer;
+#[path = "vm/runtime.rs"]
+mod runtime;
 
 pub enum Unwind {
     Error(String),
@@ -105,6 +109,7 @@ impl VM {
         let proto = Rc::new(FnProto {
             name: Some("<script>".into()),
             params: vec![],
+            is_async: false,
             chunk: top_level,
         });
         let local_count = proto.chunk.local_count as usize;
@@ -409,6 +414,9 @@ impl VM {
                 resource_transfer::returned(self.stack.last())?;
                 self.do_return();
             }
+            Instr::Spawn => self.spawn_top()?,
+            Instr::Await => self.await_top()?,
+            Instr::Join(count) => self.join_top(*count as usize)?,
             Instr::MakeFn(idx) => {
                 let proto = self.frames.last().unwrap().proto.chunk.protos[*idx as usize].clone();
                 let closure = self.frames.last().unwrap().env.clone();
@@ -706,6 +714,10 @@ impl VM {
                 self.do_return();
             }
 
+            Instr::Spawn => self.spawn_top()?,
+            Instr::Await => self.await_top()?,
+            Instr::Join(count) => self.join_top(count as usize)?,
+
             Instr::MakeFn(idx) => {
                 let proto = self.frames.last().unwrap().proto.chunk.protos[idx as usize].clone();
                 let closure = self.frames.last().unwrap().env.clone();
@@ -813,6 +825,16 @@ impl VM {
     }
 
     fn dispatch_call(&mut self, callee: Value, args: Vec<Value>) -> Result<(), Unwind> {
+        if matches!(&callee, Value::VmFn(function) if function.proto.is_async) {
+            let task = crate::value::resource::OwnedResource::scheduled_task(callee, args)?;
+            self.stack
+                .push(Value::Resource(Rc::new(RefCell::new(task))));
+            return Ok(());
+        }
+        self.dispatch_scheduled_call(callee, args)
+    }
+
+    fn dispatch_scheduled_call(&mut self, callee: Value, args: Vec<Value>) -> Result<(), Unwind> {
         match callee {
             Value::VmFn(f) => {
                 if args.len() != f.proto.params.len() {
@@ -934,41 +956,5 @@ fn clone_const_value(value: &Value) -> Value {
     match value {
         Value::Bytes(bytes) => Value::Bytes(Rc::new(RefCell::new(bytes.borrow().clone()))),
         other => other.clone(),
-    }
-}
-
-impl Runtime for VM {
-    fn invoke(&mut self, callee: &Value, args: &[Value]) -> Result<Value, String> {
-        let depth = self.frames.len();
-        if let Err(u) = self.dispatch_call(callee.clone(), args.to_vec()) {
-            return Err(format_unwind(u));
-        }
-        while self.frames.len() > depth {
-            let (instr, code_len) = {
-                let f = self.frames.last().unwrap();
-                let code_len = f.proto.chunk.code.len();
-                if f.ip >= code_len {
-                    self.stack.push(Value::Nil);
-                    self.do_return();
-                    continue;
-                }
-                (f.proto.chunk.code[f.ip].clone(), code_len)
-            };
-            self.frames.last_mut().unwrap().ip += 1;
-            match self.step(instr, code_len) {
-                Ok(()) => {}
-                Err(Unwind::TryErr(e)) => {
-                    self.stack
-                        .push(Value::Result(Rc::new(crate::value::ResultValue::Err(e))));
-                    self.do_return();
-                }
-                Err(u) => return Err(format_unwind(u)),
-            }
-        }
-        Ok(self.stack.pop().unwrap_or(Value::Nil))
-    }
-
-    fn global_defined(&self, name: &str) -> bool {
-        self.globals.borrow().contains(name)
     }
 }

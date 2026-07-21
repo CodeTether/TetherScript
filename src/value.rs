@@ -22,6 +22,9 @@ use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 use crate::{ast::Block, bytecode::VmFnObj};
 
 pub mod resource;
+mod runtime;
+
+pub use runtime::Runtime;
 
 /// A TetherScript value. Heap-backed payloads are Rc'd so cloning is cheap and
 /// aliasing is shared by default.
@@ -57,6 +60,7 @@ pub enum ResultValue {
 pub struct FnObj {
     pub params: Vec<String>,
     pub body: Rc<Block>,
+    pub is_async: bool,
     /// Captured environment (closure).
     pub closure: Rc<RefCell<Env>>,
     pub name: Option<String>,
@@ -89,17 +93,6 @@ pub enum NativeFunc {
 /// Abstraction over the active execution engine. Both the tree-walking
 /// interpreter and the bytecode VM implement this so runtime-aware natives
 /// (see `NativeFunc::Runtime`) can invoke TetherScript callables uniformly.
-pub trait Runtime {
-    /// Synchronously call `callee` with `args` and return its result.
-    /// Errors and panics bubble up as `Err(String)`.
-    fn invoke(&mut self, callee: &Value, args: &[Value]) -> Result<Value, String>;
-
-    /// Return true when a global binding exists in this runtime.
-    fn global_defined(&self, _name: &str) -> bool {
-        false
-    }
-}
-
 impl Value {
     pub fn type_name(&self) -> &'static str {
         match self {

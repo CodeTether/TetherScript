@@ -722,6 +722,7 @@ mod tests {
         let err = encode(&Value::Fn(Rc::new(FnObj {
             params: vec![],
             body: Rc::new(crate::ast::Block { stmts: vec![] }),
+            is_async: false,
             closure: crate::value::Env::new_global(),
             name: Some("test".into()),
         })));

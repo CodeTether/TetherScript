@@ -16,6 +16,12 @@ use crate::{browser, browser_js, http, js, output, process_control};
 use crate::{lexer::Lexer, parser::Parser};
 use crate::{smtp, system};
 
+#[path = "interp/async_builtin.rs"]
+mod async_builtin;
+#[path = "interp/async_ops.rs"]
+mod async_ops;
+#[path = "interp/hoist.rs"]
+mod hoist;
 #[path = "http_builtins.rs"]
 mod http_builtins;
 #[path = "interp/module_method.rs"]
@@ -88,19 +94,11 @@ impl Interpreter {
     /// Unlike `run`, this does NOT auto-invoke `main`.
     pub fn run_repl(&mut self, program: &Program) -> Result<Value, String> {
         for stmt in &program.stmts {
-            if let Stmt::FnDecl { name, params, body } = stmt {
-                let func = Value::Fn(Rc::new(FnObj {
-                    params: params.clone(),
-                    body: body.clone(),
-                    closure: self.globals.clone(),
-                    name: Some(name.clone()),
-                }));
-                self.globals.borrow_mut().define(name, func, false);
-            }
+            hoist::statement(stmt, &self.globals);
         }
         let mut last = Value::Nil;
         for stmt in &program.stmts {
-            if matches!(stmt, Stmt::FnDecl { .. }) {
+            if hoist::is_declaration(stmt) {
                 continue;
             }
             match self.exec_stmt(stmt, &self.globals.clone()) {
@@ -117,19 +115,11 @@ impl Interpreter {
         // Two-pass: hoist top-level fn declarations so forward references
         // (e.g. `main` calling `fib` defined below) work.
         for stmt in &program.stmts {
-            if let Stmt::FnDecl { name, params, body } = stmt {
-                let func = Value::Fn(Rc::new(FnObj {
-                    params: params.clone(),
-                    body: body.clone(),
-                    closure: self.globals.clone(),
-                    name: Some(name.clone()),
-                }));
-                self.globals.borrow_mut().define(name, func, false);
-            }
+            hoist::statement(stmt, &self.globals);
         }
 
         for stmt in &program.stmts {
-            if matches!(stmt, Stmt::FnDecl { .. }) {
+            if hoist::is_declaration(stmt) {
                 continue;
             }
             match self.exec_stmt(stmt, &self.globals.clone()) {
@@ -174,6 +164,7 @@ impl Interpreter {
                 let func = Value::Fn(Rc::new(FnObj {
                     params: params.clone(),
                     body: body.clone(),
+                    is_async: false,
                     closure: env.clone(),
                     name: Some(name.clone()),
                 }));
@@ -341,6 +332,7 @@ impl Interpreter {
             Expr::Fn { params, body } => Ok(Value::Fn(Rc::new(FnObj {
                 params: params.clone(),
                 body: body.clone(),
+                is_async: false,
                 closure: env.clone(),
                 name: None,
             }))),
@@ -361,19 +353,14 @@ impl Interpreter {
             Expr::AsyncFn { params, body } => Ok(Value::Fn(Rc::new(FnObj {
                 params: params.clone(),
                 body: body.clone(),
+                is_async: true,
                 closure: env.clone(),
                 name: None,
             }))),
 
-            Expr::Await(inner) | Expr::Spawn(inner) => self.eval(inner, env),
-
-            Expr::Join(exprs) => {
-                let mut out = Vec::with_capacity(exprs.len());
-                for expr in exprs {
-                    out.push(self.eval(expr, env)?);
-                }
-                resource_transfer::list(out, "join result")
-            }
+            Expr::Await(inner) => self.eval_await(inner, env),
+            Expr::Spawn(inner) => self.eval_spawn(inner, env),
+            Expr::Join(exprs) => self.eval_join(exprs, env),
 
             Expr::Try(inner) => {
                 let v = self.eval(inner, env)?;
@@ -488,6 +475,18 @@ impl Interpreter {
     }
 
     fn call_owned(&self, callee: &Value, args: Vec<Value>) -> EvalResult {
+        self.call_mode(callee, args, true)
+    }
+
+    fn call_scheduled(&self, callee: &Value, args: &[Value]) -> EvalResult {
+        self.call_mode(callee, args.to_vec(), false)
+    }
+
+    fn call_mode(&self, callee: &Value, args: Vec<Value>, schedule: bool) -> EvalResult {
+        if schedule && matches!(callee, Value::Fn(function) if function.is_async) {
+            let task = crate::value::resource::OwnedResource::scheduled_task(callee.clone(), args)?;
+            return Ok(Value::Resource(Rc::new(RefCell::new(task))));
+        }
         match callee {
             Value::Fn(f) => {
                 if args.len() != f.params.len() {
@@ -956,6 +955,16 @@ impl<'a> Runtime for InterpRuntime<'a> {
             Ok(v) => Ok(v),
             Err(Unwind::Error(e)) | Err(Unwind::Panic(e)) | Err(Unwind::TryErr(e)) => Err(e),
             Err(Unwind::Return(_)) => Err("`return` unwound out of callback".into()),
+        }
+    }
+
+    fn invoke_scheduled(&mut self, callee: &Value, args: &[Value]) -> Result<Value, String> {
+        match self.interp.call_scheduled(callee, args) {
+            Ok(value) => Ok(value),
+            Err(Unwind::Error(error)) | Err(Unwind::Panic(error)) | Err(Unwind::TryErr(error)) => {
+                Err(error)
+            }
+            Err(Unwind::Return(_)) => Err("`return` unwound out of scheduled task".into()),
         }
     }
 
@@ -1554,6 +1563,12 @@ fn install_pure_builtins(env: &Rc<RefCell<Env>>) {
             };
             Ok(Value::Bool(rt.global_defined(name)))
         }),
+        false,
+    );
+
+    e.define(
+        "select",
+        runtime_native("select", Some(1), async_builtin::select),
         false,
     );
 

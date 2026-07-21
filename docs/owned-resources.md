@@ -40,7 +40,7 @@ Resource-specific operations are:
 - `tcp_listener`: `accept`, `local_addr`, `port`
 - `request_body`: `read`, `remaining`, `capacity`
 - `response_writer`: `write`, `body`, `len`, `capacity`
-- `task`: `complete`, `result`, `is_complete`
+- `task`: `id`, `state`, `complete`, `result`, `is_complete`
 - `timer`: `ready`, `remaining_ms`, `reset`
 - `channel`: `send`, `recv`, `len`, `capacity`, `is_full`
 - `render_surface`: `render`, `pixels`, `ppm`, `clear`, `has_frame`, `width`, `height`, `pixel_count`, `capacity`

@@ -1,16 +1,27 @@
-// Async syntax smoke test — zero-dependency scheduler frontend.
-//
-// In this P4 foundation pass, async/await/spawn/join parse and compile while
-// await/spawn currently evaluate synchronously. The scheduler runtime exists
-// in Rust and will be wired into VM suspension/resume in the next slice.
+// Dependency-free cooperative tasks are lazy until await, join, or select.
+let trace = []
 
-async fn value() {
-    return 21
+async fn double(value) {
+    trace.push(value)
+    return value * 2
 }
 
 fn main() {
-    let a = spawn value()
-    let b = await value()
-    let both = join(a, b)
-    println("async smoke: " + both.len())
+    let first = spawn double(2)
+    let second = spawn double(3)
+    println("scheduled: " + first.state() + "," + second.state())
+    println("trace before await: " + str(trace.len()))
+    let values = join(first, second)
+    println("joined: " + values.join(","))
+    println("trace after join: " + trace.join(","))
+
+    let waiting = spawn double(4)
+    let ready = spawn 99
+    let selected = select([move waiting, move ready])
+    println("selected: " + str(selected.index) + ":" + str(selected.value))
+    println("trace after select: " + trace.join(","))
+
+    let cancelled = spawn double(5)
+    cancelled.cancel().unwrap()
+    println("cancelled: " + str(cancelled.is_cancelled()))
 }
