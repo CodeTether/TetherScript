@@ -7,7 +7,10 @@ use tetherscript::value::Value;
 
 type PgQuery<'query> = Query<'query, Postgres, PgArguments>;
 
-pub fn value<'query>(query: PgQuery<'query>, value: &Value) -> Result<PgQuery<'query>, String> {
+pub(crate) fn value<'query>(
+    query: PgQuery<'query>,
+    value: &Value,
+) -> Result<PgQuery<'query>, String> {
     match value {
         Value::Nil => Ok(query.bind(Option::<String>::None)),
         Value::Bool(value) => Ok(query.bind(*value)),

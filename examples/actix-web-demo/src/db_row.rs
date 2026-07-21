@@ -8,7 +8,7 @@ use sqlx::postgres::PgRow;
 use sqlx::{Column, Row};
 use tetherscript::value::Value;
 
-pub fn rows(rows: Vec<PgRow>) -> Result<Value, String> {
+pub(crate) fn rows(rows: Vec<PgRow>) -> Result<Value, String> {
     let values = rows.into_iter().map(row).collect::<Result<Vec<_>, _>>()?;
     Ok(Value::List(Rc::new(RefCell::new(values))))
 }
