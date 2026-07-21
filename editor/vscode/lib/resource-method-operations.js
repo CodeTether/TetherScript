@@ -1,0 +1,28 @@
+const operations = {
+  accept: ['tcp_listener.accept()', 'Accept a nonblocking TCP connection as a Result.'],
+  body: ['response_writer.body()', 'Return buffered response bytes.'],
+  capacity: ['resource.capacity()', 'Return a bounded resource capacity.'],
+  complete: ['task.complete(value)', 'Complete a pending task once.'],
+  flush: ['file.flush()', 'Flush buffered file data as a Result.'],
+  id: ['child_process.id()', 'Return the child process ID.'],
+  is_complete: ['task.is_complete()', 'Return whether a task has completed.'],
+  is_full: ['channel.is_full()', 'Return whether a channel reached capacity.'],
+  kill: ['child_process.kill()', 'Terminate a child process as a Result.'],
+  local_addr: ['tcp_listener.local_addr()', 'Return the listener address as a Result.'],
+  peer_addr: ['tcp_stream.peer_addr()', 'Return the peer address as a Result.'],
+  port: ['tcp_listener.port()', 'Return the bound TCP port as a Result.'],
+  read: ['resource.read(limit)', 'Read available bytes without blocking.'],
+  ready: ['timer.ready()', 'Return whether a timer is ready.'],
+  recv: ['channel.recv()', 'Receive a queued value or backpressure Err.'],
+  remaining: ['request_body.remaining()', 'Return unread request-body bytes.'],
+  remaining_ms: ['timer.remaining_ms()', 'Return time until the timer is ready.'],
+  reset: ['timer.reset(delay_ms)', 'Reset a monotonic timer.'],
+  result: ['task.result()', 'Return task output or a pending backpressure Err.'],
+  send: ['channel.send(value)', 'Queue a value or return a backpressure Err.'],
+  shutdown: ['tcp_stream.shutdown()', 'Shut down a TCP stream as a Result.'],
+  try_wait: ['child_process.try_wait()', 'Poll child completion without blocking.'],
+  wait: ['child_process.wait()', 'Wait for child completion within its deadline.'],
+  write: ['resource.write(value)', 'Write within resource capacity as a Result.'],
+};
+
+module.exports = { operations };

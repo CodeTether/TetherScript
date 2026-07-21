@@ -1,74 +1,21 @@
-const keywords = [
-  'as', 'async', 'await', 'else', 'export', 'fn', 'for', 'if', 'import', 'in',
-  'join', 'let', 'move', 'mut', 'panic', 'return', 'spawn', 'while',
-];
-
-const constants = ['true', 'false', 'nil'];
+const { assertions } = require('./tool-data-assertions');
+const { browser } = require('./tool-data-browser');
+const { core } = require('./tool-data-core');
+const { data } = require('./tool-data-data');
+const { files } = require('./tool-data-files');
+const { network } = require('./tool-data-network');
+const { system } = require('./tool-data-system');
+const { terminal } = require('./tool-data-terminal');
+const { constants, keywords } = require('./language-words');
+const { methods } = require('./method-data');
+const { factories } = require('./resource-factory-data');
 
 const builtins = {
-  Ok: ['Ok(value)', 'Create a successful Result value.'],
-  Err: ['Err(message)', 'Create an error Result value.'],
-  assert: ['assert(condition[, message])', 'Fail execution when a condition is false.'],
-  base64_decode: ['base64_decode(text)', 'Decode Base64 text.'],
-  base64_encode: ['base64_encode(text)', 'Encode text as Base64.'],
-  bytes: ['bytes(value)', 'Convert a string or byte list to bytes.'],
-  cwd: ['cwd()', 'Return the current working directory as a Result.'],
-  env_get: ['env_get(name)', 'Read an environment variable as a Result.'],
-  fs_copy: ['fs_copy(from, to)', 'Copy a filesystem entry.'],
-  fs_exists: ['fs_exists(path)', 'Return whether a path exists.'],
-  fs_list: ['fs_list(path)', 'List directory entries.'],
-  fs_mkdir: ['fs_mkdir(path)', 'Create a directory.'],
-  fs_read: ['fs_read(path)', 'Read a UTF-8 file.'],
-  fs_remove: ['fs_remove(path)', 'Remove a filesystem entry.'],
-  fs_rename: ['fs_rename(from, to)', 'Rename a filesystem entry.'],
-  fs_stat: ['fs_stat(path)', 'Return filesystem metadata.'],
-  fs_write: ['fs_write(path, body)', 'Write a UTF-8 file.'],
-  http_get: ['http_get(url)', 'Run a blocking HTTP GET request.'],
-  http_post: ['http_post(url, body)', 'Run a blocking HTTP POST request.'],
-  http_request: ['http_request(method, url[, body[, headers]])', 'Run a blocking HTTP request.'],
-  json_encode: ['json_encode(value)', 'Encode a value as compact JSON.'],
-  json_encode_pretty: ['json_encode_pretty(value)', 'Encode a value as formatted JSON.'],
-  json_parse: ['json_parse(text)', 'Parse JSON into tetherscript values.'],
-  len: ['len(value)', 'Return the length of a string, bytes, list, or map.'],
-  map: ['map()', 'Create an empty map.'],
-  parse_float: ['parse_float(text)', 'Parse a float and return a Result.'],
-  parse_int: ['parse_int(text)', 'Parse an integer and return a Result.'],
-  print: ['print(...values)', 'Write values without a newline.'],
-  println: ['println(...values)', 'Write values with a newline.'],
-  process_run: ['process_run(command[, args[, stdin[, timeout_ms]]])', 'Run a subprocess.'],
-  sha256_hex: ['sha256_hex(text)', 'Compute a SHA-256 hex digest.'],
-  sleep_ms: ['sleep_ms(ms)', 'Sleep for a number of milliseconds.'],
-  str: ['str(value)', 'Convert a value to a string.'],
-  time_now_ms: ['time_now_ms()', 'Return the current Unix time in milliseconds.'],
-  tui_present: ['tui_present(view)', 'Clear and draw a terminal UI view.'],
-  tui_read_event: ['tui_read_event([prompt])', 'Read one terminal input event.'],
-  tui_render: ['tui_render(view)', 'Render a terminal UI view to text.'],
-  tui_size: ['tui_size()', 'Return terminal rows and columns.'],
-  type_of: ['type_of(value)', 'Return the runtime type name.'],
-  url_parse: ['url_parse(url)', 'Parse a URL into a map.'],
+  ...assertions, ...browser, ...core, ...data, ...files,
+  ...network, ...system, ...terminal,
+};
+const namespaces = {
+  resource: ['resource', 'Create move-only host resources with explicit lifecycle controls.'],
 };
 
-const methods = {
-  contains: ['value.contains(needle)', 'Return whether a string, list, or map contains a value.'],
-  ends_with: ['text.ends_with(suffix)', 'Return whether a string ends with a suffix.'],
-  err: ['result.err()', 'Return the Err message or nil.'],
-  is_err: ['result.is_err()', 'Return true for Err results.'],
-  is_ok: ['result.is_ok()', 'Return true for Ok results.'],
-  join: ['list.join(separator)', 'Join list items into a string.'],
-  keys: ['map.keys()', 'Return map keys as a list.'],
-  len: ['value.len()', 'Return the length of a string, bytes, list, or map.'],
-  lower: ['text.lower()', 'Return a lowercase string.'],
-  ok: ['result.ok()', 'Return the Ok value or nil.'],
-  pop: ['list.pop()', 'Remove and return the last list item.'],
-  push: ['list.push(value)', 'Append a value to a list.'],
-  replace: ['text.replace(from, to)', 'Replace string occurrences.'],
-  split: ['text.split(separator)', 'Split a string into a list.'],
-  starts_with: ['text.starts_with(prefix)', 'Return whether a string starts with a prefix.'],
-  trim: ['text.trim()', 'Trim surrounding whitespace.'],
-  unwrap: ['result.unwrap()', 'Return Ok value or fail on Err.'],
-  unwrap_or: ['result.unwrap_or(default)', 'Return Ok value or a default.'],
-  upper: ['text.upper()', 'Return an uppercase string.'],
-  values: ['map.values()', 'Return map values as a list.'],
-};
-
-module.exports = { builtins, constants, keywords, methods };
+module.exports = { builtins, constants, factories, keywords, methods, namespaces };
