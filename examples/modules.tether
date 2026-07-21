@@ -1,0 +1,6 @@
+import "./modules/math.tether" as math
+
+fn main() {
+    println("sum", math.add(20, 22))
+    println("double", math.double(21))
+}

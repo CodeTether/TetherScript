@@ -567,6 +567,8 @@ fn tool_defs(kind) {
     defs.push(tool_for(kind, "powershell", "Run a command with PowerShell.", p, ["command"]))
     p = map(); p.command = prop("Bash command to run."); p.timeout_ms = prop("Optional timeout in milliseconds.")
     defs.push(tool_for(kind, "bash", "Run a command with bash.", p, ["command"]))
+    p = map(); p.query = prop("Web search query."); p.engine = prop("Optional search engine: google, bing, duckduckgo, or brave. Defaults to TETHERSCRIPT_AGENT_SEARCH_ENGINE.")
+    defs.push(tool_for(kind, "web_search", "Search the web and return the search-results page snapshot.", p, ["query"]))
     p = map(); p.url = prop("HTTP or HTTPS URL to navigate to.")
     defs.push(tool_for(kind, "browser_goto", "Navigate the native browser to a granted URL.", p, ["url"]))
     p = map(); p.selector = prop("CSS selector for the element to click.")
@@ -922,6 +924,40 @@ fn browser_tool_result(name, result) {
     if result.is_err() { return name + " failed: " + result.err() }
     return json_encode(result.unwrap())
 }
+fn default_web_search_engine() {
+    let engine = env_text("TETHERSCRIPT_AGENT_SEARCH_ENGINE").trim().lower()
+    if engine == "" { return "google" }
+    return engine
+}
+
+fn valid_web_search_engine(engine) {
+    return engine == "google" || engine == "bing" || engine == "duckduckgo" || engine == "brave"
+}
+
+fn web_search_encode(query) {
+    return str(js_eval("encodeURIComponent(" + json_encode(str(query)) + ")"))
+}
+
+fn web_search_url(engine, query) {
+    let encoded = web_search_encode(query)
+    if engine == "bing" { return "https://www.bing.com/search?q=" + encoded }
+    if engine == "duckduckgo" { return "https://duckduckgo.com/?q=" + encoded }
+    if engine == "brave" { return "https://search.brave.com/search?q=" + encoded }
+    return "https://www.google.com/search?q=" + encoded
+}
+
+fn web_search_result(args) {
+    let query = arg(args, "query", "").trim()
+    if query == "" { return "web_search failed: query is empty" }
+    let engine = arg(args, "engine", default_web_search_engine()).trim().lower()
+    if !valid_web_search_engine(engine) { return "web_search failed: unsupported engine " + engine + "; use google, bing, duckduckgo, or brave" }
+    let navigated = browser.goto(web_search_url(engine, query))
+    if navigated.is_err() { return "web_search failed: " + navigated.err() }
+    let snapshot = browser.page_snapshot()
+    if snapshot.is_err() { return "web_search failed: " + snapshot.err() }
+    return json_encode(snapshot.unwrap())
+}
+
 fn run_tool(name, args) {
     if name == "cwd" { return cwd().unwrap_or("cwd failed") }
     if name == "ls" { return json_encode(fs_list(arg(args, "path", ".")).unwrap_or([])) }
@@ -1015,6 +1051,7 @@ fn run_tool(name, args) {
     if name == "run" { return json_encode(shell(arg(args, "command", ""), tool_timeout_ms(args)).unwrap_or(map())) }
     if name == "powershell" { return json_encode(powershell(arg(args, "command", ""), tool_timeout_ms(args)).unwrap_or(map())) }
     if name == "bash" { return json_encode(bash(arg(args, "command", ""), tool_timeout_ms(args)).unwrap_or(map())) }
+    if name == "web_search" { return web_search_result(args) }
     if name == "browser_goto" { return browser_tool_result(name, browser.goto(arg(args, "url", ""))) }
     if name == "browser_click" { return browser_tool_result(name, browser.click(arg(args, "selector", ""))) }
     if name == "browser_text" { return browser_tool_result(name, browser.text(arg(args, "selector", ""))) }
@@ -1046,6 +1083,7 @@ fn summarize_tool_output(output) {
 // Convert simple string outputs into JSON-RPC tool error status.
 fn tool_failed(output) {
     if output.starts_with("unknown tool:") || output.starts_with("browser_") && output.contains(" failed:") { return true }
+    if output.starts_with("web_search failed:") { return true }
     if output.starts_with("cwd failed") { return true }
     if output.starts_with("read failed") { return true }
     if output.starts_with("mkdir failed:") { return true }
@@ -1116,7 +1154,7 @@ fn base_messages() {
     let messages = []
     let sys = map()
     sys.role = "system"
-    sys.content = "You are a concise coding agent running in a local project workspace. For requests about the current project, repository, files, code, edits, diagnostics, or shell commands, use cwd, ls, read, write, and run tools to inspect and act locally. For web tasks, use browser_goto before browser_text, browser_click, or browser_snapshot; these tools operate on one persistent native page. Do not ask the user to upload or paste files that the tools can read. Ask for content only when it is outside the accessible workspace or genuinely missing. Keep answers concise and report tool-backed changes clearly."
+    sys.content = "You are a concise coding agent running in a local project workspace. For requests about the current project, repository, files, code, edits, diagnostics, or shell commands, use cwd, ls, read, write, and run tools to inspect and act locally. For web research, use web_search first, then browser_goto, browser_text, browser_click, or browser_snapshot as needed; browser tools operate on one persistent native page. Do not ask the user to upload or paste files that the tools can read. Ask for content only when it is outside the accessible workspace or genuinely missing. Keep answers concise and report tool-backed changes clearly."
     messages.push(sys)
     return messages
 }
@@ -1697,6 +1735,7 @@ fn valid_tool(name) {
     if name == "run" { return true }
     if name == "powershell" { return true }
     if name == "bash" { return true }
+    if name == "web_search" { return true }
     if name == "browser_goto" || name == "browser_click" || name == "browser_text" || name == "browser_snapshot" { return true }
     if name == "js_eval" { return true }
     return false
@@ -2108,6 +2147,13 @@ fn manual_tool(command) {
         args.script = trimmed.replace("js ", "")
         return run_tool("js_eval", args)
     }
+    if trimmed.starts_with("web_search ") {
+        let args = map()
+        let raw = trimmed.replace("web_search ", "")
+        if raw.starts_with(b"\x7b".decode_utf8()) { return run_tool("web_search", parse_args(raw)) }
+        args.query = raw
+        return run_tool("web_search", args)
+    }
     if trimmed.starts_with("browser_text ") {
         return run_tool("browser_text", parse_args(trimmed.replace("browser_text ", "")))
     }
@@ -2125,7 +2171,7 @@ fn manual_tool(command) {
     if trimmed.starts_with("replace ") {
         return run_tool("replace", parse_args(trimmed.replace("replace ", "")))
     }
-    return "tools: cwd, ls <path>, read <path>, replace path/old/new JSON, run|powershell|bash <command> or JSON timeout_ms, js <script>, browser_text|browser_query|browser_render JSON"
+    return "tools: cwd, ls <path>, read <path>, replace path/old/new JSON, run|powershell|bash <command> or JSON timeout_ms, js <script>, web_search <query>, browser_text|browser_query|browser_render JSON"
 }
 
 // Input state supports single-line prompts and /multi multiline prompts.
@@ -2511,6 +2557,7 @@ fn config_text() {
         "; router=" + env_text("TETHERSCRIPT_AGENT_ROUTER") +
         "; mode=" + env_text("TETHERSCRIPT_AGENT_MODE") +
         "; stdio_rpc=" + env_text("TETHERSCRIPT_AGENT_STDIO_RPC") +
+        "; search_engine=" + default_web_search_engine() +
         "; timeout_ms=" + str(default_tool_timeout_ms()) +
         "; confirm_destructive=" + str(destructive_confirm_enabled()) +
         "; session=" + session_path() +
@@ -2610,7 +2657,7 @@ fn command_palette() {
         "rendering: /preview [width] /preview-all /up /page-up /down /page-down /top /bottom\n" +
         "navigation: /timeline /search <text> /last /last-agent /last-tool /bookmark [label] /bookmarks /events\n" +
         "sessions: /save <name> /load <name> /sessions /compact /export [name] /release-notes [name] /changelog [entry]\n" +
-        "tools: /tools /tool <cmd> /retry-tool /checkpoints /restore <path>\n" +
+        "tools: /tools /tool <cmd> (including web_search <query>) /retry-tool /checkpoints /restore <path>\n" +
         "git-release: /git /git-diff /git-commit <msg> /release /version /bump patch|minor|major\n" +
         "automation: /self <goal> /self-budget [n] /self-pause /self-resume /self-stop /next [feature] /templates /use <template> [task]"
 }
@@ -2639,6 +2686,8 @@ fn tui_preview_text() {
 fn command_examples() {
     return "examples:\n" +
         "/tool powershell Get-ChildItem\n" +
+        "/tool web_search TetherScript language\n" +
+        "/tool web_search \{\"query\":\"Rust & WebAssembly\",\"engine\":\"duckduckgo\"\}\n" +
         "/tool browser_text html=<h1>Hello</h1> selector=h1\n" +
         "/use fix describe the bug here\n" +
         "/search provider\n" +
@@ -2875,7 +2924,7 @@ fn interactive_handle(log, session, reload, input, line) {
         return true
     }
     if line == "/tools" {
-        log.push(item("system", "tools", "cwd, ls <path>, read <path>, replace path/old/new JSON, run|powershell|bash <command> or JSON timeout_ms, js <script>, browser_text|browser_query|browser_render JSON"))
+        log.push(item("system", "tools", "cwd, ls <path>, read <path>, replace path/old/new JSON, run|powershell|bash <command> or JSON timeout_ms, js <script>, web_search <query>, browser_text|browser_query|browser_render JSON"))
         return true
     }
     if line == "/multi" || line.starts_with("/multi ") {

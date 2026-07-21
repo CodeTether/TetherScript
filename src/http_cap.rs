@@ -30,6 +30,6 @@ mod url;
 
 pub use authority::HttpAuthority;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "openssl-tls"))]
 #[path = "http_cap/tls_tests.rs"]
 mod tls_tests;

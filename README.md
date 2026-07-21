@@ -47,6 +47,56 @@ The built launcher forwards its own process arguments to `env_args()`. It is a
 self-contained runner for the script; internally it compiles the embedded source
 to tetherscript bytecode on startup before VM execution.
 
+## Local packages and modules
+
+Create a package and run it from its root or any nested directory:
+
+```bash
+tetherscript init hello
+cd hello
+tetherscript run
+tetherscript check
+```
+
+Packages use a dependency-free `tetherscript.json` manifest:
+
+```json
+{
+  "schema": 1,
+  "package": {
+    "name": "hello",
+    "version": "0.1.0",
+    "entry": "src/main.tether"
+  }
+}
+```
+
+Modules are file-relative, explicitly exported, and isolated behind a namespace:
+
+```tether
+// math.tether
+fn add(left, right) { left + right }
+export add
+```
+
+```tether
+// main.tether
+import "./math.tether" as math
+
+fn main() {
+    println(math.add(20, 22))
+}
+```
+
+Imports must name `.tether` files inside the package root. Cycles, duplicate
+bindings, duplicate exports, missing exports, and package-root escapes are
+reported before ownership analysis or execution. The current package foundation
+is local-only; remote registries, dependency downloads, and lockfiles are not yet
+implemented.
+
+Standalone `build` currently rejects imported entry files until module bundling
+is added, rather than producing a launcher with unresolved imports.
+
 ## Actix Web plugin beta
 
 The optional `actix-web` feature registers a sandboxed tetherscript hook as an
@@ -120,7 +170,8 @@ tetherscript currently includes:
 - `Result` values and `?` propagation for expected failures.
 - Method calls on built-in values.
 - JSON parsing/encoding implemented in-tree.
-- Tera template rendering from tetherscript maps with `tera_render`.
+- Optional Tera-compatible rendering from tetherscript maps with `tera_render`
+  when built with `--features tera`.
 - Blocking HTTP client helpers, a blocking HTTP/1.1 handler server, and a
   native cached static-file server.
 - Experimental browser primitives for parsing small HTML fragments, applying
@@ -304,11 +355,19 @@ The handler receives a request map with `method`, `path`, `query`, `headers`, an
 `body`. It may return either a string, sent as `200 text/plain`, or a map with
 optional `status`, `headers`, and `body`.
 
-HTTPS clients use OpenSSL in-process, require TLS 1.2 or newer, load the host
-platform's trust anchors, and verify both the certificate chain and hostname.
-The same transport backs `http_get`, `http_head`, `http_post`, `http_request`,
-the scoped `http` capability, provider capabilities, and Vault requests. No
-`openssl` executable is launched at runtime.
+The default core has no third-party dependencies. Build with
+`--features openssl-tls` to add in-process OpenSSL HTTPS:
+
+```bash
+cargo build --release --features openssl-tls
+```
+
+The optional transport requires TLS 1.2 or newer, loads the host platform's
+trust anchors, and verifies both the certificate chain and hostname. It backs
+`http_get`, `http_head`, `http_post`, `http_request`, the scoped `http`
+capability, provider capabilities, and Vault requests. No `openssl` executable
+is launched at runtime. Without the feature, an HTTPS request returns a clear
+feature-required error while plain HTTP remains available.
 
 To serve HTTPS, pass a PEM certificate chain and private key as language values.
 Loading them through a scoped `fs` capability keeps file authority explicit:
@@ -330,7 +389,17 @@ fn main() {
 
 The first certificate must be the leaf; any following certificates are sent as
 its intermediate chain. The server rejects malformed PEM and mismatched keys
-before binding the port.
+before binding the port. `examples/https_server.tether` renders a secure-context
+status page suitable for checking the browser's address-bar security indicator.
+A real trusted indicator requires all of the following:
+
+1. The leaf certificate's `subjectAltName` contains the exact browser hostname.
+2. `fullchain.pem` contains the leaf followed by every required intermediate.
+3. The issuing root CA is trusted by the browser or operating system.
+4. The page is opened through `https://` using that exact hostname.
+
+A self-signed certificate that has not been explicitly trusted cannot produce a
+genuine trusted indicator; bypassing a browser warning is not verification.
 
 For static sites, `http_serve_static(port, root_dir)` preloads files through the
 granted `fs` capability and serves precomputed responses from native Rust without
@@ -443,13 +512,16 @@ diagnostics.
   for bugs.
 - **Embeddable host boundary** — host effects should flow through explicit host
   integration rather than unreviewable shell glue.
-- **Zero-dependency goal** — the runtime avoids third-party crates unless a
-  future governance decision justifies them.
+- **Zero-dependency core** — default features compile the language using only
+  the Rust standard library. Third-party integrations must be explicit optional
+  features or separate examples/adapters.
+- **No dependency masquerading as implementation** — compatibility crates such
+  as Tera remain opt-in while native language facilities are implemented in-tree.
 
 ## What is not done yet
 
 - Runtime `&mut` aliasing / XOR-mutability enforcement.
-- Modules and imports.
+- Remote package registries, dependency downloads, and lockfiles.
 - Formatter and REPL.
 - More complete LSP features such as completions, hover, go-to-definition, and
   exact spans.
@@ -491,6 +563,8 @@ src/
   lsp.rs         — LSP server
   output.rs      — output capture helpers
   parser.rs      — parser
+  modules/       — file-relative import graph loading and namespace lowering
+  package/       — local manifest discovery, validation, and scaffolding
   plugin.rs      — Rust host plugin API
   smtp.rs        — SMTP support
   system.rs      — filesystem/process/env/path/time/hash/base64/url tools
@@ -518,7 +592,10 @@ docs/
 - [x] `for x in iterable` loops
 - [x] JSON support
 - [x] HTTP client/server support
+- [x] Zero-default-dependency core build
+- [x] Optional verified OpenSSL TLS client/server transport
 - [x] Standard filesystem/process/env/path/time/hash/base64/url tools
+- [x] Local packages and file-relative modules/imports
 - [x] Experimental browser parser/layout/text renderer
 - [x] Experimental dependency-free browser JavaScript host bindings
 - [x] Native production debug report for bundled UI validation
@@ -529,7 +606,10 @@ docs/
 - [ ] First native backend and object-file emission
 - [ ] Cross-compilation and stable C ABI interoperability
 - [ ] Runtime `&mut` exclusivity enforcement
-- [ ] Modules and imports
+- [x] File-relative modules, explicit exports, and namespaced imports
+- [x] Local package manifests, discovery, initialization, run, and check
+- [ ] Remote dependency registry, lockfile, cache, add/update, and publish flows
+- [ ] Native dependency-free template engine and Tera-compatible syntax
 - [ ] Plugin and capability manifests as stable formats
 - [ ] Audit stream for capability calls
 - [ ] Formatter

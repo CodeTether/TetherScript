@@ -17,3 +17,10 @@ editor/vscode/package-lock.json
 # TetherScript local agent runtime state
 .tetherscript/
 examples/.tetherscript/
+
+# Local validation and benchmark artifacts
+/.tmp/
+/benchmark-results.json
+
+# Local HTTPS identities (never commit private keys)
+/certs/

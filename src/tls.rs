@@ -17,36 +17,47 @@
 
 use std::net::TcpStream;
 
+#[cfg(feature = "openssl-tls")]
 use openssl::ssl::SslStream;
 
+#[cfg(feature = "openssl-tls")]
 #[path = "tls_client.rs"]
 mod client;
+#[cfg(not(feature = "openssl-tls"))]
+#[path = "tls_disabled.rs"]
+mod disabled;
+#[cfg(feature = "openssl-tls")]
 #[path = "tls_roots.rs"]
 mod roots;
+#[cfg(feature = "openssl-tls")]
 #[path = "tls_server.rs"]
 mod server;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "openssl-tls"))]
 #[path = "tls_test_identity.rs"]
 pub(crate) mod test_identity;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "openssl-tls"))]
 #[path = "tls_http_test_server.rs"]
 pub(crate) mod http_test_server;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "openssl-tls"))]
 #[path = "tls_client_test_support.rs"]
 mod client_test_support;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "openssl-tls"))]
 #[path = "tls_client_tests.rs"]
 mod client_tests;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "openssl-tls"))]
 #[path = "tls_server_tests.rs"]
 mod server_tests;
 
+#[cfg(feature = "openssl-tls")]
 pub use client::TlsConnector;
+#[cfg(not(feature = "openssl-tls"))]
+pub use disabled::TlsConnector;
+#[cfg(feature = "openssl-tls")]
 pub(crate) use server::TlsAcceptor;
 
 /// A verified OpenSSL stream over TCP.
@@ -61,4 +72,7 @@ pub(crate) use server::TlsAcceptor;
 /// # drop(stream);
 /// # Ok::<(), std::io::Error>(())
 /// ```
+#[cfg(feature = "openssl-tls")]
 pub type TlsStream = SslStream<TcpStream>;
+#[cfg(not(feature = "openssl-tls"))]
+pub type TlsStream = TcpStream;

@@ -17,10 +17,12 @@ use std::rc::Rc;
 
 use crate::bytecode::{Chunk, FnProto, Instr, VmFnObj};
 use crate::interp::{
-    apply_binary, apply_unary, call_method, field_value, index_value, install_builtins,
-    iterable_values,
+    apply_binary, apply_unary, field_value, index_value, install_builtins, iterable_values,
 };
 use crate::value::{Env, NativeFunc, Runtime, Value};
+
+#[path = "vm/module_method.rs"]
+mod module_method;
 
 pub enum Unwind {
     Error(String),
@@ -399,18 +401,7 @@ impl VM {
                 let at = self.stack.len() - argc;
                 let args: Vec<Value> = self.stack.drain(at..).collect();
                 let target = self.stack.pop().unwrap();
-                let result = if let Value::Capability(c) = &target {
-                    let c = c.clone();
-                    crate::interp::call_capability_method(
-                        &c,
-                        &name,
-                        &args,
-                        self as &mut dyn Runtime,
-                    )?
-                } else {
-                    call_method(&target, &name, &args)?
-                };
-                self.stack.push(result);
+                self.dispatch_method(target, &name, args)?;
             }
             Instr::Call(argc) => {
                 let argc = *argc as usize;
@@ -709,18 +700,7 @@ impl VM {
                 let at = self.stack.len() - argc;
                 let args: Vec<Value> = self.stack.drain(at..).collect();
                 let target = self.stack.pop().unwrap();
-                let result = if let Value::Capability(c) = &target {
-                    let c = c.clone();
-                    crate::interp::call_capability_method(
-                        &c,
-                        &name,
-                        &args,
-                        self as &mut dyn Runtime,
-                    )?
-                } else {
-                    call_method(&target, &name, &args)?
-                };
-                self.stack.push(result);
+                self.dispatch_method(target, &name, args)?;
             }
 
             Instr::Call(argc) => {

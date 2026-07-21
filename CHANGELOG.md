@@ -6,14 +6,24 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added file-relative modules with explicit `export` declarations, namespaced
+  `import "./file.tether" as name` bindings, cycle detection, and package-root
+  containment.
+- Added local `tetherscript.json` package manifests, `tetherscript init`, nearest
+  package discovery, and package-aware `run` and `check` commands.
 - Added `https_serve(port, certificate_pem, private_key_pem, handler)` with
   validated PEM certificate chains and private keys.
 
 ### Changed
 
 - Replaced the `openssl s_client` subprocess shim with vendored, in-process
-  OpenSSL for HTTPS, including native trust roots, certificate-chain and
-  hostname verification, TLS 1.2 minimums, and bounded socket I/O.
+  OpenSSL behind the explicit `openssl-tls` feature, including native trust
+  roots, certificate-chain and hostname verification, TLS 1.2 minimums, and
+  bounded socket I/O.
+- Restored a zero-default-dependency core by making OpenSSL, native certificate
+  loading, and Tera compatibility explicit opt-in features.
+- Updated the HTTPS server example to document the certificate SAN, full chain,
+  and browser trust requirements for a genuine secure address-bar indicator.
 
 ## [0.1.0-alpha.22] - 2026-07-20
 

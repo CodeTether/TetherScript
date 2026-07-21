@@ -31,8 +31,10 @@ pub(crate) fn print() {
 }
 
 const COMMANDS: &[&str] = &[
-    "run <file>        Run a TetherScript program",
+    "run [target]      Run a source file or local package",
     "build <file>      Build a standalone executable launcher",
+    "check [target]    Analyze a source file or local package",
+    "init [directory]  Create a local package",
     "inspect <file>    Inspect frontend output (tokens, AST, bytecode)",
     "render <html>     Render HTML/CSS to a display list",
     "raster <html>     Render HTML/CSS to a native PPM image",

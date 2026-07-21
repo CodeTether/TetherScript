@@ -1,25 +1,36 @@
-//! Database capability method dispatch.
-
-use std::rc::Rc;
+//! Execute parameterized SQLx queries for the database capability.
 
 use tetherscript::value::Value;
 
-use crate::database;
 use crate::db_pool::DbPool;
 
-pub fn invoke(pool: &DbPool, method: &str, arguments: &[Value]) -> Result<Value, String> {
-    match method {
-        "country" => country(pool, arguments),
-        _ => Err(format!("db: unsupported method `{method}`")),
+pub async fn query(pool: &DbPool, arguments: &[Value]) -> Result<Value, String> {
+    let (sql, parameters) = parse_arguments(arguments)?;
+    let mut query = sqlx::query(&sql);
+    for parameter in &parameters {
+        query = crate::db_bind::value(query, parameter)?;
     }
+    let rows = query
+        .fetch_all(pool)
+        .await
+        .map_err(|error| format!("db.query: SQL execution failed: {error}"))?;
+    crate::db_row::rows(rows)
 }
 
-fn country(pool: &DbPool, arguments: &[Value]) -> Result<Value, String> {
-    let Some(Value::Str(code)) = arguments.first() else {
-        return Err("db.country: expected a country-code string".into());
+fn parse_arguments(arguments: &[Value]) -> Result<(String, Vec<Value>), String> {
+    let [Value::Str(sql), Value::List(parameters)] = arguments else {
+        return Err("db.query: expected a SQL string and parameter list".into());
     };
-    let record = database::country(pool, code)?
-        .ok_or_else(|| format!("db.country: country `{code}` not found"))?;
-    let json = serde_json::to_string(&record).map_err(|error| error.to_string())?;
-    Ok(Value::Str(Rc::new(json)))
+    Ok((sql.to_string(), parameters.borrow().clone()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn query_requires_sql_and_parameter_list() {
+        let error = parse_arguments(&[Value::Int(1)]).unwrap_err();
+        assert_eq!(error, "db.query: expected a SQL string and parameter list");
+    }
 }

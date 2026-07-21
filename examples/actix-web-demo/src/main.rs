@@ -6,9 +6,13 @@
 mod dashboard;
 mod database;
 mod db_authority;
+mod db_bind;
 mod db_config;
+mod db_decode;
+mod db_decode_numeric;
 mod db_pool;
 mod db_query;
+mod db_row;
 mod rust_route;
 mod tether_route;
 
@@ -16,8 +20,10 @@ use actix_web::{web, App, HttpServer};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let pool = db_pool::create().expect("database pool should connect");
-    let tether_route = tether_route::build(pool.clone());
+    let pool = db_pool::create()
+        .await
+        .expect("database pool should connect");
+    let tether_route = tether_route::build(pool.clone(), tokio::runtime::Handle::current());
     let pool = web::Data::new(pool);
 
     println!("dashboard:         http://127.0.0.1:18081/");

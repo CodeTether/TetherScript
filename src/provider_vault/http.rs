@@ -10,6 +10,7 @@ use super::{request, response};
 
 trait NetStream: Read + Write {}
 impl NetStream for TcpStream {}
+#[cfg(feature = "openssl-tls")]
 impl NetStream for crate::tls::TlsStream {}
 
 pub(super) fn get(target: &str, token: &str) -> Result<String, String> {

@@ -1,3 +1,5 @@
+#![cfg(feature = "tera")]
+
 use tetherscript::compiler::Compiler;
 use tetherscript::interp::Interpreter;
 use tetherscript::lexer::Lexer;

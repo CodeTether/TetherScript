@@ -27,14 +27,21 @@ impl Authority for DbAuthority {
         method: &str,
         args: &[Value],
     ) -> Result<Value, String> {
-        if method != "lookup" {
+        if method != "query" {
             return Err(format!("db: unsupported method `{method}`"));
         }
-        let Some(Value::Str(key)) = args.first() else {
-            return Err("db.lookup: expected string key".into());
+        let [Value::Str(sql), Value::List(params)] = args else {
+            return Err("db.query: expected SQL and parameters".into());
+        };
+        if sql.as_str() != "SELECT value FROM records WHERE id = $1" {
+            return Err(format!("db.query: unexpected SQL `{sql}`"));
+        }
+        let params = params.borrow();
+        let Some(Value::Str(key)) = params.first() else {
+            return Err("db.query: expected string parameter".into());
         };
         self.calls.fetch_add(1, Ordering::SeqCst);
-        Ok(Value::Str(Rc::new(format!("record:{key}"))))
+        Ok(super::db_value::row("value", format!("record:{key}")))
     }
 
     fn as_any(&self) -> &dyn Any {

@@ -13,7 +13,8 @@
 //! use tetherscript::{ast::{Block, Expr, Program, Stmt}, ir};
 //! use std::rc::Rc;
 //!
-//! let program = Program { stmts: vec![Stmt::FnDecl {
+//! let program = Program { imports: vec![], exports: vec![],
+//!     stmts: vec![Stmt::FnDecl {
 //!     name: "answer".into(), params: vec![],
 //!     body: Rc::new(Block { stmts: vec![Stmt::Expr {
 //!         expr: Expr::Int(42), terminated: false,

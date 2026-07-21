@@ -1,14 +1,21 @@
-// PEM-backed HTTPS server example.
+// Browser-trusted, PEM-backed HTTPS server example.
 //
-// Run with a filesystem capability scoped to a directory containing the files:
+// fullchain.pem must start with a leaf certificate whose subjectAltName matches
+// the browser URL (for example, localhost), followed by any intermediates. The
+// issuing root CA must be trusted by the browser/OS or no secure indicator will
+// appear. Never commit private-key.pem.
+//
+// Build and run:
+//   cargo build --features openssl-tls
 //   tetherscript run --grant-fs ./certs examples/https_server.tether
+// Then open the certificate's exact hostname, for example https://localhost:8443.
 
 fn handle(request) {
     let response = map()
     response.status = 200
     response.headers = map()
-    response.headers["content-type"] = "text/plain; charset=utf-8"
-    response.body = "secure response for " + request.path + "\n"
+    response.headers["content-type"] = "text/html; charset=utf-8"
+    response.body = "<!doctype html><meta charset='utf-8'><title>Verified HTTPS</title><h1>Verified HTTPS from tetherscript</h1><p>The browser accepted this origin's certificate chain and hostname without a warning.</p><p id='context'></p><script>document.getElementById('context').textContent = window.isSecureContext ? 'Secure context: yes' : 'Secure context: no';</script><small>Path: " + request.path + "</small>"
     return response
 }
 

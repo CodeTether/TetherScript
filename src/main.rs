@@ -5,9 +5,10 @@
 //! # Usage
 //!
 //! ```text
-//! tetherscript run <file.tether>              run with bytecode VM (default)
-//! tetherscript run --interp <file.tether>     run with tree-walking interpreter
-//! tetherscript check <file>                   parse and run ownership analysis
+//! tetherscript run [file-or-package]          run with bytecode VM (default)
+//! tetherscript run --interp [target]          run with tree-walking interpreter
+//! tetherscript check [file-or-package]        resolve, parse, and analyze
+//! tetherscript init [directory]               create a local package
 //! tetherscript render <html-file> [css-file] [width] render HTML/CSS files to a text display list
 //! tetherscript raster <html-file> <output.ppm> [css-file] [width] [height] [scale] render to pixels
 //! tetherscript inspect --tokens <file>        dump tokens
@@ -43,19 +44,25 @@ mod ir;
 mod js;
 mod json;
 mod lexer;
+mod lexer_keyword;
 mod lsp;
 mod main_build;
 mod main_build_parse;
 mod main_caps;
+mod main_check;
 mod main_embedded;
 mod main_help;
 mod main_help_examples;
+mod main_init;
 mod main_inspect;
 mod main_inspect_help;
 mod main_run_help;
+mod main_target;
 mod main_usage;
+mod modules;
 mod output;
 mod ownership;
+mod package;
 mod parser;
 mod process_control;
 mod provider_cap;
@@ -128,7 +135,8 @@ fn main() {
     match first.as_str() {
         "run" => cmd_run(&args[2..]),
         "build" => cmd_build(&args[2..]),
-        "check" => cmd_check(&args[2..]),
+        "check" => main_check::run(&args[2..]),
+        "init" => main_init::run(&args[2..]),
         "render" => cmd_render(&args[2..]),
         "raster" => cmd_raster(&args[2..]),
         "js" => cmd_js(&args[2..]),
@@ -332,14 +340,7 @@ fn cmd_run(args: &[String]) {
         }
     }
 
-    let path = match path {
-        Some(p) => p,
-        None => {
-            eprintln!("tetherscript run: missing source file");
-            eprintln!("Try 'tetherscript run --help' for usage.");
-            process::exit(2);
-        }
-    };
+    let path = main_target::resolve(path.as_deref(), "run");
 
     run_reload::execute(
         &path,
@@ -483,53 +484,6 @@ fn cmd_git() {
         Ok(panel) => print!("{}", git_tui::render_panel(&panel)),
         Err(error) => {
             eprintln!("tetherscript git: {error}");
-            process::exit(1);
-        }
-    }
-}
-
-fn cmd_check(args: &[String]) {
-    if args.len() != 1 || args[0] == "--help" || args[0] == "-h" {
-        println!("tetherscript check -- Parse source and run static ownership analysis");
-        println!();
-        println!("USAGE:");
-        println!("    tetherscript check <file.tether>");
-        if args.len() != 1 {
-            process::exit(2);
-        }
-        return;
-    }
-
-    let src = read_source(&args[0]);
-    let tokens = match Lexer::new(&src).tokenize() {
-        Ok(t) => t,
-        Err(e) => {
-            eprintln!(
-                "tetherscript check: lex error at {}:{}: {}",
-                e.line, e.col, e.msg
-            );
-            process::exit(1);
-        }
-    };
-    let program = match Parser::new(tokens).parse_program() {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!(
-                "tetherscript check: parse error at {}:{}: {}",
-                e.line, e.col, e.msg
-            );
-            process::exit(1);
-        }
-    };
-    match ownership::analyze(&program) {
-        Ok(()) => println!("{}: ok", args[0]),
-        Err(diagnostics) => {
-            for diagnostic in diagnostics {
-                eprintln!(
-                    "tetherscript check: ownership error: {}",
-                    diagnostic.message
-                );
-            }
             process::exit(1);
         }
     }
@@ -748,14 +702,7 @@ fn cmd_run_legacy(args: &[String]) {
         }
     }
 
-    let path = match path {
-        Some(p) => p,
-        None => {
-            eprintln!("tetherscript: missing source file");
-            eprintln!("Try 'tetherscript --help' for usage.");
-            process::exit(2);
-        }
-    };
+    let path = main_target::resolve(path.as_deref(), "run");
 
     run_reload::execute(
         &path,
@@ -817,21 +764,10 @@ fn execute_file(
     let src = read_source(path);
     let full_access = main_caps::script_full_access(&src, full_access);
 
-    let tokens = match Lexer::new(&src).tokenize() {
-        Ok(t) => t,
-        Err(e) => {
-            eprintln!("tetherscript: lex error at {}:{}: {}", e.line, e.col, e.msg);
-            process::exit(1);
-        }
-    };
-
-    let program = match Parser::new(tokens).parse_program() {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!(
-                "tetherscript: parse error at {}:{}: {}",
-                e.line, e.col, e.msg
-            );
+    let program = match modules::load_program(std::path::Path::new(path)) {
+        Ok(program) => program,
+        Err(error) => {
+            eprintln!("tetherscript: {error}");
             process::exit(1);
         }
     };
