@@ -23,7 +23,7 @@ impl Interpreter {
             .collect::<Result<Vec<_>, _>>()?;
         if let Value::Map(map) = &target {
             if let Some(callee) = map.borrow().get(name).cloned() {
-                return self.call(&callee, &args);
+                return self.call_owned(&callee, args);
             }
         }
         if let Value::Capability(capability) = &target {

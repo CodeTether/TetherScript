@@ -2,40 +2,36 @@
 
 use crate::value::Value;
 
-use super::result;
+use super::{result, transfer};
 
 pub(super) struct Handle {
-    result: Option<Value>,
+    pub(super) state: State,
+}
+
+pub(super) enum State {
+    Pending,
+    Complete(Value),
+    Consumed,
 }
 
 impl Handle {
     pub(super) fn pending() -> Self {
-        Self { result: None }
+        Self {
+            state: State::Pending,
+        }
     }
 
     pub(super) fn call(&mut self, name: &str, args: &[Value]) -> Result<Value, String> {
         match (name, args) {
-            ("complete", [value]) => Ok(result::nil(self.complete(value.clone()))),
+            ("complete", [value]) => Ok(result::nil(
+                transfer::retained(value, "task.complete").and_then(|value| self.complete(value)),
+            )),
             ("result", []) => Ok(result::value(self.result())),
-            ("is_complete", []) => Ok(Value::Bool(self.result.is_some())),
+            ("is_complete", []) => Ok(Value::Bool(matches!(self.state, State::Complete(_)))),
             _ => Err(format!(
                 "task: no method `{name}` accepting {} arguments",
                 args.len()
             )),
         }
-    }
-
-    fn complete(&mut self, value: Value) -> Result<(), String> {
-        if self.result.is_some() {
-            return Err("task.complete: task already completed".into());
-        }
-        self.result = Some(value);
-        Ok(())
-    }
-
-    fn result(&self) -> Result<Value, String> {
-        self.result
-            .clone()
-            .ok_or_else(|| "task.result: backpressure: task is still pending".into())
     }
 }

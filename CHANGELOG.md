@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added move-only owned runtime resources for files, child processes, TCP,
+  request/response bodies, tasks, timers, and bounded channels, with recursive
+  transfer enforcement at every persistent language boundary.
 - Updated the VS Code extension with package-local import-path completion,
   export-aware namespace completion and navigation, namespace-preserving auto
   imports, module diagnostics, hovers, document links, and module snippets.

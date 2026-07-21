@@ -12,8 +12,7 @@
 //! user bindings environment-backed so runtime ownership tombstones and
 //! mutability checks match the reference interpreter.
 
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
 use crate::bytecode::{Chunk, FnProto, Instr, VmFnObj};
 use crate::interp::{
@@ -23,6 +22,8 @@ use crate::value::{Env, NativeFunc, Runtime, Value};
 
 #[path = "vm/module_method.rs"]
 mod module_method;
+#[path = "vm/resource_transfer.rs"]
+mod resource_transfer;
 
 pub enum Unwind {
     Error(String),
@@ -205,22 +206,12 @@ impl VM {
             Instr::DefLet(idx, mutable) => {
                 let name = self.name(*idx);
                 let v = self.stack.pop().expect("DefLet with empty stack");
-                self.frames
-                    .last()
-                    .unwrap()
-                    .env
-                    .borrow_mut()
-                    .define(&name, v, *mutable);
+                resource_transfer::define(&self.frames.last().unwrap().env, &name, v, *mutable)?;
             }
             Instr::Assign(idx) => {
                 let name = self.name(*idx);
                 let v = self.stack.pop().expect("Assign with empty stack");
-                self.frames
-                    .last()
-                    .unwrap()
-                    .env
-                    .borrow_mut()
-                    .assign(&name, v.clone())?;
+                resource_transfer::assign(&self.frames.last().unwrap().env, &name, &v)?;
                 self.stack.push(v);
             }
             Instr::GetLocal(idx) => {
@@ -229,11 +220,13 @@ impl VM {
             }
             Instr::SetLocal(idx) => {
                 let v = self.stack.pop().expect("SetLocal with empty stack");
+                resource_transfer::validate(&v, "local assignment")?;
                 self.set_local(*idx as usize, v.clone());
                 self.stack.push(v);
             }
             Instr::DefLocal(idx, _mutable) => {
                 let v = self.stack.pop().expect("DefLocal with empty stack");
+                resource_transfer::validate(&v, "local binding")?;
                 self.set_local(*idx as usize, v);
             }
             Instr::MoveLocal(idx) => {
@@ -311,7 +304,7 @@ impl VM {
                 let n = *n as usize;
                 let at = self.stack.len() - n;
                 let items: Vec<Value> = self.stack.drain(at..).collect();
-                self.stack.push(Value::List(Rc::new(RefCell::new(items))));
+                self.stack.push(resource_transfer::list(items)?);
             }
             Instr::Index => {
                 let i = self.stack.pop().unwrap();
@@ -322,6 +315,7 @@ impl VM {
                 let v = self.stack.pop().unwrap();
                 let i = self.stack.pop().unwrap();
                 let t = self.stack.pop().unwrap();
+                resource_transfer::validate(&v, "indexed assignment")?;
                 match (&t, &i) {
                     (Value::List(xs), Value::Int(idx)) => {
                         let mut xs = xs.borrow_mut();
@@ -381,6 +375,7 @@ impl VM {
                 let name = self.name(*idx);
                 let v = self.stack.pop().unwrap();
                 let t = self.stack.pop().unwrap();
+                resource_transfer::validate(&v, "field assignment")?;
                 match t {
                     Value::Map(m) => {
                         m.borrow_mut().insert(name, v.clone());
@@ -411,6 +406,7 @@ impl VM {
                 self.dispatch_call(callee, args)?;
             }
             Instr::Return => {
+                resource_transfer::returned(self.stack.last())?;
                 self.do_return();
             }
             Instr::MakeFn(idx) => {
@@ -493,22 +489,12 @@ impl VM {
             Instr::DefLet(idx, mutable) => {
                 let name = self.name(idx);
                 let v = self.stack.pop().expect("DefLet with empty stack");
-                self.frames
-                    .last()
-                    .unwrap()
-                    .env
-                    .borrow_mut()
-                    .define(&name, v, mutable);
+                resource_transfer::define(&self.frames.last().unwrap().env, &name, v, mutable)?;
             }
             Instr::Assign(idx) => {
                 let name = self.name(idx);
                 let v = self.stack.pop().expect("Assign with empty stack");
-                self.frames
-                    .last()
-                    .unwrap()
-                    .env
-                    .borrow_mut()
-                    .assign(&name, v.clone())?;
+                resource_transfer::assign(&self.frames.last().unwrap().env, &name, &v)?;
                 self.stack.push(v);
             }
 
@@ -519,11 +505,13 @@ impl VM {
             }
             Instr::SetLocal(idx) => {
                 let v = self.stack.pop().expect("SetLocal with empty stack");
+                resource_transfer::validate(&v, "local assignment")?;
                 self.set_local(idx as usize, v.clone());
                 self.stack.push(v);
             }
             Instr::DefLocal(idx, _mutable) => {
                 let v = self.stack.pop().expect("DefLocal with empty stack");
+                resource_transfer::validate(&v, "local binding")?;
                 self.set_local(idx as usize, v);
             }
             Instr::MoveLocal(idx) => {
@@ -609,7 +597,7 @@ impl VM {
                 let n = n as usize;
                 let at = self.stack.len() - n;
                 let items: Vec<Value> = self.stack.drain(at..).collect();
-                self.stack.push(Value::List(Rc::new(RefCell::new(items))));
+                self.stack.push(resource_transfer::list(items)?);
             }
             Instr::Index => {
                 let i = self.stack.pop().unwrap();
@@ -620,6 +608,7 @@ impl VM {
                 let v = self.stack.pop().unwrap();
                 let i = self.stack.pop().unwrap();
                 let t = self.stack.pop().unwrap();
+                resource_transfer::validate(&v, "indexed assignment")?;
                 match (&t, &i) {
                     (Value::List(xs), Value::Int(idx)) => {
                         let mut xs = xs.borrow_mut();
@@ -680,6 +669,7 @@ impl VM {
                 let name = self.name(idx);
                 let v = self.stack.pop().unwrap();
                 let t = self.stack.pop().unwrap();
+                resource_transfer::validate(&v, "field assignment")?;
                 match t {
                     Value::Map(m) => {
                         m.borrow_mut().insert(name, v.clone());
@@ -712,6 +702,7 @@ impl VM {
             }
 
             Instr::Return => {
+                resource_transfer::returned(self.stack.last())?;
                 self.do_return();
             }
 

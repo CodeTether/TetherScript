@@ -4,7 +4,7 @@ use std::collections::VecDeque;
 
 use crate::value::Value;
 
-use super::result;
+use super::{result, transfer};
 
 pub(super) struct Handle {
     pub(super) queue: VecDeque<Value>,
@@ -24,7 +24,9 @@ impl Handle {
 
     pub(super) fn call(&mut self, name: &str, args: &[Value]) -> Result<Value, String> {
         match (name, args) {
-            ("send", [value]) => Ok(result::nil(self.send(value.clone()))),
+            ("send", [value]) => Ok(result::nil(
+                transfer::retained(value, "channel.send").and_then(|value| self.send(value)),
+            )),
             ("recv", []) => Ok(result::value(self.recv())),
             ("len", []) => Ok(Value::Int(self.queue.len() as i64)),
             ("capacity", []) => Ok(Value::Int(self.capacity as i64)),
