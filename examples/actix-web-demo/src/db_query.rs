@@ -4,7 +4,7 @@ use tetherscript::value::Value;
 
 use crate::db_pool::DbPool;
 
-pub async fn query(pool: &DbPool, arguments: &[Value]) -> Result<Value, String> {
+pub(crate) async fn query(pool: &DbPool, arguments: &[Value]) -> Result<Value, String> {
     let (sql, parameters) = parse_arguments(arguments)?;
     let mut query = sqlx::query(&sql);
     for parameter in &parameters {
