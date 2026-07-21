@@ -20,12 +20,14 @@ pub(crate) fn connect(
     if url.https {
         let connector =
             TlsConnector::new().map_err(|e| format!("http_request: create TLS connector: {e}"))?;
-        let stream = connector.connect(&url.host, url.port).map_err(|e| {
-            format!(
-                "http_request: TLS handshake with {}:{} failed: {}",
-                url.host, url.port, e
-            )
-        })?;
+        let stream = connector
+            .connect_with_timeout(&url.host, url.port, timeout)
+            .map_err(|e| {
+                format!(
+                    "http_request: TLS handshake with {}:{} failed: {}",
+                    url.host, url.port, e
+                )
+            })?;
         return Ok(Box::new(stream));
     }
     let tcp = TcpStream::connect((url.host.as_str(), url.port)).map_err(|e| {

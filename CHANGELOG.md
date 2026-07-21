@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added `https_serve(port, certificate_pem, private_key_pem, handler)` with
+  validated PEM certificate chains and private keys.
+
+### Changed
+
+- Replaced the `openssl s_client` subprocess shim with vendored, in-process
+  OpenSSL for HTTPS, including native trust roots, certificate-chain and
+  hostname verification, TLS 1.2 minimums, and bounded socket I/O.
+
 ## [0.1.0-alpha.22] - 2026-07-20
 
 ### Fixed

@@ -282,10 +282,10 @@ fn main() {
 }
 ```
 
-## HTTP server
+## HTTP and HTTPS
 
-tetherscript ships with a dependency-free blocking HTTP/1.1 server exposed as
-`http_serve`:
+tetherscript ships with blocking HTTP/1.1 clients and servers. Plain listeners
+are exposed as `http_serve`:
 
 ```kl
 fn handle(req) {
@@ -303,6 +303,34 @@ fn main() {
 The handler receives a request map with `method`, `path`, `query`, `headers`, and
 `body`. It may return either a string, sent as `200 text/plain`, or a map with
 optional `status`, `headers`, and `body`.
+
+HTTPS clients use OpenSSL in-process, require TLS 1.2 or newer, load the host
+platform's trust anchors, and verify both the certificate chain and hostname.
+The same transport backs `http_get`, `http_head`, `http_post`, `http_request`,
+the scoped `http` capability, provider capabilities, and Vault requests. No
+`openssl` executable is launched at runtime.
+
+To serve HTTPS, pass a PEM certificate chain and private key as language values.
+Loading them through a scoped `fs` capability keeps file authority explicit:
+
+```kl
+fn handle(req) {
+    let response = map()
+    response.status = 200
+    response.body = "secure hello\n"
+    return response
+}
+
+fn main() {
+    let certificates = fs.read("fullchain.pem")?
+    let private_key = fs.read("private-key.pem")?
+    https_serve(8443, certificates, private_key, handle)
+}
+```
+
+The first certificate must be the leaf; any following certificates are sent as
+its intermediate chain. The server rejects malformed PEM and mismatched keys
+before binding the port.
 
 For static sites, `http_serve_static(port, root_dir)` preloads files through the
 granted `fs` capability and serves precomputed responses from native Rust without
@@ -323,12 +351,11 @@ Run it with a filesystem grant scoped to the site root:
 
 ## Standard tools
 
-The runtime includes dependency-free standard tools exposed as built-ins,
-including:
+The runtime includes standard tools exposed as built-ins, including:
 
 - `json_parse`, `json_encode`, `json_encode_pretty`
 - `http_get`, `http_head`, `http_post`, `http_request`, `http_serve`,
-  `http_serve_static`
+  `https_serve`, `http_serve_static`
 - `browser_parse_html`, `browser_parse_css`, `browser_styles`,
   `browser_query_selector`, `browser_text_content`, `browser_snapshot`,
   `browser_layout`, `browser_display_list`, `browser_render`

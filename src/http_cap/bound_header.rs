@@ -6,7 +6,11 @@ use super::authority::HttpAuthority;
 
 impl HttpAuthority {
     /// Attach a harness-owned header without exposing its value to scripts.
-    pub fn with_bound_header(auth: Rc<dyn Authority>, name: &str, value: &str) -> Rc<dyn Authority> {
+    pub fn with_bound_header(
+        auth: Rc<dyn Authority>,
+        name: &str,
+        value: &str,
+    ) -> Rc<dyn Authority> {
         let this = auth
             .as_any()
             .downcast_ref::<HttpAuthority>()

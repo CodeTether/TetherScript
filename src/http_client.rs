@@ -1,7 +1,7 @@
-//! HTTP client: send requests and read responses over plain TCP.
+//! HTTP client over plain TCP or verified, in-process OpenSSL.
 //!
 //! Public functions `get`, `head`, `post`, `request` wrap `client_request`.
-//! The client uses std TCP plus the crate's platform TLS stream.
+//! HTTPS requires a valid platform-trusted certificate matching the URL host.
 
 use std::cell::RefCell;
 use std::collections::HashMap;

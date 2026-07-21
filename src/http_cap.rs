@@ -29,3 +29,7 @@ mod scope;
 mod url;
 
 pub use authority::HttpAuthority;
+
+#[cfg(test)]
+#[path = "http_cap/tls_tests.rs"]
+mod tls_tests;

@@ -13,6 +13,11 @@ aligned with the runtime semantics already in the repository.
 - Add tests for every behavior change.
 - Preserve the examples unless the change intentionally updates their behavior.
 
+## Build Prerequisites
+
+The HTTPS transport vendors OpenSSL. Building from source therefore requires
+Perl plus the platform C toolchain; no OpenSSL installation is needed at runtime.
+
 ## Required Checks
 
 Run these before sending a release or pull request:
