@@ -1,0 +1,14 @@
+// Verified HTTPS client example.
+//
+// OpenSSL runs in-process. The request succeeds only when the server's
+// certificate chain is trusted by the platform and matches example.com.
+
+fn main() {
+    let response = http_get("https://example.com/")?
+    if !response.ok {
+        return Err("unexpected HTTPS status " + response.status)
+    }
+    println("verified HTTPS status:", response.status)
+    println("content type:", response.headers["content-type"])
+    return Ok(nil)
+}

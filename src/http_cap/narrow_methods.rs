@@ -2,10 +2,7 @@ use std::collections::HashSet;
 
 use crate::value::Value;
 
-pub(super) fn apply(
-    value: Option<&Value>,
-    methods: &mut HashSet<String>,
-) -> Result<(), String> {
+pub(super) fn apply(value: Option<&Value>, methods: &mut HashSet<String>) -> Result<(), String> {
     let Some(value) = value else {
         return Ok(());
     };

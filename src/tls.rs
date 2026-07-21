@@ -1,76 +1,64 @@
-//! Zero-Rust-dependency TLS stream used by ProviderAuthority.
+//! Verified, in-process TLS transport for HTTPS clients and servers.
 //!
-//! This module intentionally avoids Rust TLS crates. It delegates TLS record
-//! handling and certificate verification to the platform OpenSSL executable
-//! (`openssl s_client`). That keeps Cargo dependency count at zero while still
-//! using the system TLS implementation and CA bundle.
+//! OpenSSL handles TLS records, certificate-chain validation, hostname
+//! validation, and TLS version negotiation. Trust anchors come from the host
+//! platform's native certificate store.
 //!
-//! The public surface is intentionally tiny: enough for HTTPS POST over an
-//! already-connected TCP target.
+//! # Usage
+//!
+//! ```no_run
+//! use tetherscript::tls::TlsConnector;
+//!
+//! let connector = TlsConnector::new()?;
+//! let stream = connector.connect("example.com", 443)?;
+//! # drop(stream);
+//! # Ok::<(), std::io::Error>(())
+//! ```
 
-use std::io::{self, Read, Write};
-#[path = "tls_openssl.rs"]
-mod openssl;
+use std::net::TcpStream;
 
-use std::process::{Child, ChildStdin, ChildStdout};
+use openssl::ssl::SslStream;
 
-pub struct TlsConnector;
+#[path = "tls_client.rs"]
+mod client;
+#[path = "tls_roots.rs"]
+mod roots;
+#[path = "tls_server.rs"]
+mod server;
 
-impl TlsConnector {
-    pub fn new() -> io::Result<Self> {
-        Ok(Self)
-    }
+#[cfg(test)]
+#[path = "tls_test_identity.rs"]
+pub(crate) mod test_identity;
 
-    pub fn connect(&self, domain: &str, port: u16) -> io::Result<TlsStream> {
-        TlsStream::connect(domain, port)
-    }
-}
+#[cfg(test)]
+#[path = "tls_http_test_server.rs"]
+pub(crate) mod http_test_server;
 
-pub struct TlsStream {
-    child: Child,
-    stdin: ChildStdin,
-    stdout: ChildStdout,
-}
+#[cfg(test)]
+#[path = "tls_client_test_support.rs"]
+mod client_test_support;
 
-impl TlsStream {
-    fn connect(domain: &str, port: u16) -> io::Result<Self> {
-        let mut child = openssl::spawn(domain, port)?;
-        let stdin = child
-            .stdin
-            .take()
-            .ok_or_else(|| io::Error::other("openssl stdin unavailable"))?;
-        let stdout = child
-            .stdout
-            .take()
-            .ok_or_else(|| io::Error::other("openssl stdout unavailable"))?;
+#[cfg(test)]
+#[path = "tls_client_tests.rs"]
+mod client_tests;
 
-        Ok(Self {
-            child,
-            stdin,
-            stdout,
-        })
-    }
-}
+#[cfg(test)]
+#[path = "tls_server_tests.rs"]
+mod server_tests;
 
-impl Read for TlsStream {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.stdout.read(buf)
-    }
-}
+pub use client::TlsConnector;
+pub(crate) use server::TlsAcceptor;
 
-impl Write for TlsStream {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.stdin.write(buf)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.stdin.flush()
-    }
-}
-
-impl Drop for TlsStream {
-    fn drop(&mut self) {
-        let _ = self.child.kill();
-        let _ = self.child.wait();
-    }
-}
+/// A verified OpenSSL stream over TCP.
+///
+/// # Examples
+///
+/// ```no_run
+/// use tetherscript::tls::{TlsConnector, TlsStream};
+///
+/// let connector = TlsConnector::new()?;
+/// let stream: TlsStream = connector.connect("example.com", 443)?;
+/// # drop(stream);
+/// # Ok::<(), std::io::Error>(())
+/// ```
+pub type TlsStream = SslStream<TcpStream>;

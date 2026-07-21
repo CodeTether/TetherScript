@@ -85,5 +85,11 @@ specific provider id.
 - `process_run` executes a command plus argv directly; it does not invoke a shell unless the script explicitly runs one.
 - `process_list` returns PID/name maps; `process_kill` may fail when the OS denies access or the PID no longer exists.
 - File and process output are bounded to keep accidental large reads from consuming unbounded memory.
-- Std-only HTTP supports plain `http://`; `https://` requires TLS and is rejected explicitly.
-- The standard-tool implementation itself uses Rust `std` only. It does not add or depend on external crates for JSON, LSP JSON-RPC framing, SMTP DKIM signing, path, filesystem, process, Base64, SHA-256, or URL parsing.
+- HTTPS uses vendored OpenSSL in-process with TLS 1.2 or newer, platform trust
+  anchors, certificate-chain validation, and hostname validation. It never
+  shells out to an `openssl` executable.
+- `https_serve(port, certificate_pem, private_key_pem, handler)` validates the
+  identity before binding; scripts can source PEM values through a scoped `fs`
+  capability.
+- JSON, LSP JSON-RPC framing, SMTP DKIM signing, path, filesystem, process,
+  Base64, SHA-256, and URL parsing remain implemented with Rust `std` only.

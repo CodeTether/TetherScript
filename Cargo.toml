@@ -48,4 +48,8 @@ actix-web = ["dep:actix-web"]
 
 [dependencies]
 actix-web = { version = "=4.11.0", optional = true, default-features = false, features = ["macros"] }
+# HTTPS runs in-process and ships without a runtime OpenSSL installation.
+openssl = { version = "0.10.81", features = ["vendored"] }
+# Supplies platform trust anchors to OpenSSL, including the Windows cert store.
+rustls-native-certs = "0.8.4"
 tera = "1.20.0"

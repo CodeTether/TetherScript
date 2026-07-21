@@ -1,0 +1,19 @@
+// PEM-backed HTTPS server example.
+//
+// Run with a filesystem capability scoped to a directory containing the files:
+//   tetherscript run --grant-fs ./certs examples/https_server.tether
+
+fn handle(request) {
+    let response = map()
+    response.status = 200
+    response.headers = map()
+    response.headers["content-type"] = "text/plain; charset=utf-8"
+    response.body = "secure response for " + request.path + "\n"
+    return response
+}
+
+fn main() {
+    let certificates = fs.read("fullchain.pem")?
+    let private_key = fs.read("private-key.pem")?
+    https_serve(8443, certificates, private_key, handle)
+}

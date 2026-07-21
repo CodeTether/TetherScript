@@ -2,15 +2,14 @@
 
 use std::collections::HashMap;
 use std::io::{self, Write};
-use std::net::TcpStream;
 
 use super::http_response_extract::extract;
 use super::http_status::reason_phrase;
 use crate::value::Value;
 
 /// Write a TetherScript HTTP response value to the socket.
-pub(crate) fn write_response(
-    stream: &mut TcpStream,
+pub(crate) fn write_response<W: Write>(
+    stream: &mut W,
     resp: &Value,
     keep_alive: bool,
 ) -> Result<(), String> {
@@ -27,8 +26,8 @@ pub(crate) fn write_response(
 }
 
 /// Write a simple text/byte response without going through script values.
-pub(crate) fn write_simple(
-    stream: &mut TcpStream,
+pub(crate) fn write_simple<W: Write>(
+    stream: &mut W,
     status: u16,
     content_type: &str,
     body: &[u8],
@@ -46,8 +45,8 @@ pub(crate) fn write_simple(
     .map_err(|e| e.to_string())
 }
 
-fn write_parts(
-    stream: &mut TcpStream,
+fn write_parts<W: Write>(
+    stream: &mut W,
     status: u16,
     reason: &str,
     headers: HashMap<String, String>,
