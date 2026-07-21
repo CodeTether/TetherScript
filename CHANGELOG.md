@@ -4,8 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.0-alpha.26] - 2026-07-21
+
 ### Added
 
+- Added opt-in native windows, frame presentation, and keyboard/mouse input
+  for owned RGBA render surfaces through the `native-window` feature, plus a
+  shared view schema for terminal and native UI backends.
 - Added move-only owned runtime resources for files, child processes, TCP,
   request/response bodies, tasks, timers, and bounded channels, with recursive
   transfer enforcement at every persistent language boundary.

@@ -19,9 +19,11 @@ The terminal surface is deliberately small and dependency-free:
 - `tui_clear()`, `tui_cursor(visible)`, `tui_alt_screen(enabled)`, and
   `tui_move_to(row, col)` return raw ANSI control strings.
 
-A view is a map with `title`, `status`, `width`, `height`, and `items`. Each
-item may be a string or a map with `kind`, `name`, `text`, and optional style
-fields.
+A view is a backend-neutral map with `title`, `status`, `width`, `height`, and
+`items`. Each item may be a string or a map with `kind`, `name`, `text`, and
+optional style fields. Pass the same map to `tui_present(view)` for a terminal,
+or to `surface.render_view(view)` and `surface.present()` for a native window.
+See [`examples/dual_ui.tether`](../examples/dual_ui.tether).
 
 Agent behavior stays in script. The reference example is a real stdio TUI by
 default:

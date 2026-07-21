@@ -1,5 +1,7 @@
 render_surface
 frame before render: false
+window before open: false
+present before render rejected: true
 rendered pixels: 32
 dimensions: 8x4
 rgba bytes: 128

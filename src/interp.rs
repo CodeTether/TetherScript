@@ -31,7 +31,7 @@ mod resource_transfer;
 #[path = "interp/result_method.rs"]
 mod result_method;
 #[path = "tui/mod.rs"]
-mod tui;
+pub(crate) mod tui;
 
 /// Non-local control flow. Wrapped in Result::Err so we can `?` it through
 /// the evaluator without polluting the happy path.

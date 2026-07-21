@@ -3,6 +3,8 @@ fn main() {
     let surface = resource.render_surface(8, 4, 1, 32).unwrap()
     println(type_of(surface))
     println("frame before render: " + str(surface.has_frame()))
+    println("window before open: " + str(surface.is_window_open()))
+    println("present before render rejected: " + str(surface.present().is_err()))
     println("rendered pixels: " + str(surface.render("<div>ok</div>", "").unwrap()))
     println("dimensions: " + str(surface.width()) + "x" + str(surface.height()))
     println("rgba bytes: " + str(surface.pixels().unwrap().len()))

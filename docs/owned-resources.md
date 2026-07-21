@@ -43,7 +43,7 @@ Resource-specific operations are:
 - `task`: `id`, `state`, `complete`, `result`, `is_complete`
 - `timer`: `ready`, `remaining_ms`, `reset`
 - `channel`: `send`, `recv`, `len`, `capacity`, `is_full`
-- `render_surface`: `render`, `pixels`, `ppm`, `clear`, `has_frame`, `width`, `height`, `pixel_count`, `capacity`
+- `render_surface`: `render`, `render_view`, `pixels`, `ppm`, `open_window`, `present`, `poll_input`, `is_window_open`, `close_window`, `clear`, `has_frame`, `width`, `height`, `pixel_count`, `capacity`
 
 TCP handles are nonblocking. `accept`, socket reads/writes, pending task results,
 empty channel receives, full channel sends, and full response writes report
@@ -61,3 +61,18 @@ Rendering surfaces hold at most one RGBA frame. Creation rejects dimensions
 that exceed the explicit pixel capacity, while `clear` releases the frame
 without closing the reusable surface. See
 [`examples/render_surface.tether`](../examples/render_surface.tether).
+
+The same structured view map accepted by `tui_render(view)` and
+`tui_present(view)` can be drawn off-screen with `surface.render_view(view)` and
+then displayed in a native window. This keeps title, status, items, panels, and
+input-widget state in one backend-neutral UI definition.
+
+Native presentation is opt-in so servers and headless agents retain a
+zero-window-system default build. Enable it with `--features native-window`,
+then call `open_window(title)`, `render(...)`, and `present()` in an event loop.
+`poll_input()` returns mouse coordinates/buttons and the `keys_down`,
+`keys_pressed`, and `keys_released` lists. `is_window_open()` reports when the
+user closes the window, while `close_window()` releases only the window and leaves the off-screen
+surface reusable. Generic `close()` releases both. Native windows may need to run on
+the process main thread on some platforms. See
+[`examples/render_window.tether`](../examples/render_window.tether).

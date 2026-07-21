@@ -17,6 +17,7 @@ mod key_read;
 mod key_value;
 mod line;
 mod line_item;
+mod native;
 mod panel;
 mod panel_rows;
 mod panel_state;
@@ -35,6 +36,8 @@ mod val;
 mod view;
 mod view_extra;
 mod view_input;
+
+pub(crate) use native::document as native_document;
 
 pub(super) fn install(env: &mut crate::value::Env) {
     install::install(env);
