@@ -160,15 +160,40 @@ pub struct Block {
 }
 
 /// A file-relative module import with a local namespace alias.
+///
+/// # Examples
+///
+/// ```
+/// use tetherscript::ast::ImportDecl;
+/// let import = ImportDecl {
+///     path: "./math.tether".into(),
+///     alias: "math".into(),
+/// };
+/// assert_eq!(import.alias, "math");
+/// ```
 #[derive(Debug, Clone)]
 pub struct ImportDecl {
+    /// File path as written in the importing source file.
     pub path: String,
+    /// Local namespace binding used to access exported values.
     pub alias: String,
 }
 
+/// Parsed source file with compile-time module metadata and executable statements.
+///
+/// # Examples
+///
+/// ```
+/// use tetherscript::ast::Program;
+/// let program = Program { imports: vec![], exports: vec![], stmts: vec![] };
+/// assert!(program.stmts.is_empty());
+/// ```
 #[derive(Debug, Clone)]
 pub struct Program {
+    /// File-relative imports declared by this source file.
     pub imports: Vec<ImportDecl>,
+    /// Top-level binding names exposed to importers.
     pub exports: Vec<String>,
+    /// Executable declarations and statements.
     pub stmts: Vec<Stmt>,
 }

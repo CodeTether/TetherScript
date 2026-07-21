@@ -23,9 +23,21 @@ pub use resolve::{resolve_target, ResolvedTarget};
 ///
 /// * `cwd` — Directory from which manifest discovery starts.
 ///
+/// # Returns
+///
+/// The canonical package entry and discovered package root.
+///
 /// # Errors
 ///
 /// Returns an error when no manifest exists or its entry is invalid.
+///
+/// # Examples
+///
+/// ```no_run
+/// let target = tetherscript::package::current(std::path::Path::new("."))?;
+/// println!("entry: {}", target.entry().display());
+/// # Ok::<(), String>(())
+/// ```
 pub fn current(cwd: &std::path::Path) -> Result<ResolvedTarget, String> {
     resolve_target(None, cwd)
 }

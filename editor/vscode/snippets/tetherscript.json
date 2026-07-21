@@ -1,4 +1,19 @@
 {
+  "module import": {
+    "prefix": ["import", "usemod"],
+    "body": "import \"${1:./module.tether}\" as ${2:module}",
+    "description": "Import a local tetherscript module under a namespace."
+  },
+  "module export": {
+    "prefix": "export",
+    "body": "export ${1:name}",
+    "description": "Explicitly export a top-level binding."
+  },
+  "exported function": {
+    "prefix": "exportfn",
+    "body": ["fn ${1:name}(${2:args}) {", "    $0", "}", "", "export ${1:name}"],
+    "description": "Create and export a module function."
+  },
   "main function": {
     "prefix": ["main", "fnmain"],
     "body": [

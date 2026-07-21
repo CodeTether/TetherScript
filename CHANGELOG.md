@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Updated the VS Code extension with package-local import-path completion,
+  export-aware namespace completion and navigation, namespace-preserving auto
+  imports, module diagnostics, hovers, document links, and module snippets.
 - Added file-relative modules with explicit `export` declarations, namespaced
   `import "./file.tether" as name` bindings, cycle detection, and package-root
   containment.

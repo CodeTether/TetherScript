@@ -511,8 +511,11 @@ for the CodeTether integration model.
 ## Editor support
 
 A VSCode extension lives in [`editor/vscode/`](editor/vscode/). It provides syntax
-highlighting and connects VSCode to `tetherscript lsp` for live lex/parse
-diagnostics.
+highlighting, connects VSCode to `tetherscript lsp` for live lex/parse diagnostics,
+and understands local modules. It completes import paths and exported namespace
+members, inserts namespace-preserving auto imports, diagnoses invalid imports and
+exports, provides module hovers, and navigates from imports or qualified members to
+their source files.
 
 ## Design principles
 
@@ -602,7 +605,8 @@ docs/
 - [x] Runtime ownership tracking
 - [x] Bytecode compiler and VM
 - [x] Initial straight-line Tether IR, verifier, and textual renderer
-- [x] LSP server and VSCode extension
+- [x] LSP server and VSCode extension, including module diagnostics,
+  namespace completion, auto imports, and cross-file navigation
 - [x] `Result` and `?` semantics
 - [x] `for x in iterable` loops
 - [x] JSON support

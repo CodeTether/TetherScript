@@ -1,0 +1,8 @@
+.gitignore
+.vscodeignore
+test/**
+*.vsix
+*.tgz
+node_modules/.cache/**
+package-lock.json
+**/*.map

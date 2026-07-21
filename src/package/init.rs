@@ -10,9 +10,22 @@ use super::Manifest;
 ///
 /// * `root` — Destination package directory.
 ///
+/// # Returns
+///
+/// The validated manifest written to the new package.
+///
 /// # Errors
 ///
 /// Returns an error rather than overwriting an existing manifest or entry.
+///
+/// # Examples
+///
+/// ```no_run
+/// let root = std::path::Path::new("hello");
+/// let manifest = tetherscript::package::init(root)?;
+/// assert_eq!(manifest.name(), "hello");
+/// # Ok::<(), String>(())
+/// ```
 pub fn init(root: &Path) -> Result<Manifest, String> {
     let name = package_name(root)?;
     let entry = PathBuf::from("src/main.tether");

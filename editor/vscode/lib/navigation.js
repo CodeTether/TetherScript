@@ -36,6 +36,10 @@ function registerNavigation(vscode, context) {
       provideDefinition(document, position) {
         const wordRange = document.getWordRangeAtPosition(position, /[A-Za-z_][A-Za-z0-9_]*/);
         if (!wordRange) return undefined;
+        if (wordRange.start.character > 0) {
+          const before = wordRange.start.translate(0, -1);
+          if (document.getText(new vscode.Range(before, wordRange.start)) === '.') return undefined;
+        }
 
         const word = document.getText(wordRange);
         return functionRanges(vscode, document)
