@@ -1,0 +1,51 @@
+// First-class owned runtime handles share close, cancellation, and deadlines.
+fn main() {
+    let file = resource.file("examples/hello.tether", "read").unwrap()
+    println(type_of(file))
+    file.set_deadline(1000).unwrap()
+    file.read(2).unwrap()
+
+    let child = if process_platform() == "windows" {
+        resource.child_process("cmd", ["/C", "exit", "0"]).unwrap()
+    } else {
+        resource.child_process("true", []).unwrap()
+    }
+    println(type_of(child))
+    child.set_deadline(5000).unwrap()
+    println("child success: " + str(child.wait().unwrap().success))
+
+    let listener = resource.tcp_listen("127.0.0.1", 0).unwrap()
+    println(type_of(listener))
+    let stream = resource.tcp_connect("127.0.0.1", listener.port().unwrap(), 1000).unwrap()
+    println(type_of(stream))
+    let accepted = listener.accept().unwrap()
+
+    let request = resource.request_body("body", 4).unwrap()
+    println(type_of(request) + ": " + request.read(4).unwrap().decode_utf8())
+    let response = resource.response_writer(4).unwrap()
+    response.write("done").unwrap()
+    println(type_of(response) + ": " + response.body().decode_utf8())
+
+    let task = resource.task().unwrap()
+    task.complete("done").unwrap()
+    println(type_of(task) + ": " + task.result().unwrap())
+    let timer = resource.timer(0).unwrap()
+    println(type_of(timer) + ": " + str(timer.ready()))
+
+    let channel = resource.channel(1).unwrap()
+    channel.set_deadline(1000).unwrap()
+    channel.send("one").unwrap()
+    println(type_of(channel) + " backpressure: " + str(channel.send("two").is_err()))
+    println("channel value: " + channel.recv().unwrap())
+    println("deadline expired: " + str(channel.is_expired()))
+
+    file.close().unwrap()
+    child.close().unwrap()
+    accepted.close().unwrap()
+    stream.close().unwrap()
+    listener.close().unwrap()
+    channel.close().unwrap()
+    println("closed: " + str(channel.is_closed()))
+    timer.cancel().unwrap()
+    println("cancelled: " + str(timer.is_cancelled()))
+}
