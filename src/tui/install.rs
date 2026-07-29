@@ -16,6 +16,13 @@ pub(super) fn install(env: &mut Env) {
     define(env, "tui_move_to", Some(2), super::ansi::move_to);
     define(env, "tui_render", Some(1), super::render::render);
     define(env, "tui_present", Some(1), super::render::present);
+    define(env, "tui_native", Some(1), super::native_window::builtin);
+    define(
+        env,
+        "tui_native_agent",
+        Some(3),
+        super::native_window::agent_builtin,
+    );
     define(env, "tui_read_event", None, super::input::read_event);
     define(env, "tui_read_key", Some(0), super::key_read::read_key);
     define(env, "tui_style_open", Some(1), super::style::open_value);

@@ -1,0 +1,19 @@
+// Real cross-platform native TUI powered by egui.
+// cargo run --features native-window --bin tetherscript -- run examples/native_tui_tasks.tether
+
+fn main() {
+    let view = map()
+    view["title"] = "Tether Tasks"
+    view["status"] = "native workspace online"
+    view["width"] = 100
+    view["height"] = 40
+    view["items"] = [
+        "[x] Native widgets: Render with a real cross-platform GUI toolkit",
+        "[x] Shared schema: Drive terminal and native views from tetherscript",
+        "[ ] Input handling: Use geometry-backed mouse and keyboard controls",
+        "[ ] Release build: Package the polished native experience",
+        "[ ] Build something useful: Replace the framebuffer prototype"
+    ]
+
+    tui_native(view).unwrap()
+}

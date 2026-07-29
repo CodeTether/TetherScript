@@ -14,6 +14,8 @@ pub fn run(endpoint: &str, url: &str) -> Output {
             "examples/agent_tui.tether",
         ])
         .env("TETHERSCRIPT_AGENT_MODE", "rpc")
+        .env_remove("VAULT_ADDR")
+        .env_remove("VAULT_TOKEN")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

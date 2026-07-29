@@ -1,3 +1,5 @@
+#![cfg(feature = "openssl-tls")]
+
 use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::process::Command;

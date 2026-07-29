@@ -321,13 +321,25 @@ fn main() {
 
 fn agent_command() -> Command {
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_tetherscript"));
-    cmd.env("CODETETHER_DISABLE_ENV_FALLBACK", "1")
+    cmd.env("TETHERSCRIPT_AGENT_SESSION_PATH", isolated_session_path())
+        .env("CODETETHER_DISABLE_ENV_FALLBACK", "1")
         .env_remove("TETHERSCRIPT_PROVIDER")
         .env_remove("TETHERSCRIPT_AGENT_PROVIDER")
         .env_remove("TETHERSCRIPT_PROVIDER_ENDPOINT")
         .env_remove("VAULT_ADDR")
         .env_remove("VAULT_TOKEN");
     cmd
+}
+
+fn isolated_session_path() -> PathBuf {
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    std::env::temp_dir().join(format!(
+        "tetherscript-agent-test-{}-{nonce}.jsonl",
+        std::process::id()
+    ))
 }
 
 fn wait_with_timeout(mut child: Child, timeout: Duration) -> Output {

@@ -1,3 +1,5 @@
+#![cfg(feature = "openssl-tls")]
+
 #[allow(dead_code)]
 mod embedded_reload_support;
 

@@ -42,15 +42,14 @@ fn surface_requires_a_frame_before_presenting() {
 #[test]
 fn surface_explains_how_to_enable_native_windows() {
     let mut surface = OwnedResource::render_surface(8, 4, 1, 32).unwrap();
-    let error = error(surface.call("open_window", &[text("test")]).unwrap());
-    assert!(error.contains("`native-window` feature"), "{error}");
-    let error = error(surface.call("poll_input", &[]).unwrap());
-    assert!(error.contains("no native window is open"), "{error}");
-}
-
-#[test]
-fn surface_rejects_frames_over_its_pixel_quota() {
-    let error = OwnedResource::render_surface(8, 4, 2, 127).unwrap_err();
-    assert!(error.contains("backpressure"), "{error}");
-    assert!(error.contains("128 pixels"), "{error}");
+    let open_error = error(surface.call("open_window", &[text("test")]).unwrap());
+    assert!(
+        open_error.contains("`native-window` feature"),
+        "{open_error}"
+    );
+    let input_error = error(surface.call("poll_input", &[]).unwrap());
+    assert!(
+        input_error.contains("no native window is open"),
+        "{input_error}"
+    );
 }

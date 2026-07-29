@@ -1,0 +1,13 @@
+// Run: cargo run --features native-agent --bin tetherscript -- run examples/native_fix_runner.tether
+// tetherscript: authority agent
+
+// Performs repository tasks through the existing Vault-backed agent, then
+// exposes the resulting Git diff and validation evidence for human review.
+fn main() {
+    let config = map()
+    config.title = "Tether Fix Runner"
+    config.agent_path = "examples/agent_tui.tether"
+    config.mode = "fix"
+
+    tui_native_agent(config, vault, fs).unwrap()
+}

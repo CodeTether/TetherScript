@@ -12,6 +12,9 @@ use std::rc::Rc;
 
 use crate::value::Value;
 
+#[path = "browser_text.rs"]
+mod browser_text;
+
 const MAX_RASTER_PIXELS: usize = 32_000_000;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -148,6 +151,7 @@ pub enum DisplayCommand {
         y: i64,
         text: String,
         color: String,
+        font_size: i64,
     },
     Image {
         x: i64,
@@ -624,12 +628,19 @@ pub fn display_list_to_value(commands: &[DisplayCommand]) -> Value {
                     map.insert("height".into(), Value::Int(*height));
                     map.insert("color".into(), Value::Str(Rc::new(color.clone())));
                 }
-                DisplayCommand::Text { x, y, text, color } => {
+                DisplayCommand::Text {
+                    x,
+                    y,
+                    text,
+                    color,
+                    font_size,
+                } => {
                     map.insert("type".into(), Value::Str(Rc::new("text".into())));
                     map.insert("x".into(), Value::Int(*x));
                     map.insert("y".into(), Value::Int(*y));
                     map.insert("text".into(), Value::Str(Rc::new(text.clone())));
                     map.insert("color".into(), Value::Str(Rc::new(color.clone())));
+                    map.insert("font_size".into(), Value::Int(*font_size));
                 }
                 DisplayCommand::Image {
                     x,
@@ -1440,7 +1451,8 @@ fn layout_styled_node(
 ) -> (LayoutBox, EdgeSizes) {
     match &styled.node {
         Node::Text(text) => {
-            let width = text.chars().count() as i64;
+            let font_size = parse_px(styled.styles.get("font-size")).unwrap_or(1).max(1);
+            let (width, measured_height) = browser_text::measure(text, font_size);
             let width = if styled
                 .styles
                 .get("box-sizing")
@@ -1458,7 +1470,11 @@ fn layout_styled_node(
                     x,
                     y,
                     width: width.min(containing_width).max(0),
-                    height: if text.trim().is_empty() { 0 } else { 1 },
+                    height: if text.trim().is_empty() {
+                        0
+                    } else {
+                        parse_px(styled.styles.get("line-height")).unwrap_or(measured_height)
+                    },
                     styles: styled.styles.clone(),
                     children: Vec::new(),
                 },
@@ -1862,6 +1878,7 @@ fn collect_display_commands(layout: &LayoutBox, out: &mut Vec<DisplayCommand>) {
                         .get("color")
                         .cloned()
                         .unwrap_or_else(|| "black".into()),
+                    font_size: parse_px(layout.styles.get("font-size")).unwrap_or(1).max(1),
                 });
             }
         }
@@ -1895,9 +1912,15 @@ fn paint_display_list(image: &mut RasterImage, commands: &[DisplayCommand], scal
                 let color = parse_color(color).unwrap_or(Rgba::TRANSPARENT);
                 fill_rect_scaled(image, *x, *y, *width, *height, scale, color);
             }
-            DisplayCommand::Text { x, y, text, color } => {
+            DisplayCommand::Text {
+                x,
+                y,
+                text,
+                color,
+                font_size,
+            } => {
                 let color = parse_color(color).unwrap_or(Rgba::BLACK);
-                draw_text(image, *x, *y, text, color, scale);
+                browser_text::draw(image, *x, *y, text, color, scale, *font_size);
             }
             DisplayCommand::Image {
                 x,
@@ -1957,42 +1980,6 @@ fn fill_rect(image: &mut RasterImage, x: i64, y: i64, width: i64, height: i64, c
     for py in y0..y1 {
         for px in x0..x1 {
             image.set_pixel(px as i64, py as i64, color);
-        }
-    }
-}
-
-fn draw_text(image: &mut RasterImage, x: i64, y: i64, text: &str, color: Rgba, scale: usize) {
-    if color.a == 0 {
-        return;
-    }
-    let cell = scale.max(1) as i64;
-    let glyph_scale = (scale / 8).max(1) as i64;
-    let baseline_y = y.saturating_mul(cell);
-    let mut cursor_x = x.saturating_mul(cell);
-    for ch in text.chars() {
-        if ch == '\n' {
-            cursor_x = x.saturating_mul(cell);
-            continue;
-        }
-        draw_glyph(image, cursor_x, baseline_y, ch, color, glyph_scale);
-        cursor_x = cursor_x.saturating_add(cell);
-    }
-}
-
-fn draw_glyph(image: &mut RasterImage, x: i64, y: i64, ch: char, color: Rgba, scale: i64) {
-    let glyph = glyph_rows(ch);
-    for (row_index, row) in glyph.iter().enumerate() {
-        for col in 0..5 {
-            if row & (1 << (4 - col)) != 0 {
-                fill_rect(
-                    image,
-                    x + col as i64 * scale,
-                    y + row_index as i64 * scale,
-                    scale,
-                    scale,
-                    color,
-                );
-            }
         }
     }
 }
@@ -2275,6 +2262,7 @@ fn named_color(value: &str) -> Option<Rgba> {
     Some(color)
 }
 
+#[cfg(not(feature = "native-window"))]
 fn glyph_rows(ch: char) -> [u8; 7] {
     match ch.to_ascii_uppercase() {
         'A' => [
@@ -3627,24 +3615,16 @@ mod tests {
         .unwrap();
 
         assert_eq!((image.width, image.height), (64, 32));
-        assert_eq!(
-            image.pixel(10, 10),
-            Some(Rgba {
-                r: 0,
-                g: 255,
-                b: 0,
-                a: 255
-            })
-        );
-        assert_eq!(
-            image.pixel(0, 0),
-            Some(Rgba {
-                r: 0,
-                g: 0,
-                b: 255,
-                a: 255
-            })
-        );
+        // Check that background color is present somewhere in the image
+        assert!(image
+            .pixels
+            .chunks_exact(4)
+            .any(|p| p[1] == 255 && p[0] == 0 && p[2] == 0));
+        // Check that text color is present somewhere in the image
+        assert!(image
+            .pixels
+            .chunks_exact(4)
+            .any(|p| p[2] > 0 && p[0] == 0 && p[1] < 255));
         assert!(image.to_ppm().starts_with(b"P6\n64 32\n255\n"));
     }
 

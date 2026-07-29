@@ -469,6 +469,7 @@ fn render_view(view) {
 }
 
 fn show(log, status) {
+    if env_text("TETHERSCRIPT_AGENT_MODE") == "rpc" { return }
     let view = map()
     view.title = agent_label() + " stdio"
     view.width = 80
@@ -1341,6 +1342,8 @@ fn load_self_prompt() {
 
 // Session persistence. Default and named sessions are JSONL conversation logs.
 fn session_path() {
+    let override = env_text("TETHERSCRIPT_AGENT_SESSION_PATH")
+    if override != "" { return override }
     return ".tetherscript/agent_tui_session.jsonl"
 }
 
@@ -2087,10 +2090,21 @@ fn prompt(params) {
     return ""
 }
 
+fn agent_state(session, id) {
+    let result = map()
+    result.messages = session.messages
+    result.model = default_model()
+    result.provider_ready = provider_ready()
+    result.session_path = session_path()
+    result.workspace = cwd().unwrap_or("unavailable")
+    stdio_write(jsonrpc_response(id, result))
+}
+
 fn agent_message(log, session, id, params) {
     let question = prompt(params)
     log.push(item("user", "jsonrpc", question))
     let answer = agent_turn(log, session, question)
+    save_session(session)
     log.push(item("agent", "provider", answer))
     write_result(id, answer, answer == provider_missing())
 }
@@ -2099,10 +2113,11 @@ fn handle(log, session, reload, msg) {
     if !msg.contains("method") { return true }
     log.push(item("rpc", "in", msg.method))
     if msg.method == "initialize" { initialize(msg.id); return true }
+    if msg.method == "agent/state" { agent_state(session, msg.id); return true }
     if msg.method == "tools/list" { tools_list(msg.id); return true }
     if msg.method == "tools/call" { tools_call(log, msg.id, msg.params) }
     if msg.method == "agent/message" { agent_message(log, session, msg.id, msg.params) }
-    if msg.method != "tools/call" && msg.method != "agent/message" && msg.contains("id") {
+    if msg.method != "agent/state" && msg.method != "tools/call" && msg.method != "agent/message" && msg.contains("id") {
         stdio_write(jsonrpc_error(msg.id, -32601, "method not found", msg.method))
     }
     if reload_needed(reload) { return reload_now_rpc(log, session, reload) }

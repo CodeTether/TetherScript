@@ -1,3 +1,5 @@
+#![cfg(feature = "tera")]
+
 use std::process::Command;
 
 #[test]

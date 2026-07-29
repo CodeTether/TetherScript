@@ -1,0 +1,14 @@
+// Run: cargo run --features native-agent --bin tetherscript -- run examples/native_agent.tether
+// tetherscript: authority agent
+
+// Native agent shell using the same Vault, workspace authority, tools, model
+// selection, and JSONL session as examples/agent_tui.tether.
+fn main() {
+    let config = map()
+    config.title = "tetherscript agent + CPU state"
+    config.agent_path = "examples/agent_tui.tether"
+
+    // Passing both grants makes the native host verify that this script was
+    // launched with the standard agent authority before it starts agent RPC.
+    tui_native_agent(config, vault, fs).unwrap()
+}
