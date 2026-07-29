@@ -1,0 +1,15 @@
+fn main() {
+    let view = map()
+    view["title"] = "unicode widths"
+    view["width"] = 44
+    view["height"] = 8
+    view["status"] = "borders stay aligned"
+    view["items"] = [
+        "ascii: plain text",
+        "cjk:   日本語のテキスト",
+        "emoji: rocket 🚀 and star ⭐",
+        "combining: éclair",
+        "truncated: 日本語日本語日本語日本語日本語日本語"
+    ]
+    print(tui_render(view))
+}

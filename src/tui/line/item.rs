@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use crate::value::Value;
 
-use super::{style, style::Style, style_span};
+use crate::interp::tui::{style, style::Style, style_span};
 
 pub(super) fn render(value: &Value) -> String {
     match value {

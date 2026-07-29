@@ -17,7 +17,9 @@ fn channel_requires_move_before_retaining_a_resource() {
     let borrowed = owner.clone();
     let mut channel = OwnedResource::channel(1).unwrap();
 
-    let rejected = channel.call("send", &[borrowed.clone()]).unwrap();
+    let rejected = channel
+        .call("send", std::slice::from_ref(&borrowed))
+        .unwrap();
     let message = error(rejected);
     assert!(message.contains("channel.send"));
     assert!(message.contains("use `move`"));
@@ -33,7 +35,9 @@ fn task_requires_move_before_retaining_a_resource() {
     let borrowed = owner.clone();
     let mut task = OwnedResource::task();
 
-    let rejected = task.call("complete", &[borrowed.clone()]).unwrap();
+    let rejected = task
+        .call("complete", std::slice::from_ref(&borrowed))
+        .unwrap();
     let message = error(rejected);
     assert!(message.contains("task.complete"));
     assert!(message.contains("timer resource"));

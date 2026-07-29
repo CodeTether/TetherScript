@@ -16,7 +16,6 @@ mod key_parse;
 mod key_read;
 mod key_value;
 mod line;
-mod line_item;
 mod native;
 mod native_window;
 mod panel;
@@ -37,6 +36,7 @@ mod val;
 mod view;
 mod view_extra;
 mod view_input;
+mod width;
 
 pub(crate) use native::document as native_document;
 
