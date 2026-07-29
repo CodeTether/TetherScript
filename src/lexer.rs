@@ -1,11 +1,18 @@
 //! Lexer — source text → tokens.
 //!
-//! Hand-written, single-pass, character-by-character. We track line/col for
-//! error messages and emit explicit `Newline` tokens (even though rk uses
-//! braces, newlines still matter for nice error recovery and REPL UX).
+//! This module implements a hand-written, single-pass, character-by-character lexer.
+//! It transforms a raw UTF-8 source string into a sequence of [`crate::token::Spanned`] tokens.
+//!
+//! The lexer tracks line and column positions to provide precise error reporting.
+//! It emits explicit `Newline` tokens to support better error recovery and a
+//! responsive REPL experience.
 
 use crate::token::{Spanned, Token};
 
+/// A lexical scanner that consumes source text and produces tokens.
+///
+/// The `Lexer` maintains a cursor position and source coordinates (line, col)
+/// as it traverses the input bytes.
 pub struct Lexer<'a> {
     src: &'a [u8],
     pos: usize,
@@ -13,14 +20,26 @@ pub struct Lexer<'a> {
     col: usize,
 }
 
+/// Error produced during the lexical analysis phase.
 #[derive(Debug)]
 pub struct LexError {
+    /// A descriptive error message explaining what went wrong.
     pub msg: String,
+    /// The 1-indexed line number where the error occurred.
     pub line: usize,
+    /// The 1-indexed column number where the error occurred.
     pub col: usize,
 }
 
 impl<'a> Lexer<'a> {
+    /// Creates a new `Lexer` from a source string.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use tetherscript::lexer::Lexer;
+    /// let lexer = Lexer::new("let x = 10;");
+    /// ```
     pub fn new(src: &'a str) -> Self {
         Self {
             src: src.as_bytes(),
@@ -30,6 +49,22 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Consumes the entire source and returns a vector of tokens.
+    ///
+    /// This method will always append a `Token::Eof` to the end of the sequence.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`LexError`] if an invalid character sequence is encountered
+    /// (e.g., an unterminated string literal).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use tetherscript::lexer::Lexer;
+    /// let tokens = Lexer::new("let x = 5;").tokenize().unwrap();
+    /// assert_eq!(tokens.last().unwrap().token, tetherscript::token::Token::Eof);
+    /// ```
     pub fn tokenize(mut self) -> Result<Vec<Spanned>, LexError> {
         let mut out = Vec::new();
         while let Some(tok) = self.next_token()? {
