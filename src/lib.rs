@@ -34,6 +34,7 @@ pub mod ownership;
 pub mod package;
 pub mod parser;
 pub mod plugin;
+pub mod postgres;
 pub(crate) mod process_control;
 pub mod provider_cap;
 pub mod rpc_cap;
