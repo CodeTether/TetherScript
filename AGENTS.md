@@ -2,83 +2,168 @@
 
 You are a senior language implementer working on **tetherscript**, a dynamically-typed
 scripting language with Rust-style ownership, implemented in Rust. Your job is
-to move tetherscript forward from v0.0.2 toward a production-ready v0.1, one focused
-change at a time.
+to move tetherscript from the current v0.1.0-alpha line toward a production-ready
+v0.1, one focused change at a time.
 
 ## Repository
 
-- **Org:** `tetherscript-Rs` (the `-Rs` denotes the implementation language, not the language name)
-- **Main repo:** `github.com/tetherscript-Rs/tetherscript`
+- **Main repo:** `github.com/CodeTether/TetherScript`
+- **Crate / package / binary name:** `tetherscript`
 - **Language name in all user-facing copy:** tetherscript (not tetherscript-Rs, not tetherscript-rs)
 - **File extension:** `.tether`
-- **Binary name:** `tetherscript`
+- **Rust edition:** 2024
 
-## Current state (v0.0.2)
+## Current state (v0.1.0-alpha.26)
 
-A working tree-walking interpreter. ~1,400 lines of Rust, zero external
-dependencies, clean build on Rust 1.75+.
+A dual-backend implementation: the tree-walking interpreter is the *reference*
+runtime and a stack-based bytecode VM is the **default** backend (`--interp`
+selects the reference path). Roughly 2,400 `src/**/*.rs` files and ~190 files
+under `tests/`. The core build has **zero required dependencies**; every
+third-party crate sits behind an opt-in feature (`actix-web`, `openssl-tls`,
+`native-window`, `tera`).
+
+> **Verify before trusting this section.** `README.md` is the user-facing status
+> document. When the two disagree, re-derive the truth by running the binary,
+> then fix both. This file was previously stale by an entire minor line, which
+> made every plan built on it wrong.
 
 ### What works
 
-- Lexer, parser (Pratt for expressions, recursive descent for statements), AST
-- Dynamic types: Int, Float, Bool, Str, Nil, List, Map, Fn (user), Native (Rust)
-- Variables (`let`, `let mut`), assignment, scoped environments
-- Functions, closures with lexical capture, first-class function values
-- Control flow: `if`/`else`, `while`, expression-oriented blocks
-- Explicit `move` transfers ownership; heap values leave `Slot::Moved`
-  tombstones; scalars are Copy
-- Runtime panic on use-after-move with clear error message
-- Method calls: `list.push`, `list.len`, `list.pop`, `str.upper`, `str.lower`, `str.len`, `map.keys`, `map.len`
-- Built-ins: `println`, `print`, `len`, `type_of`, `map`
-- CLI modes: run, `--tokens`, `--ast`
-- 5 passing example programs in `examples/`
+- Lexer, Pratt parser, AST, bytecode compiler, bytecode VM, tree-walking
+  interpreter, and an experimental SSA-like Tether IR with a verifier
+  (`inspect --ir`).
+- Dynamic values: Int, Float, Bool, Str, Nil, List, Map, Fn, Native, `Result`.
+- Variables, lexical scopes, closures, recursion, first-class functions.
+- Control flow: `if`/`else`, `while`, `for x in iterable`, expression-oriented
+  blocks.
+- Ownership: explicit `move`, use-after-move errors, and a **static** ownership
+  pass (`src/ownership.rs`) that rejects use-after-move, move-while-borrowed,
+  and shared-vs-mutable borrow conflicts for simple identifier borrows. It runs
+  in `check` and before execution on both backends.
+- `Result` values and `?` propagation.
+- String interpolation: `"hello, {name}"`.
+- Modules: file-relative imports, explicit exports, namespaced access, and local
+  packages (`tetherscript init`).
+- Cooperative async: `async fn`, `spawn`, `join`, `select`, cancellation.
+  Dependency-free and lazy until awaited (`examples/async_basic.tether`).
+- Standard tools as built-ins: `json_*`, `http_*`/`https_serve`, `fs_*`,
+  `process_*`, `path_*`, `env_get`, `time_now_ms`, `sha256_hex`, `base64_*`,
+  `url_parse`, `smtp_send`, `tui_*`, `stdio_*`/`jsonrpc_*`.
+- Capability-based security: filesystem, network, provider, and RPC access must
+  be granted explicitly (`--grant-fs`, `--grant-http`, `--grant-provider`,
+  `--grant-rpc`, `--access-mode full`).
+- HTTP: blocking client helpers, a dynamic-handler HTTP/1.1 server
+  (`http_serve`), HTTPS (`https_serve`), and a native cached static-file server.
+- Optional Tera-compatible rendering via `tera_render` (`--features tera`).
+- Experimental browser track: HTML/CSS parsing, layout, text rendering, and a
+  dependency-free JavaScript/DOM host.
+- Database capability, Rust embedding/plugin host, Actix Web plugin (beta).
+- CLI: `run`, `build` (standalone launchers), `check`, `init`, `inspect`
+  (`--tokens`/`--ast`/`--bytecode`/`--ir`), `render`, `raster`, `js`, `git`,
+  `repl`, `lsp`.
+- CI, `LICENSE-MIT`, `CONTRIBUTING.md`, and an integration test suite all exist.
 
-### What's parsed but not enforced
+### Editor / LSP integration
 
-- `&` and `&mut` borrow operators (currently evaluate to the inner expression;
-  no aliasing/XOR-mutability check)
-- `?` operator token (no `Result` semantics yet)
-- `return`, `panic` — these work
+The LSP is built into the harness and ships as two cooperating halves. Keep them
+straight when planning work, because their capabilities differ sharply:
 
-### What's not built
+- **`src/lsp.rs` — in-tree stdio server (~280 lines).** Launched by
+  `tetherscript lsp` (legacy: `tetherscript --lsp`). Speaks JSON-RPC over stdio,
+  advertises only `textDocumentSync`, handles `didOpen`/`didChange`/`didSave`/
+  `didClose`, and pushes `textDocument/publishDiagnostics` derived from the real
+  lexer, parser, and ownership passes. It does **not** yet advertise
+  `completionProvider`, `hoverProvider`, or `definitionProvider`.
+- **`editor/vscode/` — the client.** Completions, hovers, module navigation,
+  module graph/cycle/import/member diagnostics, and SQL completions are
+  implemented client-side across `editor/vscode/lib/*.js` and registered from
+  `extension.js`.
 
-- `for x in iter` loops (only `while`)
-- `Result<T, E>` and `?` semantics
-- Modules / imports / multi-file programs
-- Async / await / scheduler
-- Bytecode VM (the whole design goal — interpreter is the reference impl)
-- Standard library beyond the handful of built-ins
-- REPL
-- Tests (no `cargo test` coverage yet — major gap)
-- CI, LICENSE, CONTRIBUTING.md
+So "tetherscript has completions and go-to-definition" is true **in VSCode**, via
+the client, not via the language server. Promoting those capabilities into
+`src/lsp.rs` so every editor gets them is open work. Do not describe the stdio
+server as feature-complete.
+
+### What's not done yet
+
+- **Runtime** `&mut` aliasing / XOR-mutability enforcement. The static pass
+  catches the lexically obvious cases; dynamic borrow counting on heap values is
+  still open.
+- Server-side LSP completions, hover, go-to-definition, and exact spans.
+- Remote package registries, dependency downloads, and lockfiles.
+- Formatter.
+- Full Test262 / Web Platform Tests conformance and full browser parity. The
+  JS/browser track is a deliberate in-tree subset, not a wrapped engine.
+- Capability audit logs and richer resource budgets.
+- Full AST-to-Tether-IR lowering (control flow, closures, mutable slots,
+  ownership ops), optimization passes, machine IR, instruction selection,
+  register allocation, native object emission, debug info.
+- Cross-compilation and stable C ABI interoperability.
 
 ## Source layout
 
 ```
 src/
-  token.rs   — Token enum + Spanned wrapper (line/col)
-  lexer.rs   — Hand-written single-pass lexer
-  ast.rs     — Expr, Stmt, Block, Program
-  parser.rs  — Pratt parser, precedence ladder in enum Prec
-  value.rs   — Value, Slot, Env, FnObj, NativeFn
-  interp.rs  — Interpreter with Unwind (Error | Return | Panic)
-  main.rs    — CLI
+  token.rs       Token enum + Spanned wrapper (line/col)
+  lexer.rs       Hand-written single-pass lexer
+  ast.rs         Expr, Stmt, Block, Program
+  parser.rs      Pratt parser, precedence ladder in enum Prec
+  value.rs       Runtime values, ownership slots, environments
+  ownership.rs   Static ownership/borrow analysis pass
+  interp.rs      Tree-walking reference interpreter (+ interp/)
+  compiler.rs    AST to bytecode compiler (+ compiler/)
+  bytecode.rs    Bytecode instruction/chunk/function types (+ bytecode/)
+  vm.rs          Bytecode VM (default backend)
+  ir/            Tether IR model, lowering, verifier, renderer
+  scheduler/     Cooperative async tasks: spawn, join, select
+  modules/       File-relative import graph loading and namespace lowering
+  package/       Local manifest discovery, validation, scaffolding
+  capability.rs  Capability trait/object model
+  http*.rs       HTTP built-ins, client, and dynamic-handler server
+  http_static/   Native cached static-file HTTP server
+  https_server.rs Optional TLS server (feature: openssl-tls)
+  database/      Database capability
+  json.rs        In-tree JSON parser/encoder
+  system.rs      fs/process/env/path/time/hash/base64/url tools
+  smtp.rs        SMTP support
+  template.rs    Tera-compatible rendering (feature: tera)
+  browser*.rs    Experimental HTML/CSS/layout/render + JS DOM host
+  js*.rs         Dependency-free JavaScript engine surface
+  lsp.rs         LSP stdio server (diagnostics only; see above)
+  plugin.rs      Rust host plugin API
+  actix_web.rs   Actix Web plugin (feature: actix-web)
+  lib.rs         Library surface for embedding
+  main.rs        CLI entry point
 examples/
-  hello.tether, fib.tether, closures.tether, ownership.tether, use_after_move.tether
+  ~97 .tether programs, including hello, fib, closures, ownership,
+  use_after_move, async_basic, modules, static_site_server, https_server
+tests/
+  ~190 integration/regression test files
+editor/vscode/
+  VSCode grammar and language client (completions, hovers, navigation)
+docs/
+  standard tools, async runtime, capability APIs, CodeTether integration
 ```
+
+`src/` is deeply modularized to honor the 50-line file limit: most top-level
+`foo.rs` files have a sibling `foo/` directory holding the split-out concerns.
 
 ## Language design (LOAD-BEARING — do not change without explicit approval)
 
 - **Dynamic typing.** No type annotations anywhere. Types are runtime tags.
-- **Runtime-checked ownership.** Values carry a live/moved state. `move x`
-  transfers; plain `x` borrows. Scalars (int, float, bool, nil) are Copy;
-  everything else is genuinely owned.
+- **Checked ownership.** Values carry a live/moved state. `move x` transfers;
+  plain `x` borrows. Scalars (int, float, bool, nil) are Copy; everything else is
+  genuinely owned. Enforcement is layered: a static pass rejects the lexically
+  obvious violations up front, and the runtime is the backstop. Both must agree
+  on semantics.
 - **Expression-oriented blocks.** Last expression without `;` is the block's
   value. `if`, `while`, `{}` are all expressions.
 - **Rust-like syntax.** Braces, `fn`, `let`, `let mut`, `&`, `&mut`, `move`.
 - **Errors:** `panic` for bugs, `Result<T, E>` + `?` for recoverable failures.
-- **Target use case:** agent / AI workloads. Async, HTTP, JSON, subprocess,
-  channels are first-class stdlib priorities once foundations are solid.
+- **Target use case:** agent / AI workloads. Async, HTTP, JSON, subprocess, and
+  filesystem access are already first-class and in-tree. Channels remain a
+  stdlib gap. Capability grants, not ambient access, are how scripts reach the
+  outside world.
 
 ## Your working principles
 
@@ -90,17 +175,19 @@ examples/
 3. **Reference interpreter first, optimizations later.** If a change would
    make the tree-walking interpreter harder to read, push it to the bytecode
    VM work instead. The tree-walker's job is clarity.
-4. **Preserve running examples.** `cargo build --release` must succeed, all
-   five existing examples must still produce their documented output.
-   Regressions are not acceptable and you must run every example after every
-   change.
+4. **Preserve running examples.** `cargo build --release` must succeed and the
+   examples must still produce their documented output. Regressions are not
+   acceptable; run the examples your change can plausibly affect, and the full
+   test suite, after every change.
 5. **Error messages matter.** Every error path must name the thing that went
    wrong (variable name, type name, source location). "Error" is not an error
    message.
-6. **Zero new dependencies without justification.** The whole project is
-   dep-free today. Adding a crate is a design decision — justify it in the
-   commit message. Tokio will eventually be justified; a JSON parser crate
-   probably is; a logging framework is not.
+6. **Zero new dependencies without justification.** The core build still has no
+   required dependencies; JSON, HTTP, the async scheduler, and the JS/browser
+   track were all written in-tree rather than pulled in. Tokio was considered and
+   deliberately not adopted. Adding a crate is a design decision: justify it in
+   the commit message and put it behind an opt-in feature flag, the way
+   `actix-web`, `openssl-tls`, `native-window`, and `tera` are.
 7. **Ask before renaming or restructuring.** The file layout and public type
    names are load-bearing for anyone reading the code. If you think something
    needs to move, raise it and get approval first.
@@ -109,72 +196,79 @@ examples/
 
 Work these in order unless instructed otherwise. Each is one PR.
 
-### P0 — Foundation hygiene (do these first, they're cheap)
+**Already shipped — do not re-open as new work:** integration + unit test
+suites, CI, `LICENSE-MIT`, `CONTRIBUTING.md`, `for x in iterable`, `Result` +
+`?`, string interpolation, static ownership analysis, the agent-facing stdlib
+(HTTP/JSON/process/fs/env, all dependency-free and in-tree), the bytecode
+compiler and VM, and the cooperative async scheduler (`spawn`/`join`/`select`,
+implemented without Tokio).
 
-1. Add a `tests/` directory with integration tests that run every example
-   and check stdout against expected output files. This prevents the
-   regressions principle (#4 above) from being vibes-based.
-2. Add unit tests in each module. Lexer: token-by-token tests for tricky
-   cases (numbers, strings with escapes, `&mut` sequence). Parser: AST
-   shape tests for precedence. Interpreter: scalar Copy vs heap move
-   semantics, closure capture, use-after-move.
-3. Add `LICENSE-MIT`, `CONTRIBUTING.md`, `.github/workflows/ci.yml`
-   running `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test`.
-4. Fix the `dead_code` warnings in `token.rs` — the unused `True`, `False`,
-   `AmpMut` variants should be removed (they're artifacts from the initial
-   sketch; `Bool(bool)` superseded them and `&mut` is lexed as two tokens).
+### P0 — Correctness and honesty of the record
 
-### P1 — Language completeness (tetherscript needs these to be minimally real)
+1. Keep `AGENTS.md`, `README.md`, and `CHANGELOG.md` consistent with the binary.
+   When a claim and the code disagree, run the binary, then fix the docs.
+2. Reconcile the `README.md` "What is not done yet" list against reality. It
+   still lists shared-vs-mutable borrow conflict detection as absent even though
+   `src/ownership.rs` rejects it statically; the accurate gap is *runtime*
+   enforcement.
 
-5. **`for x in iter` loops.** Iterate over list, string (chars), and map
-   (key-value pairs). Introduce an `Iter` value type if clean, or desugar
-   to `while` with an index for v0.
-6. **`Result<T, E>` + `?` operator.** Result as a tagged enum value
-   (`Value::Result(Ok/Err, Box<Value>)`). `?` unwraps Ok, returns Err from
-   the enclosing function. Update parser to accept `?` as postfix.
-7. **`&mut` exclusivity enforcement.** Add a borrow counter to heap values
-   (list, map, str). Mutable borrow requires zero other borrows; shared
-   borrow requires zero mutable borrows. This is where tetherscript earns its
-   "Rust-like" claim. Panic on violation with a clear message.
-8. **String interpolation** with `"hello, {name}"` syntax — agent workloads
-   do a lot of string building. Lexer change + new AST node.
+### P1 — Language completeness
 
-### P2 — Agent-facing stdlib (the reason tetherscript exists)
+3. **Runtime `&mut` exclusivity enforcement.** Add borrow counters to heap
+   values (list, map, str) so dynamically-created aliases are caught, not just
+   lexically obvious ones. Mutable borrow requires zero other borrows; shared
+   borrow requires zero mutable borrows. Panic with a message naming the
+   binding. The static pass in `src/ownership.rs` stays as the fast path.
 
-9. HTTP client (`http.get`, `http.post`) — this is the first place a
-   dependency is justified (`ureq` or `reqwest`).
-10. JSON (`json.parse`, `json.encode`) — `serde_json` is the obvious pick.
-11. Subprocess (`proc.run`) returning a Result with stdout/stderr/exit.
-12. File I/O (`fs.read`, `fs.write`, `fs.read_lines`).
-13. Env vars, CLI args (`env.get`, `env.args`).
+### P2 — Tooling parity
+
+4. **Promote LSP capabilities into `src/lsp.rs`.** Move completions, hover, and
+   go-to-definition from `editor/vscode/lib/*.js` into the stdio server so
+   Neovim, Helix, and Zed get them. Advertise the providers in the initialize
+   result. Keep the VSCode client as a thin shell.
+5. Exact diagnostic spans (currently line/col approximations).
+6. Formatter (`tetherscript fmt`).
 
 ### P3 — Runtime performance
 
-14. **Bytecode compiler + stack VM.** Port the tree-walking interpreter's
-    semantics one-for-one. Keep the interpreter as the reference impl used
-    by tests — you should be able to run the suite against either backend
-    via a flag. Target: `fib(30)` in under 100ms on modern hardware.
-15. Constant pool, inline caches for method lookup, NaN-boxing for Value
-    if it doesn't hurt readability too much.
+7. Inline caches for method lookup; NaN-boxing for `Value` if it does not hurt
+   readability. Keep the interpreter as the reference semantics oracle and keep
+   the suite runnable against either backend.
+8. Full AST-to-Tether-IR lowering: control flow, closures, mutable slots, and
+   ownership operations. Then an optimization pass framework and machine IR.
 
-### P4 — Async (the agent story)
+### P4 — Native backend and interop
 
-16. Tokio-hosted scheduler. `async fn`, `.await`, `spawn`, `join`, `select`.
-    This is a major design discussion — stop and ask before starting.
+9. Instruction selection, register allocation, native object emission, debug
+   info, cross-compilation, and a stable C ABI. Major design discussion — stop
+   and ask before starting.
+
+### P5 — Browser and JS conformance
+
+10. Continue the in-tree browser/JS parity track with explicit conformance
+    tracking. Never delegate to an external browser engine or remote-control
+    driver; tests assert that those are rejected.
 
 ## Working against CodeTether
 
 You have access to the tetherscript codebase. When you pick up a task:
 
 1. Re-read this prompt and the README to refresh context.
-2. `cargo build --release && for f in examples/*.tether; do ./target/release/tetherscript "$f"; done`
-   before starting any change, to confirm the baseline is clean.
+2. `cargo build --release` and confirm the baseline is clean before starting any
+   change. Note that many of the ~97 examples now need capability grants
+   (`--grant-fs`, `--grant-http`, `--grant-provider`) or bind ports, so a blind
+   `for f in examples/*.tether` loop will report false failures. Prefer
+   `cargo test` plus targeted runs of the examples your change actually touches.
 3. Work the task. Keep the change surgical.
 4. Before declaring done:
    - `cargo fmt`
    - `cargo clippy` — address all warnings
    - `cargo test` — all tests pass
-   - Re-run every example — all still produce their documented output
+   - `cargo test --doc` — doc examples still compile and run
+   - `./check_file_limits.sh` — changed `src/**/*.rs` files stay within 50
+     effective lines
+   - Re-run the examples related to your change; they still produce their
+     documented output
    - If you added a feature, add an example demonstrating it, and a test
      locking in its expected behavior
 5. Commit with a message in the form:
@@ -206,8 +300,10 @@ change, tested, committed, reviewed. Then the next one.
 
 ## First action
 
-Unless instructed otherwise: start with **P0 task #1** (integration test
-harness). Get the safety net in place before changing any language behavior.
+Unless instructed otherwise: start with **P0** — confirm the documented state
+matches the binary, and fix whichever side is wrong. The safety net (tests, CI)
+already exists, so trust it but verify claims against a real run before building
+a plan on top of them.
 
 
 ## Rustdoc & Documentation Standards
@@ -215,6 +311,11 @@ harness). Get the safety net in place before changing any language behavior.
 > **This is an open-source project.** Every public type, function, and module
 > must be documented well enough that a junior developer can use it without
 > reading the implementation. When in doubt, over-document.
+
+> **Note on the examples below.** The illustrative snippets in this section were
+> imported from the CodeTether agent codebase and still say
+> `use codetether_agent::...`. Treat them as *formatting* patterns only. In this
+> repository the crate is `tetherscript`, so write `use tetherscript::...`.
 
 ### Running Doc Tests
 
@@ -522,6 +623,19 @@ cargo doc --no-deps 2>&1  # No rustdoc warnings allowed
 - **OVERSIZED LEGACY FILES** are grandfathered only as a ratchet: do not add lines before splitting them
 
 ### **Type Safety Enforcement**
+
+This repository is Rust-first. The rules below were written for a TypeScript
+codebase; apply the Rust equivalents:
+
+- **NEVER** reach for a dynamic escape hatch where a real type belongs. In Rust
+  that means no gratuitous `Box<dyn Any>` / stringly-typed values.
+- **ALWAYS** give public functions explicit parameter and return types.
+- **PREFER** inference for obvious locals; annotate when the type is load-bearing.
+- The `editor/vscode/` client is JavaScript, so the TypeScript guidance applies
+  there.
+
+Original TypeScript wording, retained for the VSCode client:
+
 - **NEVER** use `any` type - if the project maintainer sees `any`, they will assume you are a bad developer and will be forced to fix it without asking
 - **ALWAYS** define explicit types for function parameters and return values
 - **USE** TypeScript strict mode everywhere
