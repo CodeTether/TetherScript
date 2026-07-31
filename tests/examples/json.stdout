@@ -1,0 +1,19 @@
+name:   TetherScript
+version: int
+tags:   ["lang","rust"]
+active: bool
+
+compact:
+{"body":"hello from TetherScript","headers":{"content_type":"text/plain"},"status":200}
+
+pretty:
+{
+  "body": "hello from TetherScript",
+  "headers": {
+    "content_type": "text/plain"
+  },
+  "status": 200
+}
+
+original: [1, 2, {"key": "value"}, null]
+roundtrip: [1,2,{"key":"value"},null]
