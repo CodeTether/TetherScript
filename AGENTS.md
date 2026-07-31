@@ -58,6 +58,9 @@ third-party crate sits behind an opt-in feature (`actix-web`, `openssl-tls`,
 - Experimental browser track: HTML/CSS parsing, layout, text rendering, and a
   dependency-free JavaScript/DOM host.
 - Database capability, Rust embedding/plugin host, Actix Web plugin (beta).
+- Native PostgreSQL client (`src/postgres/`) speaking the v3 wire protocol over
+  TCP with no driver dependency: simple-query protocol, trust/password/md5/
+  SCRAM-SHA-256 auth, text-format row decoding. No TLS and no `Parse`/`Bind` yet.
 - CLI: `run`, `build` (standalone launchers), `check`, `init`, `inspect`
   (`--tokens`/`--ast`/`--bytecode`/`--ir`), `render`, `raster`, `js`, `git`,
   `repl`, `lsp`.
@@ -90,11 +93,22 @@ server as feature-complete.
   catches the lexically obvious cases; dynamic borrow counting on heap values is
   still open.
 - Server-side LSP completions, hover, go-to-definition, and exact spans.
+- PostgreSQL extended-protocol parameter binding (`Parse`/`Bind`), TLS for
+  database sockets, and binary-format decoding. Until binding lands, SQL text
+  must never be built from untrusted input. Also open: wiring the native client
+  into a `QueryHandler` so scripts can reach it through the `db` capability
+  instead of only from Rust hosts.
 - Remote package registries, dependency downloads, and lockfiles.
 - Formatter.
 - Full Test262 / Web Platform Tests conformance and full browser parity. The
   JS/browser track is a deliberate in-tree subset, not a wrapped engine.
 - Capability audit logs and richer resource budgets.
+- Moving ambient host tools behind explicit capabilities. This is a real gap, not
+  a nicety: the `fs_*` and `process_*` builtins call `std` directly and ignore
+  capability grants, so `fs_read("/etc/hostname")` succeeds with no `--grant-fs`.
+  The `fs` capability object enforces correctly and is undefined without a grant,
+  so scripts should prefer `fs.read` over `fs_read`. Note that `tetherscript
+  --help` currently overstates the guarantee.
 - Full AST-to-Tether-IR lowering (control flow, closures, mutable slots,
   ownership ops), optimization passes, machine IR, instruction selection,
   register allocation, native object emission, debug info.
@@ -123,6 +137,7 @@ src/
   http_static/   Native cached static-file HTTP server
   https_server.rs Optional TLS server (feature: openssl-tls)
   database/      Database capability
+  postgres/      Native PostgreSQL wire-protocol client
   json.rs        In-tree JSON parser/encoder
   system.rs      fs/process/env/path/time/hash/base64/url tools
   smtp.rs        SMTP support

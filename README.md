@@ -123,6 +123,48 @@ Drivers remain outside tetherscript, preserving the library's zero-dependency
 core. The granted database role defines the SQL permissions available to the
 script.
 
+### Native PostgreSQL client
+
+A host adapter no longer has to supply the driver. `tetherscript::postgres`
+speaks the PostgreSQL v3 wire protocol directly over TCP, so the zero-dependency
+core now includes a real client:
+
+```rust,no_run
+use tetherscript::postgres::{Config, Connection};
+
+let mut connection = Connection::connect(&Config {
+    host: "127.0.0.1".into(),
+    port: 5432,
+    user: "tsuser".into(),
+    password: "pencil".into(),
+    database: "tsdb".into(),
+})?;
+let rows = connection.simple_query("SELECT id, name FROM users ORDER BY id")?;
+```
+
+Rows decode to a list of maps keyed by column name. Text-format fields become
+the closest scalar: `t`/`f` to bool, numeric strings to int or float, SQL `NULL`
+to `nil`, everything else to str.
+
+Authentication covers trust, cleartext `password`, legacy `md5`, and
+SCRAM-SHA-256. HMAC-SHA-256, PBKDF2, and MD5 are implemented in-tree on the
+existing SHA-256 and verified against the published RFC 4231, RFC 6070,
+RFC 1321, and RFC 7677 vectors.
+
+Current limits, before you depend on it:
+
+- **No TLS.** Connections are cleartext; use a trusted network or a tunnel.
+- **Simple query only.** No extended-protocol `Parse`/`Bind` yet, so values
+  cannot be bound as parameters and must not be concatenated from untrusted
+  input.
+- **Text-format decoding**, so exact SQL types need an explicit cast.
+- **One synchronous connection**; pooling belongs to the host.
+
+Wire-level tests run against a real server and are skipped unless
+`TETHERSCRIPT_PG_TEST_URL` is set. See `tests/postgres_live.rs`.
+
+See [`docs/postgres-client.md`](docs/postgres-client.md) for the full contract.
+
 ## Actix Web plugin beta
 
 The optional `actix-web` feature registers a sandboxed tetherscript hook as an
@@ -551,6 +593,9 @@ their source files.
 ## What is not done yet
 
 - Runtime `&mut` aliasing / XOR-mutability enforcement.
+- PostgreSQL extended-protocol parameter binding (`Parse`/`Bind`), TLS for
+  database connections, and binary-format row decoding. The native client
+  currently speaks the simple-query protocol over a cleartext socket.
 - Remote package registries, dependency downloads, and lockfiles.
 - Formatter and REPL.
 - More complete LSP features such as completions, hover, go-to-definition, and
@@ -563,7 +608,13 @@ their source files.
   for agents, with conformance tracked explicitly rather than delegated to an
   external browser engine.
 - Capability audit logs and richer resource budgets.
-- Moving ambient host tools behind explicit capabilities where practical.
+- Moving ambient host tools behind explicit capabilities. The `fs_*` and
+  `process_*` builtins call the host directly and do **not** consult capability
+  grants, so `fs_read` succeeds without `--grant-fs`. The capability objects do
+  enforce — `fs` is undefined unless granted, and rejects absolute paths and `..`
+  escapes — so prefer `fs.read(..)` over `fs_read(..)` when a script must be
+  sandboxed. Until this is closed, the capability guarantee applies to the
+  capability objects, not to the ambient builtins.
 - Async scheduler.
 - Tether IR lowering for control flow, closures, mutable slots, and all ownership
   operations.
@@ -631,6 +682,7 @@ docs/
 - [x] Experimental dependency-free browser JavaScript host bindings
 - [x] Native production debug report for bundled UI validation
 - [x] Rust embedding/plugin host
+- [x] Native PostgreSQL wire-protocol client (no driver dependency)
 - [ ] Native full browser parity
 - [ ] Full AST-to-Tether-IR lowering
 - [ ] Optimization pass framework and machine IR
