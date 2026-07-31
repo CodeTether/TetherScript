@@ -13,14 +13,30 @@ use crate::value::Env;
 
 // Explicit paths: this module is itself declared with `#[path]` from `interp.rs`,
 // so relative submodule resolution would otherwise look in `src/` directly.
+#[path = "web_builtins/base32.rs"]
+pub(crate) mod base32;
 #[path = "web_builtins/cookie.rs"]
 pub(crate) mod cookie;
+#[path = "web_builtins/csrf.rs"]
+pub(crate) mod csrf;
+#[path = "web_builtins/datetime.rs"]
+pub(crate) mod datetime;
+#[path = "web_builtins/etag.rs"]
+pub(crate) mod etag;
 #[path = "web_builtins/form.rs"]
 pub(crate) mod form;
 #[path = "web_builtins/hmac.rs"]
 pub(crate) mod hmac;
 #[path = "web_builtins/jwt.rs"]
 pub(crate) mod jwt;
+#[path = "web_builtins/mime.rs"]
+pub(crate) mod mime;
+#[path = "web_builtins/password.rs"]
+pub(crate) mod password;
+#[path = "web_builtins/random.rs"]
+pub(crate) mod random;
+#[path = "web_builtins/route.rs"]
+pub(crate) mod route;
 #[path = "web_builtins/sse.rs"]
 pub(crate) mod sse;
 #[path = "web_builtins/uuid.rs"]
@@ -34,4 +50,12 @@ pub(crate) fn install(env: &Rc<RefCell<Env>>) {
     form::install(env);
     uuid::install(env);
     sse::install(env);
+    base32::install(env);
+    csrf::install(env);
+    datetime::install(env);
+    etag::install(env);
+    mime::install(env);
+    password::install(env);
+    random::install(env);
+    route::install(env);
 }
