@@ -32,6 +32,11 @@ impl Builder {
         self
     }
 
+    pub(super) fn i16(&mut self, value: i16) -> &mut Self {
+        self.body.extend_from_slice(&value.to_be_bytes());
+        self
+    }
+
     /// Append a NUL-terminated string.
     pub(super) fn cstr(&mut self, value: &str) -> &mut Self {
         self.body.extend_from_slice(value.as_bytes());

@@ -115,3 +115,63 @@ fn rejects_a_wrong_password() {
         "error should be qualified, got: {error}"
     );
 }
+
+/// Extended-protocol binding must return the same rows as inline SQL would.
+#[test]
+fn binds_parameters_through_the_extended_protocol() {
+    let Some(config) = config() else { return };
+    let mut connection = Connection::connect(&config).expect("connect should succeed");
+    let result = connection
+        .query("SELECT name FROM users WHERE id = $1", &[Value::Int(2)])
+        .expect("parameterized query should succeed");
+    let rows = rows(&result);
+    assert_eq!(rows.len(), 1);
+    match field(&rows[0], "name") {
+        Value::Str(name) => assert_eq!(name.as_str(), "Ada"),
+        other => panic!("expected str, got {}", other.type_name()),
+    }
+}
+
+/// A bound value is data, never SQL. This is the whole point of Parse/Bind.
+#[test]
+fn a_bound_parameter_cannot_terminate_the_statement() {
+    let Some(config) = config() else { return };
+    let mut connection = Connection::connect(&config).expect("connect should succeed");
+    let hostile = Value::Str(std::rc::Rc::new("Ada'; DROP TABLE users; --".into()));
+    let result = connection
+        .query("SELECT id FROM users WHERE name = $1", &[hostile])
+        .expect("hostile input must be treated as a plain value");
+    assert_eq!(rows(&result).len(), 0, "no name matches that literal");
+
+    // The table must still be there.
+    let survived = connection
+        .simple_query("SELECT id FROM users")
+        .expect("users table must still exist");
+    assert_eq!(rows(&survived).len(), 2);
+}
+
+#[test]
+fn binds_nil_as_sql_null() {
+    let Some(config) = config() else { return };
+    let mut connection = Connection::connect(&config).expect("connect should succeed");
+    let result = connection
+        .query(
+            "SELECT id FROM users WHERE note IS NOT DISTINCT FROM $1",
+            &[Value::Nil],
+        )
+        .expect("nil should bind as NULL");
+    assert_eq!(rows(&result).len(), 1, "exactly one row has a NULL note");
+}
+
+#[test]
+fn multiple_parameters_bind_positionally() {
+    let Some(config) = config() else { return };
+    let mut connection = Connection::connect(&config).expect("connect should succeed");
+    let result = connection
+        .query(
+            "SELECT id FROM users WHERE id = $1 AND active = $2",
+            &[Value::Int(1), Value::Bool(true)],
+        )
+        .expect("two parameters should bind");
+    assert_eq!(rows(&result).len(), 1);
+}

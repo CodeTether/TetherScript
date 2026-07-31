@@ -1,12 +1,10 @@
-//! Simple-query execution and row collection.
+//! Query execution for both the simple and extended protocols.
 
-use std::cell::RefCell;
 use std::io::Write;
-use std::rc::Rc;
 
 use super::connection::Connection;
 use super::encode::Builder;
-use super::{decode, error, rows};
+use super::{collect, extended, params};
 use crate::value::Value;
 
 /// Send `Query` and gather rows until `ReadyForQuery`.
@@ -17,28 +15,28 @@ pub(super) fn run(connection: &mut Connection, sql: &str) -> Result<Value, Strin
         .stream
         .write_all(&query.finish())
         .map_err(|error| format!("postgres: send query: {error}"))?;
-    collect(connection)
+    collect::rows(connection)
 }
 
-fn collect(connection: &mut Connection) -> Result<Value, String> {
-    let mut columns: Vec<String> = Vec::new();
-    let mut collected: Vec<Value> = Vec::new();
-    let mut failure: Option<String> = None;
-    loop {
-        let message = decode::read(&mut connection.stream)
-            .map_err(|error| format!("postgres: read query response: {error}"))?;
-        match message.tag {
-            b'T' => columns = rows::row_description(&message.body)?,
-            b'D' => collected.push(rows::data_row(&message.body, &columns)?),
-            b'E' => failure = Some(error::describe(&message.body)),
-            // Surface the error only after ReadyForQuery, so the connection is
-            // left reusable rather than abandoned mid-stream.
-            b'Z' => break,
-            _ => {}
-        }
-    }
-    match failure {
-        Some(message) => Err(message),
-        None => Ok(Value::List(Rc::new(RefCell::new(collected)))),
-    }
+/// Run `sql` with bound `parameters` through the extended query protocol.
+///
+/// Placeholders are `$1`, `$2`, and so on. Values travel separately from the
+/// statement text, so they cannot alter the parsed SQL.
+pub(super) fn run_params(
+    connection: &mut Connection,
+    sql: &str,
+    parameters: &[Value],
+) -> Result<Value, String> {
+    let encoded = params::encode_all(parameters)?;
+    let mut batch = extended::parse(sql);
+    batch.extend_from_slice(&extended::bind(&encoded));
+    batch.extend_from_slice(&extended::describe());
+    batch.extend_from_slice(&extended::execute());
+    // Sync must ride along, or the server waits and the read below blocks.
+    batch.extend_from_slice(&extended::sync());
+    connection
+        .stream
+        .write_all(&batch)
+        .map_err(|error| format!("postgres: send parameterized query: {error}"))?;
+    collect::rows(connection)
 }

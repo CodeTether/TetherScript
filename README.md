@@ -131,6 +131,7 @@ core now includes a real client:
 
 ```rust,no_run
 use tetherscript::postgres::{Config, Connection};
+use tetherscript::value::Value;
 
 let mut connection = Connection::connect(&Config {
     host: "127.0.0.1".into(),
@@ -139,7 +140,8 @@ let mut connection = Connection::connect(&Config {
     password: "pencil".into(),
     database: "tsdb".into(),
 })?;
-let rows = connection.simple_query("SELECT id, name FROM users ORDER BY id")?;
+// `query` binds parameters, so untrusted values never enter the SQL text.
+let rows = connection.query("SELECT name FROM users WHERE id = $1", &[Value::Int(1)])?;
 ```
 
 Rows decode to a list of maps keyed by column name. Text-format fields become
@@ -151,17 +153,31 @@ SCRAM-SHA-256. HMAC-SHA-256, PBKDF2, and MD5 are implemented in-tree on the
 existing SHA-256 and verified against the published RFC 4231, RFC 6070,
 RFC 1321, and RFC 7677 vectors.
 
+Scripts reach it through the `db` capability. `PostgresHandler` implements
+`QueryHandler`, so a host grants it and a `.tether` script queries with bound
+parameters:
+
+```tether
+let rows = db.query("SELECT id, name FROM users WHERE id = $1", [id])?
+```
+
+`db` is undefined unless granted, so scripts get no ambient database access. See
+`examples/db_capability.rs` for the host and `examples/db_capability.tether` for
+the script.
+
 Current limits, before you depend on it:
 
 - **No TLS.** Connections are cleartext; use a trusted network or a tunnel.
-- **Simple query only.** No extended-protocol `Parse`/`Bind` yet, so values
-  cannot be bound as parameters and must not be concatenated from untrusted
-  input.
+- **Parameters bind as text.** `query` uses `Parse`/`Bind`, so values never enter
+  the SQL string, but the server infers each type. str, int, float, bool, and nil
+  are supported. `simple_query` takes no parameters, so untrusted input belongs in
+  `query`.
 - **Text-format decoding**, so exact SQL types need an explicit cast.
 - **One synchronous connection**; pooling belongs to the host.
 
 Wire-level tests run against a real server and are skipped unless
-`TETHERSCRIPT_PG_TEST_URL` is set. See `tests/postgres_live.rs`.
+`TETHERSCRIPT_PG_TEST_URL` is set. See `tests/postgres_live.rs` and
+`tests/db_capability_live.rs`.
 
 See [`docs/postgres-client.md`](docs/postgres-client.md) for the full contract.
 
@@ -593,9 +609,9 @@ their source files.
 ## What is not done yet
 
 - Runtime `&mut` aliasing / XOR-mutability enforcement.
-- PostgreSQL extended-protocol parameter binding (`Parse`/`Bind`), TLS for
-  database connections, and binary-format row decoding. The native client
-  currently speaks the simple-query protocol over a cleartext socket.
+- TLS for PostgreSQL connections and binary-format row decoding. The native
+  client binds parameters through `Parse`/`Bind`, but runs over a cleartext
+  socket and decodes every value from text format.
 - Remote package registries, dependency downloads, and lockfiles.
 - Formatter and REPL.
 - More complete LSP features such as completions, hover, go-to-definition, and

@@ -13,6 +13,7 @@ client is simply an in-tree implementation a host may use instead.
 
 ```rust,no_run
 use tetherscript::postgres::{Config, Connection};
+use tetherscript::value::Value;
 
 let mut connection = Connection::connect(&Config {
     host: "127.0.0.1".into(),
@@ -22,7 +23,12 @@ let mut connection = Connection::connect(&Config {
     database: "tsdb".into(),
 })?;
 
-let rows = connection.simple_query("SELECT id, name FROM users ORDER BY id")?;
+// `query` binds parameters through the extended protocol. Use it for anything
+// that came from outside the program.
+let rows = connection.query(
+    "SELECT id, name FROM users WHERE id = $1",
+    &[Value::Int(1)],
+)?;
 ```
 
 Nothing is read from the ambient environment. The host decides where credentials
@@ -66,6 +72,53 @@ failure, which is painful to diagnose.
 MD5 is cryptographically broken. It is implemented only because deployments
 still request it, and should never be used for anything else.
 
+## Reaching it from a script
+
+`PostgresHandler` implements `QueryHandler`, so a host grants it as the `db`
+capability and a `.tether` script queries through it. Scripts have no ambient
+database access: `db` is undefined unless it was granted.
+
+```rust,no_run
+use std::rc::Rc;
+use tetherscript::database::DatabaseAuthority;
+use tetherscript::plugin::PluginHost;
+use tetherscript::postgres::{Config, PostgresHandler};
+
+let handler = PostgresHandler::connect(&config)?;
+let mut host = PluginHost::new();
+host.grant("db", Rc::new(DatabaseAuthority::new(handler)));
+```
+
+The script then passes parameters as a separate list, never as SQL text:
+
+```tether
+fn find_user(id) {
+    let rows = db.query("SELECT id, name FROM users WHERE id = $1", [id])?
+    if rows.len() == 0 {
+        return Err("no user with id " + str(id))
+    }
+    return Ok(rows[0])
+}
+```
+
+Because the value is bound rather than spliced, a quoting attack is inert:
+
+```tether
+// Matches no row. It does not terminate the statement, and the table survives.
+let rows = db.query("SELECT id FROM users WHERE name = $1",
+                    ["Ada'; DROP TABLE users; --"])?
+```
+
+That behaviour is asserted, not assumed — see `a_bound_parameter_cannot_terminate_the_statement`
+in `tests/postgres_live.rs` and `bound_parameters_cannot_inject_sql` in
+`tests/db_capability_live.rs`.
+
+Runnable end-to-end example:
+
+```bash
+TETHERSCRIPT_PG_URL=127.0.0.1:55432 cargo run --example db_capability
+```
+
 ## Limits
 
 Understand these before depending on the client:
@@ -73,9 +126,11 @@ Understand these before depending on the client:
 - **No TLS.** Connections are cleartext, so credentials and row data cross the
   network unprotected. Use a trusted network or a tunnel. Wiring this through the
   optional `openssl-tls` transport is open work.
-- **Simple query only.** There is no extended-protocol `Parse`/`Bind`, so values
-  cannot be bound as parameters. Untrusted input must not be concatenated into
-  SQL text. This is the most important gap to close next.
+- **Parameters bind as text.** `query` uses the extended protocol, so values never
+  enter the SQL string, but the server infers each type rather than being told it.
+  Supported parameter types are str, int, float, bool, and nil. `simple_query`
+  accepts no parameters at all, so untrusted input belongs in `query`.
+- **No binary format**, in either direction.
 - **Text-format decoding**, per the table above.
 - **One synchronous connection.** Pooling belongs to the host, matching how
   `DatabaseAuthority` is granted per request.
@@ -107,3 +162,9 @@ Both paths were verified against PostgreSQL 16.
 The crypto primitives have unit coverage that runs unconditionally, so a
 regression in SHA-256, HMAC, PBKDF2, or MD5 is caught by a normal `cargo test`
 without a database present.
+
+The extended-protocol message bytes are also asserted unconditionally in
+`src/postgres/extended_tests.rs`, covering the `Parse` layout, NULL as a -1
+length, text-format value framing, and rejection of unbindable parameter types by
+position. Framing bugs there would otherwise surface as an opaque server
+complaint or a hung read.

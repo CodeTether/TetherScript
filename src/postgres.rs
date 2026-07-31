@@ -9,6 +9,7 @@
 //!
 //! ```rust,no_run
 //! use tetherscript::postgres::{Config, Connection};
+//! use tetherscript::value::Value;
 //!
 //! # fn main() -> Result<(), String> {
 //! let mut connection = Connection::connect(&Config {
@@ -19,9 +20,12 @@
 //!     database: "tsdb".into(),
 //! })?;
 //!
-//! // Rows are a list of maps keyed by column name.
-//! let rows = connection.simple_query("SELECT id, name FROM users ORDER BY id")?;
-//! println!("{rows:?}");
+//! // Rows are a list of maps keyed by column name. Prefer `query` whenever a
+//! // value comes from outside: it binds parameters instead of splicing SQL.
+//! let rows = connection.query(
+//!     "SELECT id, name FROM users WHERE id = $1",
+//!     &[Value::Int(1)],
+//! )?;
 //! # Ok(())
 //! # }
 //! ```
@@ -36,7 +40,9 @@
 //! | `startup` | StartupMessage through `ReadyForQuery` |
 //! | `auth` / `sasl` / `scram` | Authentication negotiation |
 //! | `hmac` / `md5` | Crypto primitives for SCRAM and legacy `md5` |
-//! | `query` / `rows` / `error` | Simple-query execution and decoding |
+//! | `extended` / `params` | `Parse`/`Bind` and parameter encoding |
+//! | `query` / `collect` / `rows` / `error` | Execution and row decoding |
+//! | `handler` | `QueryHandler` adapter for the `db` capability |
 //!
 //! Crypto is built on the in-tree SHA-256 in [`crate::system`]. HMAC-SHA-256,
 //! PBKDF2, and MD5 are verified against the published vectors in RFC 4231,
@@ -50,13 +56,23 @@
 //! - **No TLS.** Connections are cleartext, so credentials and rows cross the
 //!   network unprotected. Use it on a trusted network or through a tunnel until
 //!   TLS is wired through the optional `openssl-tls` transport.
-//! - **Simple query only.** There is no extended-protocol `Parse`/`Bind`, so
-//!   values cannot be bound as parameters yet and must not be concatenated from
-//!   untrusted input. Server-side binding is the next step.
+//! - **Parameters bind, but only as text.** [`Connection::query`] uses the
+//!   extended protocol, so values never enter the SQL string. Types are inferred
+//!   by the server; str, int, float, bool, and nil are supported.
+//!   [`Connection::simple_query`] takes no parameters, so anything untrusted
+//!   belongs in `query`.
 //! - **Text-format decoding.** Values arrive as text and are converted
 //!   heuristically, so exact SQL types need an explicit cast in the query.
 //! - **One connection, synchronous.** Pooling belongs to the host, matching how
 //!   [`crate::database::DatabaseAuthority`] is granted per request.
+//!
+//! ## Reaching it from a script
+//!
+//! [`PostgresHandler`] implements [`crate::database::QueryHandler`], so a host can
+//! grant it as the `db` capability and a `.tether` script can call
+//! `db.query(sql, [params])`. Scripts have no ambient database access: `db` is
+//! undefined unless granted. See `examples/db_capability.rs` and
+//! `examples/db_capability.tether`.
 //!
 //! ## Testing
 //!
@@ -71,17 +87,21 @@
 //! ```
 
 mod auth;
+mod collect;
 mod connection;
 mod cursor;
 mod decode;
 mod encode;
 mod error;
+mod extended;
+mod handler;
 mod hmac;
 mod md5;
 mod md5_block;
 mod md5_constants;
 mod md5_password;
 mod nonce;
+mod params;
 mod query;
 mod rows;
 mod sasl;
@@ -89,9 +109,13 @@ mod scram;
 mod startup;
 
 pub use connection::{Config, Connection};
+pub use handler::PostgresHandler;
 
 #[cfg(test)]
 mod hmac_tests;
+
+#[cfg(test)]
+mod extended_tests;
 
 #[cfg(test)]
 mod md5_tests;

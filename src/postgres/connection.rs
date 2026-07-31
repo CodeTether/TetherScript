@@ -154,4 +154,40 @@ impl Connection {
     pub fn simple_query(&mut self, sql: &str) -> Result<Value, String> {
         query::run(self, sql)
     }
+
+    /// Execute SQL with bound parameters through the extended query protocol.
+    ///
+    /// This is the safe path for untrusted values. The statement is parsed once
+    /// with `$1`-style placeholders and the values are sent separately, so a
+    /// parameter can never change the shape of the SQL. Prefer it over
+    /// [`Connection::simple_query`] whenever a value comes from outside.
+    ///
+    /// # Arguments
+    ///
+    /// * `sql` — A single statement using `$1`, `$2`, … placeholders.
+    /// * `parameters` — Values to bind, positionally. Supported types are str,
+    ///   int, float, bool, and nil (SQL NULL).
+    ///
+    /// # Returns
+    ///
+    /// The decoded rows, in the same shape as [`Connection::simple_query`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error naming the position and type of any parameter that has no
+    /// text-format encoding, the server's `ErrorResponse`, or a transport error.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// # use tetherscript::postgres::Connection;
+    /// # use tetherscript::value::Value;
+    /// # fn run(connection: &mut Connection) -> Result<(), String> {
+    /// let rows = connection.query("SELECT name FROM users WHERE id = $1", &[Value::Int(1)])?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn query(&mut self, sql: &str, parameters: &[Value]) -> Result<Value, String> {
+        query::run_params(self, sql, parameters)
+    }
 }

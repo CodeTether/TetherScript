@@ -93,11 +93,10 @@ server as feature-complete.
   catches the lexically obvious cases; dynamic borrow counting on heap values is
   still open.
 - Server-side LSP completions, hover, go-to-definition, and exact spans.
-- PostgreSQL extended-protocol parameter binding (`Parse`/`Bind`), TLS for
-  database sockets, and binary-format decoding. Until binding lands, SQL text
-  must never be built from untrusted input. Also open: wiring the native client
-  into a `QueryHandler` so scripts can reach it through the `db` capability
-  instead of only from Rust hosts.
+- TLS for database sockets and binary-format decoding. `Parse`/`Bind` parameter
+  binding and the `QueryHandler` bridge have landed, so scripts reach the native
+  client through `db.query(sql, [params])`; types are still server-inferred and
+  only str/int/float/bool/nil bind.
 - Remote package registries, dependency downloads, and lockfiles.
 - Formatter.
 - Full Test262 / Web Platform Tests conformance and full browser parity. The
