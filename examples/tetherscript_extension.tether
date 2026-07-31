@@ -1,7 +1,11 @@
 // Dogfood plugin: extends the TetherScript binary through the embedded plugin host.
 //
-// Run:
-//     tetherscript --plugin examples/tetherscript_extension.tether validate
+// This is a plugin, not a standalone script: the `plugin()` hook describes it and
+// `validate()` is invoked by a Rust host through `PluginHost` (see `src/plugin.rs`
+// and `docs/tetherscript-and-codetether.md`). There is no `--plugin` CLI flag.
+//
+// Check that it parses and passes ownership analysis:
+//     tetherscript check examples/tetherscript_extension.tether
 
 fn plugin() {
     let meta = map()
@@ -15,12 +19,14 @@ fn plugin() {
 }
 
 fn validate() {
-    let good = tetherscript.diagnose("fn main() { println(\"plugin ok\") }")?
+    // `\{` and `\}` escape literal braces so the source sample is not read as
+    // a string-interpolation hole.
+    let good = tetherscript.diagnose("fn main() \{ println(\"plugin ok\") \}")?
     if !good.ok {
         return Err("expected valid TetherScript source, got " + good.stage + ": " + good.message)
     }
 
-    let bad = tetherscript.diagnose("fn main( {")?
+    let bad = tetherscript.diagnose("fn main( \{")?
     if bad.ok {
         return Err("expected invalid TetherScript source to be rejected")
     }

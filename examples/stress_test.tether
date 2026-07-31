@@ -363,7 +363,7 @@ fn main() {
     println("")
     print("Rendering maze as HTML via browser engine... ")
     let maze_html = maze_to_html(grid, mw, mh, path)
-    let maze_css = ".maze { width: 500px } .c { height: 1px } .s { background: #48f } .st { background: #4c4 } .e { background: #c44 }"
+    let maze_css = ".maze \{ width: 500px \} .c \{ height: 1px \} .s \{ background: #48f \} .st \{ background: #4c4 \} .e \{ background: #c44 \}"
     let snap = browser_snapshot(maze_html, maze_css, 520)
     println("done")
 
@@ -374,7 +374,7 @@ fn main() {
     // 5. JS cross-engine check
     println("")
     print("JS engine: computing fib(25)... ")
-    let js_fib = js_eval("function f(n){if(n<2)return n;return f(n-1)+f(n-2)} f(25);")
+    let js_fib = js_eval("function f(n)\{if(n<2)return n;return f(n-1)+f(n-2)\} f(25);")
     println(str(js_fib))
 
     // Summary

@@ -24,7 +24,7 @@ fn main() {
     let source = http_get(src).unwrap().body
     let probe = "if(typeof _.blotName!=\"string\"&&typeof _.attrName!=\"string\")throw new o(\"Invalid definition\")"
     let patched = "if(typeof _.blotName!=\"string\"&&typeof _.attrName!=\"string\")throw new o(\"Invalid definition shape qkey=\"+_.__realmRegisterKey+\" name=\"+_.name+\" ctor=\"+(_.constructor&&_.constructor.name)+\" keys=\"+Object.keys(_).join(\",\")+\" type=\"+typeof _)"
-    let qprobe = "Object.keys(D).forEach(function(W){G.register(W,D[W],P)})"
-    let qpatched = "Object.keys(D).forEach(function(W){D[W]&&typeof D[W]==\"object\"&&(D[W].__realmRegisterKey=W),G.register(W,D[W],P)})"
+    let qprobe = "Object.keys(D).forEach(function(W)\{G.register(W,D[W],P)\})"
+    let qpatched = "Object.keys(D).forEach(function(W)\{D[W]&&typeof D[W]==\"object\"&&(D[W].__realmRegisterKey=W),G.register(W,D[W],P)\})"
     println(browser_run_scripts(inline_first_script(redirected.body, source.replace(probe, patched).replace(qprobe, qpatched))))
 }

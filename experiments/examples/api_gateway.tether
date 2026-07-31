@@ -59,7 +59,7 @@ fn handle_root() {
 
 fn handle_render() {
     let html = "<div class=\"card\"><h2>Rendered by TetherScript</h2><p>Real layout engine</p></div>"
-    let css = ".card { width: 60px; padding: 2px; background: #f0f0f0 } h2 { height: 2px } p { height: 1px; color: #333 }"
+    let css = ".card \{ width: 60px; padding: 2px; background: #f0f0f0 \} h2 \{ height: 2px \} p \{ height: 1px; color: #333 \}"
     let display = browser_render(html, css, 80)
     let result = map()
     result.display_list = display
@@ -92,7 +92,7 @@ fn handle_compute(req) {
     if req.body == nil || req.body == "" {
         let err = map()
         err.error = "POST body required"
-        err.hint = "send JSON like {\"x\": 10, \"y\": 20}"
+        err.hint = "send JSON like \{\"x\": 10, \"y\": 20\}"
         return json_response(400, err)
     }
     let parsed = json_parse(req.body)

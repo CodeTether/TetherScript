@@ -11,12 +11,13 @@ fn verify_checkout(browser, base_url) {
     let report = browser.page_snapshot()?
     let component = browser."react.component_for_selector"("[data-testid='checkout-form']")?
 
-    return Ok(map() {
-        "ok": true,
-        "snapshot": report,
-        "component": component,
-        "trace": browser.trace()?
-    })
+    // tetherscript has no map-literal syntax; build maps by field assignment.
+    let result = map()
+    result.ok = true
+    result.snapshot = report
+    result.component = component
+    result.trace = browser.trace()?
+    return Ok(result)
 }
 
 fn main() {

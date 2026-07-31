@@ -147,11 +147,11 @@ fn md_to_html(md) {
 }
 
 fn page_template(post) {
-    return "<!doctype html><html><head><meta charset=\"utf-8\"><title>" + escape_html(post.title) + "</title><style>body{font-family:sans-serif;max-width:720px;margin:40px auto;line-height:1.6}a{color:#06c}.meta{color:#666}</style></head><body><p><a href=\"index.html\">← index</a></p><article><h1>" + escape_html(post.title) + "</h1><p class=\"meta\">" + escape_html(post.date) + " · " + escape_html(post.tags) + "</p>" + md_to_html(post.body) + "</article></body></html>"
+    return "<!doctype html><html><head><meta charset=\"utf-8\"><title>" + escape_html(post.title) + "</title><style>body\{font-family:sans-serif;max-width:720px;margin:40px auto;line-height:1.6\}a\{color:#06c\}.meta\{color:#666\}</style></head><body><p><a href=\"index.html\">← index</a></p><article><h1>" + escape_html(post.title) + "</h1><p class=\"meta\">" + escape_html(post.date) + " · " + escape_html(post.tags) + "</p>" + md_to_html(post.body) + "</article></body></html>"
 }
 
 fn index_page(posts) {
-    let mut html = "<!doctype html><html><head><meta charset=\"utf-8\"><title>TetherScript Content Site</title><style>body{font-family:sans-serif;max-width:760px;margin:40px auto}.post{margin:24px 0}.meta{color:#666}</style></head><body><h1>TetherScript Content Site</h1><p>Generated from markdown by TetherScript.</p>"
+    let mut html = "<!doctype html><html><head><meta charset=\"utf-8\"><title>TetherScript Content Site</title><style>body\{font-family:sans-serif;max-width:760px;margin:40px auto\}.post\{margin:24px 0\}.meta\{color:#666\}</style></head><body><h1>TetherScript Content Site</h1><p>Generated from markdown by TetherScript.</p>"
     let mut i = 0
     while i < posts.len() {
         let p = posts[i]

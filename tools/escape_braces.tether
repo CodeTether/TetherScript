@@ -1,0 +1,91 @@
+// Escape literal braces inside tetherscript string literals.
+//
+// tetherscript reads `{` in a string as the start of an interpolation hole, so
+// embedded JS/CSS/JSON payloads must write the escaped forms instead. This
+// codemod splits each line on the quote character to find string literals, then
+// escapes braces only inside them.
+//
+// Run:
+//   tetherscript run --grant-fs . tools/escape_braces.tether -- <file.tether>
+
+fn backslash() { return "\\" }
+fn open_brace() { return "\{" }
+fn close_brace() { return "\}" }
+
+// A quote preceded by an odd number of backslashes is escaped, so it does not
+// close the literal.
+fn ends_escaped(chunk) {
+    let parts = chunk.split(backslash())
+    let mut trailing = 0
+    let mut i = parts.len() - 1
+    while i > 0 {
+        if parts[i] == "" {
+            trailing = trailing + 1
+            i = i - 1
+        } else {
+            i = 0
+        }
+    }
+    return trailing % 2 == 1
+}
+
+fn escape_chunk(chunk) {
+    let esc_open = backslash() + open_brace()
+    let esc_close = backslash() + close_brace()
+    let mut out = chunk.replace(open_brace(), esc_open)
+    out = out.replace(close_brace(), esc_close)
+    // Never double-escape braces that were already correct.
+    out = out.replace(backslash() + esc_open, esc_open)
+    out = out.replace(backslash() + esc_close, esc_close)
+    return out
+}
+
+fn escape_line(line) {
+    if line.trim().starts_with("//") { return line }
+
+    let chunks = line.split("\"")
+    let mut out = ""
+    let mut in_str = false
+    let mut i = 0
+    while i < chunks.len() {
+        let chunk = chunks[i]
+        if i > 0 { out = out + "\"" }
+        if in_str {
+            out = out + escape_chunk(chunk)
+        } else {
+            out = out + chunk
+        }
+        if i < chunks.len() - 1 && !ends_escaped(chunk) {
+            in_str = !in_str
+        }
+        i = i + 1
+    }
+    return out
+}
+
+fn main() {
+    let args = env_args()
+    if args.len() < 1 {
+        println("usage: escape_braces.tether -- <file.tether>")
+        return
+    }
+
+    let path = args[0]
+    let src = fs_read(path)
+    if src.is_err() {
+        println("cannot read " + path)
+        return
+    }
+
+    let mut fixed = []
+    for line in src.unwrap().lines() {
+        fixed.push(escape_line(line))
+    }
+
+    let wrote = fs_write(path, fixed.join("\n") + "\n")
+    if wrote.is_err() {
+        println("cannot write " + path)
+        return
+    }
+    println("escaped braces in " + path)
+}

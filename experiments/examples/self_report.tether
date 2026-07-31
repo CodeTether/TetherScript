@@ -8,7 +8,7 @@
 fn build_report() {
     let html = "<div class=\"report\"><h1>TetherScript Capability Report</h1><div class=\"section\"><h2>Language Features</h2><ul><li>Dynamic typing with ownership</li><li>Closures and first-class functions</li><li>Result type with ? operator</li><li>Pattern matching</li></ul></div><div class=\"section\"><h2>Runtime</h2><ul><li>Tree-walking interpreter</li><li>Bytecode VM</li><li>JS engine built-in</li><li>HTML/CSS renderer</li></ul></div><div class=\"section\"><h2>Stdlib</h2><ul><li>HTTP server (http_serve)</li><li>JSON parse/encode</li><li>SMTP (smtp_send)</li><li>FS capabilities</li><li>LLM provider (chat + stream)</li><li>RPC (MCP + A2A)</li></ul></div><footer>Built with TetherScript 0.1.0-alpha.10</footer></div>"
 
-    let css = ".report { width: 80px; padding: 2px; background: #fafafa } h1 { height: 2px; color: #222 } .section { padding: 1px } h2 { height: 1px; color: #555 } ul { height: 5px } li { height: 1px; color: #666 } footer { height: 1px; color: #999 }"
+    let css = ".report \{ width: 80px; padding: 2px; background: #fafafa \} h1 \{ height: 2px; color: #222 \} .section \{ padding: 1px \} h2 \{ height: 1px; color: #555 \} ul \{ height: 5px \} li \{ height: 1px; color: #666 \} footer \{ height: 1px; color: #999 \}"
 
     let result = map()
     result.html = html
@@ -79,10 +79,10 @@ fn main() {
 
     // 5. JS eval — prove the JS engine works inline
     print_separator("JavaScript Engine Check")
-    let js_result = js_eval("var s = 0; for(var i = 1; i <= 10; i = i + 1) { s = s + i; } s;")
+    let js_result = js_eval("var s = 0; for(var i = 1; i <= 10; i = i + 1) \{ s = s + i; \} s;")
     println("  js_eval sum(1..10) = " + str(js_result))
 
-    let js_fib = js_eval("function fib(n) { if (n < 2) return n; return fib(n-1) + fib(n-2); } fib(20);")
+    let js_fib = js_eval("function fib(n) \{ if (n < 2) return n; return fib(n-1) + fib(n-2); \} fib(20);")
     println("  js_eval fib(20) = " + str(js_fib))
 
     // 6. Ownership demonstration

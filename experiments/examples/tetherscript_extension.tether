@@ -15,12 +15,12 @@ fn plugin() {
 }
 
 fn validate() {
-    let good = tetherscript.diagnose("fn main() { println(\"plugin ok\") }")?
+    let good = tetherscript.diagnose("fn main() \{ println(\"plugin ok\") \}")?
     if !good.ok {
         return Err("expected valid TetherScript source, got " + good.stage + ": " + good.message)
     }
 
-    let bad = tetherscript.diagnose("fn main( {")?
+    let bad = tetherscript.diagnose("fn main( \{")?
     if bad.ok {
         return Err("expected invalid TetherScript source to be rejected")
     }
