@@ -24,6 +24,10 @@ mod async_ops;
 mod hoist;
 #[path = "http_builtins.rs"]
 mod http_builtins;
+
+#[path = "web_builtins.rs"]
+mod web_builtins;
+
 #[path = "interp/module_method.rs"]
 mod module_method;
 #[path = "interp/resource_transfer.rs"]
@@ -1085,6 +1089,7 @@ pub(crate) fn install_builtins(env: &Rc<RefCell<Env>>) {
     install_pure_builtins(env);
     install_browser_builtins(env);
     http_builtins::install(env);
+    web_builtins::install(env);
     crate::value::resource::install(env);
     let mut e = env.borrow_mut();
 
