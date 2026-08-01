@@ -97,6 +97,32 @@ implemented.
 Standalone `build` currently rejects imported entry files until module bundling
 is added, rather than producing a launcher with unresolved imports.
 
+## Web built-ins
+
+Primitives for HTTP services, all in-tree with no dependency and no feature flag:
+routing, JWT, cookies, signed sessions, CSRF, password hashing, CSPRNG helpers,
+UUIDs, base32, form and multipart bodies, header/auth extraction, MIME types,
+ETags and cache control, HTTP dates, HTML templating, input validation, rate
+limiting, SSE framing, and structured logging.
+
+```tether
+// A parameterized route. Note the escaped braces: `{` opens an interpolation
+// hole, so an Actix-style pattern is written `\{code\}`.
+let params = route_match("/api/short-urls/\{code\}", req.path)?
+if params != nil {
+    return handler(req, params.code)
+}
+```
+
+Security behaviour is deliberate and asserted by tests: `template_render` escapes
+by default, `jwt_verify` chooses the algorithm rather than trusting the token's
+`alg`, signature comparisons are constant-time, `cookie_serialize` rejects header
+injection in every attribute, and `log_json` writes to stderr so a log line cannot
+corrupt an HTTP body on stdout.
+
+See [`docs/web-builtins.md`](docs/web-builtins.md) for the full surface and its
+limits, and `examples/the reference application_server.tether` for a server built on it.
+
 ## Database capability
 
 Database access is framework-neutral. Hosts implement
