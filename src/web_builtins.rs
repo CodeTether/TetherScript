@@ -25,22 +25,36 @@ pub(crate) mod datetime;
 pub(crate) mod etag;
 #[path = "web_builtins/form.rs"]
 pub(crate) mod form;
+#[path = "web_builtins/header.rs"]
+pub(crate) mod header;
 #[path = "web_builtins/hmac.rs"]
 pub(crate) mod hmac;
 #[path = "web_builtins/jwt.rs"]
 pub(crate) mod jwt;
+#[path = "web_builtins/log.rs"]
+pub(crate) mod log;
 #[path = "web_builtins/mime.rs"]
 pub(crate) mod mime;
+#[path = "web_builtins/multipart.rs"]
+pub(crate) mod multipart;
 #[path = "web_builtins/password.rs"]
 pub(crate) mod password;
 #[path = "web_builtins/random.rs"]
 pub(crate) mod random;
+#[path = "web_builtins/ratelimit.rs"]
+pub(crate) mod ratelimit;
 #[path = "web_builtins/route.rs"]
 pub(crate) mod route;
+#[path = "web_builtins/session.rs"]
+pub(crate) mod session;
 #[path = "web_builtins/sse.rs"]
 pub(crate) mod sse;
+#[path = "web_builtins/template.rs"]
+pub(crate) mod template;
 #[path = "web_builtins/uuid.rs"]
 pub(crate) mod uuid;
+#[path = "web_builtins/validate.rs"]
+pub(crate) mod validate;
 
 /// Register every web built-in group.
 pub(crate) fn install(env: &Rc<RefCell<Env>>) {
@@ -58,4 +72,11 @@ pub(crate) fn install(env: &Rc<RefCell<Env>>) {
     password::install(env);
     random::install(env);
     route::install(env);
+    header::install(env);
+    log::install(env);
+    multipart::install(env);
+    ratelimit::install(env);
+    session::install(env);
+    template::install(env);
+    validate::install(env);
 }
