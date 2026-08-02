@@ -24,6 +24,7 @@
 //!     user: "tsuser".into(),
 //!     password: "pencil".into(),
 //!     database: "tsdb".into(),
+//!     tls: false,
 //! })?;
 //!
 //! let mut host = PluginHost::new();

@@ -21,6 +21,8 @@ let mut connection = Connection::connect(&Config {
     user: "tsuser".into(),
     password: "pencil".into(),
     database: "tsdb".into(),
+    // TLS is opt-in and explicit: no field defaults to cleartext silently.
+    tls: false,
 })?;
 
 // `query` binds parameters through the extended protocol. Use it for anything

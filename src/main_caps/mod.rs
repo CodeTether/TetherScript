@@ -3,6 +3,7 @@
 mod browser;
 mod db;
 mod db_port;
+mod db_sslmode;
 mod fs;
 mod interp;
 mod provider;
@@ -35,3 +36,6 @@ mod db_tests;
 
 #[cfg(test)]
 mod db_reject_tests;
+
+#[cfg(test)]
+mod db_sslmode_tests;

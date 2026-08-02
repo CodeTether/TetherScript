@@ -18,6 +18,7 @@
 //!     user: "tsuser".into(),
 //!     password: "pencil".into(),
 //!     database: "tsdb".into(),
+//!     tls: false,
 //! })?;
 //!
 //! // Rows are a list of maps keyed by column name. Prefer `query` whenever a
@@ -110,6 +111,8 @@ mod rows;
 mod sasl;
 mod scram;
 mod startup;
+mod tls;
+mod transport;
 
 // `Connection` is the embedding surface and is unused by the CLI binary itself,
 // which reaches the client only through `PostgresHandler`.

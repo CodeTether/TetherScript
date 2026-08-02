@@ -174,6 +174,7 @@ let mut connection = Connection::connect(&Config {
     user: "tsuser".into(),
     password: "pencil".into(),
     database: "tsdb".into(),
+    tls: false,
 })?;
 // `query` binds parameters, so untrusted values never enter the SQL text.
 let rows = connection.query("SELECT name FROM users WHERE id = $1", &[Value::Int(1)])?;

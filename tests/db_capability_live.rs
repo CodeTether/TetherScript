@@ -21,6 +21,7 @@ fn config() -> Option<Config> {
         user: "tsuser".into(),
         password: "pencil".into(),
         database: "tsdb".into(),
+        tls: false,
     })
 }
 

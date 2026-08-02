@@ -27,4 +27,9 @@ impl TlsConnector {
     ) -> io::Result<TcpStream> {
         Err(io::Error::new(io::ErrorKind::Unsupported, ERROR))
     }
+
+    /// Return an error because TLS was not compiled into this binary.
+    pub fn connect_over(&self, _domain: &str, _tcp: TcpStream) -> io::Result<TcpStream> {
+        Err(io::Error::new(io::ErrorKind::Unsupported, ERROR))
+    }
 }

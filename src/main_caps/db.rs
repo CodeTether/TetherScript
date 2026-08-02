@@ -36,6 +36,9 @@ pub(super) fn authority(explicit: &Option<String>) -> Result<Option<DatabaseAuth
 
 /// Parse `postgres://user:password@host:port/database`.
 ///
+/// An optional `?sslmode=require` (or `verify-full`) query enables TLS, matching
+/// libpq's spelling so an existing connection string works unchanged.
+///
 /// # Errors
 ///
 /// Returns an error naming the missing component, because a connection string
@@ -49,9 +52,10 @@ pub(super) fn parse_url(url: &str) -> Result<Config, String> {
         .split_once('@')
         .ok_or("--grant-db needs user:password@host (no `@` found)")?;
     let (user, password) = credentials.split_once(':').unwrap_or((credentials, ""));
-    let (authority, database) = location
+    let (authority, path) = location
         .split_once('/')
         .ok_or("--grant-db needs a /database path")?;
+    let (database, query) = path.split_once('?').unwrap_or((path, ""));
     let (host, port) = super::db_port::split(authority)?;
     Ok(Config {
         host: host.to_string(),
@@ -59,5 +63,6 @@ pub(super) fn parse_url(url: &str) -> Result<Config, String> {
         user: user.to_string(),
         password: password.to_string(),
         database: database.to_string(),
+        tls: super::db_sslmode::wanted(query)?,
     })
 }

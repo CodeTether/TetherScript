@@ -64,6 +64,26 @@ impl TlsConnector {
         tcp.set_write_timeout(Some(timeout))?;
         self.0.connect(domain, tcp).map_err(error)
     }
+
+    /// Negotiate TLS over an already-connected socket.
+    ///
+    /// Protocols that begin in cleartext and upgrade in place need this: the
+    /// PostgreSQL wire protocol sends an `SSLRequest` and reads a single-byte
+    /// reply before any TLS record, so the socket must already exist.
+    ///
+    /// # Arguments
+    ///
+    /// * `domain` — Hostname to validate the certificate against. Passing the
+    ///   wrong name here would accept a certificate issued for another host.
+    /// * `tcp` — Connected socket, positioned at the start of the TLS handshake.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for TLS negotiation, certificate-chain, or
+    /// hostname-validation failures.
+    pub fn connect_over(&self, domain: &str, tcp: TcpStream) -> io::Result<TlsStream> {
+        self.0.connect(domain, tcp).map_err(error)
+    }
 }
 
 pub(super) fn builder() -> io::Result<openssl::ssl::SslConnectorBuilder> {

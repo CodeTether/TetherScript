@@ -1,11 +1,12 @@
 //! A single PostgreSQL connection over TCP.
 //!
-//! Deliberately synchronous and single-connection: the `db` capability is
-//! request-scoped, so pooling belongs to the host, matching how
-//! `DatabaseAuthority` is granted.
+//! Deliberately synchronous. The socket is either plain TCP or TLS negotiated in
+//! place; both are used identically once the handshake finishes, so the protocol
+//! code works through a boxed transport rather than a generic parameter.
 
 use std::net::TcpStream;
 
+use super::transport::Socket;
 use super::{query, startup};
 use crate::value::Value;
 
@@ -26,6 +27,7 @@ use crate::value::Value;
 ///     user: "tsuser".into(),
 ///     password: "pencil".into(),
 ///     database: "tsdb".into(),
+///     tls: false,
 /// };
 /// assert_eq!(config.port, 5432);
 /// ```
@@ -43,6 +45,8 @@ pub struct Config {
     pub password: String,
     /// Database to attach to after authentication.
     pub database: String,
+    /// Whether TLS is required before the startup message.
+    pub tls: bool,
 }
 
 /// An authenticated connection ready to accept queries.
@@ -63,6 +67,7 @@ pub struct Config {
 ///     user: "tsuser".into(),
 ///     password: "pencil".into(),
 ///     database: "tsdb".into(),
+///     tls: false,
 /// };
 /// let mut connection = Connection::connect(&config)?;
 /// let rows = connection.simple_query("SELECT id, name FROM users")?;
@@ -71,18 +76,14 @@ pub struct Config {
 /// # }
 /// ```
 pub struct Connection {
-    pub(super) stream: TcpStream,
+    pub(super) stream: Socket,
 }
 
-/// Prints only the peer address: never credentials, which a panic could leak.
+/// Deliberately opaque: the settings that reached this connection include a
+/// password, and a panic message must never print one.
 impl std::fmt::Debug for Connection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let peer = self
-            .stream
-            .peer_addr()
-            .map(|addr| addr.to_string())
-            .unwrap_or_else(|_| "disconnected".into());
-        write!(f, "Connection({peer})")
+        f.write_str("Connection(..)")
     }
 }
 
@@ -111,12 +112,19 @@ impl Connection {
     /// See the [`Connection`] example; connecting requires a live server, so the
     /// snippet there is `no_run`.
     pub fn connect(config: &Config) -> Result<Self, String> {
-        let stream = TcpStream::connect((config.host.as_str(), config.port)).map_err(|error| {
+        let tcp = TcpStream::connect((config.host.as_str(), config.port)).map_err(|error| {
             format!(
                 "postgres: connect to {}:{}: {error}",
                 config.host, config.port
             )
         })?;
+        // TLS is negotiated before the startup message, so credentials never cross
+        // the network in cleartext when it is requested.
+        let stream: Socket = if config.tls {
+            super::tls::negotiate(tcp, &config.host)?
+        } else {
+            Box::new(tcp)
+        };
         let mut connection = Self { stream };
         startup::run(&mut connection, config)?;
         Ok(connection)

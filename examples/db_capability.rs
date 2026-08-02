@@ -38,6 +38,8 @@ fn main() -> Result<(), String> {
         user: std::env::var("TETHERSCRIPT_PG_USER").unwrap_or_else(|_| "tsuser".into()),
         password: std::env::var("TETHERSCRIPT_PG_PASSWORD").unwrap_or_else(|_| "pencil".into()),
         database: std::env::var("TETHERSCRIPT_PG_DB").unwrap_or_else(|_| "tsdb".into()),
+        // Cleartext for a local throwaway container; production needs TLS.
+        tls: false,
     })?;
 
     let mut host = PluginHost::new();
