@@ -200,6 +200,14 @@ let rows = db.query("SELECT id, name FROM users WHERE id = $1", [id])?
 `examples/db_capability.rs` for the host and `examples/db_capability.tether` for
 the script.
 
+Transactions pin one pooled connection for their lifetime:
+
+```tether
+db.begin()?
+db.query("UPDATE accounts SET balance = balance - $1 WHERE id = $2", [30, 1])?
+db.commit()?
+```
+
 Current limits, before you depend on it:
 
 - **No TLS.** Connections are cleartext; use a trusted network or a tunnel.
@@ -208,7 +216,8 @@ Current limits, before you depend on it:
   are supported. `simple_query` takes no parameters, so untrusted input belongs in
   `query`.
 - **Text-format decoding**, so exact SQL types need an explicit cast.
-- **One synchronous connection**; pooling belongs to the host.
+- **Synchronous, pooled connections.** Queries lease from a small pool; a
+  transaction pins one. There is no async or multi-threaded execution.
 
 Wire-level tests run against a real server and are skipped unless
 `TETHERSCRIPT_PG_TEST_URL` is set. See `tests/postgres_live.rs` and
@@ -644,9 +653,10 @@ their source files.
 ## What is not done yet
 
 - Runtime `&mut` aliasing / XOR-mutability enforcement.
-- TLS for PostgreSQL connections and binary-format row decoding. The native
-  client binds parameters through `Parse`/`Bind`, but runs over a cleartext
-  socket and decodes every value from text format.
+- TLS for PostgreSQL connections, binary-format row decoding, and
+  `LISTEN`/`NOTIFY`. The native client pools connections, binds parameters through
+  `Parse`/`Bind`, and supports transactions, but runs over a cleartext socket and
+  decodes every value from text format.
 - Remote package registries, dependency downloads, and lockfiles.
 - Formatter and REPL.
 - More complete LSP features such as completions, hover, go-to-definition, and

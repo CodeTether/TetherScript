@@ -19,7 +19,12 @@ impl Authority for DatabaseAuthority {
     ) -> Result<Value, String> {
         match method {
             "query" => super::query::call(self.handler.as_ref(), arguments),
-            _ => Err(format!("db: unsupported method `{method}` (have: query)")),
+            "begin" | "commit" | "rollback" | "pool_size" => {
+                super::unit_call::call_unit(self.handler.as_ref(), method, arguments)
+            }
+            _ => Err(format!(
+                "db: unsupported method `{method}` (have: query, begin, commit, rollback, pool_size)"
+            )),
         }
     }
 

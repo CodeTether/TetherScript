@@ -35,4 +35,45 @@ pub trait QueryHandler: 'static {
     /// Returns a database-qualified message when binding, execution, or row
     /// decoding fails.
     fn query(&self, sql: &str, parameters: &[Value]) -> Result<Value, String>;
+
+    /// Begin a transaction, pinning one connection until it resolves.
+    ///
+    /// Every subsequent [`QueryHandler::query`] must run on the pinned connection
+    /// until [`QueryHandler::commit`] or [`QueryHandler::rollback`], because a
+    /// pooled handler could otherwise send the statements to a different
+    /// connection and silently drop them from the transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a transaction is already open or the adapter does not
+    /// support them. The default implementation refuses, so an adapter that has not
+    /// opted in cannot appear to honour a transaction it is ignoring.
+    fn begin(&self) -> Result<(), String> {
+        Err("db.begin: this database adapter does not support transactions".into())
+    }
+
+    /// Commit the open transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no transaction is open or the commit fails.
+    fn commit(&self) -> Result<(), String> {
+        Err("db.commit: this database adapter does not support transactions".into())
+    }
+
+    /// Roll back the open transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no transaction is open or the rollback fails.
+    fn rollback(&self) -> Result<(), String> {
+        Err("db.rollback: this database adapter does not support transactions".into())
+    }
+
+    /// Number of connections the adapter currently holds, for diagnostics.
+    ///
+    /// Defaults to 1, which is correct for a single-connection adapter.
+    fn pool_size(&self) -> usize {
+        1
+    }
 }

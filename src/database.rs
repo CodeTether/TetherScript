@@ -23,6 +23,7 @@ mod authority;
 mod invoke;
 mod query;
 mod query_handler;
+mod unit_call;
 
 pub use authority::DatabaseAuthority;
 pub use query_handler::QueryHandler;

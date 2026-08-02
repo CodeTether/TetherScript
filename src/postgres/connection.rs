@@ -29,6 +29,9 @@ use crate::value::Value;
 /// };
 /// assert_eq!(config.port, 5432);
 /// ```
+///
+/// `Clone` is derived so a connection pool can reconnect from the same settings.
+#[derive(Clone)]
 pub struct Config {
     /// Hostname or IP address of the server.
     pub host: String,

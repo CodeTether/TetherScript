@@ -1,9 +1,13 @@
 //! [`QueryHandler`] adapter over the native client.
 //!
-//! Bridges the two halves that already existed separately: the `db` capability
-//! contract in [`crate::database`] and the wire client in [`crate::postgres`].
-//! Granting this to a [`PluginHost`](crate::plugin::PluginHost) is what lets a
-//! `.tether` script call `db.query(..)` with no driver dependency anywhere.
+//! Bridges the `db` capability contract in [`crate::database`] to the wire client
+//! in [`crate::postgres`], so a `.tether` script can call `db.query(..)` with no
+//! driver dependency anywhere.
+//!
+//! Queries are served from a [`Pool`], because `http_serve` is single-threaded and
+//! a single connection would serialize every request behind the slowest statement.
+//! A transaction pins one connection for its whole lifetime, since statements sent
+//! to a different connection would silently fall outside it.
 //!
 //! # Examples
 //!
@@ -31,20 +35,27 @@
 use std::cell::RefCell;
 
 use super::connection::{Config, Connection};
+use super::pool::Pool;
 use crate::database::QueryHandler;
 use crate::value::Value;
 
-/// A [`QueryHandler`] backed by one native PostgreSQL connection.
-///
-/// `QueryHandler::query` takes `&self`, so the connection sits behind a
-/// [`RefCell`]: the protocol is stateful and every exchange needs mutable access
-/// to the socket.
+/// Connections opened by default. Small because the runtime is single-threaded:
+/// the pool exists to avoid head-of-line blocking across nested handlers, not to
+/// exploit parallelism the runtime does not have.
+const DEFAULT_POOL_SIZE: usize = 4;
+
+/// A [`QueryHandler`] backed by a pool of native PostgreSQL connections.
 pub struct PostgresHandler {
-    connection: RefCell<Connection>,
+    pool: Pool,
+    /// Connection pinned by an open transaction, if any.
+    transaction: RefCell<Option<Connection>>,
 }
 
 impl PostgresHandler {
     /// Connect and authenticate, returning a handler ready to grant as `db`.
+    ///
+    /// Opens one connection immediately so a bad address or credential fails here
+    /// rather than at the script's first query, then keeps it for reuse.
     ///
     /// # Arguments
     ///
@@ -55,8 +66,20 @@ impl PostgresHandler {
     /// Returns a `postgres:`-prefixed message when connecting or authenticating
     /// fails.
     pub fn connect(config: &Config) -> Result<Self, String> {
+        Self::with_pool_size(config, DEFAULT_POOL_SIZE)
+    }
+
+    /// Connect with an explicit maximum pool size.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the first connection cannot be established.
+    pub fn with_pool_size(config: &Config, max_size: usize) -> Result<Self, String> {
+        let pool = Pool::new(config.clone(), max_size);
+        pool.release(pool.acquire()?);
         Ok(Self {
-            connection: RefCell::new(Connection::connect(config)?),
+            pool,
+            transaction: RefCell::new(None),
         })
     }
 }
@@ -64,15 +87,37 @@ impl PostgresHandler {
 impl QueryHandler for PostgresHandler {
     /// Execute `sql` with bound `parameters` through the extended protocol.
     ///
-    /// Always parameterized, even for an empty list, so a script cannot opt into
-    /// the unparameterized path by accident.
+    /// Always parameterized, even for an empty list, so a script cannot reach the
+    /// unparameterized path by accident.
     fn query(&self, sql: &str, parameters: &[Value]) -> Result<Value, String> {
-        // A reentrant db.query from inside a handler would alias the socket; a
-        // named error beats a panic from the RefCell.
-        let mut connection = self
-            .connection
-            .try_borrow_mut()
-            .map_err(|_| "db.query: connection is already in use by an outer query".to_string())?;
-        connection.query(sql, parameters)
+        super::handler_exec::query(self, sql, parameters)
+    }
+
+    fn begin(&self) -> Result<(), String> {
+        super::handler_tx::begin(self)
+    }
+
+    fn commit(&self) -> Result<(), String> {
+        super::handler_tx::finish(self, "COMMIT")
+    }
+
+    fn rollback(&self) -> Result<(), String> {
+        super::handler_tx::finish(self, "ROLLBACK")
+    }
+
+    fn pool_size(&self) -> usize {
+        self.pool.size()
+    }
+}
+
+impl PostgresHandler {
+    /// Pool access for the split-out execution and transaction modules.
+    pub(super) fn pool(&self) -> &Pool {
+        &self.pool
+    }
+
+    /// Pinned transaction slot for the split-out modules.
+    pub(super) fn transaction(&self) -> &RefCell<Option<Connection>> {
+        &self.transaction
     }
 }

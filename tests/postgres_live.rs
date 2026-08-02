@@ -175,3 +175,87 @@ fn multiple_parameters_bind_positionally() {
         .expect("two parameters should bind");
     assert_eq!(rows(&result).len(), 1);
 }
+
+/// A committed transaction must persist, and a rolled-back one must leave nothing.
+#[test]
+fn transactions_commit_and_roll_back() {
+    let Some(config) = config() else { return };
+    use tetherscript::database::QueryHandler;
+    use tetherscript::postgres::PostgresHandler;
+
+    let handler = PostgresHandler::connect(&config).expect("connect");
+    let table = format!("tx_{}", std::process::id());
+    handler
+        .query(&format!("CREATE TABLE {table} (n int)"), &[])
+        .expect("create");
+
+    handler.begin().expect("begin");
+    handler
+        .query(&format!("INSERT INTO {table} VALUES (1)"), &[])
+        .expect("insert");
+    handler.commit().expect("commit");
+
+    handler.begin().expect("begin again");
+    handler
+        .query(&format!("INSERT INTO {table} VALUES (2)"), &[])
+        .expect("insert");
+    handler.rollback().expect("rollback");
+
+    let remaining = handler
+        .query(&format!("SELECT n FROM {table}"), &[])
+        .expect("select");
+    assert_eq!(
+        rows(&remaining).len(),
+        1,
+        "only the committed row may survive"
+    );
+
+    handler
+        .query(&format!("DROP TABLE {table}"), &[])
+        .expect("drop");
+}
+
+/// Nesting must be refused rather than flattened: a caller that believes it has an
+/// inner scope would otherwise have its rollback discard the outer work too.
+#[test]
+fn a_nested_begin_is_refused() {
+    let Some(config) = config() else { return };
+    use tetherscript::database::QueryHandler;
+    use tetherscript::postgres::PostgresHandler;
+
+    let handler = PostgresHandler::connect(&config).expect("connect");
+    handler.begin().expect("first begin");
+    let nested = handler.begin();
+    handler.rollback().expect("rollback");
+    let error = nested.expect_err("nested begin must fail");
+    assert!(error.contains("already open"), "got: {error}");
+}
+
+#[test]
+fn commit_without_a_transaction_is_an_error() {
+    let Some(config) = config() else { return };
+    use tetherscript::database::QueryHandler;
+    use tetherscript::postgres::PostgresHandler;
+
+    let handler = PostgresHandler::connect(&config).expect("connect");
+    let error = handler.commit().expect_err("must fail");
+    assert!(error.contains("no transaction"), "got: {error}");
+}
+
+/// A failed statement must leave the connection reusable rather than leaking it.
+#[test]
+fn the_pool_does_not_leak_a_connection_on_error() {
+    let Some(config) = config() else { return };
+    use tetherscript::database::QueryHandler;
+    use tetherscript::postgres::PostgresHandler;
+
+    let handler = PostgresHandler::connect(&config).expect("connect");
+    let before = handler.pool_size();
+    for _ in 0..5 {
+        handler
+            .query("SELECT * FROM no_such_table", &[])
+            .expect_err("must fail");
+    }
+    assert_eq!(handler.pool_size(), before, "pool must not grow on errors");
+    handler.query("SELECT 1 AS one", &[]).expect("still usable");
+}

@@ -131,6 +131,48 @@ That behaviour is asserted, not assumed — see `a_bound_parameter_cannot_termin
 in `tests/postgres_live.rs` and `bound_parameters_cannot_inject_sql` in
 `tests/db_capability_live.rs`.
 
+## Pooling
+
+`PostgresHandler` serves queries from a small pool, because `http_serve` runs a
+single-threaded accept loop and one connection would put every request behind the
+slowest statement. Connections are opened lazily up to the limit, so a script that
+never queries pays for nothing.
+
+```tether
+println(str(db.pool_size()?))   // connections currently held
+```
+
+A connection whose exchange failed mid-stream is discarded rather than reused: it
+may still have unread bytes queued, which would misalign every later reply. A
+server-side SQL error is different — the reply was drained through
+`ReadyForQuery` — so that connection returns to the pool.
+
+## Transactions
+
+`begin` pins one connection until `commit` or `rollback`. Pinning is required, not
+an optimization: without it a pooled handler could send the statements to a
+different connection, where they would commit independently and survive a
+rollback.
+
+```tether
+db.begin()?
+let created = store.create(code, url, expires_at)
+if created.is_err() {
+    db.rollback()?
+    return error_response()
+}
+db.commit()?
+```
+
+Three deliberate refusals, each an error rather than a silent no-op:
+
+- **Nested `begin`** — a caller that believes it has an inner scope would otherwise
+  have its rollback discard the outer work too.
+- **`commit` or `rollback` with nothing open** — usually a control-flow bug.
+- **Either, on an adapter that has not opted in.** `QueryHandler`'s default
+  implementations return an error, so a handler cannot appear to honour a
+  transaction it is ignoring.
+
 Runnable end-to-end example:
 
 ```bash
