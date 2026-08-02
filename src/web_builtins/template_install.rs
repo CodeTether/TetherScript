@@ -10,7 +10,7 @@ use crate::value::{Env, Value};
 
 use super::template_args::{native, str_arg, wrap};
 use super::template_escape::{escape, escape_attr};
-use super::template_render::render;
+use super::template_render::{render, render_inherited};
 
 /// Define `html_escape`, `html_attr`, `template_render`, `template_render_raw`.
 pub(super) fn install(env: &Rc<RefCell<Env>>) {
@@ -44,6 +44,14 @@ pub(super) fn install(env: &Rc<RefCell<Env>>) {
         native("template_render_raw", 2, |args| {
             let template = str_arg(&args[0], "template_render_raw: template")?;
             Ok(wrap(render(&template, &args[1], false)))
+        }),
+        false,
+    );
+    bindings.define(
+        "template_render_inherited",
+        native("template_render_inherited", 3, |args| {
+            let template = str_arg(&args[0], "template_render_inherited: template")?;
+            Ok(wrap(render_inherited(&template, &args[1], &args[2], true)))
         }),
         false,
     );

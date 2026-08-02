@@ -3,7 +3,9 @@
 //! Each iteration renders the body against a child context holding the loop
 //! variable, so the binding cannot leak past `endfor`.
 
-use super::template_block::{iterable, matching_end, render};
+use std::collections::HashMap;
+
+use super::template_block::{iterable, matching_end, render_with};
 use super::template_scan::Piece;
 use crate::value::Value;
 
@@ -19,13 +21,19 @@ pub(super) fn run(
     body: &str,
     context: &Value,
     escaping: bool,
+    overrides: &HashMap<String, String>,
     out: &mut String,
 ) -> Result<usize, String> {
     let (name, subject) = super::template_loop_header::parse(body)?;
     let (end, _) = matching_end(pieces, index)?;
     for item in iterable(context, subject)? {
         let scope = super::template_loop_header::child(context, name, item)?;
-        out.push_str(&render(&pieces[index + 1..end], &scope, escaping)?);
+        out.push_str(&render_with(
+            &pieces[index + 1..end],
+            &scope,
+            escaping,
+            overrides,
+        )?);
     }
     Ok(end + 1)
 }

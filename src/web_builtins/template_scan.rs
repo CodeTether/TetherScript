@@ -19,6 +19,25 @@ pub(super) enum Piece<'a> {
     Tag(&'a str),
 }
 
+/// Re-render pieces to equivalent source text.
+///
+/// Needed because a block's body must be re-scanned in the context of whichever
+/// template ends up rendering it, and reconstructing text is simpler than
+/// threading byte offsets through every layer.
+pub(super) fn to_source(pieces: &[Piece<'_>]) -> String {
+    pieces.iter().map(one_source).collect()
+}
+
+/// Source text for a single piece.
+fn one_source(piece: &Piece<'_>) -> String {
+    match piece {
+        Piece::Text(text) => (*text).to_string(),
+        Piece::Escaped(name) => format!("{{{{ {name} }}}}"),
+        Piece::Raw(name) => format!("{{{{{{ {name} }}}}}}"),
+        Piece::Tag(body) => format!("{{% {body} %}}"),
+    }
+}
+
 /// Split `template` into pieces in source order.
 ///
 /// # Errors

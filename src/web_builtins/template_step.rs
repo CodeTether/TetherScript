@@ -2,6 +2,8 @@
 //!
 //! Split from [`super::template_block`] so each file owns one concern.
 
+use std::collections::HashMap;
+
 use super::template_context::lookup;
 use super::template_escape::escape;
 use super::template_scan::Piece;
@@ -17,6 +19,7 @@ pub(super) fn step(
     index: usize,
     context: &Value,
     escaping: bool,
+    overrides: &HashMap<String, String>,
     out: &mut String,
 ) -> Result<usize, String> {
     match &pieces[index] {
@@ -37,6 +40,8 @@ pub(super) fn step(
             }
             Ok(index + 1)
         }
-        Piece::Tag(body) => super::template_tag::tag(pieces, index, body, context, escaping, out),
+        Piece::Tag(body) => {
+            super::template_tag::tag(pieces, index, body, context, escaping, overrides, out)
+        }
     }
 }

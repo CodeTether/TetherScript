@@ -102,8 +102,8 @@ is added, rather than producing a launcher with unresolved imports.
 Primitives for HTTP services, all in-tree with no dependency and no feature flag:
 routing, JWT, cookies, signed sessions, CSRF, password hashing, CSPRNG helpers,
 UUIDs, base32, form and multipart bodies, header/auth extraction, MIME types,
-ETags and cache control, HTTP dates, HTML templating, input validation, rate
-limiting, SSE framing, and structured logging.
+ETags and cache control, HTTP dates, HTML templating with Tera-style inheritance,
+input validation, rate limiting, SSE framing, and structured logging.
 
 ```tether
 // A parameterized route. Note the escaped braces: `{` opens an interpolation

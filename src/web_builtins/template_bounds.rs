@@ -28,10 +28,12 @@ pub(super) fn matching_end(
     for (offset, piece) in pieces.iter().enumerate().skip(open) {
         let Piece::Tag(body) = piece else { continue };
         match body.split_whitespace().next().unwrap_or("") {
-            "if" | "for" => depth += 1,
+            // `block` counts too: a block inside an `if` must not let the `if`'s
+            // `endif` search stop at the block's `endblock`, and vice versa.
+            "if" | "for" | "block" => depth += 1,
             // Only the outermost `else` at depth 1 belongs to this block.
             "else" if depth == 1 && alternate.is_none() => alternate = Some(offset),
-            "endif" | "endfor" => {
+            "endif" | "endfor" | "endblock" => {
                 depth -= 1;
                 if depth == 0 {
                     return Ok((offset, alternate));
@@ -40,5 +42,5 @@ pub(super) fn matching_end(
             _ => {}
         }
     }
-    Err("template: unbalanced block; missing `endif` or `endfor`".to_string())
+    Err("template: unbalanced block; missing `endif`, `endfor`, or `endblock`".to_string())
 }

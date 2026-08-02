@@ -45,6 +45,10 @@ use crate::value::Env;
 pub(super) mod template_args;
 #[path = "template_block.rs"]
 pub(super) mod template_block;
+#[path = "template_block_tag.rs"]
+pub(super) mod template_block_tag;
+#[path = "template_blocks.rs"]
+pub(super) mod template_blocks;
 #[path = "template_bounds.rs"]
 pub(super) mod template_bounds;
 #[path = "template_context.rs"]
@@ -53,8 +57,14 @@ pub(super) mod template_context;
 pub(super) mod template_delimit;
 #[path = "template_escape.rs"]
 pub(super) mod template_escape;
+#[path = "template_extends.rs"]
+pub(super) mod template_extends;
+#[path = "template_inherit.rs"]
+pub(super) mod template_inherit;
 #[path = "template_install.rs"]
 pub(super) mod template_install;
+#[path = "template_lookup.rs"]
+pub(super) mod template_lookup;
 #[path = "template_loop.rs"]
 pub(super) mod template_loop;
 #[path = "template_loop_header.rs"]
@@ -69,6 +79,8 @@ pub(super) mod template_step;
 pub(super) mod template_subject;
 #[path = "template_tag.rs"]
 pub(super) mod template_tag;
+#[path = "template_tag_unknown.rs"]
+pub(super) mod template_tag_unknown;
 #[path = "template_truth.rs"]
 pub(super) mod template_truth;
 

@@ -27,7 +27,7 @@ group can be added without touching a shared registration list.
 | mime | `mime_for_path`, `mime_parse`, `mime_is_text` |
 | etag | `etag_of`, `etag_weak`, `etag_matches`, `cache_control`, `not_modified_response` |
 | datetime | `http_date`, `http_date_parse`, `rfc3339`, `rfc3339_parse`, `time_now_secs` |
-| template | `html_escape`, `html_attr`, `template_render`, `template_render_raw` |
+| template | `html_escape`, `html_attr`, `template_render`, `template_render_raw`, `template_render_inherited` |
 | validate | `is_email`, `is_slug`, `is_digits`, `normalize_phone`, `validate_fields` |
 | ratelimit | `bucket_new`, `bucket_take`, `retry_after_header`, `too_many_requests_response` |
 | sse | `sse_event`, `sse_comment`, `sse_retry` |
@@ -88,9 +88,36 @@ to show". A **missing** key is also false, since that is how a view tests an
 optional value — but a missing key in a `{{ }}` hole is still an error, because
 there a typo would silently blank the page.
 
-Not supported: `{% extends %}`, `{% block %}`, `{% include %}`, `{% macro %}`, and
-filters such as `| safe`. Each is reported by name rather than ignored, so a
-template using one fails loudly instead of rendering a hole.
+### Inheritance
+
+`template_render_inherited(template, context, templates)` resolves
+`{% extends %}`. The child names a parent and supplies `{% block %}` bodies; the
+parent renders, with the child's blocks substituted by name. A block the child does
+not override keeps the parent's content, so a block body is a default rather than a
+requirement.
+
+```tether
+let templates = map()
+templates["layout"] = "<html><title>\{% block title %\}Site\{% endblock %\}</title>" +
+                      "<body>\{% block content %\}\{% endblock %\}</body></html>"
+
+let page = "\{% extends \"layout\" %\}\{% block content %\}<h1>\{\{ heading \}\}</h1>\{% endblock %\}"
+let html = template_render_inherited(page, context, templates)?
+```
+
+Chains nest to any depth up to 16, and the most-derived template wins at every
+level. Exceeding the depth is reported as a possible cycle rather than looping.
+Both quote styles work, and `{% endblock name %}` is accepted alongside bare
+`{% endblock %}`.
+
+Templates come from a caller-supplied **map**, not the filesystem: `template_*` are
+pure built-ins, so reading files from inside them would bypass the `fs` capability.
+A host that wants on-disk views reads them through `fs` and passes the map in.
+
+Still not supported: `{% include %}`, `{% macro %}`, `{% set %}`, and filters such
+as `| safe`. Each is reported by name — with a hint where there is an obvious
+alternative — rather than ignored, so a template using one fails loudly instead of
+rendering a hole.
 
 ## Security defaults
 
@@ -162,9 +189,9 @@ because the core build takes no dependencies.
 ## What is not here
 
 - No Redis or any session *store*; only the signed-cookie half.
-- No template inheritance (`{% extends %}`, `{% block %}`), includes, macros, or
-  filters. `template_render` covers substitution, `if`, and `for`. The optional
-  `tera` feature remains the richer path.
+- No template includes, macros, `{% set %}`, or filters. `template_render` covers
+  substitution, `if`, and `for`; `template_render_inherited` adds `extends` and
+  `block`. The optional `tera` feature remains the richer path.
 - No regex engine, so `validate` uses hand-written scanners and `is_email` is a
   pragmatic filter, not RFC 5322 and not proof of deliverability.
 - No WebSocket upgrade.

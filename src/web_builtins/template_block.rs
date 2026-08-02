@@ -1,33 +1,31 @@
-//! Statement evaluation for `{% if %}` and `{% for %}`.
+//! Statement evaluation for the block-aware template subset.
 //!
-//! Together these are the overwhelming majority of tags in the reference views, so
-//! they are the subset implemented first. Evaluation walks the piece list with an
-//! explicit index rather than recursing over slices, which keeps nesting depth
-//! independent of the Rust stack.
+//! Evaluation walks the piece list with an explicit index rather than recursing
+//! over slices, which keeps nesting depth independent of the Rust stack.
+//!
+//! Block overrides are carried through every layer because a `{% block %}` may
+//! appear inside an `{% if %}` or `{% for %}` in the parent template.
+
+use std::collections::HashMap;
 
 use super::template_scan::Piece;
 use crate::value::Value;
 
-/// Render `pieces` against `context`.
-///
-/// # Arguments
-///
-/// * `pieces` — Scanned template.
-/// * `context` — Root context map.
-/// * `escaping` — Whether `{{ }}` output is HTML-escaped.
+/// Render `pieces`, substituting `overrides` for matching `{% block %}` bodies.
 ///
 /// # Errors
 ///
 /// Returns an error for an unknown key, an unbalanced block, or an unsupported tag.
-pub(super) fn render(
+pub(super) fn render_with(
     pieces: &[Piece<'_>],
     context: &Value,
     escaping: bool,
+    overrides: &HashMap<String, String>,
 ) -> Result<String, String> {
     let mut out = String::new();
     let mut index = 0usize;
     while index < pieces.len() {
-        index = super::template_step::step(pieces, index, context, escaping, &mut out)?;
+        index = super::template_step::step(pieces, index, context, escaping, overrides, &mut out)?;
     }
     Ok(out)
 }
