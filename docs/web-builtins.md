@@ -114,10 +114,36 @@ Templates come from a caller-supplied **map**, not the filesystem: `template_*` 
 pure built-ins, so reading files from inside them would bypass the `fs` capability.
 A host that wants on-disk views reads them through `fs` and passes the map in.
 
-Still not supported: `{% include %}`, `{% macro %}`, `{% set %}`, and filters such
-as `| safe`. Each is reported by name — with a hint where there is an obvious
-alternative — rather than ignored, so a template using one fails loudly instead of
-rendering a hole.
+### Filters
+
+`{{ value | filter | filter(arg=x) }}` chains left to right.
+
+| Filter | Effect |
+| --- | --- |
+| `safe` | Emit raw, suppressing escaping |
+| `default(value=..)` | Substitute when the key is missing **or** `nil` |
+| `json`, `json_encode` | Encode as JSON |
+| `length` | Length of a str, list, or map |
+| `upper`, `lower`, `trim` | String transforms |
+
+`{{ data | json | safe }}` is the idiom for embedding a value in a `<script>` block,
+and is why `safe` exists: it marks content as intentionally raw. Everything else
+escapes, so reaching for `safe` is a visible decision rather than a default.
+
+`default` fires for a missing key *and* for `nil`, matching Tera. Its argument is
+validated on every render even when the value is present, so a malformed
+`default()` surfaces immediately rather than only on the rows where the key happens
+to be absent.
+
+An unknown filter is an error, never a pass-through: silently ignoring `| json`
+would emit a bare value where a page expects JSON and break the consuming script
+rather than the render.
+
+### Still unsupported
+
+`{% include %}`, `{% macro %}`, and `{% set %}`. Each is reported by name — with a
+hint where there is an obvious alternative — rather than ignored, so a template
+using one fails loudly instead of rendering a hole.
 
 ## Security defaults
 
@@ -189,9 +215,9 @@ because the core build takes no dependencies.
 ## What is not here
 
 - No Redis or any session *store*; only the signed-cookie half.
-- No template includes, macros, `{% set %}`, or filters. `template_render` covers
-  substitution, `if`, and `for`; `template_render_inherited` adds `extends` and
-  `block`. The optional `tera` feature remains the richer path.
+- No template includes, macros, or `{% set %}`. `template_render` covers
+  substitution, `if`, `for`, and filters; `template_render_inherited` adds `extends`
+  and `block`. The optional `tera` feature remains the richer path.
 - No regex engine, so `validate` uses hand-written scanners and `is_email` is a
   pragmatic filter, not RFC 5322 and not proof of deliverability.
 - No WebSocket upgrade.

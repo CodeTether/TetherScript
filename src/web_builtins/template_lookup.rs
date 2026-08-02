@@ -1,9 +1,9 @@
 //! Named-template lookup for inheritance.
 //!
 //! Templates are supplied by the caller as a map rather than read from disk:
-//! `template_render` is a pure built-in, so reading files from inside it would
-//! bypass the `fs` capability entirely. A host that wants filesystem templates
-//! reads them through `fs` and passes the map in.
+//! `template_render_*` are pure built-ins, so reading files from inside them would
+//! bypass the `fs` capability entirely. A host that wants filesystem templates reads
+//! them through `fs` and passes the map in.
 
 use crate::value::Value;
 

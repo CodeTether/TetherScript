@@ -1,7 +1,9 @@
 //! Condition and loop-subject resolution.
+//!
+//! Truthiness lives here too, since deciding whether a condition holds and deciding
+//! what a condition *means* are the same concern.
 
 use super::template_context::lookup_value;
-use super::template_truth::truthy;
 use crate::value::Value;
 
 /// Resolve the loop subject, which must be a list.
@@ -32,5 +34,25 @@ pub(super) fn condition(context: &Value, key: &str) -> Result<bool, String> {
     match lookup_value(context, key) {
         Ok(value) => Ok(truthy(&value)),
         Err(_) => Ok(false),
+    }
+}
+
+/// Whether `value` should take the `if` branch.
+///
+/// Follows Tera/Jinja rather than tetherscript's own rules: a template asking
+/// `{% if items %}` means "is there anything to show", so an empty list and an empty
+/// string are both false. Requiring `items.len() > 0` in every view would make
+/// ported templates diverge from their originals.
+pub(super) fn truthy(value: &Value) -> bool {
+    match value {
+        Value::Nil => false,
+        Value::Bool(flag) => *flag,
+        Value::Int(number) => *number != 0,
+        Value::Float(number) => *number != 0.0,
+        Value::Str(text) => !text.is_empty(),
+        Value::List(items) => !items.borrow().is_empty(),
+        Value::Map(entries) => !entries.borrow().is_empty(),
+        // Anything else present is something, so it shows.
+        _ => true,
     }
 }

@@ -3,9 +3,12 @@
 //! the reference application renders every page through Tera, but tetherscript's Tera support
 //! sits behind the optional `tera` feature, so the default zero-dependency build
 //! cannot render a page at all. This group provides a small always-available
-//! renderer so the port can serve HTML without a dependency. It is deliberately
-//! not a Tera clone: there are no filters, loops, conditionals, or inheritance.
-//! Use `tera_render` when the `tera` feature is enabled and those are needed.
+//! renderer so the port can serve HTML without a dependency.
+//!
+//! It covers the Tera subset the reference views actually lean on: substitution,
+//! `if`/`for`, `extends`/`block` inheritance, and the common filters. It is still not
+//! a Tera clone — `include`, `macro`, and `set` are absent, and each is rejected by
+//! name. Use `tera_render` when the `tera` feature is enabled and those are needed.
 //!
 //! # Script surface
 //!
@@ -45,20 +48,26 @@ use crate::value::Env;
 pub(super) mod template_args;
 #[path = "template_block.rs"]
 pub(super) mod template_block;
-#[path = "template_block_tag.rs"]
-pub(super) mod template_block_tag;
 #[path = "template_blocks.rs"]
 pub(super) mod template_blocks;
-#[path = "template_bounds.rs"]
-pub(super) mod template_bounds;
 #[path = "template_context.rs"]
 pub(super) mod template_context;
 #[path = "template_delimit.rs"]
 pub(super) mod template_delimit;
+#[path = "template_emit.rs"]
+pub(super) mod template_emit;
 #[path = "template_escape.rs"]
 pub(super) mod template_escape;
 #[path = "template_extends.rs"]
 pub(super) mod template_extends;
+#[path = "template_filter.rs"]
+pub(super) mod template_filter;
+#[path = "template_filter_apply.rs"]
+pub(super) mod template_filter_apply;
+#[path = "template_filter_arg.rs"]
+pub(super) mod template_filter_arg;
+#[path = "template_filter_fn.rs"]
+pub(super) mod template_filter_fn;
 #[path = "template_inherit.rs"]
 pub(super) mod template_inherit;
 #[path = "template_install.rs"]
@@ -79,10 +88,6 @@ pub(super) mod template_step;
 pub(super) mod template_subject;
 #[path = "template_tag.rs"]
 pub(super) mod template_tag;
-#[path = "template_tag_unknown.rs"]
-pub(super) mod template_tag_unknown;
-#[path = "template_truth.rs"]
-pub(super) mod template_truth;
 
 /// Register this group's built-ins.
 pub(crate) fn install(env: &Rc<RefCell<Env>>) {

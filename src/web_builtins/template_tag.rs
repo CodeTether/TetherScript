@@ -39,7 +39,7 @@ pub(super) fn tag(
         }
         "for" => super::template_loop::run(pieces, index, body, context, escaping, overrides, out),
         "block" => {
-            super::template_block_tag::run(pieces, index, body, context, escaping, overrides, out)
+            super::template_blocks::run(pieces, index, body, context, escaping, overrides, out)
         }
         // The root template no longer carries `extends`; reaching one means it was
         // not the first tag, which inheritance resolution rejects.
@@ -49,6 +49,6 @@ pub(super) fn tag(
         keyword @ ("else" | "endif" | "endfor" | "endblock") => {
             Err(format!("template: `{keyword}` without a matching opener"))
         }
-        other => super::template_tag_unknown::reject(other),
+        other => super::template_step::reject(other),
     }
 }

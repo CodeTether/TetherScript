@@ -30,5 +30,5 @@ pub(super) fn render_with(
     Ok(out)
 }
 
-pub(super) use super::template_bounds::matching_end;
+pub(super) use super::template_delimit::matching_end;
 pub(super) use super::template_subject::{condition, iterable};
