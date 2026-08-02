@@ -151,6 +151,15 @@ script.
 
 ### Native PostgreSQL client
 
+Scripts reach SQL through the `db` capability, granted from the CLI:
+
+```bash
+tetherscript run --grant-db postgres://user:pass@localhost:5432/app app.tether
+```
+
+The connection is established before the script starts, so a bad URL fails
+immediately. Without the grant, `db` is undefined and the script fails closed.
+
 A host adapter no longer has to supply the driver. `tetherscript::postgres`
 speaks the PostgreSQL v3 wire protocol directly over TCP, so the zero-dependency
 core now includes a real client:

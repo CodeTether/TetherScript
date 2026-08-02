@@ -74,6 +74,24 @@ still request it, and should never be used for anything else.
 
 ## Reaching it from a script
 
+### From the CLI
+
+`--grant-db` connects the native client and grants it as `db`, so a script run from
+the command line reaches SQL with no Rust host involved:
+
+```bash
+tetherscript run --grant-db postgres://user:pass@localhost:5432/app app.tether
+```
+
+The URL is parsed and the connection established *before* the script starts, so a
+typo or an unreachable database fails immediately rather than at the first query.
+Unlike `--grant-fs`, this is never implied by `--access-mode full`: a connection
+string carries credentials that cannot be inferred from the environment, so the
+grant is always explicit. Without it, `db` is undefined and the script fails
+closed.
+
+### From a Rust host
+
 `PostgresHandler` implements `QueryHandler`, so a host grants it as the `db`
 capability and a `.tether` script queries through it. Scripts have no ambient
 database access: `db` is undefined unless it was granted.

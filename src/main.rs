@@ -34,6 +34,7 @@ mod bytecode_visual;
 mod capability;
 mod cli_args;
 mod compiler;
+mod database;
 mod embed;
 mod embed_perm;
 mod fs_cap;
@@ -64,6 +65,7 @@ mod output;
 mod ownership;
 mod package;
 mod parser;
+mod postgres;
 mod process_control;
 mod provider_cap;
 mod provider_env;
@@ -177,6 +179,7 @@ fn cmd_run(args: &[String]) {
     let mut vm_mode = true;
     let mut step_budget: Option<u64> = None;
     let mut fs_grant: Option<String> = None;
+    let mut db_grant: Option<String> = None;
     let mut full_access = false;
     let mut provider_grant: Option<String> = None;
     let mut provider_key: Option<String> = None;
@@ -225,6 +228,17 @@ fn cmd_run(args: &[String]) {
                     process::exit(2);
                 }
                 fs_grant = Some(args[i].clone());
+                i += 1;
+            }
+            "--grant-db" => {
+                i += 1;
+                if i >= args.len() {
+                    eprintln!(
+                        "tetherscript run: --grant-db requires a postgres:// connection string"
+                    );
+                    process::exit(2);
+                }
+                db_grant = Some(args[i].clone());
                 i += 1;
             }
             "--access-mode" => {
@@ -347,6 +361,7 @@ fn cmd_run(args: &[String]) {
         vm_mode,
         step_budget,
         &fs_grant,
+        &db_grant,
         full_access,
         &provider_grant,
         &provider_key,
@@ -549,6 +564,7 @@ fn cmd_run_legacy(args: &[String]) {
     let mut vm_mode = true;
     let mut step_budget: Option<u64> = None;
     let mut fs_grant: Option<String> = None;
+    let mut db_grant: Option<String> = None;
     let mut full_access = false;
     let mut provider_grant: Option<String> = None;
     let mut provider_key: Option<String> = None;
@@ -592,6 +608,15 @@ fn cmd_run_legacy(args: &[String]) {
                     process::exit(2);
                 }
                 fs_grant = Some(args[i].clone());
+                i += 1;
+            }
+            "--grant-db" => {
+                i += 1;
+                if i >= args.len() {
+                    eprintln!("tetherscript: --grant-db requires a postgres:// connection string");
+                    process::exit(2);
+                }
+                db_grant = Some(args[i].clone());
                 i += 1;
             }
             "--access-mode" => {
@@ -709,6 +734,7 @@ fn cmd_run_legacy(args: &[String]) {
         vm_mode,
         step_budget,
         &fs_grant,
+        &db_grant,
         full_access,
         &provider_grant,
         &provider_key,
@@ -751,6 +777,7 @@ fn execute_file(
     vm_mode: bool,
     step_budget: Option<u64>,
     fs_grant: &Option<String>,
+    db_grant: &Option<String>,
     full_access: bool,
     provider_grant: &Option<String>,
     provider_key: &Option<String>,
@@ -786,6 +813,7 @@ fn execute_file(
         vm.install_cli_args(script_args);
         let caps = RunCaps {
             fs_grant,
+            db_grant,
             full_access,
             provider_grant,
             provider_key,
@@ -809,6 +837,7 @@ fn execute_file(
         interp.install_cli_args(script_args);
         let caps = RunCaps {
             fs_grant,
+            db_grant,
             full_access,
             provider_grant,
             provider_key,

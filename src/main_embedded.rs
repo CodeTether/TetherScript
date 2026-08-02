@@ -31,6 +31,9 @@ pub(super) fn run_source(src: &str, opts: &args::EmbeddedArgs) -> Result<(), Str
     let browser_scopes = Vec::new();
     let caps = RunCaps {
         fs_grant: &opts.fs_grant,
+        // Embedded hosts grant `db` through PluginHost directly, so the CLI-only
+        // connection-string grant is absent here.
+        db_grant: &None,
         full_access: opts.full_access,
         provider_grant: &opts.provider_grant,
         provider_key: &opts.provider_key,

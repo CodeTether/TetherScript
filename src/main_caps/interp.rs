@@ -1,6 +1,6 @@
 //! Interpreter capability grants.
 
-use crate::main_caps::{browser, fs, provider, RunCaps};
+use crate::main_caps::{browser, db, fs, provider, RunCaps};
 use crate::{fs_cap, interp::Interpreter, rpc_cap};
 
 pub(crate) fn grant(interp: &mut Interpreter, caps: &RunCaps<'_>) -> Result<(), String> {
@@ -17,6 +17,9 @@ pub(crate) fn grant(interp: &mut Interpreter, caps: &RunCaps<'_>) -> Result<(), 
     }
     if caps.full_access {
         interp.grant("vault", crate::provider_vault::vault_authority());
+    }
+    if let Some(auth) = db::authority(caps.db_grant)? {
+        interp.grant("db", std::rc::Rc::new(auth));
     }
     if let Some(endpoint) = caps.rpc_grant {
         interp.grant("rpc", rpc_cap::RpcAuthority::new(endpoint));

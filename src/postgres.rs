@@ -108,6 +108,9 @@ mod sasl;
 mod scram;
 mod startup;
 
+// `Connection` is the embedding surface and is unused by the CLI binary itself,
+// which reaches the client only through `PostgresHandler`.
+#[allow(unused_imports)]
 pub use connection::{Config, Connection};
 pub use handler::PostgresHandler;
 

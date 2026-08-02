@@ -1,6 +1,6 @@
 //! VM capability grants.
 
-use crate::main_caps::{browser, fs, provider, RunCaps};
+use crate::main_caps::{browser, db, fs, provider, RunCaps};
 use crate::{fs_cap, rpc_cap, vm::VM};
 
 pub(crate) fn grant(vm: &mut VM, caps: &RunCaps<'_>) -> Result<(), String> {
@@ -17,6 +17,9 @@ pub(crate) fn grant(vm: &mut VM, caps: &RunCaps<'_>) -> Result<(), String> {
     }
     if caps.full_access {
         vm.grant("vault", crate::provider_vault::vault_authority());
+    }
+    if let Some(auth) = db::authority(caps.db_grant)? {
+        vm.grant("db", std::rc::Rc::new(auth));
     }
     if let Some(endpoint) = caps.rpc_grant {
         vm.grant("rpc", rpc_cap::RpcAuthority::new(endpoint));
