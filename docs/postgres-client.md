@@ -9,6 +9,37 @@ as SQLx.
 Drivers are still supported and still welcome — `QueryHandler` is unchanged. This
 client is simply an in-tree implementation a host may use instead.
 
+## TLS
+
+PostgreSQL upgrades in place rather than using a separate port: the client sends an
+`SSLRequest`, reads one byte (`S` to proceed, `N` to refuse), and only then begins
+the handshake. Enable it with `sslmode` in the connection string:
+
+```bash
+tetherscript run --grant-db 'postgres://user:pass@host/app?sslmode=require' app.tether
+```
+
+| `sslmode` | Behaviour |
+| --- | --- |
+| absent, `disable` | Cleartext |
+| `require`, `verify-full` | TLS, with chain **and** hostname validation |
+| `prefer`, `allow` | **Refused** |
+| `verify-ca` | **Refused** |
+
+`prefer` and `allow` are refused rather than honoured because both silently fall
+back to cleartext, which would leave a caller believing a connection was encrypted
+when it was not. A server that answers `N` to an explicit `require` is an error for
+the same reason — there is no silent downgrade. `verify-ca` is refused in favour of
+`verify-full`, since the connector always validates the hostname and there is no
+weaker option to offer.
+
+TLS needs the `openssl-tls` feature. Without it, requesting TLS reports the missing
+feature by name rather than proceeding in the clear:
+
+```bash
+cargo build --release --features openssl-tls
+```
+
 ## Usage
 
 ```rust,no_run
@@ -185,9 +216,9 @@ TETHERSCRIPT_PG_URL=127.0.0.1:55432 cargo run --example db_capability
 
 Understand these before depending on the client:
 
-- **No TLS.** Connections are cleartext, so credentials and row data cross the
-  network unprotected. Use a trusted network or a tunnel. Wiring this through the
-  optional `openssl-tls` transport is open work.
+- **TLS is opt-in.** Without `sslmode=require`, connections are cleartext and
+  credentials cross the network unprotected. TLS also needs the `openssl-tls`
+  feature, so the default build cannot encrypt at all.
 - **Parameters bind as text.** `query` uses the extended protocol, so values never
   enter the SQL string, but the server infers each type rather than being told it.
   Supported parameter types are str, int, float, bool, and nil. `simple_query`

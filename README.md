@@ -211,7 +211,8 @@ db.commit()?
 
 Current limits, before you depend on it:
 
-- **No TLS.** Connections are cleartext; use a trusted network or a tunnel.
+- **TLS is opt-in**, via `?sslmode=require` and the `openssl-tls` feature.
+  Without both, connections are cleartext.
 - **Parameters bind as text.** `query` uses `Parse`/`Bind`, so values never enter
   the SQL string, but the server infers each type. str, int, float, bool, and nil
   are supported. `simple_query` takes no parameters, so untrusted input belongs in

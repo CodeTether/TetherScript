@@ -39,42 +39,40 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::system::result_value;
-use crate::value::{Env, Value};
+use crate::value::Env;
 
-use super::super::pure_native;
-
+#[path = "template_args.rs"]
+pub(super) mod template_args;
+#[path = "template_block.rs"]
+pub(super) mod template_block;
+#[path = "template_bounds.rs"]
+pub(super) mod template_bounds;
 #[path = "template_context.rs"]
 pub(super) mod template_context;
+#[path = "template_delimit.rs"]
+pub(super) mod template_delimit;
 #[path = "template_escape.rs"]
 pub(super) mod template_escape;
 #[path = "template_install.rs"]
 pub(super) mod template_install;
+#[path = "template_loop.rs"]
+pub(super) mod template_loop;
+#[path = "template_loop_header.rs"]
+pub(super) mod template_loop_header;
 #[path = "template_render.rs"]
 pub(super) mod template_render;
+#[path = "template_scan.rs"]
+pub(super) mod template_scan;
+#[path = "template_step.rs"]
+pub(super) mod template_step;
+#[path = "template_subject.rs"]
+pub(super) mod template_subject;
+#[path = "template_tag.rs"]
+pub(super) mod template_tag;
+#[path = "template_truth.rs"]
+pub(super) mod template_truth;
 
 /// Register this group's built-ins.
 pub(crate) fn install(env: &Rc<RefCell<Env>>) {
     template_install::install(env);
-}
-
-/// Coerce a built-in argument to a string, naming the parameter on mismatch.
-pub(super) fn str_arg(value: &Value, label: &str) -> Result<String, String> {
-    match value {
-        Value::Str(text) => Ok((**text).clone()),
-        other => Err(format!("{label} must be str, got {}", other.type_name())),
-    }
-}
-
-/// Wrap a fallible render as a tetherscript `Result`.
-pub(super) fn wrap(result: Result<String, String>) -> Value {
-    result_value(result.map(|text| Value::Str(Rc::new(text))))
-}
-
-/// Build a pure native from a name, arity, and body.
-pub(super) fn native<F>(name: &str, arity: usize, func: F) -> Value
-where
-    F: Fn(&[Value]) -> Result<Value, String> + 'static,
-{
-    pure_native(name, Some(arity), func)
 }

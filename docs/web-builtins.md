@@ -68,6 +68,30 @@ segmentation, so an encoded `%2F` can never forge a separator.
 See `examples/the reference application/server/router.tether` for a dispatch table built on
 this.
 
+## Templating
+
+`template_render` supports substitution, `{% if %}`/`{% else %}`/`{% endif %}`, and
+`{% for x in items %}`/`{% endfor %}`, which together are the majority of tags in a
+typical Tera view. Blocks nest, and escaping applies inside them.
+
+```tether
+let page = template_render(
+    "\{% if user %\}<h1>\{\{ user.name \}\}</h1>\{% endif %\}" +
+    "<ul>\{% for i in items %\}<li>\{\{ i \}\}</li>\{% endfor %\}</ul>",
+    context,
+)?
+```
+
+Condition truthiness follows Tera/Jinja rather than tetherscript: an empty list,
+empty string, and zero are all false, so `{% if items %}` means "is there anything
+to show". A **missing** key is also false, since that is how a view tests an
+optional value — but a missing key in a `{{ }}` hole is still an error, because
+there a typo would silently blank the page.
+
+Not supported: `{% extends %}`, `{% block %}`, `{% include %}`, `{% macro %}`, and
+filters such as `| safe`. Each is reported by name rather than ignored, so a
+template using one fails loudly instead of rendering a hole.
+
 ## Security defaults
 
 These are deliberate, and the tests assert them:
@@ -138,9 +162,9 @@ because the core build takes no dependencies.
 ## What is not here
 
 - No Redis or any session *store*; only the signed-cookie half.
-- No Tera-compatible template inheritance, filters, or loops. `template_render`
-  does substitution and escaping. The optional `tera` feature remains the richer
-  path.
+- No template inheritance (`{% extends %}`, `{% block %}`), includes, macros, or
+  filters. `template_render` covers substitution, `if`, and `for`. The optional
+  `tera` feature remains the richer path.
 - No regex engine, so `validate` uses hand-written scanners and `is_email` is a
   pragmatic filter, not RFC 5322 and not proof of deliverability.
 - No WebSocket upgrade.

@@ -8,9 +8,9 @@ use std::rc::Rc;
 
 use crate::value::{Env, Value};
 
+use super::template_args::{native, str_arg, wrap};
 use super::template_escape::{escape, escape_attr};
 use super::template_render::render;
-use super::{native, str_arg, wrap};
 
 /// Define `html_escape`, `html_attr`, `template_render`, `template_render_raw`.
 pub(super) fn install(env: &Rc<RefCell<Env>>) {

@@ -25,6 +25,18 @@ use crate::value::Value;
 /// absent, when a non-final segment is not a map, or when the value is a list or
 /// function with no sensible text form.
 pub(super) fn lookup(context: &Value, key: &str) -> Result<String, String> {
+    render_scalar(&lookup_value(context, key)?, key)
+}
+
+/// Resolve a dotted key to its value, without converting it to text.
+///
+/// Blocks need the value itself: `{% if items %}` tests emptiness and
+/// `{% for x in items %}` iterates, neither of which has a text form.
+///
+/// # Errors
+///
+/// Returns an error naming the missing segment when the path does not resolve.
+pub(super) fn lookup_value(context: &Value, key: &str) -> Result<Value, String> {
     let mut current = context.clone();
     for segment in key.split('.') {
         let Value::Map(map) = &current else {
@@ -43,7 +55,7 @@ pub(super) fn lookup(context: &Value, key: &str) -> Result<String, String> {
             }
         };
     }
-    render_scalar(&current, key)
+    Ok(current)
 }
 
 /// Convert a resolved value to its rendered text.
