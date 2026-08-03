@@ -536,6 +536,35 @@ fn a_request_without_an_origin_gets_no_cors_headers() {
 }
 
 #[test]
+fn the_null_origin_is_never_allow_listed() {
+    // `Origin: null` is sent by sandboxed iframes, `file://` documents, and some
+    // redirects, so it identifies no one: any attacker can present it by opening
+    // their own page in a sandboxed frame. It must not be allow-listable, and it
+    // must not match an exact-origin policy.
+    let out = stdout_of(&program(
+        r#"
+    // `null` carries no scheme, so it cannot even be written into an allow-list.
+    let attempted = map()
+    attempted.origins = ["null"]
+    println(str(cors_policy(attempted).is_err()))
+
+    // And it is not echoed by a real policy.
+    let p = policy_for(true)?
+    let h = cors_headers(p, request("GET", origin_headers("null")))?
+    println(str(h.contains("access-control-allow-origin")))
+
+    let headers = origin_headers("null")
+    headers["access-control-request-method"] = "POST"
+    println(str(cors_preflight(p, request("OPTIONS", headers)).is_err()))"#,
+    ));
+    assert_eq!(
+        out.lines().collect::<Vec<_>>(),
+        ["true", "false", "true"],
+        "`null` is a shared bucket, never an identity: {out}"
+    );
+}
+
+#[test]
 fn malformed_arguments_are_named_in_the_error() {
     let out = stdout_of(&program(
         r#"

@@ -17,6 +17,14 @@
 //! * **Credentials never pair with `*`.** `cors_config` rejects that combination
 //!   at construction, so by the time this runs the wildcard branch is known to be
 //!   credential-free.
+//! * **The `null` origin is never allow-listable.** A sandboxed iframe, a
+//!   `file://` document, and a redirected request all send `Origin: null`, so
+//!   `null` identifies no one: it is a shared bucket any attacker can enter by
+//!   opening their own page in a sandboxed frame. `cors_config_syntax` rejects
+//!   `null` as a list entry because it carries no scheme, so an exact-match
+//!   policy can never echo it and this function returns `None` for it. Under a
+//!   bare wildcard it receives `*` like any other origin, which is correct:
+//!   that policy grants no credentials, so it discloses nothing origin-specific.
 
 use super::cors_policy_read::Policy;
 
