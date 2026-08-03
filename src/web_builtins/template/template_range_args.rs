@@ -20,7 +20,7 @@ pub(super) fn parse_args(inner: &str, context: &Value, lenient: bool) -> Result<
         let (key, value) = part
             .split_once('=')
             .ok_or_else(|| format!("template: range argument `{part}` must be `key=value`"))?;
-        let resolved = resolve_int(value.trim(), context, lenient)?;
+        let resolved = resolve_value(value.trim(), context, lenient)?;
         match key.trim() {
             "start" => start = resolved,
             "end" => end = Some(resolved),
@@ -35,21 +35,31 @@ pub(super) fn parse_args(inner: &str, context: &Value, lenient: bool) -> Result<
     Ok(RangeArgs { start, end, step })
 }
 
-fn resolve_int(text: &str, context: &Value, lenient: bool) -> Result<i64, String> {
-    match text.parse::<i64>() {
-        Ok(n) => Ok(n),
-        Err(_) => match super::template_context::lookup_value(context, text) {
-            Ok(Value::Int(n)) => Ok(n),
-            Ok(Value::Float(n)) => Ok(n as i64),
-            Ok(Value::Nil) if lenient => Ok(0),
-            Ok(other) => Err(format!(
-                "template: range argument `{text}` is {}, not a number",
-                other.type_name()
-            )),
-            Err(_) if lenient => Ok(0),
-            Err(_) => Err(format!(
-                "template: range argument `{text}` is not a number or a known key"
-            )),
-        },
+fn resolve_value(expr: &str, context: &Value, lenient: bool) -> Result<i64, String> {
+    if let Some((l, r)) = expr.split_once(" - ") {
+        return Ok(term(l.trim(), context, lenient)? - term(r.trim(), context, lenient)?);
+    }
+    term(expr, context, lenient)
+}
+
+fn term(expr: &str, context: &Value, lenient: bool) -> Result<i64, String> {
+    if let Ok(n) = expr.parse::<i64>() {
+        return Ok(n);
+    }
+    let val = super::template_emit_default::value_of(expr, context).or_else(|_| {
+        if lenient {
+            Ok(Value::Nil)
+        } else {
+            Err::<Value, String>("unresolved".into())
+        }
+    })?;
+    match val {
+        Value::Int(n) => Ok(n),
+        Value::Float(n) => Ok(n as i64),
+        Value::Nil if lenient => Ok(0),
+        other => Err(format!(
+            "range argument is {}, not a number",
+            other.type_name()
+        )),
     }
 }

@@ -25,21 +25,21 @@ pub(super) fn run(
     Ok(end + 1)
 }
 
+/// Parse `for <name> in <subject>`.
+///
+/// The subject is everything after `in`, not just the next word: a real view writes
+/// `range(end=average_rating_rounded | default(value=5))`, which contains spaces.
 fn parse(body: &str) -> Result<(&str, &str), String> {
-    let mut words = body.split_whitespace();
-    words.next();
-    let name = words
-        .next()
-        .ok_or("template: `for` needs a variable name")?;
-    let keyword = words.next().unwrap_or("");
-    if keyword != "in" {
-        return Err(format!(
-            "template: `for {name}` must be followed by `in`, got `{keyword}`"
-        ));
+    let rest = body.strip_prefix("for").unwrap_or(body).trim();
+    let mid = rest.find(" in ").ok_or("template: `for` needs ` in `")?;
+    let name = rest[..mid].trim();
+    let subject = rest[mid + 4..].trim();
+    if name.is_empty() {
+        return Err("template: `for` needs a variable name".into());
     }
-    let subject = words
-        .next()
-        .ok_or("template: `for` needs something to iterate")?;
+    if subject.is_empty() {
+        return Err("template: `for` needs something to iterate".into());
+    }
     Ok((name, subject))
 }
 

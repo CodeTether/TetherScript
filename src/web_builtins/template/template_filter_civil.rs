@@ -1,9 +1,20 @@
-//! Civil-date conversion for the `date` filter.
-//!
-//! Howard Hinnant's `civil_from_days` algorithm, which is exact for the whole range of
-//! `i64` days and needs no lookup tables. Duplicated from the `datetime` group rather than
-//! sharing it, because those helpers are `pub(super)` to a different parent and widening
-//! their visibility for one caller would be the worse trade.
+//! Civil-date conversion for the `date` filter, plus month-name constants.
+
+/// Abbreviated then full month names, indexed from January.
+pub(super) const MONTHS: [(&str, &str); 12] = [
+    ("Jan", "January"),
+    ("Feb", "February"),
+    ("Mar", "March"),
+    ("Apr", "April"),
+    ("May", "May"),
+    ("Jun", "June"),
+    ("Jul", "July"),
+    ("Aug", "August"),
+    ("Sep", "September"),
+    ("Oct", "October"),
+    ("Nov", "November"),
+    ("Dec", "December"),
+];
 
 /// Convert days since the Unix epoch to a `(year, month, day)` civil date.
 ///
