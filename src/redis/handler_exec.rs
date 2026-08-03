@@ -40,7 +40,10 @@ use crate::value::Value;
 /// error for a reply that has no faithful `Value` representation.
 pub(super) fn command(handler: &RedisHandler, args: &[Vec<u8>]) -> Result<Value, String> {
     let mut connection = handler.pool().acquire()?;
-    match connection.command(args) {
+    // `Connection::command` borrows its arguments, so the owned buffers are re-borrowed
+    // here rather than the command builders being changed to allocate slices.
+    let borrowed: Vec<&[u8]> = args.iter().map(Vec::as_slice).collect();
+    match connection.command(&borrowed) {
         Err(error) => {
             handler.pool().discard();
             Err(format!("redis: transport failure: {error}"))

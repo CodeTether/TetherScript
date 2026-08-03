@@ -28,16 +28,16 @@ pub(super) fn tag(
         "if" => conditional(pieces, index, context, state, out),
         "for" => super::template_loop::run(pieces, index, body, context, state, out),
         "block" => super::template_blocks::run(pieces, index, body, context, state, out),
-        "include" => {
-            super::template_include::run(body, context, state, out)?;
-            Ok(index + 1)
-        }
+        // A definition emits nothing; it is collected and rendered only when called.
+        "macro" => super::template_macro::run(pieces, index, body, context, state, out),
+        // An include splices in place, so the cursor advances by one piece.
+        "include" => super::template_include::run(body, context, state, out).map(|()| index + 1),
         // The root template no longer carries `extends`; reaching one means it was not
         // the first tag, which inheritance resolution rejects.
         "extends" => Err("template: `extends` must be the first tag in a template".into()),
         // These are consumed by their opening tag, so reaching one here means it had
         // no opener.
-        keyword @ ("else" | "elif" | "endif" | "endfor" | "endblock") => {
+        keyword @ ("else" | "elif" | "endif" | "endfor" | "endblock" | "endmacro") => {
             Err(format!("template: `{keyword}` without a matching opener"))
         }
         other => super::template_step::reject(other),

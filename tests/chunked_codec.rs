@@ -8,8 +8,8 @@
 //! response head.
 
 use tetherscript::chunked::codec::{
-    ChunkedError, MAX_CHUNK_BYTES, MAX_TRAILERS, decode, decode_trailers, encode_body,
-    encode_chunk, encode_last_chunk, parse_chunk_size, streaming_head, strip_extensions,
+    decode, decode_trailers, encode_body, encode_chunk, encode_last_chunk, parse_chunk_size,
+    streaming_head, strip_extensions, ChunkedError, MAX_CHUNK_BYTES, MAX_TRAILERS,
 };
 
 /// A `Malformed` outcome, with a helpful message when the value is anything else.
@@ -143,7 +143,10 @@ fn extensions_are_stripped_without_trimming() {
     assert_eq!(strip_extensions(b";q=1"), b"");
     // Whitespace is preserved so the size parser can reject it explicitly.
     assert_eq!(strip_extensions(b"1a ;q=1"), b"1a ");
-    assert_malformed(decode(b"5 ;q=1\r\nhello\r\n0\r\n\r\n"), "padded size with extension");
+    assert_malformed(
+        decode(b"5 ;q=1\r\nhello\r\n0\r\n\r\n"),
+        "padded size with extension",
+    );
 }
 
 // -------------------------------------------------------------------- trailers
@@ -200,7 +203,10 @@ fn too_many_trailers_is_rejected() {
     let many: Vec<(String, String)> = (0..=MAX_TRAILERS)
         .map(|index| (format!("X-N{index}"), "v".to_string()))
         .collect();
-    assert_malformed(encode_last_chunk(&many), "encoding more trailers than allowed");
+    assert_malformed(
+        encode_last_chunk(&many),
+        "encoding more trailers than allowed",
+    );
 }
 
 #[test]
@@ -225,7 +231,10 @@ fn oversized_trailer_line_is_rejected() {
 fn trailer_encoding_refuses_injected_crlf() {
     // Response splitting: a CRLF in a value would forge additional fields.
     let bad = [("X-A".to_string(), "v\r\nX-B: forged".to_string())];
-    assert_malformed(encode_last_chunk(&bad), "CRLF injected into a trailer value");
+    assert_malformed(
+        encode_last_chunk(&bad),
+        "CRLF injected into a trailer value",
+    );
     let bad_name = [("X A".to_string(), "v".to_string())];
     assert_malformed(encode_last_chunk(&bad_name), "non-token trailer name");
 }
@@ -240,15 +249,24 @@ fn valid_hex_sizes_parse() {
     assert_eq!(parse_chunk_size(b"1f").unwrap(), 31);
     // Leading zeros are legal and unambiguous, so they are accepted.
     assert_eq!(parse_chunk_size(b"00000005").unwrap(), 5);
-    assert_eq!(decode(b"0005\r\nhello\r\n0\r\n\r\n").unwrap().payload, b"hello");
+    assert_eq!(
+        decode(b"0005\r\nhello\r\n0\r\n\r\n").unwrap().payload,
+        b"hello"
+    );
 }
 
 #[test]
 fn signed_size_is_rejected() {
     assert_malformed(parse_chunk_size(b"+5"), "plus-signed size");
     assert_malformed(parse_chunk_size(b"-5"), "minus-signed size");
-    assert_malformed(decode(b"+5\r\nhello\r\n0\r\n\r\n"), "plus-signed size on the wire");
-    assert_malformed(decode(b"-5\r\nhello\r\n0\r\n\r\n"), "minus-signed size on the wire");
+    assert_malformed(
+        decode(b"+5\r\nhello\r\n0\r\n\r\n"),
+        "plus-signed size on the wire",
+    );
+    assert_malformed(
+        decode(b"-5\r\nhello\r\n0\r\n\r\n"),
+        "minus-signed size on the wire",
+    );
 }
 
 #[test]
@@ -263,7 +281,10 @@ fn size_with_whitespace_is_rejected() {
     assert_malformed(parse_chunk_size(b"5 "), "trailing space");
     assert_malformed(parse_chunk_size(b" 5"), "leading space");
     assert_malformed(parse_chunk_size(b"5\t"), "trailing tab");
-    assert_malformed(decode(b"5 \r\nhello\r\n0\r\n\r\n"), "trailing space on the wire");
+    assert_malformed(
+        decode(b"5 \r\nhello\r\n0\r\n\r\n"),
+        "trailing space on the wire",
+    );
     assert_malformed(decode(b"0 \r\n\r\n"), "padded zero chunk");
 }
 
@@ -287,7 +308,10 @@ fn overflowing_size_is_rejected_not_wrapped() {
         decode(b"10000000000000000\r\n\r\n"),
         "overflowing size on the wire",
     );
-    assert_malformed(parse_chunk_size(b"ffffffffffffffffff"), "far-overflowing size");
+    assert_malformed(
+        parse_chunk_size(b"ffffffffffffffffff"),
+        "far-overflowing size",
+    );
     assert!(!matches!(parse_chunk_size(b"10000000000000000"), Ok(0)));
 }
 
@@ -296,7 +320,10 @@ fn overflowing_size_is_rejected_not_wrapped() {
 #[test]
 fn size_above_the_chunk_bound_is_rejected() {
     let over = format!("{:x}", MAX_CHUNK_BYTES + 1);
-    assert_malformed(parse_chunk_size(over.as_bytes()), "size past the chunk bound");
+    assert_malformed(
+        parse_chunk_size(over.as_bytes()),
+        "size past the chunk bound",
+    );
     assert_malformed(
         decode(format!("{over}\r\nhello\r\n").as_bytes()),
         "oversized chunk on the wire",
@@ -327,7 +354,10 @@ fn oversized_size_line_is_rejected_rather_than_scanned_forever() {
 #[test]
 fn streaming_head_advertises_chunked_and_never_content_length() {
     let head = streaming_head(200, "OK", "text/event-stream", &[]).unwrap();
-    assert!(head.starts_with("HTTP/1.1 200 OK\r\n"), "status line: {head:?}");
+    assert!(
+        head.starts_with("HTTP/1.1 200 OK\r\n"),
+        "status line: {head:?}"
+    );
     assert!(head.contains("Transfer-Encoding: chunked\r\n"));
     assert!(head.contains("Content-Type: text/event-stream\r\n"));
     assert!(
@@ -351,15 +381,24 @@ fn caller_supplied_framing_headers_are_dropped() {
     assert_eq!(lower.matches("transfer-encoding").count(), 1);
     assert!(!lower.contains("identity"));
     assert_eq!(lower.matches("connection:").count(), 1);
-    assert!(head.contains("X-Stream: yes\r\n"), "non-reserved headers pass through");
+    assert!(
+        head.contains("X-Stream: yes\r\n"),
+        "non-reserved headers pass through"
+    );
 }
 
 #[test]
 fn streaming_head_refuses_header_injection() {
     let split = vec![("X-A".to_string(), "v\r\nContent-Length: 0".to_string())];
-    assert_malformed(streaming_head(200, "OK", "text/plain", &split), "injected header");
+    assert_malformed(
+        streaming_head(200, "OK", "text/plain", &split),
+        "injected header",
+    );
     let bad_name = vec![("X\r\nY".to_string(), "v".to_string())];
-    assert_malformed(streaming_head(200, "OK", "text/plain", &bad_name), "injected name");
+    assert_malformed(
+        streaming_head(200, "OK", "text/plain", &bad_name),
+        "injected name",
+    );
     assert_malformed(
         streaming_head(200, "OK", "text/plain\r\nContent-Length: 0", &[]),
         "injected content type",

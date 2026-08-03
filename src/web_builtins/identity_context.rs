@@ -54,7 +54,10 @@ pub(super) fn extract(request: &Value) -> Result<Value, String> {
     }
     let address = fields::client_ip(&req, &headers);
     ctx.insert("client_ip".into(), Value::Str(Rc::new(address)));
-    ctx.insert("user_agent".into(), fields::optional(&headers, "user-agent"));
+    ctx.insert(
+        "user_agent".into(),
+        fields::optional(&headers, "user-agent"),
+    );
     ctx.insert("referer".into(), fields::optional(&headers, "referer"));
     let id = fields::request_id(&headers);
     ctx.insert("request_id".into(), Value::Str(Rc::new(id)));
@@ -87,10 +90,7 @@ pub(super) fn id_of(request: &Value) -> Result<Value, String> {
 ///
 /// Absent `headers` is tolerated so a hand-built request fixture still yields a
 /// context; a *mistyped* `headers` is not, because that is a real shape error.
-fn headers_of(
-    req: &HashMap<String, Value>,
-    label: &str,
-) -> Result<HashMap<String, Value>, String> {
+fn headers_of(req: &HashMap<String, Value>, label: &str) -> Result<HashMap<String, Value>, String> {
     match req.get("headers") {
         Some(value) => as_map(value, &format!("{label}: headers")),
         None => Ok(HashMap::new()),

@@ -9,7 +9,7 @@
 use std::io::{Read, Write};
 
 use super::connection::Connection;
-use super::decode::{Decoded, decode};
+use super::decode::{decode, Decoded};
 use super::error::RedisError;
 use super::value::RespValue;
 

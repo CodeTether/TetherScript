@@ -5,7 +5,7 @@
 //! length, before any buffer is sized from that claim.
 
 use super::reject_tests::reject;
-use super::wire::{KEY, client_frame};
+use super::wire::{client_frame, KEY};
 use tetherscript::websocket::error::ProtocolError;
 use tetherscript::websocket::limits::{self, MAX_PAYLOAD_LEN};
 

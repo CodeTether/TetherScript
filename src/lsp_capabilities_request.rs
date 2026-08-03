@@ -25,7 +25,7 @@
 //! ```
 
 use crate::lsp_capabilities::docs::Docs;
-use crate::lsp_capabilities::jsonval::{ValueText, pointer};
+use crate::lsp_capabilities::jsonval::{pointer, ValueText};
 use crate::lsp_capabilities::position::byte_offset;
 use crate::value::Value;
 

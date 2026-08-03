@@ -92,10 +92,12 @@ pub fn parse(url: &str) -> Result<Config, String> {
 /// other scheme naming the one required. Neither message echoes the URL.
 fn scheme(url: &str) -> Result<&str, String> {
     if url.starts_with("rediss://") {
-        return Err("--grant-redis: rediss:// is not supported because TLS is not wired \
+        return Err(
+            "--grant-redis: rediss:// is not supported because TLS is not wired \
                     for the Redis transport yet; refusing rather than sending your \
                     password in cleartext. Use a TLS tunnel and redis://."
-            .into());
+                .into(),
+        );
     }
     url.strip_prefix("redis://")
         .ok_or_else(|| "--grant-redis must start with redis://".to_string())

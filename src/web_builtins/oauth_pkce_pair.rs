@@ -11,8 +11,8 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use super::generate::{challenge, generate};
 use super::METHOD;
-use super::gen::{challenge, generate};
 use crate::value::Value;
 
 /// Mint a verifier and its S256 challenge.

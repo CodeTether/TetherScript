@@ -30,7 +30,9 @@ const K: usize = 256;
 
 /// A digest with no repeated structure, so a misaligned compare cannot pass.
 fn digest(alg: DigestAlgorithm) -> Vec<u8> {
-    (0..alg.digest_len()).map(|i| (i as u8).wrapping_mul(7) ^ 0x5a).collect()
+    (0..alg.digest_len())
+        .map(|i| (i as u8).wrapping_mul(7) ^ 0x5a)
+        .collect()
 }
 
 /// Build the one canonical `EM = 0x00 || 0x01 || PS || 0x00 || T` block.
@@ -130,7 +132,10 @@ fn missing_zero_separator_is_refused() {
     let separator = K - alg.encoded_len() - 1;
     assert_eq!(em[separator], 0x00);
     em[separator] = 0x01;
-    assert_eq!(check_encoding(&em, &digest(alg), alg), Err(RsaError::MissingSeparator));
+    assert_eq!(
+        check_encoding(&em, &digest(alg), alg),
+        Err(RsaError::MissingSeparator)
+    );
 }
 
 #[test]
@@ -139,7 +144,10 @@ fn an_all_ff_block_with_no_separator_is_refused() {
     let alg = DigestAlgorithm::Sha256;
     let mut em = vec![0x00, 0x01];
     em.resize(K, 0xff);
-    assert_eq!(check_encoding(&em, &digest(alg), alg), Err(RsaError::MissingSeparator));
+    assert_eq!(
+        check_encoding(&em, &digest(alg), alg),
+        Err(RsaError::MissingSeparator)
+    );
 }
 
 #[test]
@@ -183,7 +191,10 @@ fn a_one_bit_change_in_the_last_digest_octet_is_refused() {
     let alg = DigestAlgorithm::Sha256;
     let mut em = good(alg);
     *em.last_mut().unwrap() ^= 0x01;
-    assert_eq!(check_encoding(&em, &digest(alg), alg), Err(RsaError::DigestMismatch));
+    assert_eq!(
+        check_encoding(&em, &digest(alg), alg),
+        Err(RsaError::DigestMismatch)
+    );
 }
 
 #[test]
@@ -191,7 +202,10 @@ fn a_one_bit_change_in_the_first_digest_octet_is_refused() {
     let alg = DigestAlgorithm::Sha256;
     let mut em = good(alg);
     em[K - alg.digest_len()] ^= 0x80;
-    assert_eq!(check_encoding(&em, &digest(alg), alg), Err(RsaError::DigestMismatch));
+    assert_eq!(
+        check_encoding(&em, &digest(alg), alg),
+        Err(RsaError::DigestMismatch)
+    );
 }
 
 #[test]
@@ -206,7 +220,10 @@ fn a_trailing_octet_after_the_digest_is_refused() {
     assert_eq!(em.len(), K);
     assert_eq!(
         check_encoding(&em, &digest(alg), alg),
-        Err(RsaError::DigestInfoLength { expected: 51, found: 52 })
+        Err(RsaError::DigestInfoLength {
+            expected: 51,
+            found: 52
+        })
     );
 }
 
@@ -219,7 +236,10 @@ fn a_digestinfo_region_one_octet_short_is_refused() {
     em.truncate(K);
     assert_eq!(
         check_encoding(&em, &digest(alg), alg),
-        Err(RsaError::DigestInfoLength { expected: 51, found: 50 })
+        Err(RsaError::DigestInfoLength {
+            expected: 51,
+            found: 50
+        })
     );
 }
 
@@ -230,7 +250,10 @@ fn a_caller_supplied_digest_of_the_wrong_length_is_refused() {
     let alg = DigestAlgorithm::Sha256;
     assert_eq!(
         check_encoding(&good(alg), &[0u8; 20], alg),
-        Err(RsaError::DigestLength { expected: 32, found: 20 })
+        Err(RsaError::DigestLength {
+            expected: 32,
+            found: 20
+        })
     );
 }
 
@@ -241,7 +264,10 @@ fn a_block_too_small_to_hold_the_structure_is_refused() {
     let alg = DigestAlgorithm::Sha512;
     assert_eq!(
         check_encoding(&[0u8; 64], &digest(alg), alg),
-        Err(RsaError::EncodingTooShort { modulus_bytes: 64, needed: 94 })
+        Err(RsaError::EncodingTooShort {
+            modulus_bytes: 64,
+            needed: 94
+        })
     );
 }
 

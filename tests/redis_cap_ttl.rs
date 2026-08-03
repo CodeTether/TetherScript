@@ -40,7 +40,10 @@ fn one_second_is_accepted_as_the_smallest_usable_ttl() {
 #[test]
 fn a_zero_ttl_is_rejected() {
     let error = coerce_seconds::positive("redis.expire", "seconds", 0).unwrap_err();
-    assert!(error.contains("`seconds`"), "must name the parameter: {error}");
+    assert!(
+        error.contains("`seconds`"),
+        "must name the parameter: {error}"
+    );
     assert!(error.contains("positive"), "got: {error}");
 }
 
@@ -48,7 +51,10 @@ fn a_zero_ttl_is_rejected() {
 #[test]
 fn a_negative_ttl_is_rejected() {
     let error = coerce_seconds::positive("redis.setex", "seconds", -1).unwrap_err();
-    assert!(error.contains("`seconds`"), "must name the parameter: {error}");
+    assert!(
+        error.contains("`seconds`"),
+        "must name the parameter: {error}"
+    );
 }
 
 #[test]

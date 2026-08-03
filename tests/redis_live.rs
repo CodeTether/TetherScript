@@ -58,27 +58,38 @@ fn cleanup(connection: &mut Connection, name: &str) {
 /// The handshake must complete and the server must answer `PING`.
 #[test]
 fn connects_and_pings() {
-    let Some(mut connection) = connect() else { return };
+    let Some(mut connection) = connect() else {
+        return;
+    };
     assert_eq!(connection.ping().unwrap(), "PONG");
 }
 
 /// A round trip of an arbitrary command through the generic entry point.
 #[test]
 fn sends_arbitrary_command() {
-    let Some(mut connection) = connect() else { return };
-    let reply = connection.command(&[&b"ECHO"[..], &b"round trip"[..]]).unwrap();
+    let Some(mut connection) = connect() else {
+        return;
+    };
+    let reply = connection
+        .command(&[&b"ECHO"[..], &b"round trip"[..]])
+        .unwrap();
     assert_eq!(reply, RespValue::Bulk(b"round trip".to_vec()));
 }
 
 /// `SET` then `GET` must return exactly what was stored.
 #[test]
 fn sets_and_gets_a_value() {
-    let Some(mut connection) = connect() else { return };
+    let Some(mut connection) = connect() else {
+        return;
+    };
     let name = key("set_get");
     connection
         .set(name.as_bytes(), b"value", &SetOptions::default())
         .unwrap();
-    assert_eq!(connection.get(name.as_bytes()).unwrap(), Some(b"value".to_vec()));
+    assert_eq!(
+        connection.get(name.as_bytes()).unwrap(),
+        Some(b"value".to_vec())
+    );
     cleanup(&mut connection, "set_get");
 }
 
@@ -86,7 +97,9 @@ fn sets_and_gets_a_value() {
 /// is the null-bulk-versus-empty-bulk distinction observed end to end.
 #[test]
 fn distinguishes_missing_key_from_empty_value() {
-    let Some(mut connection) = connect() else { return };
+    let Some(mut connection) = connect() else {
+        return;
+    };
     let name = key("empty");
     cleanup(&mut connection, "empty");
 
@@ -106,7 +119,9 @@ fn distinguishes_missing_key_from_empty_value() {
 /// this would come back truncated.
 #[test]
 fn round_trips_a_value_containing_crlf() {
-    let Some(mut connection) = connect() else { return };
+    let Some(mut connection) = connect() else {
+        return;
+    };
     let name = key("crlf");
     let payload = b"line one\r\nFLUSHALL\r\nline two";
     connection
@@ -124,7 +139,9 @@ fn round_trips_a_value_containing_crlf() {
 /// Binary values, including NUL and invalid UTF-8, must survive.
 #[test]
 fn round_trips_binary_value() {
-    let Some(mut connection) = connect() else { return };
+    let Some(mut connection) = connect() else {
+        return;
+    };
     let name = key("binary");
     let payload = vec![0x00, 0xff, 0x0d, 0x0a, 0x80, 0x00];
     connection
@@ -140,7 +157,9 @@ fn round_trips_binary_value() {
 /// lock primitive, and it is exactly the null-bulk reply being read correctly.
 #[test]
 fn set_nx_reports_whether_it_won() {
-    let Some(mut connection) = connect() else { return };
+    let Some(mut connection) = connect() else {
+        return;
+    };
     let name = key("nx");
     cleanup(&mut connection, "nx");
 
@@ -149,7 +168,9 @@ fn set_nx_reports_whether_it_won() {
         if_not_exists: true,
     };
     assert!(connection.set(name.as_bytes(), b"first", &options).unwrap());
-    assert!(!connection.set(name.as_bytes(), b"second", &options).unwrap());
+    assert!(!connection
+        .set(name.as_bytes(), b"second", &options)
+        .unwrap());
     // The loser must not have overwritten the winner.
     assert_eq!(
         connection.get(name.as_bytes()).unwrap(),
@@ -161,7 +182,9 @@ fn set_nx_reports_whether_it_won() {
 /// `SET ... EX` sets value and expiry atomically, so `TTL` is bounded immediately.
 #[test]
 fn set_ex_applies_an_expiry() {
-    let Some(mut connection) = connect() else { return };
+    let Some(mut connection) = connect() else {
+        return;
+    };
     let name = key("ex");
     connection
         .set(name.as_bytes(), b"session", &SetOptions::expiring(120))
@@ -176,7 +199,9 @@ fn set_ex_applies_an_expiry() {
 /// `TTL` names all three states, and they must be observably different.
 #[test]
 fn reports_the_three_ttl_states() {
-    let Some(mut connection) = connect() else { return };
+    let Some(mut connection) = connect() else {
+        return;
+    };
     let name = key("ttl");
     cleanup(&mut connection, "ttl");
 
@@ -202,7 +227,9 @@ fn reports_the_three_ttl_states() {
 /// `EXPIRE` on an absent key is `false`, not an error.
 #[test]
 fn expire_on_missing_key_reports_false() {
-    let Some(mut connection) = connect() else { return };
+    let Some(mut connection) = connect() else {
+        return;
+    };
     let name = key("expire_missing");
     cleanup(&mut connection, "expire_missing");
     assert!(!connection.expire(name.as_bytes(), 60).unwrap());
@@ -211,7 +238,9 @@ fn expire_on_missing_key_reports_false() {
 /// `DEL` and `EXISTS` report counts across several keys.
 #[test]
 fn deletes_and_counts_keys() {
-    let Some(mut connection) = connect() else { return };
+    let Some(mut connection) = connect() else {
+        return;
+    };
     let first = key("del_a");
     let second = key("del_b");
     let absent = key("del_missing");
@@ -242,7 +271,9 @@ fn deletes_and_counts_keys() {
 /// connection stays usable afterwards.
 #[test]
 fn rejects_keyless_del_without_breaking_the_connection() {
-    let Some(mut connection) = connect() else { return };
+    let Some(mut connection) = connect() else {
+        return;
+    };
     assert!(matches!(
         connection.del(&[]).unwrap_err(),
         RedisError::Protocol(_)
@@ -254,7 +285,9 @@ fn rejects_keyless_del_without_breaking_the_connection() {
 /// zero when absent.
 #[test]
 fn increments_counters() {
-    let Some(mut connection) = connect() else { return };
+    let Some(mut connection) = connect() else {
+        return;
+    };
     let name = key("counter");
     cleanup(&mut connection, "counter");
 
@@ -271,7 +304,9 @@ fn increments_counters() {
 /// counter cannot outlive its window.
 #[test]
 fn rate_limit_window_survives_as_a_bounded_counter() {
-    let Some(mut connection) = connect() else { return };
+    let Some(mut connection) = connect() else {
+        return;
+    };
     let name = key("rate");
     cleanup(&mut connection, "rate");
 
@@ -290,7 +325,9 @@ fn rate_limit_window_survives_as_a_bounded_counter() {
 /// error, and the connection must remain usable for the next command.
 #[test]
 fn surfaces_server_error_and_keeps_the_connection() {
-    let Some(mut connection) = connect() else { return };
+    let Some(mut connection) = connect() else {
+        return;
+    };
     let name = key("wrongtype");
     cleanup(&mut connection, "wrongtype");
 
@@ -299,7 +336,10 @@ fn surfaces_server_error_and_keeps_the_connection() {
         .command(&[&b"RPUSH"[..], name.as_bytes(), &b"element"[..]])
         .unwrap();
     let error = connection.get(name.as_bytes()).unwrap_err();
-    assert!(error.is_server_error(), "expected a server error, got {error}");
+    assert!(
+        error.is_server_error(),
+        "expected a server error, got {error}"
+    );
     assert_eq!(error.kind(), Some("WRONGTYPE"));
     assert!(error.to_string().contains("redis: server:"));
 
@@ -311,7 +351,9 @@ fn surfaces_server_error_and_keeps_the_connection() {
 /// An unknown command is also a server error, named by its kind.
 #[test]
 fn surfaces_unknown_command_as_server_error() {
-    let Some(mut connection) = connect() else { return };
+    let Some(mut connection) = connect() else {
+        return;
+    };
     let error = connection
         .command(&[&b"TETHERSCRIPT_NOT_A_COMMAND"[..]])
         .unwrap_err();
@@ -323,7 +365,9 @@ fn surfaces_unknown_command_as_server_error() {
 /// `INCR` on a non-numeric string is a server error, not a silent zero.
 #[test]
 fn surfaces_non_numeric_incr_as_server_error() {
-    let Some(mut connection) = connect() else { return };
+    let Some(mut connection) = connect() else {
+        return;
+    };
     let name = key("not_a_number");
     connection
         .set(name.as_bytes(), b"abc", &SetOptions::default())
@@ -337,7 +381,9 @@ fn surfaces_non_numeric_incr_as_server_error() {
 /// incremental read loop against a real server.
 #[test]
 fn round_trips_a_value_larger_than_one_read() {
-    let Some(mut connection) = connect() else { return };
+    let Some(mut connection) = connect() else {
+        return;
+    };
     let name = key("large");
     // Deliberately larger than the 8 KiB read chunk, and full of CRLF so a
     // delimiter-based reader would truncate it.
@@ -352,7 +398,9 @@ fn round_trips_a_value_larger_than_one_read() {
 /// The string conveniences must agree with the byte APIs.
 #[test]
 fn string_helpers_match_the_byte_api() {
-    let Some(mut connection) = connect() else { return };
+    let Some(mut connection) = connect() else {
+        return;
+    };
     let name = key("strings");
     connection
         .set_str(&name, "text value", &SetOptions::default())

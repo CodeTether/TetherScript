@@ -48,9 +48,10 @@ pub fn check_key(key: &str) -> Result<(), HandshakeError> {
             reason: format!("is {} chars, want {KEY_LEN}", key.len()),
         });
     }
-    let bytes = crate::system::base64_decode_bytes(key).map_err(|error| HandshakeError::BadKey {
-        reason: format!("is not base64: {error}"),
-    })?;
+    let bytes =
+        crate::system::base64_decode_bytes(key).map_err(|error| HandshakeError::BadKey {
+            reason: format!("is not base64: {error}"),
+        })?;
     if bytes.len() != NONCE_LEN {
         return Err(HandshakeError::BadKey {
             reason: format!("decodes to {} bytes, want {NONCE_LEN}", bytes.len()),

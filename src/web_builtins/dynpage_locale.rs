@@ -24,7 +24,7 @@
 
 use std::collections::HashMap;
 
-use super::dynpage_locale_parse::{Entry, parse};
+use super::dynpage_locale_parse::{parse, Entry};
 use super::dynpage_request::find;
 use crate::value::Value;
 
@@ -63,7 +63,9 @@ fn best(range: &Entry, supported: &[String]) -> Option<String> {
     }
     let wanted = range.tag.as_str();
     let primary = subtag(wanted);
-    let exact = supported.iter().find(|have| have.eq_ignore_ascii_case(wanted));
+    let exact = supported
+        .iter()
+        .find(|have| have.eq_ignore_ascii_case(wanted));
     match exact {
         Some(found) => Some(found.clone()),
         None => supported

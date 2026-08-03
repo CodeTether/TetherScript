@@ -1,6 +1,6 @@
 //! Masking: the round-trip, and the direction rules that make it a real check.
 
-use super::wire::{KEY, client_frame, decode_client};
+use super::wire::{client_frame, decode_client, KEY};
 use tetherscript::websocket::encode::encode_server;
 use tetherscript::websocket::error::ProtocolError;
 use tetherscript::websocket::frame::Frame;

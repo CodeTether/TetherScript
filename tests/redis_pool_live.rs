@@ -23,7 +23,12 @@ fn handler() -> Option<RedisHandler> {
         username: None,
         password: None,
         database: 0,
-        tls: false,
+        // The client speaks cleartext RESP over TCP; TLS is not implemented, so there is
+        // no flag to set. Timeouts are explicit rather than defaulted because a read with
+        // no deadline would hang the single-threaded server forever.
+        connect_timeout: std::time::Duration::from_secs(5),
+        read_timeout: std::time::Duration::from_secs(5),
+        write_timeout: std::time::Duration::from_secs(5),
     };
     Some(RedisHandler::connect(&config).expect("connect to REDIS_TEST_URL should succeed"))
 }
@@ -67,7 +72,10 @@ fn missing_key_is_nil_and_distinct_from_empty_string() {
     let absent = key("absent");
     let empty = key("empty");
     handler.del(&absent).expect("DEL should succeed");
-    assert_eq!(handler.get(&absent).expect("GET should succeed"), Value::Nil);
+    assert_eq!(
+        handler.get(&absent).expect("GET should succeed"),
+        Value::Nil
+    );
     assert_eq!(int(&handler.exists(&absent).expect("EXISTS")), 0);
 
     handler.set(&empty, b"", None).expect("SET should succeed");
@@ -164,7 +172,9 @@ fn set_with_expiry_decr_and_raw_command() {
     let Some(handler) = handler() else { return };
     let k = key("counter");
     handler.del(&k).expect("DEL should succeed");
-    handler.set(&k, b"5", Some(60)).expect("SET EX should succeed");
+    handler
+        .set(&k, b"5", Some(60))
+        .expect("SET EX should succeed");
     assert_eq!(int(&handler.decr(&k).expect("DECR")), 4);
     assert_eq!(int(&handler.incr(&k).expect("INCR")), 5);
     assert!(int(&handler.ttl(&k).expect("TTL")) > 0, "EX must set a TTL");

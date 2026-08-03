@@ -34,7 +34,10 @@ fn send_then_receive_preserves_order() {
     let (tx, rx) = channel::bounded(8, "order").expect("capacity is positive");
 
     for value in 1..=5 {
-        assert_eq!(tx.send(&Value::Int(value), 1001).unwrap(), SendOutcome::Sent);
+        assert_eq!(
+            tx.send(&Value::Int(value), 1001).unwrap(),
+            SendOutcome::Sent
+        );
     }
 
     assert_eq!(

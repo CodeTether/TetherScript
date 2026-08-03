@@ -47,7 +47,10 @@ pub(super) fn acquire(pool: &Pool) -> Result<Connection, String> {
             *live, pool.max_size
         ));
     }
-    let connection = Connection::connect(&pool.config)?;
+    // `Connection::connect` reports a typed RedisError; the pool's callers work in
+    // strings, so it is rendered here rather than widening the pool's error type.
+    let connection =
+        Connection::connect(&pool.config).map_err(|error| format!("redis: {error}"))?;
     *live += 1;
     Ok(connection)
 }

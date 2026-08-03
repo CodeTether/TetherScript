@@ -36,7 +36,10 @@ fn borrow_propagates_across_a_zero_limb() {
 
 #[test]
 fn borrow_propagates_across_several_zero_limbs() {
-    assert_eq!(sub_limbs(&[0, 0, 0, 1], &[1]), vec![u64::MAX, u64::MAX, u64::MAX, 0]);
+    assert_eq!(
+        sub_limbs(&[0, 0, 0, 1], &[1]),
+        vec![u64::MAX, u64::MAX, u64::MAX, 0]
+    );
 }
 
 #[test]

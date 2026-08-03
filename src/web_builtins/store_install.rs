@@ -43,7 +43,12 @@ pub(super) fn install(env: &Rc<RefCell<Env>>) {
     define(bindings, "store_save", 2, access::save);
     define(bindings, "store_touch", 1, access::touch);
     define(bindings, "store_destroy", 1, revoke::destroy);
-    define(bindings, "store_destroy_subject", 1, revoke::destroy_subject);
+    define(
+        bindings,
+        "store_destroy_subject",
+        1,
+        revoke::destroy_subject,
+    );
     define(bindings, "store_configure", 2, config::configure);
     define(bindings, "store_sweep", 0, |_args| revoke::sweep());
     define(bindings, "store_count", 0, |_args| config::count());

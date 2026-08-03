@@ -17,6 +17,7 @@ mod http_headers;
 mod http_response;
 #[path = "http_response_extract.rs"]
 mod http_response_extract;
+// Streaming responses: SSE needs a body written event by event rather than once.
 #[path = "http_server.rs"]
 mod http_server;
 #[path = "http_server_args.rs"]
@@ -37,6 +38,16 @@ mod http_static;
 mod http_status;
 #[path = "http_stream.rs"]
 mod http_stream;
+#[path = "http_stream_fields.rs"]
+mod http_stream_fields;
+#[path = "http_stream_head.rs"]
+mod http_stream_head;
+#[path = "http_stream_plan.rs"]
+mod http_stream_plan;
+#[path = "http_stream_pump.rs"]
+mod http_stream_pump;
+#[path = "http_stream_response.rs"]
+mod http_stream_response;
 #[path = "http_url.rs"]
 mod http_url;
 #[cfg(feature = "openssl-tls")]

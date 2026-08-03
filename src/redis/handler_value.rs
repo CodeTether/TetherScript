@@ -1,53 +1,41 @@
-//! Mapping from RESP replies to tetherscript [`Value`]s.
+//! Converting a decoded RESP reply into a script [`Value`].
 //!
-//! The mapping is deliberately lossless or loud: a reply that cannot be
-//! represented faithfully produces a named error rather than a mangled value,
-//! because a silently replaced byte in a cache read is worse than a failed read.
-//!
-//! | RESP | `Value` |
-//! |---|---|
-//! | `Bulk(None)`, `Nil` | `Value::Nil` (distinct from `Value::Str("")`) |
-//! | `Bulk(Some(bytes))` | `Value::Str` when valid UTF-8, else an error |
-//! | `Int` | `Value::Int` |
-//! | `Simple` | `Value::Str` |
-//! | `Array` | `Value::List`, or `Value::Nil` for a null array |
-//! | `Error` | `Err(..)` |
-//! | `Bool`, `Double`, `Map`, `Push` | see [`super::handler_value_resp3`] |
+//! Written against the RESP2 codec in [`super::value`], whose null forms are distinct
+//! variants (`NullBulk`, `NullArray`) rather than `Option` payloads. That distinction is
+//! load-bearing for a session store: a missing key and a stored empty string are
+//! different answers, and collapsing them cannot tell a logged-out user from one whose
+//! session value happens to be empty.
 
 use std::rc::Rc;
 
-use super::handler_value_resp3;
-use super::resp::Resp;
+use super::value::RespValue;
 use crate::value::Value;
 
-/// Convert one reply into a tetherscript value.
+/// Convert a decoded reply to a script value.
 ///
 /// # Arguments
 ///
-/// * `reply` — A fully decoded RESP frame.
+/// * `reply` — The decoded RESP reply.
 ///
 /// # Returns
 ///
-/// The corresponding [`Value`]. A missing key yields [`Value::Nil`], which a script
-/// can distinguish from a stored empty string (`Value::Str("")`).
+/// The corresponding [`Value`]. A missing key yields [`Value::Nil`], which a script can
+/// distinguish from a stored empty string (`Value::Str("")`).
 ///
 /// # Errors
 ///
-/// Returns the server's message for `Resp::Error`, or a named decode error when a
-/// bulk payload is not valid UTF-8.
-pub(super) fn from_resp(reply: Resp) -> Result<Value, String> {
+/// Returns the server's message for an error reply, or a named decode error when a bulk
+/// payload is not valid UTF-8.
+pub(super) fn from_resp(reply: RespValue) -> Result<Value, String> {
     match reply {
-        Resp::Simple(text) => Ok(Value::Str(Rc::new(text))),
-        Resp::Error(message) => Err(format!("redis: {message}")),
-        Resp::Int(number) => Ok(Value::Int(number)),
-        Resp::Bulk(None) | Resp::Nil => Ok(Value::Nil),
-        Resp::Bulk(Some(bytes)) => bulk(bytes),
-        Resp::Array(None) => Ok(Value::Nil),
-        Resp::Array(Some(items)) => handler_value_resp3::list(items),
-        // RESP3-only variants; matched explicitly so this dispatch is exhaustive.
-        resp3 @ (Resp::Bool(_) | Resp::Double(_) | Resp::Map(_) | Resp::Push(_)) => {
-            handler_value_resp3::from_resp(resp3)
-        }
+        RespValue::Simple(text) => Ok(Value::Str(Rc::new(text))),
+        RespValue::Error { kind, message } => Err(format!("redis: {kind} {message}")),
+        RespValue::Integer(number) => Ok(Value::Int(number)),
+        // Both null forms collapse to nil at the script boundary, where tetherscript has
+        // only one absent value. The codec keeps them apart so this decision is explicit.
+        RespValue::NullBulk | RespValue::NullArray => Ok(Value::Nil),
+        RespValue::Bulk(bytes) => bulk(bytes),
+        RespValue::Array(items) => super::handler_value_resp3::list(items),
     }
 }
 
@@ -55,13 +43,14 @@ pub(super) fn from_resp(reply: Resp) -> Result<Value, String> {
 ///
 /// # Errors
 ///
-/// Returns a named error naming the invalid byte offset when the payload is not
-/// valid UTF-8, instead of substituting replacement characters.
+/// Returns an error naming the invalid byte offset when the payload is not valid UTF-8,
+/// instead of substituting replacement characters — a script that stored bytes should be
+/// told they cannot be represented rather than handed corrupted text.
 fn bulk(bytes: Vec<u8>) -> Result<Value, String> {
     match String::from_utf8(bytes) {
         Ok(text) => Ok(Value::Str(Rc::new(text))),
         Err(error) => Err(format!(
-            "redis: reply is not valid UTF-8 at byte {}; read it with a binary-aware command",
+            "redis: bulk payload is not valid UTF-8 at byte {}",
             error.utf8_error().valid_up_to()
         )),
     }

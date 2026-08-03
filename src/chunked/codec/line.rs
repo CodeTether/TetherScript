@@ -63,7 +63,9 @@ pub fn crlf_line<'a>(
     let window = &rest[..rest.len().min(limit.saturating_add(2))];
     if let Some(at) = window.iter().position(|byte| *byte == b'\n') {
         if at == 0 || window.get(at - 1) != Some(&b'\r') {
-            return Err(ChunkedError::malformed(format!("{label} ends with bare LF")));
+            return Err(ChunkedError::malformed(format!(
+                "{label} ends with bare LF"
+            )));
         }
         return Ok((&window[..at - 1], from + at + 1));
     }

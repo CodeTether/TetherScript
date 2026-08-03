@@ -17,7 +17,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use super::super::percent::decode::decode;
-use super::{Outcome, outcome};
+use super::{outcome, Outcome};
 use crate::value::Value;
 
 /// Fields lifted out of the callback query.

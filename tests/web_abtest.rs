@@ -99,7 +99,10 @@ fn a_valid_experiment_echoes_its_configuration_back() {
     let got = lines(&out);
     assert_eq!(got[0], "checkout_button", "name must round-trip: {out}");
     assert_eq!(got[1], "checkout_v1", "seed must round-trip: {out}");
-    assert_eq!(got[2], "ab_checkout", "sticky cookie must round-trip: {out}");
+    assert_eq!(
+        got[2], "ab_checkout",
+        "sticky cookie must round-trip: {out}"
+    );
     assert_eq!(got[3], "2", "both variants must survive: {out}");
     assert_eq!(
         got[4], "control",
@@ -691,7 +694,10 @@ fn a_request_with_no_cookie_reports_that_one_should_be_set() {
         got[3], "true",
         "the request path must agree with ab_assign: {out}"
     );
-    assert_eq!(got[4], "true", "the reported bucket must be the real one: {out}");
+    assert_eq!(
+        got[4], "true",
+        "the reported bucket must be the real one: {out}"
+    );
 }
 
 #[test]
@@ -739,10 +745,7 @@ fn a_cookie_naming_an_unknown_variant_is_discarded_and_rebucketed() {
         "an unknown variant must not be honoured: {out}"
     );
     assert_eq!(got[1], "true", "the subject must be re-bucketed: {out}");
-    assert_eq!(
-        got[2], "true",
-        "the stale cookie must be replaced: {out}"
-    );
+    assert_eq!(got[2], "true", "the stale cookie must be replaced: {out}");
 }
 
 #[test]

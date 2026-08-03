@@ -53,10 +53,7 @@ pub enum ShapeError {
     /// The header declared the unsecured `none` algorithm.
     AlgNone,
     /// The header's `alg` was not the algorithm the verifier was configured for.
-    AlgMismatch {
-        got: String,
-        expected: &'static str,
-    },
+    AlgMismatch { got: String, expected: &'static str },
     /// The header's `typ` did not match the required value.
     TypMismatch { got: String, expected: String },
 }

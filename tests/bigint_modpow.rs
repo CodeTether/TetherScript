@@ -26,7 +26,11 @@ const BASE_HEX: &str = "a7bbb994edc9ff01b7da78ef3d55a2acef7afde3f5fd631d6fd3843e
 
 fn modulus_2048() -> BigUint {
     let modulus = BigUint::from_hex(MODULUS_2048_HEX).expect("fixture must be valid hex");
-    assert_eq!(modulus.bit_len(), 2048, "the fixture must really be 2048 bits");
+    assert_eq!(
+        modulus.bit_len(),
+        2048,
+        "the fixture must really be 2048 bits"
+    );
     modulus
 }
 
@@ -55,25 +59,32 @@ fn modpow_matches_two_to_the_tenth_mod_1000() {
 #[test]
 fn modpow_with_exponent_zero_is_one() {
     let modulus = BigUint::from_u64(1_000);
-    assert!(BigUint::from_u64(2).modpow(&BigUint::zero(), &modulus).unwrap().is_one());
+    assert!(BigUint::from_u64(2)
+        .modpow(&BigUint::zero(), &modulus)
+        .unwrap()
+        .is_one());
     // Including for a base of zero: this implementation follows the 0^0 == 1
     // convention that RSA's algebra assumes.
-    assert!(BigUint::zero().modpow(&BigUint::zero(), &modulus).unwrap().is_one());
+    assert!(BigUint::zero()
+        .modpow(&BigUint::zero(), &modulus)
+        .unwrap()
+        .is_one());
     // And for a 2048-bit modulus, where the accumulator is never squared.
-    assert!(
-        BigUint::from_hex(BASE_HEX)
-            .unwrap()
-            .modpow(&BigUint::zero(), &modulus_2048())
-            .unwrap()
-            .is_one()
-    );
+    assert!(BigUint::from_hex(BASE_HEX)
+        .unwrap()
+        .modpow(&BigUint::zero(), &modulus_2048())
+        .unwrap()
+        .is_one());
 }
 
 #[test]
 fn modpow_with_exponent_one_is_the_base_reduced() {
     let one = BigUint::from_u64(1);
     let modulus = BigUint::from_u64(1_000);
-    assert_eq!(BigUint::from_u64(2).modpow(&one, &modulus).unwrap(), BigUint::from_u64(2));
+    assert_eq!(
+        BigUint::from_u64(2).modpow(&one, &modulus).unwrap(),
+        BigUint::from_u64(2)
+    );
     // 1234 mod 1000 == 234: the base is reduced first, so it may exceed the
     // modulus on the way in.
     assert_eq!(
@@ -87,8 +98,14 @@ fn modpow_with_modulus_one_is_always_zero() {
     // Every residue class collapses, including for a zero exponent, since the
     // initial accumulator is itself reduced.
     let one = BigUint::from_u64(1);
-    assert!(BigUint::from_u64(5).modpow(&BigUint::from_u64(3), &one).unwrap().is_zero());
-    assert!(BigUint::from_u64(5).modpow(&BigUint::zero(), &one).unwrap().is_zero());
+    assert!(BigUint::from_u64(5)
+        .modpow(&BigUint::from_u64(3), &one)
+        .unwrap()
+        .is_zero());
+    assert!(BigUint::from_u64(5)
+        .modpow(&BigUint::zero(), &one)
+        .unwrap()
+        .is_zero());
 }
 
 #[test]
@@ -115,7 +132,10 @@ fn modpow_matches_repeated_multiplication_for_a_small_exponent() {
     for _ in 0..40 {
         expected = expected.mulmod(&base, &modulus).unwrap();
     }
-    assert_eq!(base.modpow(&BigUint::from_u64(40), &modulus).unwrap(), expected);
+    assert_eq!(
+        base.modpow(&BigUint::from_u64(40), &modulus).unwrap(),
+        expected
+    );
 }
 
 #[test]
@@ -125,7 +145,10 @@ fn modpow_handles_an_exponent_wider_than_one_limb() {
     // loop cannot reach.
     let exponent = BigUint::from_limbs_le(vec![0, 1]);
     assert_eq!(exponent.bit_len(), 65);
-    assert!(BigUint::from_u64(3).modpow(&exponent, &BigUint::from_u64(5)).unwrap().is_one());
+    assert!(BigUint::from_u64(3)
+        .modpow(&exponent, &BigUint::from_u64(5))
+        .unwrap()
+        .is_one());
 }
 
 #[test]
@@ -148,7 +171,11 @@ fn modpow_completes_a_2048_bit_exponentiation_with_the_public_exponent() {
     let result = base.modpow(&BigUint::from_u64(65_537), &modulus).unwrap();
 
     assert!(result < modulus, "the result must be reduced");
-    assert_eq!(result.bit_len(), 2048, "this particular result fills the modulus");
+    assert_eq!(
+        result.bit_len(),
+        2048,
+        "this particular result fills the modulus"
+    );
     // Fixed expected value, computed independently and pinned here so a
     // regression in carry, division, or reduction cannot pass unnoticed.
     assert_eq!(
@@ -179,7 +206,10 @@ fn modpow_agrees_with_an_explicit_square_and_multiply_ladder_at_2048_bits() {
         expected = expected.mulmod(&expected, &modulus).unwrap();
     }
     expected = expected.mulmod(&base, &modulus).unwrap();
-    assert_eq!(base.modpow(&BigUint::from_u64(65_537), &modulus).unwrap(), expected);
+    assert_eq!(
+        base.modpow(&BigUint::from_u64(65_537), &modulus).unwrap(),
+        expected
+    );
 }
 
 #[test]

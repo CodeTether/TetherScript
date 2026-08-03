@@ -16,10 +16,10 @@
 //! and trailer parsing each document their own freedom from panics, and the running total
 //! uses `checked_add`.
 
-use super::error::ChunkedError;
-use super::limits::{MAX_BODY_BYTES, MAX_SIZE_LINE_BYTES};
 use super::decoded::DecodedBody;
+use super::error::ChunkedError;
 use super::extension::strip_extensions;
+use super::limits::{MAX_BODY_BYTES, MAX_SIZE_LINE_BYTES};
 use super::line::crlf_line;
 use super::payload::chunk_payload;
 use super::size::parse_chunk_size;
@@ -69,7 +69,7 @@ pub fn decode(input: &[u8]) -> Result<DecodedBody, ChunkedError> {
             });
         }
         let (data, after_payload) = chunk_payload(input, after_size, size)?;
-        if payload.len().checked_add(data.len()).unwrap_or(usize::MAX) > MAX_BODY_BYTES {
+        if payload.len().saturating_add(data.len()) > MAX_BODY_BYTES {
             return Err(ChunkedError::malformed(format!(
                 "decoded body exceeds {MAX_BODY_BYTES} bytes"
             )));

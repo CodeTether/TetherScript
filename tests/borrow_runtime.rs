@@ -303,7 +303,12 @@ fn double_release_via_table_after_guard_drop_is_an_accounting_fault() {
 
 #[test]
 fn scalars_have_no_heap_id_and_need_no_tracking() {
-    for value in [Value::Nil, Value::Int(1), Value::Float(1.5), Value::Bool(true)] {
+    for value in [
+        Value::Nil,
+        Value::Int(1),
+        Value::Float(1.5),
+        Value::Bool(true),
+    ] {
         assert!(
             heap_id_of(&value).is_none(),
             "{} is Copy; tracking it would be pointless",

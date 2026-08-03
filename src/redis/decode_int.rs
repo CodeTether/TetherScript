@@ -23,12 +23,10 @@ use super::error::RedisError;
 /// not parse as an `i64`. The message quotes what arrived, because a framing
 /// desync usually shows up here first and the offending bytes are the clue.
 pub(super) fn parse_i64(line: &[u8], context: &str) -> Result<i64, RedisError> {
-    let text = std::str::from_utf8(line).map_err(|_| {
-        RedisError::Protocol(format!("{context}: length line is not valid UTF-8"))
-    })?;
-    text.parse::<i64>().map_err(|_| {
-        RedisError::Protocol(format!("{context}: `{text}` is not a valid integer"))
-    })
+    let text = std::str::from_utf8(line)
+        .map_err(|_| RedisError::Protocol(format!("{context}: length line is not valid UTF-8")))?;
+    text.parse::<i64>()
+        .map_err(|_| RedisError::Protocol(format!("{context}: `{text}` is not a valid integer")))
 }
 
 /// Split an error line into its kind and message.

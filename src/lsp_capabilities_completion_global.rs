@@ -22,7 +22,7 @@
 //! ```
 
 use crate::lsp_capabilities::completion_item::{callable, plain};
-use crate::lsp_capabilities::rank::{Tier, sort_text};
+use crate::lsp_capabilities::rank::{sort_text, Tier};
 use crate::lsp_capabilities::{builtins, completion_scope, keywords};
 use crate::value::Value;
 

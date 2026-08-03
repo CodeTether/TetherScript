@@ -152,8 +152,7 @@ fn main() {{
 /// challenge must equal the challenge derived from the returned verifier.
 #[test]
 fn generated_pair_is_self_consistent_and_43_characters() {
-    let out = run(
-        r#"
+    let out = run(r#"
 fn main() {
     let pkce = oauth_pkce_pair().unwrap()
     println(str(pkce.code_verifier.len()))
@@ -161,8 +160,7 @@ fn main() {
     println(pkce.code_challenge_method)
     println(str(oauth_pkce_challenge(pkce.code_verifier).unwrap() == pkce.code_challenge))
 }
-"#,
-    );
+"#);
     assert_eq!(
         out, "43\n43\nS256\ntrue",
         "43-character verifier, 43-character challenge, S256, and consistent"
@@ -173,16 +171,14 @@ fn main() {
 /// predictable verifier defeats PKCE entirely.
 #[test]
 fn successive_pairs_differ() {
-    let out = run(
-        r#"
+    let out = run(r#"
 fn main() {
     let a = oauth_pkce_pair().unwrap()
     let b = oauth_pkce_pair().unwrap()
     println(str(a.code_verifier == b.code_verifier))
     println(str(a.code_challenge == b.code_challenge))
 }
-"#,
-    );
+"#);
     assert_eq!(out, "false\nfalse", "two PKCE pairs must not collide");
 }
 
@@ -190,15 +186,13 @@ fn main() {
 /// server receives would not be what was hashed.
 #[test]
 fn verifier_with_reserved_character_is_rejected() {
-    let out = run(
-        r#"
+    let out = run(r#"
 fn main() {
     let bad = oauth_pkce_challenge("dBjftJeZ4CVP+mB92K27uhbUJU1p1r_wW1gFWFOEjXk")
     println(str(bad.is_err()))
     println(bad.err())
 }
-"#,
-    );
+"#);
     let out = lines(&out, 2);
     assert_eq!(out[0], "true");
     assert!(
@@ -420,8 +414,7 @@ fn main() {{
 /// was given.
 #[test]
 fn state_round_trips_and_returns_the_original_path() {
-    let out = run(
-        r#"
+    let out = run(r#"
 fn main() {
     let token = oauth_state_token("shared-secret", 600, "/dashboard/reports").unwrap()
     println(oauth_state_verify("shared-secret", token).unwrap())
@@ -429,8 +422,7 @@ fn main() {
     println(str(token.contains("+")))
     println(str(token.contains("/")))
 }
-"#,
-    );
+"#);
     assert_eq!(
         out, "/dashboard/reports\nfalse\nfalse\nfalse",
         "the path must survive, and the token must be URL-safe unescaped"
@@ -441,13 +433,11 @@ fn main() {
 /// why `return_to` is base64url-encoded inside the payload.
 #[test]
 fn a_dot_in_the_return_path_does_not_shift_the_payload_fields() {
-    let out = run(
-        r#"
+    let out = run(r#"
 fn main() {
     println(oauth_state_verify("s", oauth_state_token("s", 600, "/files/report.v2.pdf").unwrap()).unwrap())
 }
-"#,
-    );
+"#);
     assert_eq!(out, "/files/report.v2.pdf");
 }
 
@@ -456,8 +446,7 @@ fn main() {
 /// the built-in.
 #[test]
 fn expired_state_is_rejected_with_a_named_error() {
-    let out = run(
-        r#"
+    let out = run(r#"
 fn main() {
     let token = oauth_state_token("shared-secret", 1, "/dashboard").unwrap()
     println(str(oauth_state_verify("shared-secret", token).is_ok()))
@@ -466,8 +455,7 @@ fn main() {
     println(str(after.is_err()))
     println(after.err())
 }
-"#,
-    );
+"#);
     let out = lines(&out, 3);
     assert_eq!(out[0], "true", "a fresh state must verify");
     assert_eq!(out[1], "true", "an expired state must be an error");
@@ -482,8 +470,7 @@ fn main() {
 /// distinguishable from an expiry: one is an attack, the other is a slow user.
 #[test]
 fn tampered_state_fails_the_signature_check() {
-    let out = run(
-        r#"
+    let out = run(r#"
 fn main() {
     let token = oauth_state_token("shared-secret", 600, "/dashboard").unwrap()
     let parts = token.split(".")
@@ -493,8 +480,7 @@ fn main() {
     println(str(checked.is_err()))
     println(checked.err())
 }
-"#,
-    );
+"#);
     let out = lines(&out, 2);
     assert_eq!(out[0], "true");
     assert!(
@@ -508,16 +494,14 @@ fn main() {
 /// forgery or a misconfigured deployment, and both need naming.
 #[test]
 fn wrong_secret_is_a_bad_signature_error() {
-    let out = run(
-        r#"
+    let out = run(r#"
 fn main() {
     let token = oauth_state_token("shared-secret", 600, "/dashboard").unwrap()
     let checked = oauth_state_verify("other-secret", token)
     println(str(checked.is_err()))
     println(checked.err())
 }
-"#,
-    );
+"#);
     let out = lines(&out, 2);
     assert_eq!(out[0], "true");
     assert!(
@@ -531,15 +515,13 @@ fn main() {
 /// reported as forgery.
 #[test]
 fn malformed_state_names_the_segment_count() {
-    let out = run(
-        r#"
+    let out = run(r#"
 fn main() {
     let bad = oauth_state_verify("shared-secret", "only-one-segment")
     println(str(bad.is_err()))
     println(bad.err())
 }
-"#,
-    );
+"#);
     let out = lines(&out, 2);
     assert_eq!(out[0], "true");
     assert!(
@@ -553,15 +535,13 @@ fn main() {
 /// states minted in the same second must still differ.
 #[test]
 fn successive_states_differ_because_of_the_nonce() {
-    let out = run(
-        r#"
+    let out = run(r#"
 fn main() {
     let a = oauth_state_token("s", 600, "/x").unwrap()
     let b = oauth_state_token("s", 600, "/x").unwrap()
     println(str(a == b))
 }
-"#,
-    );
+"#);
     assert_eq!(out, "false", "two states must not collide");
 }
 
@@ -569,16 +549,14 @@ fn main() {
 /// depending on the comparison. Neither is a sane request, so it is rejected.
 #[test]
 fn non_positive_ttl_is_rejected() {
-    let out = run(
-        r#"
+    let out = run(r#"
 fn main() {
     let zero = oauth_state_token("s", 0, "/x")
     println(str(zero.is_err()))
     println(zero.err())
     println(str(oauth_state_token("s", -5, "/x").is_err()))
 }
-"#,
-    );
+"#);
     let out = lines(&out, 3);
     assert_eq!(out[0], "true");
     assert!(
@@ -597,16 +575,14 @@ fn main() {
 /// catches, and the only one it catches.
 #[test]
 fn absolute_url_return_to_is_rejected() {
-    let out = run(
-        r#"
+    let out = run(r#"
 fn main() {
     let bad = oauth_state_token("s", 600, "http://evil.example/harvest")
     println(str(bad.is_err()))
     println(bad.err())
     println(str(oauth_state_token("s", 600, "https://evil.example/harvest").is_err()))
 }
-"#,
-    );
+"#);
     let out = lines(&out, 3);
     assert_eq!(out[0], "true", "http://evil must be rejected");
     assert!(
@@ -621,15 +597,13 @@ fn main() {
 /// begin with /" check while still navigating cross-origin.
 #[test]
 fn scheme_relative_return_to_is_rejected() {
-    let out = run(
-        r#"
+    let out = run(r#"
 fn main() {
     let bad = oauth_state_token("s", 600, "//evil.example/harvest")
     println(str(bad.is_err()))
     println(bad.err())
 }
-"#,
-    );
+"#);
     let out = lines(&out, 2);
     assert_eq!(out[0], "true", "//evil must be rejected");
     assert!(
@@ -643,8 +617,7 @@ fn main() {
 /// each of these is a scheme-relative URL that passes both checks above.
 #[test]
 fn backslash_return_to_forms_are_rejected() {
-    let out = run(
-        r#"
+    let out = run(r#"
 fn main() {
     let bad = oauth_state_token("s", 600, "/\\evil.example/harvest")
     println(str(bad.is_err()))
@@ -652,8 +625,7 @@ fn main() {
     println(str(oauth_state_token("s", 600, "\\\\evil.example/harvest").is_err()))
     println(str(oauth_state_token("s", 600, "/\\/evil.example").is_err()))
 }
-"#,
-    );
+"#);
     let out = lines(&out, 4);
     assert_eq!(out[0], "true", "/\\evil must be rejected");
     assert!(
@@ -669,16 +641,14 @@ fn main() {
 /// is just a broken feature.
 #[test]
 fn relative_return_to_is_accepted() {
-    let out = run(
-        r#"
+    let out = run(r#"
 fn main() {
     println(str(oauth_state_token("s", 600, "/").is_ok()))
     println(str(oauth_state_token("s", 600, "/dashboard").is_ok()))
     println(str(oauth_state_token("s", 600, "/a/b/c?tab=2").is_ok()))
     println(oauth_state_verify("s", oauth_state_token("s", 600, "/a/b/c?tab=2").unwrap()).unwrap())
 }
-"#,
-    );
+"#);
     assert_eq!(out, "true\ntrue\ntrue\n/a/b/c?tab=2");
 }
 
@@ -686,15 +656,13 @@ fn main() {
 /// written into a `Location` response header.
 #[test]
 fn return_to_with_a_control_character_is_rejected() {
-    let out = run(
-        r#"
+    let out = run(r#"
 fn main() {
     let bad = oauth_state_token("s", 600, "/ok\r\nLocation: https://evil.example")
     println(str(bad.is_err()))
     println(bad.err())
 }
-"#,
-    );
+"#);
     let out = lines(&out, 2);
     assert_eq!(out[0], "true");
     assert!(
@@ -712,15 +680,13 @@ fn main() {
 /// thing much later; here the error callback is an `Err` carrying what the provider said.
 #[test]
 fn error_callback_is_surfaced_as_an_error_not_a_missing_code() {
-    let out = run(
-        r#"
+    let out = run(r#"
 fn main() {
     let result = oauth_callback_params("error=access_denied&error_description=User+declined&state=abc")
     println(str(result.is_err()))
     println(result.err())
 }
-"#,
-    );
+"#);
     let out = lines(&out, 2);
     assert_eq!(
         out[0], "true",
@@ -741,15 +707,13 @@ fn main() {
 /// An `error` with no description must still be an error, and must still name the code.
 #[test]
 fn error_callback_without_a_description_still_errors() {
-    let out = run(
-        r#"
+    let out = run(r#"
 fn main() {
     let result = oauth_callback_params("?error=consent_required")
     println(str(result.is_err()))
     println(result.err())
 }
-"#,
-    );
+"#);
     let out = lines(&out, 2);
     assert_eq!(out[0], "true");
     assert!(
@@ -763,8 +727,7 @@ fn main() {
 /// missing keys, so a script can read any of them without a containment check.
 #[test]
 fn success_callback_yields_all_four_fields() {
-    let out = run(
-        r#"
+    let out = run(r#"
 fn main() {
     let params = oauth_callback_params("code=auth-code-123&state=state-value").unwrap()
     println(params.code)
@@ -772,8 +735,7 @@ fn main() {
     println(str(params.error == nil))
     println(str(params.error_description == nil))
 }
-"#,
-    );
+"#);
     assert_eq!(out, "auth-code-123\nstate-value\ntrue\ntrue");
 }
 
@@ -781,15 +743,13 @@ fn main() {
 /// names the actual problem instead of a downstream `invalid_grant`.
 #[test]
 fn callback_with_neither_code_nor_error_is_an_error() {
-    let out = run(
-        r#"
+    let out = run(r#"
 fn main() {
     let result = oauth_callback_params("session_state=xyz")
     println(str(result.is_err()))
     println(result.err())
 }
-"#,
-    );
+"#);
     let out = lines(&out, 2);
     assert_eq!(out[0], "true");
     assert!(
@@ -803,27 +763,23 @@ fn main() {
 /// tampered redirect, and the failure signal is the one that must not be lost.
 #[test]
 fn callback_with_both_code_and_error_is_treated_as_an_error() {
-    let out = run(
-        r#"
+    let out = run(r#"
 fn main() {
     let result = oauth_callback_params("code=abc&error=access_denied")
     println(str(result.is_err()))
 }
-"#,
-    );
+"#);
     assert_eq!(out, "true", "the error must win over the code");
 }
 
 /// A crafted `?code=good&code=evil` must not let the second value override the first.
 #[test]
 fn only_the_first_occurrence_of_a_field_is_used() {
-    let out = run(
-        r#"
+    let out = run(r#"
 fn main() {
     println(oauth_callback_params("code=first&code=second").unwrap().code)
 }
-"#,
-    );
+"#);
     assert_eq!(out, "first", "a duplicated parameter must not override");
 }
 
@@ -831,15 +787,13 @@ fn main() {
 /// tail by hand without the first parameter name becoming `?code`.
 #[test]
 fn callback_values_are_percent_decoded_and_a_leading_question_mark_is_tolerated() {
-    let out = run(
-        r#"
+    let out = run(r#"
 fn main() {
     let params = oauth_callback_params("?code=a%2Fb%20c&state=x%3Dy").unwrap()
     println(params.code)
     println(params.state)
 }
-"#,
-    );
+"#);
     assert_eq!(out, "a/b c\nx=y");
 }
 
@@ -847,15 +801,13 @@ fn main() {
 /// that differs from the value the provider sent is how a decoding bug becomes a bypass.
 #[test]
 fn malformed_percent_escape_in_a_callback_value_is_an_error() {
-    let out = run(
-        r#"
+    let out = run(r#"
 fn main() {
     let result = oauth_callback_params("code=abc%zz")
     println(str(result.is_err()))
     println(result.err())
 }
-"#,
-    );
+"#);
     let out = lines(&out, 2);
     assert_eq!(out[0], "true");
     assert!(

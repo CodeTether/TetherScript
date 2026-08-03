@@ -104,8 +104,8 @@ pub fn from_map(headers: &HashMap<String, String>) -> Option<&str> {
 /// ```
 pub fn from_pairs<'a>(headers: &'a [(&'a str, &'a str)]) -> Option<&'a str> {
     for (name, value) in headers {
-        if is_header(*name) {
-            return normalize(*value);
+        if is_header(name) {
+            return normalize(value);
         }
     }
     None

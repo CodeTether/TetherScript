@@ -29,6 +29,8 @@ pub(crate) mod form;
 pub(crate) mod header;
 #[path = "web_builtins/hmac.rs"]
 pub(crate) mod hmac;
+#[path = "web_builtins/jwks.rs"]
+pub(crate) mod jwks;
 #[path = "web_builtins/jwt.rs"]
 pub(crate) mod jwt;
 #[path = "web_builtins/log.rs"]
@@ -47,8 +49,27 @@ pub(crate) mod ratelimit;
 pub(crate) mod route;
 #[path = "web_builtins/session.rs"]
 pub(crate) mod session;
+// Middleware and integration groups: the layers Actix `.wrap(..)`s in the reference.
+#[path = "web_builtins/abtest.rs"]
+pub(crate) mod abtest;
+#[path = "web_builtins/cors.rs"]
+pub(crate) mod cors;
+#[path = "web_builtins/dynpage.rs"]
+pub(crate) mod dynpage;
+#[path = "web_builtins/identity.rs"]
+pub(crate) mod identity;
+#[path = "web_builtins/oauth.rs"]
+pub(crate) mod oauth;
+// Server-side session records and a sliding-window limiter, both Redis-shaped.
+#[path = "web_builtins/sessionstore.rs"]
+pub(crate) mod sessionstore;
 #[path = "web_builtins/sse.rs"]
 pub(crate) mod sse;
+#[path = "web_builtins/store.rs"]
+pub(crate) mod store;
+// Streaming SSE: `sse` frames one event, this frames a whole chunked stream.
+#[path = "web_builtins/ssestream.rs"]
+pub(crate) mod ssestream;
 // Pointed at a directory rather than a bare file: the template engine has 23
 // submodules, and a `#[path]`-included file resolves its own submodules against
 // `web_builtins/`, so the declarations would each need a redundant `#[path]` too.
@@ -63,10 +84,19 @@ pub(crate) mod validate;
 pub(crate) fn install(env: &Rc<RefCell<Env>>) {
     hmac::install(env);
     jwt::install(env);
+    jwks::install(env);
     cookie::install(env);
     form::install(env);
     uuid::install(env);
     sse::install(env);
+    ssestream::install(env);
+    abtest::install(env);
+    cors::install(env);
+    dynpage::install(env);
+    identity::install(env);
+    oauth::install(env);
+    store::install(env);
+    sessionstore::install(env);
     base32::install(env);
     csrf::install(env);
     datetime::install(env);
@@ -80,6 +110,8 @@ pub(crate) fn install(env: &Rc<RefCell<Env>>) {
     multipart::install(env);
     ratelimit::install(env);
     session::install(env);
-    template::install(env);
+    // Called directly rather than through a wrapper in the group's mod.rs, which keeps
+    // that file's declaration list within the line budget.
+    template::template_install::install(env);
     validate::install(env);
 }

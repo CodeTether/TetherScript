@@ -44,11 +44,12 @@ pub(crate) fn shape_text(err: &ShapeError) -> String {
         ShapeError::AlgNotString(found) => {
             format!("jwtrs: header `alg` must be a string, got {found}")
         }
-        ShapeError::AlgNone => "jwtrs: header `alg` is `none`; unsecured JWS is never accepted"
-            .to_string(),
-        ShapeError::AlgMismatch { got, expected } => format!(
-            "jwtrs: header `alg` is `{got}` but this verifier is pinned to `{expected}`"
-        ),
+        ShapeError::AlgNone => {
+            "jwtrs: header `alg` is `none`; unsecured JWS is never accepted".to_string()
+        }
+        ShapeError::AlgMismatch { got, expected } => {
+            format!("jwtrs: header `alg` is `{got}` but this verifier is pinned to `{expected}`")
+        }
         ShapeError::TypMismatch { got, expected } => {
             format!("jwtrs: header `typ` is `{got}`, expected `{expected}`")
         }

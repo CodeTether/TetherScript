@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use super::super::super::pure_native;
 use super::args::{int_arg, str_arg};
-use super::pkce::gen::challenge;
+use super::pkce::generate::challenge;
 use super::pkce::pair::build as pkce_pair;
 use super::state::{mint, verify};
 use crate::system::result_value as wrap;

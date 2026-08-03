@@ -97,7 +97,11 @@ fn rejects_hs256_when_rs256_is_expected() {
     // Algorithm confusion: the RSA public key is public, so if the verifier read
     // `HS256` from the header and HMACed with the looked-up key material, the
     // attacker could compute that MAC too. Pinning refuses before any key is fetched.
-    let token = token_with(r#"{"alg":"HS256","kid":"key-a"}"#, &payload_with(""), GOOD_SIG);
+    let token = token_with(
+        r#"{"alg":"HS256","kid":"key-a"}"#,
+        &payload_with(""),
+        GOOD_SIG,
+    );
     assert_eq!(
         validate_at(&token, 950),
         Err(JwtError::Shape(ShapeError::AlgMismatch {
@@ -156,7 +160,11 @@ fn returns_no_claims_when_the_signature_fails() {
 fn claim_checks_do_not_run_before_the_signature_check() {
     // Expired, wrong issuer, wrong audience, and no `sub` — yet the reported failure
     // is the signature, because nothing reads the payload until verification passes.
-    let token = token_with(RS256_HEADER, r#"{"iss":"evil","aud":"other","exp":1}"#, "forged");
+    let token = token_with(
+        RS256_HEADER,
+        r#"{"iss":"evil","aud":"other","exp":1}"#,
+        "forged",
+    );
     assert!(matches!(
         validate_at(&token, 9_999),
         Err(JwtError::Signature(_))
@@ -186,8 +194,8 @@ fn accepts_a_just_expired_token_within_skew() {
 #[test]
 fn skew_is_symmetric_at_both_edges() {
     let token = keycloak_token(1_000, GOOD_SIG); // nbf == 700
-    // `exp + skew` is exclusive: exactly one second inside is accepted, the boundary
-    // itself is not.
+                                                 // `exp + skew` is exclusive: exactly one second inside is accepted, the boundary
+                                                 // itself is not.
     assert!(validate_at(&token, 1_059).is_ok());
     assert!(validate_at(&token, 1_060).is_err());
     // `nbf - skew` is inclusive on the same one number.
@@ -243,7 +251,8 @@ fn rejects_a_non_numeric_exp() {
 
 #[test]
 fn rejects_a_wrong_issuer() {
-    let payload = r#"{"iss":"https://evil.example/realms/main","sub":"u","aud":"web-app","exp":1000}"#;
+    let payload =
+        r#"{"iss":"https://evil.example/realms/main","sub":"u","aud":"web-app","exp":1000}"#;
     let token = token_with(RS256_HEADER, payload, GOOD_SIG);
     assert_eq!(
         validate_at(&token, 950),
@@ -256,7 +265,11 @@ fn rejects_a_wrong_issuer() {
 
 #[test]
 fn rejects_a_missing_issuer_as_missing_not_mismatched() {
-    let token = token_with(RS256_HEADER, r#"{"sub":"u","aud":"web-app","exp":1000}"#, GOOD_SIG);
+    let token = token_with(
+        RS256_HEADER,
+        r#"{"sub":"u","aud":"web-app","exp":1000}"#,
+        GOOD_SIG,
+    );
     assert_eq!(
         validate_at(&token, 950),
         Err(JwtError::Claim(ClaimError::Missing("iss")))
@@ -272,12 +285,14 @@ fn matches_aud_given_as_a_string() {
 
 #[test]
 fn matches_aud_given_as_an_array() {
-    let payload = format!(
-        r#"{{"iss":"{ISSUER}","sub":"u","aud":["account","web-app"],"exp":1000}}"#
-    );
+    let payload =
+        format!(r#"{{"iss":"{ISSUER}","sub":"u","aud":["account","web-app"],"exp":1000}}"#);
     let token = token_with(RS256_HEADER, &payload, GOOD_SIG);
     let claims = validate_at(&token, 950).expect("array aud should match");
-    assert_eq!(claims.aud, vec!["account".to_string(), "web-app".to_string()]);
+    assert_eq!(
+        claims.aud,
+        vec!["account".to_string(), "web-app".to_string()]
+    );
 }
 
 #[test]
@@ -328,7 +343,11 @@ fn rejects_an_aud_array_holding_a_non_string() {
 #[test]
 fn rejects_a_two_part_token() {
     let full = keycloak_token(1_000, GOOD_SIG);
-    let two = full.rsplit_once('.').expect("has three parts").0.to_string();
+    let two = full
+        .rsplit_once('.')
+        .expect("has three parts")
+        .0
+        .to_string();
     assert_eq!(
         validate_at(&two, 950),
         Err(JwtError::Shape(ShapeError::WrongSegmentCount(2)))
@@ -391,14 +410,22 @@ fn rejects_a_six_bit_remainder() {
     let token = format!("abcde.{rest}");
     assert!(matches!(
         validate_at(&token, 950),
-        Err(JwtError::Shape(ShapeError::Base64 { segment: "header", .. }))
+        Err(JwtError::Shape(ShapeError::Base64 {
+            segment: "header",
+            ..
+        }))
     ));
 }
 
 #[test]
 fn rejects_a_non_object_payload() {
     // Each of these is valid JSON and an invalid JWT payload (RFC 7519 §3).
-    for (json, found) in [("[1,2,3]", "list"), ("7", "int"), ("null", "nil"), (r#""hi""#, "str")] {
+    for (json, found) in [
+        ("[1,2,3]", "list"),
+        ("7", "int"),
+        ("null", "nil"),
+        (r#""hi""#, "str"),
+    ] {
         let token = token_with(RS256_HEADER, json, GOOD_SIG);
         assert_eq!(
             validate_at(&token, 950),
@@ -428,7 +455,10 @@ fn rejects_a_malformed_json_payload() {
     let token = token_with(RS256_HEADER, r#"{"iss":"#, GOOD_SIG);
     assert!(matches!(
         validate_at(&token, 950),
-        Err(JwtError::Shape(ShapeError::MalformedJson { segment: "payload", .. }))
+        Err(JwtError::Shape(ShapeError::MalformedJson {
+            segment: "payload",
+            ..
+        }))
     ));
 }
 
@@ -480,7 +510,11 @@ fn a_token_with_no_role_containers_grants_nothing() {
 
 #[test]
 fn rejects_a_non_object_realm_access() {
-    let token = token_with(RS256_HEADER, &payload_with(r#","realm_access":"admin""#), GOOD_SIG);
+    let token = token_with(
+        RS256_HEADER,
+        &payload_with(r#","realm_access":"admin""#),
+        GOOD_SIG,
+    );
     assert_eq!(
         validate_at(&token, 950),
         Err(JwtError::Claim(ClaimError::RolesContainerNotObject {
@@ -525,7 +559,10 @@ fn rejects_too_many_roles() {
     let roles: Vec<String> = (0..300).map(|index| format!(r#""r{index}""#)).collect();
     let extra = format!(r#","realm_access":{{"roles":[{}]}}"#, roles.join(","));
     let token = token_with(RS256_HEADER, &payload_with(&extra), GOOD_SIG);
-    assert!(token.len() < MAX_TOKEN_BYTES, "fixture must not trip the size bound");
+    assert!(
+        token.len() < MAX_TOKEN_BYTES,
+        "fixture must not trip the size bound"
+    );
     assert_eq!(
         validate_at(&token, 950),
         Err(JwtError::Claim(ClaimError::TooManyRoles {
@@ -553,7 +590,11 @@ fn rejects_an_oversized_token() {
 #[test]
 fn rejects_a_mismatched_typ_when_one_is_required() {
     let config = config().requiring_typ("JWT");
-    let token = token_with(r#"{"alg":"RS256","typ":"at+jwt"}"#, &payload_with(""), GOOD_SIG);
+    let token = token_with(
+        r#"{"alg":"RS256","typ":"at+jwt"}"#,
+        &payload_with(""),
+        GOOD_SIG,
+    );
     assert_eq!(
         Claims::validate(&token, &config, 950, &verifier()),
         Err(JwtError::Shape(ShapeError::TypMismatch {

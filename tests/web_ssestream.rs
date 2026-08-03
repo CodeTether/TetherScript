@@ -50,15 +50,13 @@ fn rows(source: &str) -> Vec<String> {
 
 #[test]
 fn single_field_event_has_exact_bytes() {
-    let out = one(
-        r#"
+    let out = one(r#"
 fn main() {
     let e = map()
     e.data = "hello"
     println(sse_chunk(e).unwrap().replace("\n", "\\n"))
 }
-"#,
-    );
+"#);
     assert_eq!(
         out, "data: hello\\n\\n",
         "one data line plus the dispatching blank line: {out}"
@@ -67,15 +65,13 @@ fn main() {
 
 #[test]
 fn multi_line_data_emits_one_data_line_per_line() {
-    let out = one(
-        r#"
+    let out = one(r#"
 fn main() {
     let e = map()
     e.data = "alpha\nbeta\ngamma"
     println(sse_chunk(e).unwrap().replace("\n", "\\n"))
 }
-"#,
-    );
+"#);
     assert_eq!(
         out, "data: alpha\\ndata: beta\\ndata: gamma\\n\\n",
         "a single data: line would make the client truncate at `alpha`: {out}"
@@ -115,8 +111,7 @@ fn main() {
 
 #[test]
 fn id_event_and_data_appear_in_fixed_field_order() {
-    let out = one(
-        r#"
+    let out = one(r#"
 fn main() {
     let e = map()
     e.data = "payload"
@@ -124,8 +119,7 @@ fn main() {
     e.event = "tick"
     println(sse_chunk(e).unwrap().replace("\n", "\\n"))
 }
-"#,
-    );
+"#);
     assert_eq!(
         out, "event: tick\\nid: 17\\ndata: payload\\n\\n",
         "order is event, id, data regardless of insertion order: {out}"
@@ -134,8 +128,7 @@ fn main() {
 
 #[test]
 fn retry_field_is_placed_before_data() {
-    let out = one(
-        r#"
+    let out = one(r#"
 fn main() {
     let e = map()
     e.data = "p"
@@ -144,8 +137,7 @@ fn main() {
     e.event = "n"
     println(sse_chunk(e).unwrap().replace("\n", "\\n"))
 }
-"#,
-    );
+"#);
     assert_eq!(
         out, "event: n\\nid: 1\\nretry: 2500\\ndata: p\\n\\n",
         "data is last because it is the only multi-line field: {out}"
@@ -201,13 +193,11 @@ fn main() {
 
 #[test]
 fn keepalive_is_a_comment_only_frame() {
-    let out = one(
-        r#"
+    let out = one(r#"
 fn main() {
     println(sse_keepalive().replace("\n", "\\n"))
 }
-"#,
-    );
+"#);
     assert_eq!(
         out, ": keepalive\\n\\n",
         "a comment starts with ':' and dispatches nothing: {out}"
@@ -236,13 +226,11 @@ fn main() {
 
 #[test]
 fn retry_frame_is_a_bare_directive() {
-    let out = one(
-        r#"
+    let out = one(r#"
 fn main() {
     println(sse_retry_frame(4000).unwrap().replace("\n", "\\n"))
 }
-"#,
-    );
+"#);
     assert_eq!(out, "retry: 4000\\n\\n", "full output: {out}");
 }
 
@@ -412,14 +400,12 @@ fn main() {
 /// exactly one `data:` line.
 #[test]
 fn empty_data_payload_still_emits_one_data_line() {
-    let out = one(
-        r#"
+    let out = one(r#"
 fn main() {
     let e = map()
     e.data = ""
     println(sse_chunk(e).unwrap().replace("\n", "\\n"))
 }
-"#,
-    );
+"#);
     assert_eq!(out, "data: \\n\\n", "full output: {out}");
 }

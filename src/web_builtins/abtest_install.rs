@@ -49,9 +49,7 @@ pub(super) fn install(env: &Rc<RefCell<Env>>) {
     );
     bindings.define(
         "ab_bucket",
-        pure_native("ab_bucket", Some(2), |args| {
-            ops::bucket(&args[0], &args[1])
-        }),
+        pure_native("ab_bucket", Some(2), |args| ops::bucket(&args[0], &args[1])),
         false,
     );
 }

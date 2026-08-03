@@ -62,20 +62,27 @@ mod internals;
 #[path = "channel_tests.rs"]
 mod tests;
 
-pub use builtins::builtin::{channel_open, channel_send};
-pub use builtins::builtin_close::channel_close;
-pub use builtins::builtin_deadlock::channel_deadlock;
-pub use builtins::builtin_drop::channel_drop_receiver;
-pub use builtins::builtin_ops::channel_recv;
-pub use builtins::builtin_query::{channel_ended, channel_len};
-pub use builtins::builtin_select::channel_select;
-pub use internals::bounded::bounded;
-pub use internals::cancel::cancel_task;
-pub use internals::current::{current_task, set_current_task};
-pub use internals::deadlock::detect_deadlock;
-pub use internals::endpoint::{Receiver, Sender};
-pub use internals::parked::parked_tasks;
-pub use internals::recv::RecvOutcome;
-pub use internals::select::{select_recv, SelectOutcome};
-pub use internals::send::SendOutcome;
-pub use internals::wake::take_wakeups;
+// These are the script-facing operations. Registering them as interpreter built-ins is a
+// separate step and is not done yet, so nothing inside the crate names them; the suite in
+// `tests/scheduler_channel.rs` drives them directly. Grouped so one allow covers the
+// whole surface.
+#[allow(unused_imports)]
+pub use {
+    builtins::builtin::{channel_open, channel_send},
+    builtins::builtin_close::channel_close,
+    builtins::builtin_deadlock::channel_deadlock,
+    builtins::builtin_drop::channel_drop_receiver,
+    builtins::builtin_ops::channel_recv,
+    builtins::builtin_query::{channel_ended, channel_len},
+    builtins::builtin_select::channel_select,
+    internals::bounded::bounded,
+    internals::cancel::cancel_task,
+    internals::current::{current_task, set_current_task},
+    internals::deadlock::detect_deadlock,
+    internals::endpoint::{Receiver, Sender},
+    internals::parked::parked_tasks,
+    internals::recv::RecvOutcome,
+    internals::select::{select_recv, SelectOutcome},
+    internals::send::SendOutcome,
+    internals::wake::take_wakeups,
+};

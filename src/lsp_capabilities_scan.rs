@@ -74,7 +74,10 @@ pub fn scan(text: &str) -> Option<Scanned> {
     let offsets = tokens
         .iter()
         .map(|token| {
-            let base = starts.get(token.line.saturating_sub(1)).copied().unwrap_or(0);
+            let base = starts
+                .get(token.line.saturating_sub(1))
+                .copied()
+                .unwrap_or(0);
             (base + token.col.saturating_sub(1)).min(text.len())
         })
         .collect();

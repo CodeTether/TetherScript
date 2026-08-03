@@ -56,7 +56,10 @@ fn rfc2202_sha1_oversized_keys_are_hashed_first() {
     // RFC 2104 requires hashing the key down to 20 bytes before padding.
     let key = rep(0xaa, 80);
     assert_eq!(
-        hmac_sha1_hex(&key, b"Test Using Larger Than Block-Size Key - Hash Key First"),
+        hmac_sha1_hex(
+            &key,
+            b"Test Using Larger Than Block-Size Key - Hash Key First"
+        ),
         "aa4ae5e15272d00e95705637ce8a3b55ed402112"
     );
     assert_eq!(
@@ -115,7 +118,10 @@ fn rfc4231_sha512_oversized_keys_are_hashed_first() {
     // "working" — but would break the 65..128-byte range covered below.
     let key = rep(0xaa, 131);
     assert_eq!(
-        hmac_sha512_hex(&key, b"Test Using Larger Than Block-Size Key - Hash Key First"),
+        hmac_sha512_hex(
+            &key,
+            b"Test Using Larger Than Block-Size Key - Hash Key First"
+        ),
         concat!(
             "80b24263c7c1a3ebb71493c1dd7be8b49b46d1f41b4aeec1121b013783f8f352",
             "6b56d037e05f2598bd0fd2215d6a1e5295e64f73f63f0aec8b915a985d786598",

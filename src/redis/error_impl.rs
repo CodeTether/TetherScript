@@ -8,7 +8,6 @@ use std::fmt;
 
 use super::error::RedisError;
 
-
 impl RedisError {
     /// Whether this is an error *reply* rather than a transport or framing fault.
     ///

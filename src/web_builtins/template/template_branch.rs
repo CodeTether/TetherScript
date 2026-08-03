@@ -26,7 +26,8 @@ pub(super) fn branches<'a>(
         // `step.id == current.id` spans several whitespace-separated words.
         let (keyword, rest) = body.split_once(char::is_whitespace).unwrap_or((body, ""));
         match keyword {
-            keyword @ ("if" | "for" | "block") => {
+            // `macro` counts as a nesting opener for the same reason as `block`.
+            keyword @ ("if" | "for" | "block" | "macro") => {
                 depth += 1;
                 if depth == 1 && keyword == "if" {
                     found.push(Branch {
@@ -43,7 +44,7 @@ pub(super) fn branches<'a>(
                 condition: None,
                 at: offset,
             }),
-            "endif" | "endfor" | "endblock" => {
+            "endif" | "endfor" | "endblock" | "endmacro" => {
                 depth -= 1;
                 if depth == 0 {
                     return Ok((found, offset));

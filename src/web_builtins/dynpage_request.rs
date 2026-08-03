@@ -35,10 +35,7 @@ use crate::value::Value;
 ///
 /// Returns an error when `request` is not a map, or when `headers` is present and
 /// not a map.
-pub(super) fn headers_of(
-    request: &Value,
-    label: &str,
-) -> Result<HashMap<String, Value>, String> {
+pub(super) fn headers_of(request: &Value, label: &str) -> Result<HashMap<String, Value>, String> {
     let request = map_arg(request, &format!("{label}: request"))?;
     match request.get("headers") {
         None | Some(Value::Nil) => Ok(HashMap::new()),

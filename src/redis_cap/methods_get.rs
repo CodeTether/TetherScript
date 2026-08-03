@@ -29,7 +29,11 @@ use crate::value::Value;
 /// transport failure such as `WRONGTYPE` is a catchable `Result::Err` value instead.
 pub(super) fn get(connection: &mut Connection, arguments: &[Value]) -> Result<Value, String> {
     args::exactly("redis.get", arguments, 1)?;
-    let key = coerce_bytes::bytes("redis.get", "key", args::at("redis.get", "key", arguments, 0)?)?;
+    let key = coerce_bytes::bytes(
+        "redis.get",
+        "key",
+        args::at("redis.get", "key", arguments, 0)?,
+    )?;
     match connection.get(&key) {
         Ok(payload) => Ok(outcome::ok(reply::optional_bulk(payload))),
         Err(error) => Ok(outcome::failed("redis.get", error)),

@@ -25,7 +25,10 @@ fn addition_carries_through_several_limbs() {
 #[test]
 fn addition_carry_is_absorbed_without_growing() {
     // (2^64 - 1) + 1 == 2^64: limb 0 wraps to 0 and limb 1 becomes 1.
-    assert_eq!(BigUint::from_u64(u64::MAX).add(&BigUint::from_u64(1)), two_pow_64());
+    assert_eq!(
+        BigUint::from_u64(u64::MAX).add(&BigUint::from_u64(1)),
+        two_pow_64()
+    );
 }
 
 #[test]
@@ -77,7 +80,10 @@ fn subtraction_is_checked_not_saturating() {
         BigUint::from_u64(2).sub(&BigUint::from_u64(5)),
         Err(BigUintError::Underflow)
     );
-    assert_eq!(BigUint::zero().sub(&BigUint::from_u64(1)), Err(BigUintError::Underflow));
+    assert_eq!(
+        BigUint::zero().sub(&BigUint::from_u64(1)),
+        Err(BigUintError::Underflow)
+    );
     // One below the boundary still succeeds.
     assert!(two_pow_64().sub(&BigUint::from_u64(1)).is_ok());
 }
@@ -150,15 +156,24 @@ fn bit_len_and_bit_agree_on_limb_boundaries() {
     assert_eq!(two_pow_64().bit_len(), 65);
     assert!(two_pow_64().bit(64));
     assert!(!two_pow_64().bit(63));
-    assert!(!two_pow_64().bit(1_000), "reads past the top are zero, not a panic");
+    assert!(
+        !two_pow_64().bit(1_000),
+        "reads past the top are zero, not a panic"
+    );
 }
 
 #[test]
 fn byte_round_trip_preserves_leading_zeros_at_a_fixed_width() {
-    let bytes = [0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09];
+    let bytes = [
+        0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09,
+    ];
     let value = BigUint::from_be_bytes(&bytes);
     assert_eq!(value.to_be_bytes(bytes.len()).unwrap(), bytes);
-    assert_eq!(value.byte_len(), 9, "leading zeros are not part of the magnitude");
+    assert_eq!(
+        value.byte_len(),
+        9,
+        "leading zeros are not part of the magnitude"
+    );
 }
 
 #[test]
@@ -188,14 +203,19 @@ fn to_be_bytes_refuses_a_width_narrower_than_the_value() {
     let value = BigUint::from_be_bytes(&[0x01, 0x02, 0x03]);
     assert_eq!(
         value.to_be_bytes(2),
-        Err(BigUintError::WidthTooSmall { needed: 3, width: 2 })
+        Err(BigUintError::WidthTooSmall {
+            needed: 3,
+            width: 2
+        })
     );
     assert_eq!(value.to_be_bytes(3).unwrap(), vec![0x01, 0x02, 0x03]);
 }
 
 #[test]
 fn divmod_with_divisor_greater_than_dividend_yields_zero_and_the_dividend() {
-    let (quotient, remainder) = BigUint::from_u64(7).divmod(&BigUint::from_u64(1_000)).unwrap();
+    let (quotient, remainder) = BigUint::from_u64(7)
+        .divmod(&BigUint::from_u64(1_000))
+        .unwrap();
     assert!(quotient.is_zero());
     assert_eq!(remainder, BigUint::from_u64(7));
 }
@@ -223,7 +243,9 @@ fn divmod_matches_a_hand_computed_multi_limb_division() {
 
 #[test]
 fn divmod_by_a_single_limb_matches_native_arithmetic() {
-    let (quotient, remainder) = BigUint::from_u64(1_000).divmod(&BigUint::from_u64(7)).unwrap();
+    let (quotient, remainder) = BigUint::from_u64(1_000)
+        .divmod(&BigUint::from_u64(7))
+        .unwrap();
     assert_eq!(quotient, BigUint::from_u64(1_000 / 7));
     assert_eq!(remainder, BigUint::from_u64(1_000 % 7));
 }
@@ -257,14 +279,25 @@ fn divmod_by_zero_is_a_named_error_and_not_a_panic() {
         BigUint::from_u64(1).divmod(&BigUint::zero()),
         Err(BigUintError::DivideByZero)
     );
-    assert_eq!(BigUint::zero().divmod(&BigUint::zero()), Err(BigUintError::DivideByZero));
-    assert_eq!(BigUint::from_u64(1).rem(&BigUint::zero()), Err(BigUintError::DivideByZero));
-    assert!(BigUintError::DivideByZero.to_string().contains("divide by zero"));
+    assert_eq!(
+        BigUint::zero().divmod(&BigUint::zero()),
+        Err(BigUintError::DivideByZero)
+    );
+    assert_eq!(
+        BigUint::from_u64(1).rem(&BigUint::zero()),
+        Err(BigUintError::DivideByZero)
+    );
+    assert!(BigUintError::DivideByZero
+        .to_string()
+        .contains("divide by zero"));
 }
 
 #[test]
 fn hex_round_trips_across_limb_boundaries() {
-    assert_eq!(BigUint::from_hex("10001").unwrap(), BigUint::from_u64(65_537));
+    assert_eq!(
+        BigUint::from_hex("10001").unwrap(),
+        BigUint::from_u64(65_537)
+    );
     assert_eq!(two_pow_64().to_hex(), "10000000000000000");
     let wide = "ffffffffffffffff0000000000000001";
     assert_eq!(BigUint::from_hex(wide).unwrap().to_hex(), wide);

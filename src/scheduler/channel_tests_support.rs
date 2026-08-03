@@ -34,5 +34,8 @@ pub(super) fn assert_parked(task: u64) {
 /// Assert that `task` is not parked on any channel.
 pub(super) fn assert_not_parked(task: u64) {
     let parked = channel::parked_tasks();
-    assert!(!parked.contains(&task), "expected {task} absent from {parked:?}");
+    assert!(
+        !parked.contains(&task),
+        "expected {task} absent from {parked:?}"
+    );
 }

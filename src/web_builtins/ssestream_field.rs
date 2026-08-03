@@ -34,7 +34,10 @@ use crate::value::Value;
 /// naming the field so the caller can find the offending input.
 pub(super) fn line(name: &str, value: &Value) -> Result<String, String> {
     let Value::Str(text) = value else {
-        return Err(format!("sse: {name} must be str, got {}", value.type_name()));
+        return Err(format!(
+            "sse: {name} must be str, got {}",
+            value.type_name()
+        ));
     };
     if text.contains('\n') || text.contains('\r') {
         return Err(format!(

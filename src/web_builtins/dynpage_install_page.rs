@@ -50,25 +50,22 @@ pub(super) fn install(env: &Rc<RefCell<Env>>) {
 
 /// `page_cache_key(parts)` -> `Result` of the derived key str.
 fn key(args: &[Value]) -> Result<Value, String> {
-    Ok(wrap(
-        dynpage_parts::read(&args[0], "page_cache_key")
-            .map(|parts| Value::Str(Rc::new(dynpage_key::build(&parts)))),
-    ))
+    Ok(wrap(dynpage_parts::read(&args[0], "page_cache_key").map(
+        |parts| Value::Str(Rc::new(dynpage_key::build(&parts))),
+    )))
 }
 
 /// `vary_headers(parts)` -> `Result` of the `Vary` header value str.
 fn vary(args: &[Value]) -> Result<Value, String> {
-    Ok(wrap(
-        dynpage_parts::read(&args[0], "vary_headers")
-            .map(|parts| Value::Str(Rc::new(dynpage_vary::build(&parts)))),
-    ))
+    Ok(wrap(dynpage_parts::read(&args[0], "vary_headers").map(
+        |parts| Value::Str(Rc::new(dynpage_vary::build(&parts))),
+    )))
 }
 
 /// `page_not_modified(cached_etag, request)` -> `Result` of nil or a 304 map.
 fn fresh(args: &[Value]) -> Result<Value, String> {
     Ok(wrap(
-        str_arg(&args[0], "page_not_modified: cached_etag").and_then(|etag| {
-            dynpage_notmod::decide(&etag, &args[1], "page_not_modified")
-        }),
+        str_arg(&args[0], "page_not_modified: cached_etag")
+            .and_then(|etag| dynpage_notmod::decide(&etag, &args[1], "page_not_modified")),
     ))
 }

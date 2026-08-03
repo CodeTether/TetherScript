@@ -142,7 +142,13 @@ fn a_valid_signature_is_refused_under_a_different_claimed_algorithm() {
         &key(),
     )
     .unwrap_err();
-    assert_eq!(err, RsaError::DigestInfoLength { expected: 83, found: 51 });
+    assert_eq!(
+        err,
+        RsaError::DigestInfoLength {
+            expected: 83,
+            found: 51
+        }
+    );
 }
 
 #[test]
@@ -156,7 +162,13 @@ fn a_sha512_signature_is_refused_under_a_sha256_claim() {
         &key(),
     )
     .unwrap_err();
-    assert_eq!(err, RsaError::DigestInfoLength { expected: 51, found: 83 });
+    assert_eq!(
+        err,
+        RsaError::DigestInfoLength {
+            expected: 51,
+            found: 83
+        }
+    );
 }
 
 #[test]
@@ -171,7 +183,13 @@ fn a_sha384_signature_is_refused_under_a_sha512_claim() {
         &key(),
     )
     .unwrap_err();
-    assert_eq!(err, RsaError::DigestInfoLength { expected: 83, found: 67 });
+    assert_eq!(
+        err,
+        RsaError::DigestInfoLength {
+            expected: 83,
+            found: 67
+        }
+    );
 }
 
 #[test]
@@ -179,7 +197,12 @@ fn a_flipped_final_digest_octet_is_refused() {
     let mut digest = octets(DIGEST_SHA256, 32);
     *digest.last_mut().unwrap() ^= 0x01;
     assert_eq!(
-        verify(&octets(SIG_SHA256, 256), &digest, DigestAlgorithm::Sha256, &key()),
+        verify(
+            &octets(SIG_SHA256, 256),
+            &digest,
+            DigestAlgorithm::Sha256,
+            &key()
+        ),
         Err(RsaError::DigestMismatch)
     );
 }
@@ -190,9 +213,18 @@ fn a_flipped_signature_octet_destroys_the_padding() {
     // random, so the failure lands on a padding rule rather than the digest.
     let mut sig = octets(SIG_SHA256, 256);
     sig[128] ^= 0x01;
-    let err = verify(&sig, &octets(DIGEST_SHA256, 32), DigestAlgorithm::Sha256, &key())
-        .expect_err("a tampered signature must not verify");
-    assert_ne!(err, RsaError::DigestMismatch, "must fail structurally, not on the digest");
+    let err = verify(
+        &sig,
+        &octets(DIGEST_SHA256, 32),
+        DigestAlgorithm::Sha256,
+        &key(),
+    )
+    .expect_err("a tampered signature must not verify");
+    assert_ne!(
+        err,
+        RsaError::DigestMismatch,
+        "must fail structurally, not on the digest"
+    );
 }
 
 #[test]
@@ -200,8 +232,16 @@ fn a_signature_shorter_than_the_modulus_is_refused() {
     // A 255-octet string, i.e. the vector with its leading octet dropped.
     let sig = octets(SIG_SHA256, 256)[1..].to_vec();
     assert_eq!(
-        verify(&sig, &octets(DIGEST_SHA256, 32), DigestAlgorithm::Sha256, &key()),
-        Err(RsaError::SignatureLength { got: 255, expected: 256 })
+        verify(
+            &sig,
+            &octets(DIGEST_SHA256, 32),
+            DigestAlgorithm::Sha256,
+            &key()
+        ),
+        Err(RsaError::SignatureLength {
+            got: 255,
+            expected: 256
+        })
     );
 }
 
@@ -212,8 +252,16 @@ fn a_signature_longer_than_the_modulus_is_refused() {
     let mut sig = vec![0x00];
     sig.extend(octets(SIG_SHA256, 256));
     assert_eq!(
-        verify(&sig, &octets(DIGEST_SHA256, 32), DigestAlgorithm::Sha256, &key()),
-        Err(RsaError::SignatureLength { got: 257, expected: 256 })
+        verify(
+            &sig,
+            &octets(DIGEST_SHA256, 32),
+            DigestAlgorithm::Sha256,
+            &key()
+        ),
+        Err(RsaError::SignatureLength {
+            got: 257,
+            expected: 256
+        })
     );
 }
 
@@ -224,7 +272,12 @@ fn a_signature_equal_to_the_modulus_is_refused() {
     // an out-of-range signature.
     let sig = octets(N_HEX, 256);
     assert_eq!(
-        verify(&sig, &octets(DIGEST_SHA256, 32), DigestAlgorithm::Sha256, &key()),
+        verify(
+            &sig,
+            &octets(DIGEST_SHA256, 32),
+            DigestAlgorithm::Sha256,
+            &key()
+        ),
         Err(RsaError::SignatureOutOfRange)
     );
 }
@@ -235,9 +288,16 @@ fn a_signature_greater_than_the_modulus_is_refused() {
     // a family of accepted aliases s + i*n, so a signature is no longer a unique
     // token and replay caches keyed on its bytes can be bypassed.
     let over = BigUint::from_hex(N_HEX).unwrap().add(&BigUint::from_u64(1));
-    let sig = over.to_be_bytes(256).expect("n + 1 still fits in 256 octets");
+    let sig = over
+        .to_be_bytes(256)
+        .expect("n + 1 still fits in 256 octets");
     assert_eq!(
-        verify(&sig, &octets(DIGEST_SHA256, 32), DigestAlgorithm::Sha256, &key()),
+        verify(
+            &sig,
+            &octets(DIGEST_SHA256, 32),
+            DigestAlgorithm::Sha256,
+            &key()
+        ),
         Err(RsaError::SignatureOutOfRange)
     );
 }
@@ -246,8 +306,16 @@ fn a_signature_greater_than_the_modulus_is_refused() {
 fn an_all_zero_signature_is_refused() {
     // 0^e mod n == 0, whose encoding is 256 zero octets: leading 0x00 0x00.
     assert_eq!(
-        verify(&[0u8; 256], &octets(DIGEST_SHA256, 32), DigestAlgorithm::Sha256, &key()),
-        Err(RsaError::LeadingBytes { first: 0x00, second: 0x00 })
+        verify(
+            &[0u8; 256],
+            &octets(DIGEST_SHA256, 32),
+            DigestAlgorithm::Sha256,
+            &key()
+        ),
+        Err(RsaError::LeadingBytes {
+            first: 0x00,
+            second: 0x00
+        })
     );
 }
 
@@ -258,8 +326,16 @@ fn a_signature_of_one_is_refused() {
     let mut sig = vec![0u8; 256];
     sig[255] = 0x01;
     assert_eq!(
-        verify(&sig, &octets(DIGEST_SHA256, 32), DigestAlgorithm::Sha256, &key()),
-        Err(RsaError::LeadingBytes { first: 0x00, second: 0x00 })
+        verify(
+            &sig,
+            &octets(DIGEST_SHA256, 32),
+            DigestAlgorithm::Sha256,
+            &key()
+        ),
+        Err(RsaError::LeadingBytes {
+            first: 0x00,
+            second: 0x00
+        })
     );
 }
 
@@ -267,8 +343,14 @@ fn a_signature_of_one_is_refused() {
 fn an_even_modulus_is_refused_at_construction() {
     // The test modulus ends in 0x05; clearing the low bit makes it even, so it
     // cannot be a product of odd primes.
-    let even = BigUint::from_hex(N_HEX).unwrap().sub(&BigUint::from_u64(1)).unwrap();
-    assert!(!even.bit(0), "n - 1 must be even for this test to mean anything");
+    let even = BigUint::from_hex(N_HEX)
+        .unwrap()
+        .sub(&BigUint::from_u64(1))
+        .unwrap();
+    assert!(
+        !even.bit(0),
+        "n - 1 must be even for this test to mean anything"
+    );
     assert_eq!(
         RsaPublicKey::new(even, BigUint::from_u64(65_537)).unwrap_err(),
         RsaError::ModulusEven
@@ -334,7 +416,14 @@ fn a_leading_zero_octet_cannot_inflate_a_weak_modulus() {
 fn rejection_messages_name_what_went_wrong() {
     // AGENTS.md requires every error path to name the offending thing.
     assert!(format!("{}", RsaError::ModulusTooSmall { bytes: 128 }).contains("128"));
-    assert!(format!("{}", RsaError::SignatureLength { got: 255, expected: 256 }).contains("255"));
+    assert!(format!(
+        "{}",
+        RsaError::SignatureLength {
+            got: 255,
+            expected: 256
+        }
+    )
+    .contains("255"));
     assert!(format!("{}", RsaError::PaddingRunTooShort { len: 3 }).contains('3'));
     assert!(format!("{}", RsaError::ExponentTooSmall).contains("exponent"));
     assert!(format!("{}", RsaError::SignatureOutOfRange).contains("modulus"));

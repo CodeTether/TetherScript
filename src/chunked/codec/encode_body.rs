@@ -46,10 +46,7 @@ use super::limits::MAX_CHUNK_BYTES;
 /// // An empty body is exactly the zero chunk.
 /// assert_eq!(encode_body(b"", &[]).unwrap(), b"0\r\n\r\n".to_vec());
 /// ```
-pub fn encode_body(
-    payload: &[u8],
-    trailers: &[(String, String)],
-) -> Result<Vec<u8>, ChunkedError> {
+pub fn encode_body(payload: &[u8], trailers: &[(String, String)]) -> Result<Vec<u8>, ChunkedError> {
     let mut out = Vec::new();
     for piece in payload.chunks(MAX_CHUNK_BYTES) {
         out.extend_from_slice(&encode_chunk(piece)?);

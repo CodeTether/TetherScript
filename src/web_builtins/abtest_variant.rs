@@ -77,5 +77,8 @@ fn one(item: &Value, index: usize, label: &str) -> Result<Variant, String> {
     let entry = args::map_arg(item, &at)?;
     let name = args::field_str(&entry, "name", &at)?;
     let share = weight::read(&entry, &at, &name)?;
-    Ok(Variant { name, weight: share })
+    Ok(Variant {
+        name,
+        weight: share,
+    })
 }

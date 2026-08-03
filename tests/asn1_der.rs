@@ -67,7 +67,10 @@ fn integer_is_returned_as_raw_big_endian_bytes() {
 
     // 02 01 FF  =  INTEGER -1 in two's complement.
     let minus_one = [0x02, 0x01, 0xff];
-    assert_eq!(Reader::new(&minus_one).read_integer_bytes().unwrap(), &[0xff]);
+    assert_eq!(
+        Reader::new(&minus_one).read_integer_bytes().unwrap(),
+        &[0xff]
+    );
 
     // 02 02 00 80  =  INTEGER 128; the leading zero is required so that the
     // high bit of 0x80 is not read as a sign bit.
@@ -90,9 +93,7 @@ fn integer_is_returned_as_raw_big_endian_bytes() {
 fn integer_rejects_illegal_leading_padding() {
     // 02 02 00 05: the 0x00 is redundant because 0x05 < 0x80.
     let padded_zero = [0x02, 0x02, 0x00, 0x05];
-    let err = Reader::new(&padded_zero)
-        .read_integer_bytes()
-        .unwrap_err();
+    let err = Reader::new(&padded_zero).read_integer_bytes().unwrap_err();
     assert!(matches!(
         err,
         Error::MalformedValue {
@@ -624,7 +625,9 @@ fn every_error_reports_a_named_cause_and_a_usable_offset() {
             .unwrap_err(),
         Reader::new(&[0x04, 0xff]).read_octet_string().unwrap_err(),
         Reader::new(&[0x1f, 0x00]).read_tlv().unwrap_err(),
-        Reader::new(&[0x02, 0x01, 0x00]).read_sequence().unwrap_err(),
+        Reader::new(&[0x02, 0x01, 0x00])
+            .read_sequence()
+            .unwrap_err(),
         Reader::new(&[0x02, 0x02, 0x00, 0x01])
             .read_integer_bytes()
             .unwrap_err(),

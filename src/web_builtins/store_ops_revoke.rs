@@ -5,7 +5,7 @@
 
 use super::store_args::str_arg;
 // The trait must be in scope to call `sweep` through the boxed backend.
-use super::store_backend::SessionBackend;
+// The concrete backend types are reached directly; the trait is not named here.
 use super::store_clock::now_ms;
 use super::store_destroy;
 use super::store_state;

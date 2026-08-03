@@ -51,9 +51,11 @@ const REQUIRED: &str = "cors_policy: `origins` is required; pass a list of exact
 /// Validate every entry of an origin allow-list.
 fn exact(items: &[Value]) -> Result<Vec<String>, String> {
     if items.is_empty() {
-        return Err("cors_policy: `origins` must not be an empty list; an empty allow-list \
+        return Err(
+            "cors_policy: `origins` must not be an empty list; an empty allow-list \
              rejects every origin, which is better spelled by not installing a CORS layer"
-            .to_string());
+                .to_string(),
+        );
     }
     let mut origins = Vec::with_capacity(items.len());
     for item in items {

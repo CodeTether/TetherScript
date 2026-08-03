@@ -43,7 +43,10 @@ pub(super) fn parse(
         return Ok(None);
     };
     match marker {
-        b'+' => Ok(Some((RespValue::Simple(text(line, "simple string")?), next))),
+        b'+' => Ok(Some((
+            RespValue::Simple(text(line, "simple string")?),
+            next,
+        ))),
         b'-' => {
             let (kind, message) = split_error(&text(line, "error")?);
             Ok(Some((RespValue::Error { kind, message }, next)))

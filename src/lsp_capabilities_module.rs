@@ -138,7 +138,9 @@ pub fn exported_names(text: &str) -> Vec<Symbol> {
     let exports = export_list(text);
     collect(text)
         .into_iter()
-        .filter(|symbol| exports.iter().any(|name| *name == symbol.name))
+        // `exports` holds owned Strings, so this compares by str rather than allocating a
+        // String per symbol just to satisfy `contains`.
+        .filter(|symbol| exports.iter().any(|name| name == &symbol.name))
         .collect()
 }
 

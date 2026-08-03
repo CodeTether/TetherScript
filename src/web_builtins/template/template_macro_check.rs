@@ -27,11 +27,7 @@ use crate::value::Value;
 /// # Errors
 ///
 /// Returns an error naming the offending keyword, the macro, and the macro's signature.
-pub(super) fn reject_unknown(
-    def: &Macro<'_>,
-    path: &str,
-    args: &[Arg<'_>],
-) -> Result<(), String> {
+pub(super) fn reject_unknown(def: &Macro<'_>, path: &str, args: &[Arg<'_>]) -> Result<(), String> {
     for arg in args {
         if !def.params.iter().any(|param| param.name == arg.name) {
             return Err(format!(

@@ -35,7 +35,10 @@ pub(super) fn experiment_map(parsed: &Experiment) -> Value {
     fields.insert(config::VARIANTS.into(), variant_list(parsed));
     fields.insert(
         config::STICKY_COOKIE.into(),
-        parsed.sticky_cookie.as_deref().map_or(Value::Nil, str_value),
+        parsed
+            .sticky_cookie
+            .as_deref()
+            .map_or(Value::Nil, str_value),
     );
     Value::Map(Rc::new(RefCell::new(fields)))
 }

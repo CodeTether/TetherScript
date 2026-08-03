@@ -27,7 +27,7 @@
 //! ```
 
 use crate::lsp_capabilities::completion_item::{callable, described};
-use crate::lsp_capabilities::rank::{Tier, sort_text};
+use crate::lsp_capabilities::rank::{sort_text, Tier};
 use crate::lsp_capabilities::symbol::SymbolKind;
 use crate::lsp_capabilities::symbols::collect;
 use crate::value::Value;

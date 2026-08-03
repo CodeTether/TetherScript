@@ -88,6 +88,9 @@
 //! ```
 
 mod auth;
+// Binary-format row decoding and parameter binding, which the text-format path could not
+// do: an exact numeric or timestamptz needed a cast in every query without it.
+pub mod binary;
 mod collect;
 mod connection;
 mod cursor;

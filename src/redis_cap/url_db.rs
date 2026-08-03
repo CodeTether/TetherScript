@@ -44,7 +44,6 @@ pub fn index(path: &str) -> Result<u32, String> {
     if path.is_empty() {
         return Ok(0);
     }
-    path.parse::<u32>().map_err(|_| {
-        format!("--grant-redis database must be a non-negative number (got `{path}`)")
-    })
+    path.parse::<u32>()
+        .map_err(|_| format!("--grant-redis database must be a non-negative number (got `{path}`)"))
 }

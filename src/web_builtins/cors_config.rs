@@ -13,7 +13,7 @@
 use std::collections::HashMap;
 
 use super::cors_args::map_arg;
-use super::cors_config_build::{Fields, policy};
+use super::cors_config_build::{policy, Fields};
 use super::cors_fields as key;
 use super::{cors_config_lists as lists, cors_config_scalars as scalars, cors_token};
 use crate::value::Value;

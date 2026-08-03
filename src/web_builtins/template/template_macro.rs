@@ -72,7 +72,7 @@ pub(super) fn collect<'a>(pieces: &[Piece<'a>]) -> Result<Macros<'a>, String> {
         // Dereferenced rather than used through the `&&str` the pattern binds, so the
         // parsed parameters borrow the template text and not this loop iteration.
         let Piece::Tag(tag) = piece else { continue };
-        let header: &'a str = *tag;
+        let header: &'a str = tag;
         if header.split_whitespace().next() != Some("macro") {
             continue;
         }

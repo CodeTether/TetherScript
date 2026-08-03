@@ -23,7 +23,9 @@ fn the_locally_generated_close_codes_are_never_accepted() {
 
 #[test]
 fn the_registered_and_private_close_codes_are_accepted() {
-    for code in [1000u16, 1001, 1002, 1003, 1007, 1010, 1011, 1014, 3000, 4999] {
+    for code in [
+        1000u16, 1001, 1002, 1003, 1007, 1010, 1011, 1014, 3000, 4999,
+    ] {
         assert!(close_code::check(code).is_ok(), "code {code} should be ok");
     }
 }

@@ -58,8 +58,11 @@ impl Connection {
         value: &[u8],
         options: &SetOptions,
     ) -> Result<bool, RedisError> {
-        let mut seconds = String::new();
-        let args = build(key, value, options, &mut seconds);
+        // Rendered before `build` so the decimal text outlives the argument slice that
+        // borrows it; `build` takes `Option<&str>` rather than formatting internally
+        // because every argument it returns must borrow from the caller's frame.
+        let seconds = options.expire_seconds.map(|value| value.to_string());
+        let args = build(key, value, options, seconds.as_deref());
         match self.command(&args)? {
             RespValue::Simple(_) => Ok(true),
             RespValue::NullBulk => Ok(false),

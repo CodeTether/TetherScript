@@ -201,10 +201,15 @@ fn head_declares_an_event_stream_and_never_a_content_length() {
     assert!(response_head.contains("Cache-Control: no-store\r\n"));
     assert!(response_head.contains("Connection: keep-alive\r\n"));
     assert!(
-        !response_head.to_ascii_lowercase().contains("content-length"),
+        !response_head
+            .to_ascii_lowercase()
+            .contains("content-length"),
         "a Content-Length truncates a body that never ends: {response_head:?}"
     );
-    assert!(response_head.ends_with("\r\n\r\n"), "head needs a blank line");
+    assert!(
+        response_head.ends_with("\r\n\r\n"),
+        "head needs a blank line"
+    );
 }
 
 #[test]
@@ -216,7 +221,9 @@ fn head_drops_reserved_headers_but_keeps_caller_headers() {
         ("Connection", "close"),
     ]);
     assert!(response_head.contains("X-Accel-Buffering: no\r\n"));
-    assert!(!response_head.to_ascii_lowercase().contains("content-length"));
+    assert!(!response_head
+        .to_ascii_lowercase()
+        .contains("content-length"));
     assert!(!response_head.contains("Connection: close"));
     assert_eq!(response_head.matches("Connection: keep-alive").count(), 1);
 }
@@ -227,7 +234,12 @@ fn head_drops_reserved_headers_but_keeps_caller_headers() {
 
 #[test]
 fn last_event_id_is_read_case_insensitively() {
-    let names = ["Last-Event-ID", "Last-Event-Id", "last-event-id", "LAST-EVENT-ID"];
+    let names = [
+        "Last-Event-ID",
+        "Last-Event-Id",
+        "last-event-id",
+        "LAST-EVENT-ID",
+    ];
     for name in names {
         let headers = HashMap::from([(name.to_string(), "42".to_string())]);
         assert_eq!(from_map(&headers), Some("42"), "failed for {name}");

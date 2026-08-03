@@ -20,7 +20,7 @@
 //! );
 //! ```
 
-use crate::hash::sha1::{BLOCK, sha1};
+use crate::hash::sha1::{sha1, BLOCK};
 use crate::system::hex_encode;
 
 /// HMAC-SHA-1 per RFC 2104.

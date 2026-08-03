@@ -31,7 +31,9 @@ impl<'a> Reader<'a> {
     /// Never; all reads are bounds-checked.
     pub fn read_tlv(&mut self) -> Result<Tlv<'a>, Error> {
         if self.is_empty() {
-            return Err(Error::UnexpectedEnd { offset: self.offset() });
+            return Err(Error::UnexpectedEnd {
+                offset: self.offset(),
+            });
         }
         let (tlv, next) = header::parse(self.input, self.pos, self.base)?;
         self.pos = next;
@@ -57,7 +59,11 @@ impl<'a> Reader<'a> {
         let tlv = self.read_tlv()?;
         if tlv.tag != expected {
             self.pos = saved;
-            return Err(Error::UnexpectedTag { offset: tlv.offset, expected, found: tlv.tag });
+            return Err(Error::UnexpectedTag {
+                offset: tlv.offset,
+                expected,
+                found: tlv.tag,
+            });
         }
         Ok(tlv)
     }
@@ -71,6 +77,8 @@ impl<'a> Reader<'a> {
         if self.is_empty() {
             return Ok(());
         }
-        Err(Error::TrailingData { offset: self.offset() })
+        Err(Error::TrailingData {
+            offset: self.offset(),
+        })
     }
 }

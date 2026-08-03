@@ -42,11 +42,7 @@ use crate::value::Value;
 ///
 /// Returns an error when `request` is not a map, or when its `headers` field is
 /// present and not a map.
-pub(super) fn decide(
-    cached_etag: &str,
-    request: &Value,
-    label: &str,
-) -> Result<Value, String> {
+pub(super) fn decide(cached_etag: &str, request: &Value, label: &str) -> Result<Value, String> {
     let headers = headers_of(request, label)?;
     let Some(header) = find(&headers, "if-none-match") else {
         return Ok(Value::Nil);

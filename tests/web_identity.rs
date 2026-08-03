@@ -125,14 +125,7 @@ fn main() {
     );
     assert_eq!(
         out.lines().collect::<Vec<_>>(),
-        [
-            "GET /health",
-            "nil",
-            "nil",
-            "true",
-            "false",
-            "true"
-        ],
+        ["GET /health", "nil", "nil", "true", "false", "true"],
         "full output: {out}"
     );
 }
@@ -794,11 +787,7 @@ fn main() {
     );
     let lines: Vec<&str> = out.lines().collect();
     assert_eq!(lines[0], "true");
-    assert!(
-        lines[1].contains("`sub` must be str"),
-        "got: {}",
-        lines[1]
-    );
+    assert!(lines[1].contains("`sub` must be str"), "got: {}", lines[1]);
     assert!(
         lines[2].contains("claims must be a map"),
         "got: {}",

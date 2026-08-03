@@ -62,7 +62,9 @@ pub(super) fn parse(header: &str) -> Vec<Entry> {
         .take(MAX_ENTRIES)
         .filter_map(entry)
         .collect();
-    entries.sort_by(|left, right| right.quality.cmp(&left.quality));
+    // Descending by quality, so the client's most-preferred language comes first. Keyed on
+    // the negated quality because `sort_by_key` cannot express a reversed comparator.
+    entries.sort_by_key(|entry| std::cmp::Reverse(entry.quality));
     entries
 }
 

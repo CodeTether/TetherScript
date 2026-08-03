@@ -21,8 +21,8 @@
 //! ```
 
 use crate::lsp_capabilities::{
-    builtins_browser, builtins_core, builtins_data, builtins_files, builtins_net,
-    builtins_system, builtins_terminal,
+    builtins_browser, builtins_core, builtins_data, builtins_files, builtins_net, builtins_system,
+    builtins_terminal,
 };
 
 /// One catalog row: function name, parameter list, one-line summary.

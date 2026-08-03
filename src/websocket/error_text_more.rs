@@ -38,7 +38,10 @@ pub(super) fn write(error: &ProtocolError, f: &mut fmt::Formatter<'_>) -> fmt::R
             write!(f, "websocket: continuation with no message in progress")
         }
         ProtocolError::InterleavedDataFrame => {
-            write!(f, "websocket: data frame interleaved into a fragmented message")
+            write!(
+                f,
+                "websocket: data frame interleaved into a fragmented message"
+            )
         }
         // The framing variants are rendered by `error_text::write`, which only
         // delegates here for the cases above; this arm is therefore unreachable

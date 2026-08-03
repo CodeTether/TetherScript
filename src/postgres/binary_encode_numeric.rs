@@ -85,7 +85,12 @@ pub(super) fn encode(value: &Value) -> Result<Vec<u8>, DecodeError> {
     }
     let parsed = groups::parse(text.trim())?;
     let sign = if parsed.negative { SIGN_NEG } else { SIGN_POS };
-    let mut out = header(parsed.groups.len() as i16, parsed.weight, sign, parsed.dscale);
+    let mut out = header(
+        parsed.groups.len() as i16,
+        parsed.weight,
+        sign,
+        parsed.dscale,
+    );
     for group in &parsed.groups {
         out.extend_from_slice(&(*group as i16).to_be_bytes());
     }

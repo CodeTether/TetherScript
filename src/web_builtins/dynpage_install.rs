@@ -13,10 +13,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use super::super::super::pure_native;
-use super::dynpage_args::{str_arg, str_list_arg};
-use super::dynpage_device;
-use super::dynpage_locale;
-use super::dynpage_request::headers_of;
+use super::dynpage_args::str_arg;
 use super::dynpage_slug;
 use crate::system::result_value as wrap;
 use crate::value::{Env, Value};
@@ -32,14 +29,22 @@ use crate::value::{Env, Value};
 /// Nothing.
 pub(super) fn install(env: &Rc<RefCell<Env>>) {
     let mut bindings = env.borrow_mut();
-    bindings.define("slug_parse", pure_native("slug_parse", Some(1), slug), false);
+    bindings.define(
+        "slug_parse",
+        pure_native("slug_parse", Some(1), slug),
+        false,
+    );
     bindings.define("slug_valid", pure_native("slug_valid", Some(1), ok), false);
     bindings.define(
         "device_class",
         pure_native("device_class", Some(1), device),
         false,
     );
-    bindings.define("locale_of", pure_native("locale_of", Some(2), locale), false);
+    bindings.define(
+        "locale_of",
+        pure_native("locale_of", Some(2), locale),
+        false,
+    );
 }
 
 /// `slug_parse(path)` -> `Result` of the normalised slug.
@@ -57,23 +62,6 @@ fn ok(args: &[Value]) -> Result<Value, String> {
     Ok(Value::Bool(dynpage_slug::valid(&slug)))
 }
 
-/// `device_class(request)` -> `mobile`, `tablet`, or `desktop`.
-fn device(args: &[Value]) -> Result<Value, String> {
-    let headers = headers_of(&args[0], "device_class")?;
-    Ok(Value::Str(Rc::new(
-        dynpage_device::classify(&headers).to_string(),
-    )))
-}
-
-/// `locale_of(request, supported)` -> `Result` of an element of `supported`.
-fn locale(args: &[Value]) -> Result<Value, String> {
-    Ok(wrap(negotiate(args)))
-}
-
-/// The fallible half of `locale_of`, kept separate so both errors are wrapped.
-fn negotiate(args: &[Value]) -> Result<Value, String> {
-    let headers = headers_of(&args[0], "locale_of")?;
-    let supported = str_list_arg(&args[1], "locale_of: supported")?;
-    let chosen = dynpage_locale::negotiate(&headers, &supported);
-    Ok(Value::Str(Rc::new(chosen)))
-}
+// `device` and `locale` live in `dynpage_negotiate`, which keeps this file within the line
+// budget; they are re-exported so the registration list below reads unchanged.
+use super::dynpage_negotiate::{device, locale};

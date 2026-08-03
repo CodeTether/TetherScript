@@ -34,7 +34,10 @@ fn a_zero_ttl_is_still_an_int() {
 /// `-1` becomes `false`, not `-1`.
 #[test]
 fn a_persistent_key_is_false_not_a_negative_int() {
-    assert!(matches!(reply_ttl::value(Ttl::Persistent), Value::Bool(false)));
+    assert!(matches!(
+        reply_ttl::value(Ttl::Persistent),
+        Value::Bool(false)
+    ));
 }
 
 /// `-2` becomes `nil`, matching how a cache miss is spelled everywhere else.
@@ -46,7 +49,12 @@ fn a_missing_key_is_nil_not_a_negative_int() {
 /// No mapping produces a negative integer, which is the whole point.
 #[test]
 fn no_outcome_is_ever_a_negative_int() {
-    for outcome in [Ttl::Seconds(0), Ttl::Seconds(5), Ttl::Persistent, Ttl::Missing] {
+    for outcome in [
+        Ttl::Seconds(0),
+        Ttl::Seconds(5),
+        Ttl::Persistent,
+        Ttl::Missing,
+    ] {
         if let Value::Int(seconds) = reply_ttl::value(outcome) {
             assert!(seconds >= 0, "a sentinel leaked through as {seconds}");
         }

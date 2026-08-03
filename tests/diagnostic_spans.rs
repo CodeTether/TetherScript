@@ -15,7 +15,7 @@
 //! 200-400 lines.
 
 use tetherscript::diagnostic::{
-    Diagnostic, LspPosition, Severity, SourceMap, Span, caret, lsp_range, snippet::block, utf16,
+    caret, lsp_range, snippet::block, utf16, Diagnostic, LspPosition, Severity, SourceMap, Span,
 };
 
 /// Naive reference implementation: rescan the whole buffer for every query.
@@ -125,7 +125,10 @@ fn lsp_range_uses_utf16_code_units() {
 fn lsp_range_round_trips_through_offset_of() {
     let src = "let a = 1\n🦀 = 2\nlet c = 3\n";
     let map = SourceMap::new(src);
-    let span = Span::new(src.find("= 2").expect("present"), src.find("= 2").unwrap() + 1);
+    let span = Span::new(
+        src.find("= 2").expect("present"),
+        src.find("= 2").unwrap() + 1,
+    );
     let range = lsp_range(&map, span);
     let back = map.span_of_lsp(
         (range.start.line, range.start.character),
@@ -150,7 +153,11 @@ fn span_at_end_of_file_resolves_and_renders() {
 
     let eof = Span::at(src.len());
     let at = map.locate(eof.start);
-    assert_eq!((at.line, at.char_col), (2, 1), "trailing newline opens line 2");
+    assert_eq!(
+        (at.line, at.char_col),
+        (2, 1),
+        "trailing newline opens line 2"
+    );
 
     let rendered = Diagnostic::error(eof, "unexpected end of file")
         .with_primary_label("expected `}`")
@@ -405,7 +412,11 @@ fn line_text_strips_crlf_terminators() {
     assert_eq!(map.line_text(1), "ab");
     assert_eq!(map.line_text(2), "cd");
     assert_eq!(map.line_text(3), "");
-    assert_eq!(map.line_text(99), "", "out of range clamps to the last line");
+    assert_eq!(
+        map.line_text(99),
+        "",
+        "out of range clamps to the last line"
+    );
 }
 
 #[test]

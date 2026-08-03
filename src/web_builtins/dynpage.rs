@@ -83,6 +83,8 @@ mod dynpage_key;
 mod dynpage_locale;
 #[path = "dynpage_locale_parse.rs"]
 mod dynpage_locale_parse;
+#[path = "dynpage_negotiate.rs"]
+mod dynpage_negotiate;
 #[path = "dynpage_notmod.rs"]
 mod dynpage_notmod;
 #[path = "dynpage_parts.rs"]

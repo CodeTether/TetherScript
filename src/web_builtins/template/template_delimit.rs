@@ -57,8 +57,10 @@ pub(super) fn matching_end(pieces: &[Piece<'_>], open: usize) -> Result<usize, S
     for (offset, piece) in pieces.iter().enumerate().skip(open) {
         let Piece::Tag(body) = piece else { continue };
         match body.split_whitespace().next().unwrap_or("") {
-            "if" | "for" | "block" => depth += 1,
-            "endif" | "endfor" | "endblock" => {
+            // `macro` counts too: a macro defined inside an `if` must not let the
+            // `if`'s search stop at the macro's `endmacro`.
+            "if" | "for" | "block" | "macro" => depth += 1,
+            "endif" | "endfor" | "endblock" | "endmacro" => {
                 depth -= 1;
                 if depth == 0 {
                     return Ok(offset);

@@ -8,7 +8,7 @@
 
 use super::store_args::int_arg;
 // The trait must be in scope to call `count` through the boxed backend.
-use super::store_backend::SessionBackend;
+// `SessionBackend` is reached through the concrete types below rather than the trait.
 use super::store_state;
 use crate::value::Value;
 

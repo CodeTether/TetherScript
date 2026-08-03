@@ -19,10 +19,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use tetherscript::postgres::binary::{
-    DecodeError, FORMAT_BINARY, FORMAT_TEXT, PG_EPOCH_UNIX_DAYS, PG_EPOCH_UNIX_MICROS,
-    PG_EPOCH_UNIX_SECONDS, civil_from_days, date_unix_days, days_from_civil, decode_field,
-    decode_nullable, encode_param, format_codes, numeric_to_string, oid, supports,
-    timestamp_unix_micros,
+    civil_from_days, date_unix_days, days_from_civil, decode_field, decode_nullable, encode_param,
+    format_codes, numeric_to_string, oid, supports, timestamp_unix_micros, DecodeError,
+    FORMAT_BINARY, FORMAT_TEXT, PG_EPOCH_UNIX_DAYS, PG_EPOCH_UNIX_MICROS, PG_EPOCH_UNIX_SECONDS,
 };
 use tetherscript::value::Value;
 
@@ -177,7 +176,10 @@ fn jsonb_strips_its_version_byte_and_json_does_not_have_one() {
 fn an_unknown_jsonb_version_is_rejected_by_name() {
     let error = decode_field(oid::JSONB, &[9, b'{', b'}']).expect_err("version 9 is unknown");
     assert!(error.to_string().contains("jsonb"), "got: {error}");
-    assert!(error.to_string().contains('9'), "should name it, got: {error}");
+    assert!(
+        error.to_string().contains('9'),
+        "should name it, got: {error}"
+    );
 }
 
 #[test]
@@ -233,11 +235,18 @@ fn timestamp_epoch_conversion_holds_in_both_directions() {
     let pg_micros = 758_629_800_000_000i64;
     let unix_micros = 1_705_314_600_000_000i64;
     assert_eq!(timestamp_unix_micros(pg_micros), unix_micros);
-    assert_eq!(timestamp_unix_micros(pg_micros) - PG_EPOCH_UNIX_MICROS, pg_micros);
+    assert_eq!(
+        timestamp_unix_micros(pg_micros) - PG_EPOCH_UNIX_MICROS,
+        pg_micros
+    );
 
     // The PostgreSQL zero point is 2000-01-01, not 1970-01-01.
     assert_eq!(timestamp_unix_micros(0), 946_684_800_000_000);
-    assert_ne!(timestamp_unix_micros(0), 0, "0 must not mean the Unix epoch");
+    assert_ne!(
+        timestamp_unix_micros(0),
+        0,
+        "0 must not mean the Unix epoch"
+    );
 
     // Reading the counter as seconds would land ~24 million years out.
     let as_if_seconds = pg_micros + PG_EPOCH_UNIX_SECONDS;
@@ -263,7 +272,10 @@ fn forgetting_the_epoch_shift_would_be_off_by_thirty_years() {
 
 #[test]
 fn timestamp_zero_is_the_year_2000_not_1970() {
-    assert_eq!(text(oid::TIMESTAMPTZ, &0i64.to_be_bytes()), "2000-01-01T00:00:00Z");
+    assert_eq!(
+        text(oid::TIMESTAMPTZ, &0i64.to_be_bytes()),
+        "2000-01-01T00:00:00Z"
+    );
 }
 
 #[test]
@@ -307,8 +319,14 @@ fn date_applies_the_same_epoch_shift_in_days() {
 fn the_calendar_handles_leap_years_and_the_century_rules() {
     // 2000 is a leap year (divisible by 400); 1900 is not (divisible by 100).
     assert_eq!(civil_from_days(days_from_civil(2000, 2, 29)), (2000, 2, 29));
-    assert_eq!(days_from_civil(1900, 3, 1) - days_from_civil(1900, 2, 28), 1);
-    assert_eq!(days_from_civil(2000, 3, 1) - days_from_civil(2000, 2, 28), 2);
+    assert_eq!(
+        days_from_civil(1900, 3, 1) - days_from_civil(1900, 2, 28),
+        1
+    );
+    assert_eq!(
+        days_from_civil(2000, 3, 1) - days_from_civil(2000, 2, 28),
+        2
+    );
     // Round-trip across a spread of boundaries.
     for days in [-100_000i64, -1, 0, 1, 10_957, 19_737, 100_000] {
         let (year, month, day) = civil_from_days(days);
@@ -319,8 +337,14 @@ fn the_calendar_handles_leap_years_and_the_century_rules() {
 #[test]
 fn time_is_microseconds_since_midnight_with_no_epoch() {
     assert_eq!(text(oid::TIME, &0i64.to_be_bytes()), "00:00:00");
-    assert_eq!(text(oid::TIME, &37_800_123_456i64.to_be_bytes()), "10:30:00.123456");
-    assert_eq!(text(oid::TIME, &86_399_000_000i64.to_be_bytes()), "23:59:59");
+    assert_eq!(
+        text(oid::TIME, &37_800_123_456i64.to_be_bytes()),
+        "10:30:00.123456"
+    );
+    assert_eq!(
+        text(oid::TIME, &86_399_000_000i64.to_be_bytes()),
+        "23:59:59"
+    );
 }
 
 // ===========================================================================
@@ -345,7 +369,10 @@ fn numeric_does_not_round_trip_through_a_float() {
     let body = [0, 2, 0, 0, 0, 0, 0, 2, 0, 19, 38, 172];
     let decoded = numeric_to_string(&body).unwrap();
     assert_eq!(decoded, "19.99");
-    assert!(!decoded.contains("9999999"), "float contamination: {decoded}");
+    assert!(
+        !decoded.contains("9999999"),
+        "float contamination: {decoded}"
+    );
     // And it is exactly the string, not a float formatted back.
     assert_eq!(decoded.len(), 5);
 }
@@ -355,20 +382,35 @@ fn numeric_zero_has_no_digit_groups_at_all() {
     // ndigits 0, weight 0, sign +, dscale 0
     assert_eq!(numeric_to_string(&[0, 0, 0, 0, 0, 0, 0, 0]).unwrap(), "0");
     // Zero with a display scale keeps its scale: 0.000, not 0.
-    assert_eq!(numeric_to_string(&[0, 0, 0, 0, 0, 0, 0, 3]).unwrap(), "0.000");
+    assert_eq!(
+        numeric_to_string(&[0, 0, 0, 0, 0, 0, 0, 3]).unwrap(),
+        "0.000"
+    );
 }
 
 #[test]
 fn numeric_nan_is_the_sign_word_not_a_digit_pattern() {
     // sign 0xC000, no digits.
-    assert_eq!(numeric_to_string(&[0, 0, 0, 0, 0xC0, 0, 0, 0]).unwrap(), "NaN");
-    assert_eq!(decode(oid::NUMERIC, &[0, 0, 0, 0, 0xC0, 0, 0, 0]), str_value("NaN"));
+    assert_eq!(
+        numeric_to_string(&[0, 0, 0, 0, 0xC0, 0, 0, 0]).unwrap(),
+        "NaN"
+    );
+    assert_eq!(
+        decode(oid::NUMERIC, &[0, 0, 0, 0, 0xC0, 0, 0, 0]),
+        str_value("NaN")
+    );
 }
 
 #[test]
 fn numeric_infinities_use_their_own_sign_words() {
-    assert_eq!(numeric_to_string(&[0, 0, 0, 0, 0xD0, 0, 0, 0]).unwrap(), "Infinity");
-    assert_eq!(numeric_to_string(&[0, 0, 0, 0, 0xF0, 0, 0, 0]).unwrap(), "-Infinity");
+    assert_eq!(
+        numeric_to_string(&[0, 0, 0, 0, 0xD0, 0, 0, 0]).unwrap(),
+        "Infinity"
+    );
+    assert_eq!(
+        numeric_to_string(&[0, 0, 0, 0, 0xF0, 0, 0, 0]).unwrap(),
+        "-Infinity"
+    );
 }
 
 /// Negative is a sign word, not a two's-complement digit; digits stay non-negative.
@@ -415,8 +457,7 @@ fn numeric_zero_pads_interior_digit_groups() {
 fn numeric_handles_a_large_integer_beyond_i64() {
     // 123456789012345678901234567890, weight 7, 8 groups, dscale 0.
     let body = [
-        0, 8, 0, 7, 0, 0, 0, 0, 0, 12, 13, 128, 30, 210, 4, 210, 22, 46, 35, 52, 13, 128,
-        30, 210,
+        0, 8, 0, 7, 0, 0, 0, 0, 0, 12, 13, 128, 30, 210, 4, 210, 22, 46, 35, 52, 13, 128, 30, 210,
     ];
     assert_eq!(
         numeric_to_string(&body).unwrap(),
@@ -428,7 +469,10 @@ fn numeric_handles_a_large_integer_beyond_i64() {
 fn an_unrecognised_numeric_sign_word_is_rejected_by_name() {
     let error = numeric_to_string(&[0, 0, 0, 0, 0xAB, 0xCD, 0, 0])
         .expect_err("0xABCD is not a documented sign word");
-    assert!(matches!(error, DecodeError::BadNumericSign { .. }), "got: {error}");
+    assert!(
+        matches!(error, DecodeError::BadNumericSign { .. }),
+        "got: {error}"
+    );
     assert!(error.to_string().contains("sign"), "got: {error}");
 }
 
@@ -536,7 +580,10 @@ fn every_truncated_field_names_the_type_it_failed_to_read() {
 #[test]
 fn an_over_long_field_is_rejected_rather_than_silently_truncated() {
     let error = decode_field(oid::INT4, &[0, 0, 0, 1, 99]).expect_err("5 bytes is not an int4");
-    assert!(matches!(error, DecodeError::Overlong { .. }), "got: {error}");
+    assert!(
+        matches!(error, DecodeError::Overlong { .. }),
+        "got: {error}"
+    );
     assert!(error.to_string().contains("int4"), "got: {error}");
 
     let long_uuid: Vec<u8> = (0u8..17).collect();
@@ -549,10 +596,31 @@ fn an_over_long_field_is_rejected_rather_than_silently_truncated() {
 #[test]
 fn no_decoder_panics_on_any_prefix_of_any_length() {
     let oids = [
-        oid::BOOL, oid::BYTEA, oid::CHAR, oid::NAME, oid::INT8, oid::INT2, oid::INT4,
-        oid::TEXT, oid::OID, oid::JSON, oid::XML, oid::FLOAT4, oid::FLOAT8, oid::BPCHAR,
-        oid::VARCHAR, oid::DATE, oid::TIME, oid::TIMESTAMP, oid::TIMESTAMPTZ, oid::NUMERIC,
-        oid::UUID, oid::JSONB, oid::INT4_ARRAY, oid::TEXT_ARRAY, oid::NUMERIC_ARRAY,
+        oid::BOOL,
+        oid::BYTEA,
+        oid::CHAR,
+        oid::NAME,
+        oid::INT8,
+        oid::INT2,
+        oid::INT4,
+        oid::TEXT,
+        oid::OID,
+        oid::JSON,
+        oid::XML,
+        oid::FLOAT4,
+        oid::FLOAT8,
+        oid::BPCHAR,
+        oid::VARCHAR,
+        oid::DATE,
+        oid::TIME,
+        oid::TIMESTAMP,
+        oid::TIMESTAMPTZ,
+        oid::NUMERIC,
+        oid::UUID,
+        oid::JSONB,
+        oid::INT4_ARRAY,
+        oid::TEXT_ARRAY,
+        oid::NUMERIC_ARRAY,
         oid::TIMESTAMPTZ_ARRAY,
     ];
     let filler: Vec<u8> = (0u8..40).collect();
@@ -646,7 +714,10 @@ fn a_multi_dimensional_array_is_rejected_rather_than_flattened() {
 fn a_negative_dimension_count_is_rejected() {
     let body = [255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 23];
     let error = decode_field(oid::INT4_ARRAY, &body).expect_err("ndim -1 must be rejected");
-    assert!(matches!(error, DecodeError::UnsupportedDimensions { .. }), "got: {error}");
+    assert!(
+        matches!(error, DecodeError::UnsupportedDimensions { .. }),
+        "got: {error}"
+    );
 }
 
 /// The header's element OID must agree with the column's array OID. A disagreement
@@ -695,17 +766,38 @@ fn unsupported_oids_are_recoverable_and_wire_faults_are_not() {
             "OID {unknown} must be recoverable via the text path"
         );
         assert!(error.to_string().contains("text"), "got: {error}");
-        assert!(!supports(unknown), "supports() must agree with decode_field");
+        assert!(
+            !supports(unknown),
+            "supports() must agree with decode_field"
+        );
     }
 }
 
 #[test]
 fn supports_agrees_with_the_decoder_for_every_registered_oid() {
     let registered = [
-        oid::BOOL, oid::BYTEA, oid::CHAR, oid::NAME, oid::INT8, oid::INT2, oid::INT4,
-        oid::TEXT, oid::OID, oid::JSON, oid::XML, oid::FLOAT4, oid::FLOAT8, oid::BPCHAR,
-        oid::VARCHAR, oid::DATE, oid::TIME, oid::TIMESTAMP, oid::TIMESTAMPTZ, oid::NUMERIC,
-        oid::UUID, oid::JSONB,
+        oid::BOOL,
+        oid::BYTEA,
+        oid::CHAR,
+        oid::NAME,
+        oid::INT8,
+        oid::INT2,
+        oid::INT4,
+        oid::TEXT,
+        oid::OID,
+        oid::JSON,
+        oid::XML,
+        oid::FLOAT4,
+        oid::FLOAT8,
+        oid::BPCHAR,
+        oid::VARCHAR,
+        oid::DATE,
+        oid::TIME,
+        oid::TIMESTAMP,
+        oid::TIMESTAMPTZ,
+        oid::NUMERIC,
+        oid::UUID,
+        oid::JSONB,
     ];
     for type_oid in registered {
         assert!(supports(type_oid), "OID {type_oid} should be supported");
@@ -735,7 +827,10 @@ fn an_array_of_an_unsupported_element_type_also_falls_back() {
 fn integers_encode_big_endian_at_their_declared_width() {
     assert_eq!(encode(oid::INT2, &Value::Int(-3)), vec![255, 253]);
     assert_eq!(encode(oid::INT4, &Value::Int(66_051)), vec![0, 1, 2, 3]);
-    assert_eq!(encode(oid::INT8, &Value::Int(7)), vec![0, 0, 0, 0, 0, 0, 0, 7]);
+    assert_eq!(
+        encode(oid::INT8, &Value::Int(7)),
+        vec![0, 0, 0, 0, 0, 0, 0, 7]
+    );
     assert_eq!(encode(oid::OID, &Value::Int(4_294_967_295)), vec![255; 4]);
 }
 
@@ -751,13 +846,19 @@ fn an_out_of_range_integer_is_rejected_rather_than_wrapped() {
 
 #[test]
 fn floats_and_bools_encode_to_their_wire_forms() {
-    assert_eq!(encode(oid::FLOAT4, &Value::Float(1.5)), vec![0x3F, 0xC0, 0, 0]);
+    assert_eq!(
+        encode(oid::FLOAT4, &Value::Float(1.5)),
+        vec![0x3F, 0xC0, 0, 0]
+    );
     assert_eq!(
         encode(oid::FLOAT8, &Value::Float(-2.25)),
         vec![0xC0, 0x02, 0, 0, 0, 0, 0, 0]
     );
     // An int widens into a float column, which is unambiguous.
-    assert_eq!(encode(oid::FLOAT8, &Value::Int(1)), 1.0f64.to_bits().to_be_bytes());
+    assert_eq!(
+        encode(oid::FLOAT8, &Value::Int(1)),
+        1.0f64.to_bits().to_be_bytes()
+    );
     assert_eq!(encode(oid::BOOL, &Value::Bool(true)), vec![1]);
     assert_eq!(encode(oid::BOOL, &Value::Bool(false)), vec![0]);
 }
@@ -774,10 +875,16 @@ fn text_family_parameters_encode_as_utf8_and_jsonb_gets_its_version_byte() {
 
 #[test]
 fn uuid_parameters_parse_to_16_bytes_and_reject_a_malformed_string() {
-    let bytes = encode(oid::UUID, &str_value("00010203-0405-0607-0809-0a0b0c0d0e0f"));
+    let bytes = encode(
+        oid::UUID,
+        &str_value("00010203-0405-0607-0809-0a0b0c0d0e0f"),
+    );
     assert_eq!(bytes, (0u8..16).collect::<Vec<u8>>());
     // Unhyphenated is accepted too.
-    assert_eq!(encode(oid::UUID, &str_value("000102030405060708090a0b0c0d0e0f")), bytes);
+    assert_eq!(
+        encode(oid::UUID, &str_value("000102030405060708090a0b0c0d0e0f")),
+        bytes
+    );
     let error = encode_param(oid::UUID, &str_value("nope")).expect_err("not a uuid");
     assert!(error.to_string().contains("uuid"), "got: {error}");
 }
@@ -789,7 +896,10 @@ fn nil_encodes_to_none_and_an_empty_string_to_an_empty_vec() {
     for type_oid in [oid::INT4, oid::TEXT, oid::TIMESTAMPTZ, oid::NUMERIC] {
         assert_eq!(encode_param(type_oid, &Value::Nil).unwrap(), None);
     }
-    assert_eq!(encode_param(oid::TEXT, &str_value("")).unwrap(), Some(vec![]));
+    assert_eq!(
+        encode_param(oid::TEXT, &str_value("")).unwrap(),
+        Some(vec![])
+    );
     assert_ne!(
         encode_param(oid::TEXT, &str_value("")).unwrap(),
         encode_param(oid::TEXT, &Value::Nil).unwrap()
@@ -802,7 +912,10 @@ fn timestamp_parameters_apply_the_epoch_shift_in_reverse() {
     let bytes = encode(oid::TIMESTAMPTZ, &str_value("2024-01-15T10:30:00Z"));
     assert_eq!(bytes, 758_629_800_000_000i64.to_be_bytes().to_vec());
     // Round-trips exactly.
-    assert_eq!(decode(oid::TIMESTAMPTZ, &bytes), str_value("2024-01-15T10:30:00Z"));
+    assert_eq!(
+        decode(oid::TIMESTAMPTZ, &bytes),
+        str_value("2024-01-15T10:30:00Z")
+    );
     // The 2000 epoch, not 1970.
     let zero = encode(oid::TIMESTAMPTZ, &str_value("2000-01-01T00:00:00Z"));
     assert_eq!(zero, 0i64.to_be_bytes().to_vec());
@@ -855,7 +968,10 @@ fn numeric_parameters_stay_exact_and_a_float_is_refused() {
     let bytes = encode(oid::NUMERIC, &str_value("19.99"));
     assert_eq!(numeric_to_string(&bytes).unwrap(), "19.99");
     // An int is exact and accepted.
-    assert_eq!(numeric_to_string(&encode(oid::NUMERIC, &Value::Int(5))).unwrap(), "5");
+    assert_eq!(
+        numeric_to_string(&encode(oid::NUMERIC, &Value::Int(5))).unwrap(),
+        "5"
+    );
     // A float is refused, naming the exactness reason.
     let error = encode_param(oid::NUMERIC, &Value::Float(19.99)).expect_err("float refused");
     assert!(error.to_string().contains("exact"), "got: {error}");
@@ -864,8 +980,17 @@ fn numeric_parameters_stay_exact_and_a_float_is_refused() {
 #[test]
 fn numeric_parameters_round_trip_for_zero_negative_nan_and_high_scale() {
     let cases = [
-        "0", "0.00", "1", "-1", "19.99", "-0.50", "12345.6789", "7.0007",
-        "0.000000000000000000000000000001", "123456789012345678901234567890", "NaN",
+        "0",
+        "0.00",
+        "1",
+        "-1",
+        "19.99",
+        "-0.50",
+        "12345.6789",
+        "7.0007",
+        "0.000000000000000000000000000001",
+        "123456789012345678901234567890",
+        "NaN",
     ];
     for text in cases {
         let bytes = encode(oid::NUMERIC, &str_value(text));
@@ -892,14 +1017,23 @@ fn array_parameters_round_trip_including_a_null_element() {
     let bytes = encode(oid::INT4_ARRAY, &value);
     assert_eq!(decode(oid::INT4_ARRAY, &bytes), value);
     // has_null is set, and lower bound is 1 (not 0).
-    assert_eq!(i32::from_be_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]), 1);
-    assert_eq!(i32::from_be_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]), 1);
+    assert_eq!(
+        i32::from_be_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]),
+        1
+    );
+    assert_eq!(
+        i32::from_be_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]),
+        1
+    );
 }
 
 #[test]
 fn an_empty_list_encodes_as_a_zero_dimension_array() {
     let bytes = encode(oid::TEXT_ARRAY, &list(vec![]));
-    assert_eq!(i32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]), 0);
+    assert_eq!(
+        i32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
+        0
+    );
     assert_eq!(bytes.len(), 12, "no dimension block for an empty array");
     assert_eq!(decode(oid::TEXT_ARRAY, &bytes), list(vec![]));
 }
@@ -908,7 +1042,10 @@ fn an_empty_list_encodes_as_a_zero_dimension_array() {
 fn a_nested_list_is_rejected_rather_than_flattened() {
     let nested = list(vec![list(vec![Value::Int(1)])]);
     let error = encode_param(oid::INT4_ARRAY, &nested).expect_err("nesting is rejected");
-    assert!(error.to_string().contains("multi-dimensional"), "got: {error}");
+    assert!(
+        error.to_string().contains("multi-dimensional"),
+        "got: {error}"
+    );
 }
 
 #[test]
@@ -950,7 +1087,10 @@ fn a_uniform_format_code_array_collapses_to_the_compact_form() {
 /// Count n means one code per value, and n must match the value count.
 #[test]
 fn a_mixed_format_code_array_is_spelled_out_in_full() {
-    assert_eq!(format_codes(&[FORMAT_BINARY, FORMAT_TEXT]), vec![0, 2, 0, 1, 0, 0]);
+    assert_eq!(
+        format_codes(&[FORMAT_BINARY, FORMAT_TEXT]),
+        vec![0, 2, 0, 1, 0, 0]
+    );
     assert_eq!(
         format_codes(&[FORMAT_TEXT, FORMAT_BINARY, FORMAT_TEXT]),
         vec![0, 3, 0, 0, 0, 1, 0, 0]

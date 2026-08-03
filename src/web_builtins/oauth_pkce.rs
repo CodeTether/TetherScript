@@ -34,8 +34,9 @@
 //! [`gen::challenge`] accepts any verifier in the legal range, so a caller minting
 //! its own value still gets a validated challenge.
 
+// `gen` is a reserved keyword in Rust 2024, so the module is named `generate`.
 #[path = "oauth_pkce_gen.rs"]
-pub(crate) mod gen;
+pub(crate) mod generate;
 #[path = "oauth_pkce_pair.rs"]
 pub(crate) mod pair;
 

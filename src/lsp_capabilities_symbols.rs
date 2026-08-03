@@ -22,7 +22,7 @@
 //! assert!(names.contains(&"sum"));
 //! ```
 
-use crate::lsp_capabilities::scan::{Scanned, scan};
+use crate::lsp_capabilities::scan::{scan, Scanned};
 use crate::lsp_capabilities::symbol::Symbol;
 use crate::lsp_capabilities::{symbols_fn, symbols_local};
 use crate::token::Token;
@@ -49,7 +49,9 @@ use crate::token::Token;
 /// assert_eq!(collect("let x = 1").len(), 1);
 /// ```
 pub fn collect(text: &str) -> Vec<Symbol> {
-    scan(text).map(|scanned| from_scan(&scanned)).unwrap_or_default()
+    scan(text)
+        .map(|scanned| from_scan(&scanned))
+        .unwrap_or_default()
 }
 
 /// Collect declarations from an already-scanned document.

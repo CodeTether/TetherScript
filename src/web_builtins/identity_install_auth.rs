@@ -37,9 +37,11 @@ pub(super) fn install(env: &Rc<RefCell<Env>>) {
     );
     bindings.define(
         "anonymous",
-        pure_native("anonymous", Some(0), |_args| {
-            Ok(identity_shape::anonymous())
-        }),
+        pure_native(
+            "anonymous",
+            Some(0),
+            |_args| Ok(identity_shape::anonymous()),
+        ),
         false,
     );
     bindings.define(

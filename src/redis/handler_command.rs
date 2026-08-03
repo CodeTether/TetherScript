@@ -39,9 +39,7 @@ impl RedisHandler {
     /// ```rust,no_run
     /// # use tetherscript::redis::{Config, RedisHandler};
     /// # fn main() -> Result<(), String> {
-    /// # let handler = RedisHandler::connect(&Config {
-    /// #     host: "127.0.0.1".into(), port: 6379, username: None,
-    /// #     password: None, database: 0, tls: false })?;
+    /// # let handler = RedisHandler::connect(&Config::default())?;
     /// let pong = handler.command(&[b"PING".to_vec()])?;
     /// # Ok(())
     /// # }

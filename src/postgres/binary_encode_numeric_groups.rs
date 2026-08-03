@@ -57,8 +57,12 @@ pub(super) struct Parsed {
 pub(super) fn parse(text: &str) -> Result<Parsed, DecodeError> {
     let (negative, digits) = split::sign(text);
     let (int_digits, frac_digits) = split::halves(digits)?;
-    let dscale = i16::try_from(frac_digits.len())
-        .map_err(|_| bad(format!("scale {} exceeds the i16 header field", frac_digits.len())))?;
+    let dscale = i16::try_from(frac_digits.len()).map_err(|_| {
+        bad(format!(
+            "scale {} exceeds the i16 header field",
+            frac_digits.len()
+        ))
+    })?;
     let int_groups = split::chunk_left_padded(int_digits)?;
     let frac_groups = split::chunk_right_padded(frac_digits)?;
     let mut weight = int_groups.len() as i64 - 1;

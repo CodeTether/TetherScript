@@ -4,7 +4,7 @@ use std::io::{BufReader, Read, Write};
 
 use crate::value::{Runtime, Value};
 
-use super::{http_headers, http_response, http_server_request};
+use super::{http_headers, http_response, http_server_request, http_stream_response};
 
 pub(super) fn handle<S: Read + Write>(
     runtime: &mut dyn Runtime,
@@ -23,6 +23,13 @@ pub(super) fn handle<S: Read + Write>(
             Ok(response) => response,
             Err(error) => return handler_error(reader.get_mut(), error),
         };
+        // A streaming response owns the rest of the connection: it writes its own head and
+        // pumps events until the generator ends, so the normal single-write path and any
+        // keep-alive reuse are both bypassed.
+        if http_stream_response::is_streaming(&response) {
+            http_stream_response::write_streaming(reader.get_mut(), runtime, &response)?;
+            return Ok(());
+        }
         http_response::write_response(reader.get_mut(), &response, keep_alive)?;
         if !keep_alive {
             return Ok(());

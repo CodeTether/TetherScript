@@ -51,7 +51,11 @@ pub fn civil_from_days(days: i64) -> (i64, u32, u32) {
     let day = (doy - (153 * mp + 2) / 5 + 1) as u32;
     let month = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
     let march_year = yoe + era * 400;
-    let year = if month <= 2 { march_year + 1 } else { march_year };
+    let year = if month <= 2 {
+        march_year + 1
+    } else {
+        march_year
+    };
     (year, month, day)
 }
 

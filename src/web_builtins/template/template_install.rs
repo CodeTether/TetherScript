@@ -17,7 +17,7 @@ where
 }
 
 /// Define every template built-in.
-pub(super) fn install(env: &Rc<RefCell<Env>>) {
+pub(crate) fn install(env: &Rc<RefCell<Env>>) {
     super::template_install_escape::install(env);
     super::template_install_render::install(env);
 }

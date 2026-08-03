@@ -46,13 +46,7 @@ use crate::value::Value;
 /// let item = callable("map", "map()", "Create an empty map.", 3, "40000");
 /// assert_eq!(field(&item, "insertText").as_deref_str(), Some("map($0)"));
 /// ```
-pub fn callable(
-    label: &str,
-    detail: &str,
-    documentation: &str,
-    kind: i64,
-    sort: &str,
-) -> Value {
+pub fn callable(label: &str, detail: &str, documentation: &str, kind: i64, sort: &str) -> Value {
     obj(vec![
         ("label", str_value(label)),
         ("kind", Value::Int(kind)),
@@ -127,13 +121,7 @@ pub fn plain(label: &str, kind: i64, sort: &str) -> Value {
 /// let item = described("total", "let total", "Local binding.", 6, "00000");
 /// assert_eq!(field(&item, "detail").as_deref_str(), Some("let total"));
 /// ```
-pub fn described(
-    label: &str,
-    detail: &str,
-    documentation: &str,
-    kind: i64,
-    sort: &str,
-) -> Value {
+pub fn described(label: &str, detail: &str, documentation: &str, kind: i64, sort: &str) -> Value {
     obj(vec![
         ("label", str_value(label)),
         ("kind", Value::Int(kind)),

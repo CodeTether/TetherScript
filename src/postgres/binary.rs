@@ -71,15 +71,22 @@ mod time;
 #[path = "binary_uuid.rs"]
 mod uuid;
 
-pub use bind::{FORMAT_BINARY, FORMAT_TEXT, format_codes};
-pub use decode::array::decode_array;
-pub use decode::numeric::numeric_to_string;
-pub use decode::{decode_field, decode_nullable, supports};
-pub use encode::encode_param;
-pub use error::DecodeError;
-pub use read::Reader;
-pub use time::civil::{civil_from_days, days_from_civil};
-pub use time::{
-    PG_EPOCH_UNIX_DAYS, PG_EPOCH_UNIX_MICROS, PG_EPOCH_UNIX_SECONDS, date_unix_days,
-    timestamp_unix_micros,
+// The re-exports below are this module's public surface. The crate's own query path still
+// binds text format, so nothing internal names them yet; `tests/postgres_binary.rs`
+// exercises them, so an unused-import warning here means "not yet consumed internally".
+// Grouped into one `pub use` so a single allow covers the whole surface.
+#[allow(unused_imports)]
+pub use {
+    bind::{format_codes, FORMAT_BINARY, FORMAT_TEXT},
+    decode::array::decode_array,
+    decode::numeric::numeric_to_string,
+    decode::{decode_field, decode_nullable, supports},
+    encode::encode_param,
+    error::DecodeError,
+    read::Reader,
+    time::civil::{civil_from_days, days_from_civil},
+    time::{
+        date_unix_days, timestamp_unix_micros, PG_EPOCH_UNIX_DAYS, PG_EPOCH_UNIX_MICROS,
+        PG_EPOCH_UNIX_SECONDS,
+    },
 };

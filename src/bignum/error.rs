@@ -40,7 +40,10 @@ impl fmt::Display for ParseUintError {
         match self {
             Self::Empty => write!(f, "cannot parse an empty string as a Uint"),
             Self::InvalidDigit { ch, index } => {
-                write!(f, "invalid digit {ch:?} at index {index} while parsing a Uint")
+                write!(
+                    f,
+                    "invalid digit {ch:?} at index {index} while parsing a Uint"
+                )
             }
         }
     }

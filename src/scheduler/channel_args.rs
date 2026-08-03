@@ -14,7 +14,9 @@ use crate::value::Value;
 pub(super) fn capacity(value: &Value, operation: &str) -> Result<usize, String> {
     match value {
         Value::Int(count) if *count >= 0 => Ok(*count as usize),
-        Value::Int(count) => Err(format!("{operation}: capacity must not be negative: {count}")),
+        Value::Int(count) => Err(format!(
+            "{operation}: capacity must not be negative: {count}"
+        )),
         other => Err(format!(
             "{operation}: capacity must be an int, got {}",
             other.type_name()

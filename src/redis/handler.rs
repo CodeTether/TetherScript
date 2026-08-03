@@ -15,7 +15,7 @@
 //!   connection. That connection is [`Pool::discard`]ed: reusing it would return
 //!   the tail of this command as the answer to the next one, and nothing after it
 //!   would line up again.
-//! * A **server-side error reply** ([`super::resp::Resp::Error`], e.g. `WRONGTYPE`
+//! * A **server-side error reply** ([`super::value::RespValue::Error`], e.g. `WRONGTYPE`
 //!   or `ERR value is not an integer`) is a *complete, fully drained* reply. The
 //!   connection is [`Pool::release`]d and stays usable. Discarding here would be a
 //!   silent bug: a script that catches a `WRONGTYPE` error in a loop would churn
@@ -31,14 +31,8 @@
 //! use tetherscript::value::Value;
 //!
 //! # fn main() -> Result<(), String> {
-//! let handler = RedisHandler::connect(&Config {
-//!     host: "127.0.0.1".into(),
-//!     port: 6379,
-//!     username: None,
-//!     password: None,
-//!     database: 0,
-//!     tls: false,
-//! })?;
+//! // `default()` targets 127.0.0.1:6379 with explicit timeouts; TLS is not implemented.
+//! let handler = RedisHandler::connect(&Config::default())?;
 //!
 //! handler.set("greeting", b"hello", None)?;
 //! assert_eq!(handler.get("greeting")?, Value::Str("hello".to_string().into()));

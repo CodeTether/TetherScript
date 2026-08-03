@@ -285,7 +285,8 @@ fn slug_valid_reports_the_charset_without_normalising() {
 /// how two different renders collapse onto a single cache entry.
 #[test]
 fn the_cache_key_changes_for_every_varying_input_in_turn() {
-    let out = run_with(r#"fn main() {
+    let out = run_with(
+        r#"fn main() {
     let k = page_cache_key(base())?
     println(str(k == page_cache_key(parts("other", "en", "control", "desktop", false))?))
     println(str(k == page_cache_key(parts("about", "es", "control", "desktop", false))?))
@@ -293,7 +294,8 @@ fn the_cache_key_changes_for_every_varying_input_in_turn() {
     println(str(k == page_cache_key(parts("about", "en", "control", "mobile", false))?))
     println(str(k == page_cache_key(parts("about", "en", "control", "desktop", true))?))
     println(str(k == page_cache_key(base())?))
-}"#);
+}"#,
+    );
     let got = lines(&out);
     assert_eq!(
         got[0], "false",
@@ -320,11 +322,13 @@ fn the_cache_key_changes_for_every_varying_input_in_turn() {
 /// which is what makes the join injective.
 #[test]
 fn a_component_boundary_collision_attempt_does_not_collide() {
-    let out = run_with(r#"fn main() {
+    let out = run_with(
+        r#"fn main() {
     println(str(page_cache_key(parts("a-b", "c", "", "", false))? == page_cache_key(parts("a", "b-c", "", "", false))?))
     println(str(page_cache_key(parts("a", "", "b", "", false))? == page_cache_key(parts("a", "b", "", "", false))?))
     println(str(page_cache_key(parts("ab", "c", "", "", false))? == page_cache_key(parts("a", "bc", "", "", false))?))
-}"#);
+}"#,
+    );
     let got = lines(&out);
     assert_eq!(
         got[0], "false",
@@ -343,14 +347,16 @@ fn a_component_boundary_collision_attempt_does_not_collide() {
 /// A shared cache must be able to exclude a private render with one prefix test.
 #[test]
 fn an_authenticated_key_is_marked_private_and_anonymous_public() {
-    let out = run_with(r#"fn main() {
+    let out = run_with(
+        r#"fn main() {
     let private = page_cache_key(parts("about", "en", "", "", true))?
     let public = page_cache_key(parts("about", "en", "", "", false))?
     println(str(private.starts_with("private")))
     println(str(public.starts_with("public")))
     println(str(private.contains("about")))
     println(str(private == public))
-}"#);
+}"#,
+    );
     let got = lines(&out);
     assert_eq!(
         got[0], "true",
@@ -372,12 +378,14 @@ fn an_authenticated_key_is_marked_private_and_anonymous_public() {
 
 #[test]
 fn optional_key_inputs_may_be_omitted_entirely() {
-    let out = run_with(r#"fn main() {
+    let out = run_with(
+        r#"fn main() {
     let bare = map()
     bare.slug = "about"
     println(str(page_cache_key(bare).is_err()))
     println(str(page_cache_key(bare)? == page_cache_key(parts("about", "", "", "", false))?))
-}"#);
+}"#,
+    );
     let got = lines(&out);
     assert_eq!(got[0], "false", "only `slug` is required: {out}");
     assert_eq!(
@@ -390,7 +398,8 @@ fn optional_key_inputs_may_be_omitted_entirely() {
 /// error paths below are the only way a bad flag can reach a key.
 #[test]
 fn a_malformed_parts_map_is_rejected_naming_the_field() {
-    let out = run_with(r#"fn main() {
+    let out = run_with(
+        r#"fn main() {
     let no_slug = map()
     no_slug.locale = "en"
     println(page_cache_key(no_slug).err())
@@ -406,7 +415,8 @@ fn a_malformed_parts_map_is_rejected_naming_the_field() {
     bad_locale.slug = "about"
     bad_locale.locale = "en us"
     println(page_cache_key(bad_locale).err())
-}"#);
+}"#,
+    );
     let got = lines(&out);
     assert!(
         got[0].contains("slug"),
@@ -437,14 +447,16 @@ fn a_malformed_parts_map_is_rejected_naming_the_field() {
 /// the consumed inputs exactly.
 #[test]
 fn vary_headers_lists_exactly_the_inputs_the_key_consumed() {
-    let out = run_with(r#"fn main() {
+    let out = run_with(
+        r#"fn main() {
     println("[" + vary_headers(parts("about", "", "", "", false))? + "]")
     println(vary_headers(parts("about", "en", "", "", false))?)
     println(vary_headers(parts("about", "", "", "mobile", false))?)
     println(vary_headers(parts("about", "", "", "", true))?)
     println(vary_headers(base())?)
     println(vary_headers(parts("about", "en", "control", "desktop", true))?)
-}"#);
+}"#,
+    );
     let got = lines(&out);
     assert_eq!(
         got[0], "[]",
@@ -476,27 +488,34 @@ fn vary_headers_lists_exactly_the_inputs_the_key_consumed() {
 /// ignores the device would collapse the hit rate to nothing.
 #[test]
 fn vary_headers_omits_user_agent_when_the_key_ignores_the_device() {
-    let out = run_with(r#"fn main() {
+    let out = run_with(
+        r#"fn main() {
     let v = vary_headers(parts("about", "en", "control", "", false))?
     println(str(v.contains("User-Agent")))
     println(v)
-}"#);
+}"#,
+    );
     let got = lines(&out);
     assert_eq!(
         got[0], "false",
         "listing User-Agent unconditionally defeats the cache: {out}"
     );
-    assert_eq!(got[1], "Accept-Language", "the locale is still listed: {out}");
+    assert_eq!(
+        got[1], "Accept-Language",
+        "the locale is still listed: {out}"
+    );
 }
 
 #[test]
 fn vary_headers_rejects_the_same_bad_parts_as_the_key() {
-    let out = run_with(r#"fn main() {
+    let out = run_with(
+        r#"fn main() {
     let bad = map()
     bad.slug = "a/b"
     println(str(vary_headers(bad).is_err()))
     println(str(vary_headers(42).is_err()))
-}"#);
+}"#,
+    );
     let got = lines(&out);
     assert_eq!(got[0], "true", "the two must agree about validity: {out}");
     assert_eq!(got[1], "true", "a non-map must be refused: {out}");
@@ -506,7 +525,8 @@ fn vary_headers_rejects_the_same_bad_parts_as_the_key() {
 
 #[test]
 fn a_matching_validator_yields_a_304_and_a_mismatch_yields_nil() {
-    let out = run_with(r#"fn main() {
+    let out = run_with(
+        r#"fn main() {
     let tag = etag_of("<h1>hi</h1>")
     let hit = page_not_modified(tag, req("if-none-match", tag))?
     println(str(hit != nil))
@@ -517,9 +537,13 @@ fn a_matching_validator_yields_a_304_and_a_mismatch_yields_nil() {
     println(str(miss == nil))
     let absent = page_not_modified(tag, req("", ""))?
     println(str(absent == nil))
-}"#);
+}"#,
+    );
     let got = lines(&out);
-    assert_eq!(got[0], "true", "a matching validator must answer 304: {out}");
+    assert_eq!(
+        got[0], "true",
+        "a matching validator must answer 304: {out}"
+    );
     assert_eq!(got[1], "304", "the status must be 304: {out}");
     assert_eq!(got[2], "true", "RFC 9110 forbids a body on 304: {out}");
     assert_eq!(
@@ -530,24 +554,23 @@ fn a_matching_validator_yields_a_304_and_a_mismatch_yields_nil() {
         got[4], "true",
         "a mismatch must be nil rather than an error: {out}"
     );
-    assert_eq!(
-        got[5], "true",
-        "an absent If-None-Match must be nil: {out}"
-    );
+    assert_eq!(got[5], "true", "an absent If-None-Match must be nil: {out}");
 }
 
 /// A prefix hit would answer 304 for a body the client has never seen, which is
 /// worse than not caching at all.
 #[test]
 fn validator_comparison_is_exact_and_handles_weak_tags_and_lists() {
-    let out = run_with(r#"fn main() {
+    let out = run_with(
+        r#"fn main() {
     println(str(page_not_modified("\"abc\"", req("if-none-match", "\"abcdef\""))? == nil))
     println(str(page_not_modified("\"abc\"", req("if-none-match", "W/\"abc\""))? != nil))
     println(str(page_not_modified("\"abc\"", req("if-none-match", "\"x\", \"abc\""))? != nil))
     println(str(page_not_modified("\"abc\"", req("if-none-match", "*"))? != nil))
     println(str(page_not_modified("", req("if-none-match", "*"))? != nil))
     println(str(page_not_modified("\"abc\"", req("If-None-Match", "\"abc\""))? != nil))
-}"#);
+}"#,
+    );
     let got = lines(&out);
     assert_eq!(got[0], "true", "a prefix must not match: {out}");
     assert_eq!(
@@ -565,13 +588,15 @@ fn validator_comparison_is_exact_and_handles_weak_tags_and_lists() {
 
 #[test]
 fn page_not_modified_rejects_a_bad_argument_shape() {
-    let out = run_with(r#"fn main() {
+    let out = run_with(
+        r#"fn main() {
     println(page_not_modified(7, req("", "")).err())
     println(str(page_not_modified("\"a\"", "not a map").is_err()))
     let bad = map()
     bad.headers = "not a map"
     println(str(page_not_modified("\"a\"", bad).is_err()))
-}"#);
+}"#,
+    );
     let got = lines(&out);
     assert!(
         got[0].contains("cached_etag") && got[0].contains("int"),
@@ -589,7 +614,8 @@ fn page_not_modified_rejects_a_bad_argument_shape() {
 
 #[test]
 fn device_class_recognises_a_phone_a_tablet_and_a_desktop() {
-    let out = run_with(r#"fn main() {
+    let out = run_with(
+        r#"fn main() {
     let phone = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148"
     let android = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36"
     let tablet = "Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148"
@@ -600,7 +626,8 @@ fn device_class_recognises_a_phone_a_tablet_and_a_desktop() {
     println(device_class(req("user-agent", tablet)))
     println(device_class(req("user-agent", android_tab)))
     println(device_class(req("user-agent", desktop)))
-}"#);
+}"#,
+    );
     let got = lines(&out);
     assert_eq!(got[0], "mobile", "an iPhone is mobile: {out}");
     assert_eq!(got[1], "mobile", "an Android phone is mobile: {out}");
@@ -617,12 +644,14 @@ fn device_class_recognises_a_phone_a_tablet_and_a_desktop() {
 
 #[test]
 fn device_class_defaults_to_desktop_and_ignores_case() {
-    let out = run_with(r#"fn main() {
+    let out = run_with(
+        r#"fn main() {
     println(device_class(req("", "")))
     println(device_class(req("user-agent", "")))
     println(device_class(req("User-Agent", "iPhone")))
     println(device_class(req("user-agent", "curl/8.4.0")))
-}"#);
+}"#,
+    );
     let got = lines(&out);
     assert_eq!(got[0], "desktop", "an absent User-Agent is desktop: {out}");
     assert_eq!(got[1], "desktop", "an empty User-Agent is desktop: {out}");
@@ -634,12 +663,14 @@ fn device_class_defaults_to_desktop_and_ignores_case() {
 
 #[test]
 fn locale_negotiation_honours_q_value_ordering() {
-    let out = run_with(r#"fn main() {
+    let out = run_with(
+        r#"fn main() {
     println(locale_of(req("accept-language", "en;q=0.5, es;q=0.9"), ["en", "es"])?)
     println(locale_of(req("accept-language", "es;q=0.1, en;q=0.8"), ["en", "es"])?)
     println(locale_of(req("accept-language", "es, en;q=0.9"), ["en", "es"])?)
     println(locale_of(req("accept-language", "de;q=1.0, es;q=0.9"), ["en", "es"])?)
-}"#);
+}"#,
+    );
     let got = lines(&out);
     assert_eq!(got[0], "es", "the higher q must win: {out}");
     assert_eq!(
@@ -655,11 +686,13 @@ fn locale_negotiation_honours_q_value_ordering() {
 
 #[test]
 fn an_unsupported_language_falls_back_to_the_default() {
-    let out = run_with(r#"fn main() {
+    let out = run_with(
+        r#"fn main() {
     println(locale_of(req("accept-language", "de-DE, fr;q=0.8"), ["en", "es"])?)
     println(locale_of(req("accept-language", "zz"), ["es", "en"])?)
     println(locale_of(req("accept-language", ""), ["en", "es"])?)
-}"#);
+}"#,
+    );
     let got = lines(&out);
     assert_eq!(
         got[0], "en",
@@ -674,23 +707,30 @@ fn an_unsupported_language_falls_back_to_the_default() {
 
 #[test]
 fn an_absent_accept_language_header_uses_the_default() {
-    let out = run_with(r#"fn main() {
+    let out = run_with(
+        r#"fn main() {
     println(locale_of(req("", ""), ["en", "es"])?)
     println(locale_of(req("user-agent", "curl"), ["fr", "en"])?)
-}"#);
+}"#,
+    );
     let got = lines(&out);
     assert_eq!(got[0], "en", "an absent header is the default: {out}");
-    assert_eq!(got[1], "fr", "the default is the caller's first entry: {out}");
+    assert_eq!(
+        got[1], "fr",
+        "the default is the caller's first entry: {out}"
+    );
 }
 
 #[test]
 fn locale_negotiation_matches_a_dialect_by_primary_subtag() {
-    let out = run_with(r#"fn main() {
+    let out = run_with(
+        r#"fn main() {
     println(locale_of(req("accept-language", "en-GB"), ["en", "es"])?)
     println(locale_of(req("accept-language", "en"), ["es", "en-us"])?)
     println(locale_of(req("accept-language", "en-GB"), ["en-us", "en-gb"])?)
     println(locale_of(req("accept-language", "*"), ["es", "en"])?)
-}"#);
+}"#,
+    );
     let got = lines(&out);
     assert_eq!(got[0], "en", "`en-GB` must accept supported `en`: {out}");
     assert_eq!(got[1], "en-us", "`en` must accept supported `en-us`: {out}");
@@ -705,7 +745,8 @@ fn locale_negotiation_matches_a_dialect_by_primary_subtag() {
 /// parsed. A match hiding past the bound is discarded, not searched for.
 #[test]
 fn more_entries_than_the_bound_are_discarded_rather_than_parsed() {
-    let out = run_with(r#"fn main() {
+    let out = run_with(
+        r#"fn main() {
     let mut header = ""
     let mut i = 0
     while i < 20 {
@@ -717,7 +758,8 @@ fn more_entries_than_the_bound_are_discarded_rather_than_parsed() {
     }
     println(locale_of(req("accept-language", header + ",es;q=1.0"), ["en", "es"])?)
     println(locale_of(req("accept-language", "es;q=1.0," + header), ["en", "es"])?)
-}"#);
+}"#,
+    );
     let got = lines(&out);
     assert_eq!(
         got[0], "en",
@@ -733,11 +775,13 @@ fn more_entries_than_the_bound_are_discarded_rather_than_parsed() {
 /// would outrank a well-formed one.
 #[test]
 fn locale_negotiation_drops_a_malformed_q_rather_than_promoting_it() {
-    let out = run_with(r#"fn main() {
+    let out = run_with(
+        r#"fn main() {
     println(locale_of(req("accept-language", "es;q=bogus, en;q=0.4"), ["en", "es"])?)
     println(locale_of(req("accept-language", "es;q=0, en"), ["en", "es"])?)
     println(locale_of(req("accept-language", "es;q=7, en;q=0.2"), ["en", "es"])?)
-}"#);
+}"#,
+    );
     let got = lines(&out);
     assert_eq!(
         got[0], "en",
@@ -749,12 +793,14 @@ fn locale_negotiation_drops_a_malformed_q_rather_than_promoting_it() {
 
 #[test]
 fn locale_of_requires_a_non_empty_supported_list() {
-    let out = run_with(r#"fn main() {
+    let out = run_with(
+        r#"fn main() {
     println(locale_of(req("", ""), []).err())
     println(str(locale_of(req("", ""), "en").is_err()))
     println(str(locale_of(req("", ""), [1]).is_err()))
     println(str(locale_of("not a map", ["en"]).is_err()))
-}"#);
+}"#,
+    );
     let got = lines(&out);
     assert!(
         got[0].contains("empty"),
@@ -770,13 +816,15 @@ fn locale_of_requires_a_non_empty_supported_list() {
 /// attacker-controlled header out of the cache key.
 #[test]
 fn a_hostile_accept_language_is_never_echoed_into_the_result() {
-    let out = run_with(r#"fn main() {
+    let out = run_with(
+        r#"fn main() {
     let hostile = "<script>alert(1)</script>;q=1.0, en;q=0.1"
     let got = locale_of(req("accept-language", hostile), ["en", "es"])?
     println(got)
     println(str(got.contains("script")))
     println(str(page_cache_key(parts("about", got, "", "", false))?.contains("script")))
-}"#);
+}"#,
+    );
     let got = lines(&out);
     assert_eq!(got[0], "en", "the result must be a declared locale: {out}");
     assert_eq!(
@@ -792,7 +840,8 @@ fn a_hostile_accept_language_is_never_echoed_into_the_result() {
 /// and the key, the `Vary` value, and the conditional reply all come from one shape.
 #[test]
 fn the_group_composes_with_route_matching_and_etags() {
-    let out = run_with(r#"fn main() {
+    let out = run_with(
+        r#"fn main() {
     let m = route_match("/blog/\{slug\}", "/blog/My-Post")?
     let p = map()
     p.slug = slug_parse(m.slug)?
@@ -804,7 +853,8 @@ fn the_group_composes_with_route_matching_and_etags() {
     println(p.device)
     println(str(page_cache_key(p)?.starts_with("public")))
     println(vary_headers(p)?)
-}"#);
+}"#,
+    );
     let got = lines(&out);
     assert_eq!(
         got[0], "my-post",

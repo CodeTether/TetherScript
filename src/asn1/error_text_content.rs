@@ -33,9 +33,7 @@ pub(super) fn text(err: &Error) -> Option<String> {
             offset,
             expected,
             found,
-        } => format!(
-            "asn1: expected tag 0x{expected:02x} at offset {offset}, found 0x{found:02x}"
-        ),
+        } => format!("asn1: expected tag 0x{expected:02x} at offset {offset}, found 0x{found:02x}"),
         Error::DepthExceeded { offset, max_depth } => {
             format!("asn1: nesting deeper than {max_depth} at offset {offset}")
         }

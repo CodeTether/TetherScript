@@ -8,7 +8,7 @@
 //! Only the public surface of the client is used, so these tests also pin the API
 //! the integrator wires up.
 
-use tetherscript::redis::{Decoded, RedisError, RespValue, Ttl, decode, encode_command};
+use tetherscript::redis::{decode, encode_command, Decoded, RedisError, RespValue, Ttl};
 
 /// Unwrap a complete frame, failing loudly if the decoder wanted more bytes.
 fn frame(input: &[u8]) -> (RespValue, usize) {
@@ -84,7 +84,9 @@ fn encodes_empty_argument_as_zero_length_bulk() {
 fn encodes_binary_argument_verbatim() {
     let payload = [0x00u8, 0xff, 0x0d, 0x0a, 0x80];
     let bytes = encode_command(&[&b"SET"[..], &b"k"[..], &payload[..]]).unwrap();
-    assert!(bytes.ends_with(&[b'$', b'5', b'\r', b'\n', 0x00, 0xff, 0x0d, 0x0a, 0x80, b'\r', b'\n']));
+    assert!(
+        bytes.ends_with(&[b'$', b'5', b'\r', b'\n', 0x00, 0xff, 0x0d, 0x0a, 0x80, b'\r', b'\n'])
+    );
 }
 
 /// A command with no name is a caller bug and must not reach the socket.
@@ -315,7 +317,10 @@ fn truncated_bulk_string_reports_incomplete() {
     assert_eq!(decode(b"$5\r\nhel").unwrap(), Decoded::Incomplete);
     assert_eq!(decode(b"$5\r\nhello").unwrap(), Decoded::Incomplete);
     assert_eq!(decode(b"$5\r\nhello\r").unwrap(), Decoded::Incomplete);
-    assert_eq!(frame(b"$5\r\nhello\r\n").0, RespValue::Bulk(b"hello".to_vec()));
+    assert_eq!(
+        frame(b"$5\r\nhello\r\n").0,
+        RespValue::Bulk(b"hello".to_vec())
+    );
 }
 
 /// A length line with no terminator yet is incomplete, not malformed.
@@ -335,7 +340,10 @@ fn empty_input_reports_incomplete() {
 /// A partial element makes the whole array incomplete, not a short array.
 #[test]
 fn truncated_array_element_reports_incomplete() {
-    assert_eq!(decode(b"*2\r\n$3\r\nfoo\r\n$3\r\nba").unwrap(), Decoded::Incomplete);
+    assert_eq!(
+        decode(b"*2\r\n$3\r\nfoo\r\n$3\r\nba").unwrap(),
+        Decoded::Incomplete
+    );
 }
 
 /// A missing inner element makes the outer array incomplete too.

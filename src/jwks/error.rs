@@ -43,7 +43,10 @@ pub enum JwksError {
     NoSuitableKey { alg: String },
     /// No `kid` was requested and several usable keys are suitable, so no choice
     /// can be made without guessing. Lists the candidate ids.
-    AmbiguousKey { alg: String, candidates: Vec<String> },
+    AmbiguousKey {
+        alg: String,
+        candidates: Vec<String>,
+    },
     /// A `kid` matched, but that key is not suitable for the algorithm.
     UnsuitableKey { kid: String, reason: String },
     /// The requested algorithm is not an RSA signature algorithm this module

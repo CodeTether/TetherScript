@@ -29,7 +29,7 @@
 
 use std::collections::HashMap;
 
-use crate::lsp_capabilities::completion_context::{Context, classify, prefix};
+use crate::lsp_capabilities::completion_context::{classify, prefix, Context};
 use crate::lsp_capabilities::docs::Docs;
 use crate::lsp_capabilities::jsonval::{list, obj};
 use crate::lsp_capabilities::request::Cursor;

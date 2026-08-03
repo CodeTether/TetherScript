@@ -6,7 +6,7 @@
 
 use super::super::codec::encode;
 use super::super::entropy::bytes;
-use super::{MAX_VERIFIER, MIN_VERIFIER, unreserved};
+use super::{unreserved, MAX_VERIFIER, MIN_VERIFIER};
 use crate::system::sha256;
 
 /// Mint a fresh 43-character code verifier.

@@ -35,9 +35,9 @@ pub(crate) fn claim_text(err: &ClaimError) -> Option<String> {
         ClaimError::IssuerMismatch { got, expected } => {
             format!("jwtrs: claim `iss` is `{got}`, expected `{expected}`")
         }
-        ClaimError::AudienceNotStringOrArray(found) => format!(
-            "jwtrs: claim `aud` must be a string or an array of strings, got {found}"
-        ),
+        ClaimError::AudienceNotStringOrArray(found) => {
+            format!("jwtrs: claim `aud` must be a string or an array of strings, got {found}")
+        }
         ClaimError::TooManyAudiences { count, limit } => {
             format!("jwtrs: claim `aud` has {count} entries; limit is {limit}")
         }
@@ -47,9 +47,9 @@ pub(crate) fn claim_text(err: &ClaimError) -> Option<String> {
             got.join(", "),
             expected.join(", ")
         ),
-        ClaimError::Expired { exp, now, skew } => format!(
-            "jwtrs: token expired at {exp}; now is {now} with {skew}s skew allowed"
-        ),
+        ClaimError::Expired { exp, now, skew } => {
+            format!("jwtrs: token expired at {exp}; now is {now} with {skew}s skew allowed")
+        }
         ClaimError::NotYetValid { nbf, now, skew } => format!(
             "jwtrs: token is not valid before {nbf}; now is {now} with {skew}s skew allowed"
         ),

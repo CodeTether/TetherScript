@@ -228,7 +228,10 @@ fn pool(max: usize, steps: Vec<Step>) -> (Pool, Rc<RefCell<usize>>) {
 #[test]
 fn get_sends_a_two_element_command_array() {
     let (mut connection, written) = connection(vec![reply("$5\r\nhello\r\n")]);
-    assert_eq!(connection.get(b"session:42").unwrap(), Some(b"hello".to_vec()));
+    assert_eq!(
+        connection.get(b"session:42").unwrap(),
+        Some(b"hello".to_vec())
+    );
     assert_eq!(wire(&written), "*2\r\n$3\r\nGET\r\n$10\r\nsession:42\r\n");
 }
 
@@ -334,11 +337,8 @@ fn the_reply_model_keeps_nil_and_empty_bulk_distinct() {
 
 #[test]
 fn ttl_maps_the_negative_sentinels_instead_of_returning_them() {
-    let (mut connection, written) = connection(vec![
-        reply(":42\r\n"),
-        reply(":-1\r\n"),
-        reply(":-2\r\n"),
-    ]);
+    let (mut connection, written) =
+        connection(vec![reply(":42\r\n"), reply(":-1\r\n"), reply(":-2\r\n")]);
     assert_eq!(connection.ttl(b"k").unwrap(), Ttl::Seconds(42));
     assert_eq!(connection.ttl(b"k").unwrap(), Ttl::Persistent);
     assert_eq!(connection.ttl(b"k").unwrap(), Ttl::Missing);
@@ -400,9 +400,7 @@ fn an_eof_mid_reply_is_a_transport_error_naming_the_outstanding_reply() {
     let error = connection.get(b"k").unwrap_err();
     assert_eq!(
         error,
-        ClientError::Transport(
-            "server closed the connection with a reply outstanding".into()
-        )
+        ClientError::Transport("server closed the connection with a reply outstanding".into())
     );
 }
 

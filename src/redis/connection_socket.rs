@@ -27,10 +27,7 @@ use super::error::RedisError;
 pub(super) fn dial(config: &Config) -> Result<TcpStream, RedisError> {
     let target = (config.host.as_str(), config.port);
     let mut addresses = target.to_socket_addrs().map_err(|error| {
-        RedisError::Transport(format!(
-            "resolve {}:{}: {error}",
-            config.host, config.port
-        ))
+        RedisError::Transport(format!("resolve {}:{}: {error}", config.host, config.port))
     })?;
     let address = addresses.next().ok_or_else(|| {
         RedisError::Transport(format!(

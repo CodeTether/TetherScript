@@ -98,7 +98,7 @@ pub mod utf16;
 
 pub use caret::TAB_WIDTH;
 pub use label::Label;
-pub use lsp::{LspPosition, LspRange, lsp_range};
+pub use lsp::{lsp_range, LspPosition, LspRange};
 pub use map::SourceMap;
 pub use pos::LineCol;
 pub use render::Diagnostic;

@@ -13,7 +13,7 @@
 //! None. The split index comes from `position`, so `..at` and `at + 1..` are both in range;
 //! UTF-8 validation is fallible rather than lossy.
 
-use super::super::error::ChunkedError;
+use super::error::ChunkedError;
 
 /// Split a trailer line into a lowercased name and a trimmed value.
 ///

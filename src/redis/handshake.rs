@@ -49,9 +49,7 @@ fn authenticate(
     password: &str,
 ) -> Result<(), RedisError> {
     let reply = match username {
-        Some(user) => {
-            connection.command(&[&b"AUTH"[..], user.as_bytes(), password.as_bytes()])?
-        }
+        Some(user) => connection.command(&[&b"AUTH"[..], user.as_bytes(), password.as_bytes()])?,
         None => connection.command(&[&b"AUTH"[..], password.as_bytes()])?,
     };
     reply.simple("AUTH")?;

@@ -10,8 +10,8 @@ use super::super::clock::now_secs;
 use super::super::codec::encode;
 use super::super::entropy::bytes;
 use super::super::return_to::validate;
-use super::Claims;
 use super::codec::{nonce_hex, render};
+use super::Claims;
 use crate::value::Value;
 
 /// Mint a signed, expiring state carrying `return_to`.

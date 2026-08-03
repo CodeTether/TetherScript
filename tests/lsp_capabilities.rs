@@ -19,7 +19,7 @@ use std::rc::Rc;
 
 use tetherscript::json;
 use tetherscript::lsp_capabilities::capabilities;
-use tetherscript::lsp_capabilities::jsonval::{ValueText, field, pointer};
+use tetherscript::lsp_capabilities::jsonval::{field, pointer, ValueText};
 use tetherscript::lsp_capabilities::{completion, definition, dispatch, hover};
 use tetherscript::value::Value;
 
@@ -396,12 +396,10 @@ fn definition_of_an_import_alias_opens_the_module() {
     let docs = store(&uri, source);
     let reply = definition::handle(&params(&uri, 1, 11), &docs);
 
-    assert!(
-        field(&reply, "uri")
-            .as_deref_str()
-            .unwrap_or_default()
-            .ends_with("math.tether")
-    );
+    assert!(field(&reply, "uri")
+        .as_deref_str()
+        .unwrap_or_default()
+        .ends_with("math.tether"));
     assert_eq!(range_start(&reply), (0, 0));
     let _ = std::fs::remove_dir_all(&root);
 }
@@ -456,7 +454,10 @@ fn hover_over_a_module_alias_reports_its_export_count() {
     let uri = tetherscript::lsp_capabilities::uri::from_path(&entry);
     let docs = store(&uri, source);
     let text = hover_text(&hover::handle(&params(&uri, 1, 11), &docs));
-    assert!(text.contains("import \"./math.tether\" as math"), "got: {text}");
+    assert!(
+        text.contains("import \"./math.tether\" as math"),
+        "got: {text}"
+    );
     assert!(text.contains("1 explicit exports."), "got: {text}");
     let _ = std::fs::remove_dir_all(&root);
 }
@@ -466,8 +467,7 @@ fn hover_over_an_imported_member_reports_its_qualified_signature() {
     let root = scratch("member-hover");
     let module = root.join("math.tether");
     let entry = root.join("main.tether");
-    std::fs::write(&module, "export add\nfn add(a, b) {\n    a + b\n}\n")
-        .expect("module writable");
+    std::fs::write(&module, "export add\nfn add(a, b) {\n    a + b\n}\n").expect("module writable");
     let source = "import \"./math.tether\" as math\nlet sum = math.add(1, 2)\n";
     std::fs::write(&entry, source).expect("entry writable");
 
@@ -589,13 +589,22 @@ fn dispatch_routes_each_advertised_method_to_the_matching_handler() {
     let request = params(URI, 0, 4);
 
     let hovered = dispatch("textDocument/hover", &request, &docs).expect("handled");
-    assert_eq!(hover_text(&hovered), hover_text(&hover::handle(&request, &docs)));
+    assert_eq!(
+        hover_text(&hovered),
+        hover_text(&hover::handle(&request, &docs))
+    );
 
     let jumped = dispatch("textDocument/definition", &request, &docs).expect("handled");
     let direct = definition::handle(&request, &docs);
-    assert_eq!(field(&jumped, "uri").as_deref_str(), field(&direct, "uri").as_deref_str());
+    assert_eq!(
+        field(&jumped, "uri").as_deref_str(),
+        field(&direct, "uri").as_deref_str()
+    );
     assert_eq!(range_start(&jumped), range_start(&direct));
 
     let listed = dispatch("textDocument/completion", &request, &docs).expect("handled");
-    assert_eq!(labels(&listed), labels(&completion::handle(&request, &docs)));
+    assert_eq!(
+        labels(&listed),
+        labels(&completion::handle(&request, &docs))
+    );
 }

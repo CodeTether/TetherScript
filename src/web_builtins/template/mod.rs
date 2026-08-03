@@ -31,11 +31,6 @@
 //!
 //! Submodules live in `template/`, so the declarations below need no `#[path]`.
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use crate::value::Env;
-
 pub(super) mod template_block;
 pub(super) mod template_blocks;
 pub(super) mod template_branch;
@@ -63,14 +58,23 @@ pub(super) mod template_install;
 pub(super) mod template_install_escape;
 pub(super) mod template_install_render;
 pub(super) mod template_loop;
+pub(super) mod template_macro;
+pub(super) mod template_macro_arg;
+pub(super) mod template_macro_body;
+pub(super) mod template_macro_call;
+pub(super) mod template_macro_check;
+pub(super) mod template_macro_hole;
+pub(super) mod template_macro_invoke;
+pub(super) mod template_macro_param;
+pub(super) mod template_macro_path;
+pub(super) mod template_macro_report;
+pub(super) mod template_macro_scope;
+pub(super) mod template_macro_value;
 pub(super) mod template_render;
 pub(super) mod template_scan;
 pub(super) mod template_source;
 pub(super) mod template_step;
 pub(super) mod template_subject;
 pub(super) mod template_tag;
-
-/// Register this group's built-ins.
-pub(crate) fn install(env: &Rc<RefCell<Env>>) {
-    template_install::install(env);
-}
+// Registration lives in `template_install`, called directly by `web_builtins.rs`: a
+// wrapper here would push this declaration list over the per-file line budget.

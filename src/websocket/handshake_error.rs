@@ -53,13 +53,19 @@ impl fmt::Display for HandshakeError {
                 write!(f, "websocket handshake: missing `{name}` header")
             }
             Self::BadUpgrade { value } => {
-                write!(f, "websocket handshake: Upgrade is `{value}`, want `websocket`")
+                write!(
+                    f,
+                    "websocket handshake: Upgrade is `{value}`, want `websocket`"
+                )
             }
             Self::BadConnection { value } => {
                 write!(f, "websocket handshake: Connection `{value}` lacks Upgrade")
             }
             Self::UnsupportedVersion { version } => {
-                write!(f, "websocket handshake: version `{version}` unsupported, want 13")
+                write!(
+                    f,
+                    "websocket handshake: version `{version}` unsupported, want 13"
+                )
             }
             Self::BadKey { reason } => {
                 write!(f, "websocket handshake: Sec-WebSocket-Key {reason}")

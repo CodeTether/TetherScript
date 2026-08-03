@@ -22,7 +22,7 @@
 //! assert_eq!(&mac[..2], &[0x16, 0x4b]);
 //! ```
 
-use crate::hash::sha512::{BLOCK, sha512};
+use crate::hash::sha512::{sha512, BLOCK};
 use crate::system::hex_encode;
 
 /// HMAC-SHA-512 per RFC 2104, with the 128-byte SHA-512 block.

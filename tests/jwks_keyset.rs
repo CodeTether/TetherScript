@@ -163,7 +163,9 @@ fn missing_kid_with_no_suitable_key_is_refused() {
         r#"{{"kty":"RSA","kid":"a","alg":"RS512","e":"AQAB","n":"{N_A}"}}"#
     )]);
     let set = JwkSet::parse(&body).expect("usable, but only for RS512");
-    let error = set.select(None, SigAlg::Rs256).expect_err("wrong algorithm");
+    let error = set
+        .select(None, SigAlg::Rs256)
+        .expect_err("wrong algorithm");
     assert!(matches!(error, JwksError::NoSuitableKey { .. }), "{error}");
 }
 
@@ -174,7 +176,10 @@ fn enc_key_is_refused_for_verification() {
         r#"{{"kty":"RSA","kid":"enc-1","use":"enc","e":"AQAB","n":"{N_A}"}}"#
     )]);
     let set = JwkSet::parse(&body).expect("document itself is fine");
-    assert!(set.keys().is_empty(), "an enc key is not a verification key");
+    assert!(
+        set.keys().is_empty(),
+        "an enc key is not a verification key"
+    );
     assert_eq!(set.skipped().len(), 1);
     assert_eq!(set.skipped()[0].kid.as_deref(), Some("enc-1"));
     assert!(set.skipped()[0].reason.contains("`use` is `enc`"));
