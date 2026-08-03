@@ -1,0 +1,74 @@
+// Bounded channel producer/consumer pipeline.
+//
+// Channels are how one task streams values to another instead of batching them
+// up. The buffer here holds two values, so the producer is *stopped* by
+// backpressure rather than allowed to grow memory without limit: `chan_send`
+// answers "parked" once the buffer is full, and one `chan_recv` frees exactly
+// one slot. Closing the sender then lets the consumer drain what is already
+// buffered before it sees end-of-stream, so no value is lost at shutdown.
+//
+// Run with:
+//   tetherscript run examples/channel_pipeline.tether
+//
+// Documented output:
+//   capacity: 2
+//   sent: 0
+//   sent: 1
+//   parked: buffer full at 2
+//   recv: 0
+//   sent: 2
+//   parked: buffer full at 2
+//   recv: 1
+//   sent: 3
+//   parked: buffer full at 2
+//   recv: 2
+//   sent: 4
+//   recv: 3
+//   recv: 4
+//   end of stream: end
+//   received: 0,1,2,3,4
+//   deadlock check: clear
+
+fn main() {
+    let ch = chan_open(2, "pipeline").unwrap()
+    println("capacity: 2")
+
+    let mut next = 0
+    let mut received = []
+
+    while received.len() < 5 {
+        // Producer: push until the bounded buffer refuses more.
+        let mut sending = true
+        while sending && next < 5 {
+            let status = chan_send(ch, next).unwrap()
+            if status == "sent" {
+                println("sent: " + next)
+                next = next + 1
+            } else {
+                println("parked: buffer full at " + chan_len(ch).unwrap())
+                sending = false
+            }
+        }
+
+        // Consumer: take one value, which frees one slot for the producer.
+        let got = chan_recv(ch).unwrap()
+        if got.status == "value" {
+            println("recv: " + got.value)
+            received.push(got.value)
+        }
+    }
+
+    // Closing seals the channel without discarding anything still buffered.
+    chan_close(ch).unwrap()
+    let done = chan_recv(ch).unwrap()
+    println("end of stream: " + done.status)
+    println("received: " + received.join(","))
+
+    // Nothing is parked, so the cheap all-parked check reports no deadlock.
+    let stalled = chan_deadlock()
+    if stalled.is_err() {
+        println("deadlock check: " + stalled.err())
+    } else {
+        println("deadlock check: clear")
+    }
+}
