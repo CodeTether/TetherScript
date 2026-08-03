@@ -1,0 +1,70 @@
+// Runtime &mut exclusivity: a conflict the STATIC pass cannot see.
+//
+// This program SHOULD fail at runtime. It exists to prove the runtime borrow
+// layer catches something new, so it must NOT be a violation that
+// src/ownership.rs already rejects during `check` — if `check` rejected it, the
+// program would never reach the runtime and the example would prove nothing.
+//
+// Run it:
+//
+//   tetherscript check examples/borrow_conflict.tether   # reports NOTHING
+//   tetherscript run   examples/borrow_conflict.tether   # runtime borrow error
+//
+// Why the static pass accepts this program:
+//
+//   src/ownership.rs records a borrow only where it can see the literal shape
+//   `let <name> = &<ident>` or `let <name> = &mut <ident>` — see its
+//   `borrowed_ident` helper, which matches `Expr::Borrow(Expr::Ident)` and
+//   nothing else. It also tracks state per *binding name* in a lexical scope.
+//   So it knows `view` borrows `items`, and that is all it knows.
+//
+//   The alias below is created through a list *element*: `holder[0]` is an
+//   `Expr::Index`, not an `Expr::Ident`, so no borrow of `items` is recorded
+//   for it, and `alias` is an unrelated binding as far as the analyzer is
+//   concerned. Passing `alias` into `mutate` crosses a function boundary,
+//   where the callee's parameter `xs` is a third name the analyzer never
+//   connects back to `items` (it does not even define parameters).
+//
+//   The runtime layer keys borrow state on *heap identity* — the Rc address —
+//   and `items`, `holder[0]`, `alias`, and `xs` are all Rc clones of one
+//   allocation. So it sees the conflict the static pass structurally cannot.
+
+fn mutate(xs) {
+    // A mutating method needs exclusivity: zero other borrows of the value.
+    // The caller is still holding a shared borrow of the same allocation.
+    xs.push(99)
+    xs.len()
+}
+
+fn main() {
+    let mut items = [1, 2, 3]
+
+    // Dynamically created alias: the same allocation, reached through a list
+    // element rather than through a borrow of a simple identifier.
+    let holder = [items]
+    let alias = holder[0]
+
+    println("two names, one allocation: " + items.len() + " " + alias.len())
+
+    // A shared borrow of `items`, live for the rest of this scope.
+    let view = &items
+    println("shared view len = " + view.len())
+
+    // `alias` is the same heap value `view` is borrowing. Mutating it requires
+    // a mutable borrow, which must find zero other borrows — and does not.
+    mutate(alias)
+
+    println("unreachable: the mutable borrow above must be refused")
+}
+
+// Expected runtime error (either backend, once the counters are threaded in):
+//
+//   tetherscript: cannot mutably borrow `xs` while it is already borrowed
+//
+// The binding named is `xs`, because that is the name the script wrote at the
+// borrow site that was refused. The message is the same sentence
+// src/ownership.rs emits for the lexically obvious version of this conflict,
+// so users see one rule rather than two.
+//
+// Contrast with examples/use_after_move.tether, which the STATIC pass catches
+// before execution — that is the fast path, and it stays the fast path.
