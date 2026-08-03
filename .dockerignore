@@ -5,7 +5,10 @@ target/
 .vscode/
 .idea/
 editor/
+# Documentation is not needed in the build stage, but README.md and LICENSE-MIT
+# are copied into the runtime image, so they must not be ignored.
 *.md
+!README.md
 Dockerfile
 .dockerignore
 docker-compose.yml
