@@ -38,6 +38,7 @@ pub(super) mod template_condition;
 pub(super) mod template_context;
 pub(super) mod template_delimit;
 pub(super) mod template_emit;
+pub(super) mod template_emit_default;
 pub(super) mod template_escape;
 pub(super) mod template_extends;
 pub(super) mod template_filter;
@@ -71,10 +72,13 @@ pub(super) mod template_macro_report;
 pub(super) mod template_macro_scope;
 pub(super) mod template_macro_value;
 pub(super) mod template_render;
+pub(super) mod template_render_loop;
 pub(super) mod template_scan;
 pub(super) mod template_source;
 pub(super) mod template_step;
 pub(super) mod template_subject;
+pub(super) mod template_super;
+pub(super) mod template_super_call;
 pub(super) mod template_tag;
 // Registration lives in `template_install`, called directly by `web_builtins.rs`: a
 // wrapper here would push this declaration list over the per-file line budget.

@@ -1,8 +1,8 @@
 //! Filter application and expression emission.
 //!
-//! One concern: turning `{{ value | filter | filter }}` into output text. `safe` is the
-//! reason application returns an escaping decision alongside a value — it changes how
-//! the result is emitted rather than what it contains.
+//! One concern: turning `{{ value | filter | filter }}` into output text. `safe` is the reason
+//! application returns an escaping decision alongside a value — it changes how the result is emitted
+//! rather than what it contains.
 
 use super::template_block::Render;
 use super::template_context::{lookup_value, render_scalar};
@@ -14,20 +14,23 @@ use crate::value::Value;
 ///
 /// # Errors
 ///
-/// Returns an error for a malformed pipeline, an unknown filter, or a missing key that
-/// no `default` supplied.
+/// Returns an error for a malformed pipeline, an unknown filter, or a missing key that no `default`
+/// supplied and no lenient mode tolerated.
 pub(super) fn emit(body: &str, context: &Value, state: &Render<'_>) -> Result<String, String> {
     let (key, filters) = split(body)?;
 
-    // A missing key is only tolerable when a `default` filter follows, so absence is
-    // carried as None rather than being an immediate error.
     let resolved = match lookup_value(context, key) {
         Ok(value) => Some(value),
         Err(error) => {
-            if !filters.iter().any(|filter| filter.name == "default") {
+            // A `default` filter supplies the value, and lenient mode tolerates the absence
+            // outright — which is what lets a view tree written against Tera's own lenient default
+            // render without every unmapped key taking the page down.
+            if !state.lenient && !filters.iter().any(|filter| filter.name == "default") {
                 return Err(error);
             }
-            None
+            // Nil rather than None, so `apply` has something to work with and `render_scalar` turns
+            // it into the empty string — matching what Tera emits for a missing variable.
+            Some(Value::Nil)
         }
     };
 
@@ -36,39 +39,13 @@ pub(super) fn emit(body: &str, context: &Value, state: &Render<'_>) -> Result<St
     Ok(if escaping { escape(&text) } else { text })
 }
 
-/// Resolve an expression to a value, applying its filters but not rendering it.
-///
-/// A condition needs the value rather than the text: `{% if testimonials | length > 0 %}` has to
-/// compare a number, and rendering to a string first would make it compare `"0"` against `0`.
-/// Without this, a filtered operand fell through to a bare key lookup, found nothing, and the
-/// comparison failed with a type error — which took a whole stored page down with it.
-///
-/// # Arguments
-///
-/// * `body` — The expression, possibly containing `|` filters.
-/// * `context` — Root context map.
-///
-/// # Errors
-///
-/// Returns an error for a malformed pipeline or an unknown filter. A missing key is `nil` rather
-/// than an error, matching the tolerance a bare key already gets in a condition.
-pub(super) fn value_of(body: &str, context: &Value) -> Result<Value, String> {
-    let (key, filters) = split(body)?;
-    let resolved = lookup_value(context, key).ok();
-    match filters.is_empty() {
-        true => Ok(resolved.unwrap_or(Value::Nil)),
-        // Escaping is irrelevant here: nothing is emitted, so `safe` is accepted and ignored.
-        false => apply(resolved, &filters, false).map(|(value, _)| value),
-    }
-}
-
 /// Apply `filters` left to right, returning the value and whether to escape it.
 ///
 /// # Errors
 ///
-/// Returns an error for an unknown filter, a malformed argument, or a missing value that
-/// no `default` supplied.
-fn apply(
+/// Returns an error for an unknown filter, a malformed argument, or a missing value that no
+/// `default` supplied.
+pub(super) fn apply(
     value: Option<Value>,
     filters: &[Filter<'_>],
     escaping: bool,
@@ -78,14 +55,7 @@ fn apply(
     for filter in filters {
         match filter.name {
             "safe" => escape = false,
-            "default" => {
-                // Validated even when the value is present, so a malformed `default()`
-                // is caught on every render rather than only on missing rows.
-                let supplied = super::template_filter_arg::parse(filter.argument)?;
-                if current.is_none() || matches!(current, Some(Value::Nil)) {
-                    current = Some(supplied);
-                }
-            }
+            "default" => current = super::template_emit_default::apply(current, filter)?,
             other => current = Some(super::template_filter_fn::call(other, current, filter)?),
         }
     }

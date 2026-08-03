@@ -1,16 +1,15 @@
-//! Render state and the evaluation loop.
+//! Render state threaded through every evaluation layer.
 //!
-//! State is bundled into one [`Render`] value rather than passed as four parameters:
-//! `include` needs the template map and a depth counter, and threading those through
-//! every signature individually would push several files over the line budget.
+//! Bundled into one [`Render`] value rather than passed as separate parameters: `include` needs the
+//! template map and a depth counter, and threading those through every signature individually would
+//! push several files over the line budget.
 //!
-//! `nested` returns a fresh value rather than mutating, so a nested render cannot alter
-//! its parent's state — an include one level down must not leave escaping disabled for
-//! whatever follows it.
+//! The `nested` and `tolerant` builders return a fresh value rather than mutating, so a nested
+//! render cannot alter its parent's state — an include one level down must not leave escaping
+//! disabled for whatever follows it.
 
 use std::collections::HashMap;
 
-use super::template_scan::Piece;
 use crate::value::Value;
 
 /// Everything an evaluation step needs besides the pieces and the context.
@@ -23,6 +22,13 @@ pub(super) struct Render<'a> {
     pub templates: &'a Value,
     /// Current include nesting depth, for cycle detection.
     pub depth: usize,
+    /// When true, an unknown key renders as empty instead of failing the render.
+    ///
+    /// Off by default, because a typo like `{{ user.nmae }}` should be caught rather than shipped as
+    /// a blank. On for a caller rendering templates it did not author: Tera's own default is
+    /// lenient, so a large view tree written against it references keys a port has no equivalent
+    /// for, and one of them must not take a whole page down.
+    pub lenient: bool,
 }
 
 impl<'a> Render<'a> {
@@ -37,6 +43,7 @@ impl<'a> Render<'a> {
             overrides,
             templates,
             depth: 0,
+            lenient: false,
         }
     }
 
@@ -47,30 +54,17 @@ impl<'a> Render<'a> {
             overrides: self.overrides,
             templates: self.templates,
             depth: self.depth + usize::from(deeper),
+            lenient: self.lenient,
         }
     }
-}
 
-/// Render `pieces` against `context` with the given render state.
-///
-/// Walks the piece list with an explicit index rather than recursing over slices, which
-/// keeps nesting depth independent of the Rust stack.
-///
-/// # Errors
-///
-/// Returns an error for an unknown key, an unbalanced block, or an unsupported tag.
-pub(super) fn render_with(
-    pieces: &[Piece<'_>],
-    context: &Value,
-    state: &Render<'_>,
-) -> Result<String, String> {
-    let mut out = String::new();
-    let mut index = 0usize;
-    while index < pieces.len() {
-        index = super::template_step::step(pieces, index, context, state, &mut out)?;
+    /// The same state with unknown keys rendering as empty.
+    pub(super) fn tolerant(mut self) -> Self {
+        self.lenient = true;
+        self
     }
-    Ok(out)
 }
 
 pub(super) use super::template_delimit::matching_end;
+pub(super) use super::template_render_loop::render_with;
 pub(super) use super::template_subject::iterable;

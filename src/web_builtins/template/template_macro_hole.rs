@@ -44,6 +44,11 @@ pub(super) fn hole(
     context: &Value,
     state: &Render<'_>,
 ) -> Result<String, String> {
+    // `super()` looks like a macro call but is not one: it re-renders the parent block's body,
+    // which the enclosing `{% block %}` bound into the context before this override ran.
+    if name.trim() == "super()" {
+        return super::template_super_call::render(context, state);
+    }
     if is_call(name) {
         return call(pieces, name, context, state);
     }

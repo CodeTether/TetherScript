@@ -66,10 +66,17 @@ pub(super) fn run(
 ) -> Result<usize, String> {
     let name = name_of(body)?;
     let end = matching_end(pieces, index)?;
+    // The parent's own body, as source, so an override can re-emit it with `{{ super() }}`. That is
+    // how a child adds to `{% block head %}` instead of replacing it — and the parent's head is
+    // where every stylesheet link lives, so replacing it silently unstyles the page.
+    let parent = super::template_source::to_source(&pieces[index + 1..end]);
     let rendered = match state.overrides.get(name) {
         // Re-scanned here rather than at collection time so a block body may itself
         // contain blocks, ifs, and loops.
-        Some(source) => render_with(&scan(source)?, context, state)?,
+        Some(source) => {
+            let scope = super::template_super::with_parent(context, &parent)?;
+            render_with(&scan(source)?, &scope, state)?
+        }
         None => render_with(&pieces[index + 1..end], context, state)?,
     };
     out.push_str(&rendered);

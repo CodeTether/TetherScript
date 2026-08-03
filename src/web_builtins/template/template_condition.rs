@@ -67,7 +67,7 @@ fn operand(context: &Value, text: &str) -> Value {
         "false" => Value::Bool(false),
         // A malformed pipeline or unknown filter yields nil rather than an error, keeping a
         // condition's existing tolerance: an untaken branch must not be able to fail a render.
-        _ => super::template_emit::value_of(text, context).unwrap_or(Value::Nil),
+        _ => super::template_emit_default::value_of(text, context).unwrap_or(Value::Nil),
     }
 }
 

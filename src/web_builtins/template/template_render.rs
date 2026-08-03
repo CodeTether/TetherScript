@@ -50,3 +50,25 @@ pub(super) fn render_inherited(
     let state = Render::new(escaping, &overrides, templates);
     render_with(&pieces, context, &state)
 }
+
+/// Render with inheritance, treating an unknown key as empty rather than as an error.
+///
+/// # Arguments
+///
+/// * `templates` — Map of template name to source.
+///
+/// # Errors
+///
+/// Returns an error for a malformed template, a missing parent or partial, or an unknown filter — a
+/// missing *key* is tolerated, and nothing else is.
+pub(super) fn render_lenient(
+    template: &str,
+    context: &Value,
+    templates: &Value,
+) -> Result<String, String> {
+    let resolved = resolve(template, templates)?;
+    let pieces = scan(&resolved.root)?;
+    let overrides: HashMap<String, String> = resolved.overrides;
+    let state = Render::new(true, &overrides, templates).tolerant();
+    render_with(&pieces, context, &state)
+}
