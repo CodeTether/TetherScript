@@ -1,10 +1,22 @@
 //! strftime rendering for the `date` filter.
 //!
-//! Supports the specifiers the reference views actually use. An unknown specifier is
-//! emitted verbatim rather than dropped, so a typo is visible in the output instead of
-//! silently vanishing.
+//! Supports the specifiers the reference views use.
 
-use super::template_filter_month::MONTHS;
+/// Abbreviated then full month names.
+const MONTHS: [(&str, &str); 12] = [
+    ("Jan", "January"),
+    ("Feb", "February"),
+    ("Mar", "March"),
+    ("Apr", "April"),
+    ("May", "May"),
+    ("Jun", "June"),
+    ("Jul", "July"),
+    ("Aug", "August"),
+    ("Sep", "September"),
+    ("Oct", "October"),
+    ("Nov", "November"),
+    ("Dec", "December"),
+];
 
 /// Render `seconds` according to `pattern`.
 pub(super) fn render(seconds: i64, pattern: &str) -> String {
@@ -25,7 +37,6 @@ pub(super) fn render(seconds: i64, pattern: &str) -> String {
             Some('Y') => out.push_str(&year.to_string()),
             Some('m') => out.push_str(&format!("{month:02}")),
             Some('d') => out.push_str(&format!("{day:02}")),
-            // %e is day-of-month space-padded, which the reference uses.
             Some('e') => out.push_str(&format!("{day:2}")),
             Some('b') => out.push_str(MONTHS[index].0),
             Some('B') => out.push_str(MONTHS[index].1),
@@ -35,7 +46,6 @@ pub(super) fn render(seconds: i64, pattern: &str) -> String {
             Some('I') => out.push_str(&format!("{:02}", twelve_hour(hour))),
             Some('p') => out.push_str(if hour < 12 { "AM" } else { "PM" }),
             Some('%') => out.push('%'),
-            // Unknown specifiers survive verbatim so a typo is visible.
             Some(other) => {
                 out.push('%');
                 out.push(other);
@@ -46,7 +56,6 @@ pub(super) fn render(seconds: i64, pattern: &str) -> String {
     out
 }
 
-/// Convert a 24-hour hour to its 12-hour form, where midnight and noon are both 12.
 fn twelve_hour(hour: i64) -> i64 {
     match hour % 12 {
         0 => 12,

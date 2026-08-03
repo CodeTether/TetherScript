@@ -12,7 +12,10 @@ use crate::value::Value;
 ///
 /// Returns an error naming the key when the value is not a list: iterating a scalar once,
 /// silently, would hide the mistake.
-pub(super) fn iterable(context: &Value, key: &str) -> Result<Vec<Value>, String> {
+pub(super) fn iterable(context: &Value, key: &str, lenient: bool) -> Result<Vec<Value>, String> {
+    if super::template_range::is_range(key) {
+        return super::template_range::evaluate(key, context, lenient);
+    }
     match lookup_value(context, key)? {
         Value::List(items) => Ok(items.borrow().clone()),
         other => Err(format!(

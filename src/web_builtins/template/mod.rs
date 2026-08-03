@@ -1,36 +1,4 @@
-//! Dependency-free HTML template built-ins.
-//!
-//! A Tera-based application renders every page through Tera, but tetherscript's Tera support sits
-//! behind the optional `tera` feature, so the default zero-dependency build cannot render
-//! a page at all. This group provides a small always-available renderer so the port can
-//! serve HTML without a dependency.
-//!
-//! It covers the Tera subset the reference views actually lean on: substitution,
-//! `if`/`elif`/`else`, `for`, `extends`/`block` inheritance, `include`, comments, and the
-//! common filters. It is still not a Tera clone — `macro` and `set` are absent, and each
-//! is rejected by name. Use `tera_render` when the `tera` feature is enabled and those
-//! are needed.
-//!
-//! # Script surface
-//!
-//! | Builtin | Returns |
-//! |---|---|
-//! | `html_escape(text)` | escaped text |
-//! | `html_attr(text)` | text escaped for an attribute value |
-//! | `template_render(template, context)` | `Result` of rendered text, escaping on |
-//! | `template_render_raw(template, context)` | the same with escaping off |
-//! | `template_render_inherited(template, context, templates)` | resolves `extends` and `include` |
-//!
-//! # Examples
-//!
-//! ```text
-//! let ctx = map()
-//! ctx.title = "Bins & Cans"
-//! println(template_render("<h1>\{\{ title \}\}</h1>", ctx).unwrap())
-//! ```
-//!
-//! Submodules live in `template/`, so the declarations below need no `#[path]`.
-
+//! Always-available Tera-compatible template renderer.
 pub(super) mod template_block;
 pub(super) mod template_blocks;
 pub(super) mod template_branch;
@@ -48,7 +16,6 @@ pub(super) mod template_filter_date;
 pub(super) mod template_filter_fn;
 pub(super) mod template_filter_len;
 pub(super) mod template_filter_list;
-pub(super) mod template_filter_month;
 pub(super) mod template_filter_split;
 pub(super) mod template_filter_strftime;
 pub(super) mod template_filter_text;
@@ -71,6 +38,8 @@ pub(super) mod template_macro_path;
 pub(super) mod template_macro_report;
 pub(super) mod template_macro_scope;
 pub(super) mod template_macro_value;
+pub(super) mod template_range;
+pub(super) mod template_range_args;
 pub(super) mod template_render;
 pub(super) mod template_render_loop;
 pub(super) mod template_scan;
@@ -80,5 +49,3 @@ pub(super) mod template_subject;
 pub(super) mod template_super;
 pub(super) mod template_super_call;
 pub(super) mod template_tag;
-// Registration lives in `template_install`, called directly by `web_builtins.rs`: a
-// wrapper here would push this declaration list over the per-file line budget.
