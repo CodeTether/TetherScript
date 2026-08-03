@@ -24,5 +24,9 @@ examples/.tetherscript/
 
 # Local HTTPS identities (never commit private keys)
 /certs/
-# Client-specific port work is kept outside this repository.
+# Client-specific application ports are developed against private schemas and credentials, so
+# they live outside this repository. Keep the pattern here broad rather than naming a customer.
+/examples/client-*
+/tests/client_*
+*_port_private*
 .tmp/
