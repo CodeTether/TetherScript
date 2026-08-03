@@ -1,0 +1,108 @@
+// Server-sent events over a streaming HTTP response.
+//
+// Run with:
+//     tetherscript run examples/sse_stream.tether
+//     tetherscript run --interp examples/sse_stream.tether
+//
+// Then, in another terminal:
+//     curl -N -i http://127.0.0.1:8793/events
+//
+// `-N` disables curl's own buffering. Without it curl may hold the body until the
+// connection closes, which hides the whole point of the exercise.
+//
+// DOCUMENTED OUTPUT of `curl -N -i http://127.0.0.1:8793/events`:
+//
+//     HTTP/1.1 200 OK
+//     Connection: close
+//     Cache-Control: no-cache
+//     Content-Type: text/event-stream; charset=utf-8
+//
+//     : stream open
+//     retry: 3000
+//
+//     data: tick 1
+//
+//     data: tick 2
+//
+//     data: tick 3
+//
+//     data: done
+//
+// That is one comment line, one retry frame, and four data events, arriving one at
+// a time about 500 ms apart; the connection then closes. Header order after the
+// status line is not guaranteed. Note what is *absent*: there is no
+// `Content-Length`, because the server cannot know the body length before the
+// generator has run.
+//
+// `curl -N -i http://127.0.0.1:8793/` prints an ordinary fixed-length response,
+// `Content-Length` included, which is how the two response shapes coexist.
+//
+// LIMITATION, stated honestly: `http_serve` is a single-threaded accept loop, so
+// this stream occupies the entire server for its lifetime. Nothing else is served
+// until it ends. That is why `max_events` and `max_duration_ms` are set below —
+// they bound how long one client can hold the whole server. Do not remove them.
+
+// One `data:` event from a plain string.
+fn event(text) {
+    let fields = map()
+    fields.data = text
+    return sse_event(fields).unwrap()
+}
+
+// The generator: called once per event, returns nil to end the stream.
+//
+// Step 1 is a comment (a keep-alive; not an event, so it has no blank-line
+// terminator). Step 2 tells the client to wait 3s before reconnecting. Steps 3-5
+// are the payload, half a second apart. Step 6 is the farewell, and step 7 ends
+// the stream.
+fn make_generator() {
+    let mut step = 0
+    return fn() {
+        step = step + 1
+        if step == 1 { return sse_comment("stream open").unwrap() }
+        if step == 2 { return sse_retry(3000).unwrap() }
+        if step > 6 { return nil }
+        sleep_ms(500).unwrap()
+        if step == 6 { return event("done") }
+        return event("tick {step - 2}")
+    }
+}
+
+// A streaming response is an ordinary map carrying a `stream` callable. That key,
+// holding a function, is what tells `http_serve` to stream instead of writing one
+// complete body: no existing handler returns a function, so the two shapes can
+// never be confused.
+fn events_route() {
+    let resp = map()
+    resp.status = 200
+    resp.stream = make_generator()
+    // Bounds have defaults, but setting them here is the point: they are the only
+    // thing stopping one client from owning the single-threaded server.
+    resp.max_events = 10
+    resp.max_duration_ms = 15000
+    return resp
+}
+
+fn index() {
+    let resp = map()
+    resp.status = 200
+    resp.body = "GET /events for a server-sent event stream\n"
+    let headers = map()
+    headers["content-type"] = "text/plain; charset=utf-8"
+    resp.headers = headers
+    return resp
+}
+
+fn handle(req) {
+    if req.path == "/events" { return events_route() }
+    if req.path == "/" { return index() }
+    let resp = map()
+    resp.status = 404
+    resp.body = "not found: {req.path}\n"
+    return resp
+}
+
+fn main() {
+    println("sse example: curl -N -i http://127.0.0.1:8793/events")
+    http_serve(8793, handle)
+}
