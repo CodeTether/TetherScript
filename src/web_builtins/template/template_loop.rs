@@ -1,17 +1,45 @@
-//! `for` header parsing and per-iteration scope construction.
+//! `{% for item in items %}` evaluation.
+//!
+//! Each iteration renders the body against a child context holding the loop variable.
+//! Cloning the context rather than mutating it means the binding cannot outlive the loop
+//! or permanently shadow a parent key of the same name.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use super::template_block::{iterable, matching_end, render_with, Render};
+use super::template_scan::Piece;
 use crate::value::Value;
+
+/// Render a `for` block, returning the index just past its `endfor`.
+///
+/// # Errors
+///
+/// Returns an error for a malformed header, a non-list subject, or an unbalanced block.
+pub(super) fn run(
+    pieces: &[Piece<'_>],
+    index: usize,
+    body: &str,
+    context: &Value,
+    state: &Render<'_>,
+    out: &mut String,
+) -> Result<usize, String> {
+    let (name, subject) = parse(body)?;
+    let end = matching_end(pieces, index)?;
+    for item in iterable(context, subject)? {
+        let scope = child(context, name, item)?;
+        out.push_str(&render_with(&pieces[index + 1..end], &scope, state)?);
+    }
+    Ok(end + 1)
+}
 
 /// Parse `for <name> in <subject>`.
 ///
 /// # Errors
 ///
 /// Returns an error naming what was found when the header is malformed.
-pub(super) fn parse(body: &str) -> Result<(&str, &str), String> {
+fn parse(body: &str) -> Result<(&str, &str), String> {
     let mut words = body.split_whitespace();
     words.next();
     let name = words
@@ -31,13 +59,10 @@ pub(super) fn parse(body: &str) -> Result<(&str, &str), String> {
 
 /// Clone the parent context and bind the loop variable in the copy.
 ///
-/// Cloning rather than mutating means the binding cannot outlive the loop or
-/// permanently shadow a parent key of the same name.
-///
 /// # Errors
 ///
 /// Returns an error when the context is not a map.
-pub(super) fn child(context: &Value, name: &str, item: Value) -> Result<Value, String> {
+fn child(context: &Value, name: &str, item: Value) -> Result<Value, String> {
     let Value::Map(parent) = context else {
         return Err(format!(
             "template: context must be a map, got {}",

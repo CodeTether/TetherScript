@@ -49,7 +49,10 @@ pub(crate) mod route;
 pub(crate) mod session;
 #[path = "web_builtins/sse.rs"]
 pub(crate) mod sse;
-#[path = "web_builtins/template.rs"]
+// Pointed at a directory rather than a bare file: the template engine has 23
+// submodules, and a `#[path]`-included file resolves its own submodules against
+// `web_builtins/`, so the declarations would each need a redundant `#[path]` too.
+#[path = "web_builtins/template/mod.rs"]
 pub(crate) mod template;
 #[path = "web_builtins/uuid.rs"]
 pub(crate) mod uuid;

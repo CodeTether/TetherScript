@@ -70,9 +70,16 @@ this.
 
 ## Templating
 
-`template_render` supports substitution, `{% if %}`/`{% else %}`/`{% endif %}`, and
-`{% for x in items %}`/`{% endfor %}`, which together are the majority of tags in a
-typical Tera view. Blocks nest, and escaping applies inside them.
+`template_render` covers the Tera subset a real view leans on:
+
+| Construct | Notes |
+| --- | --- |
+| `{{ value }}` / `{{{ raw }}}` | Escaped by default; triple braces emit raw |
+| `{% if %}` / `{% elif %}` / `{% else %}` | Conditions may compare: `==`, `!=`, `>`, `<`, `>=`, `<=` |
+| `{% for x in items %}` | Iterates a list; the binding does not leak past `endfor` |
+| `{% block %}` / `{% extends %}` | Inheritance, via `template_render_inherited` |
+| `{% include %}` | Splices a partial, with `ignore missing` |
+| `{# comment #}` | Dropped entirely |
 
 ```tether
 let page = template_render(
@@ -87,6 +94,20 @@ empty string, and zero are all false, so `{% if items %}` means "is there anythi
 to show". A **missing** key is also false, since that is how a view tests an
 optional value — but a missing key in a `{{ }}` hole is still an error, because
 there a typo would silently blank the page.
+
+### Conditions
+
+A condition is a bare key tested for truthiness, or a comparison:
+
+```tether
+\{% if step.id == current_step.id %\}...\{% endif %\}
+\{% if count > 3 %\}...\{% endif %\}
+```
+
+Both sides may be dotted paths or literals. A missing key compares as `nil` rather
+than erroring, matching the tolerance a bare key gets. Ordering (`<`, `>`) requires
+numbers: comparing strings lexicographically is almost always a mistake in a
+template, so it is refused by name instead.
 
 ### Inheritance
 
@@ -122,10 +143,18 @@ A host that wants on-disk views reads them through `fs` and passes the map in.
 | --- | --- |
 | `safe` | Emit raw, suppressing escaping |
 | `default(value=..)` | Substitute when the key is missing **or** `nil` |
-| `json`, `json_encode` | Encode as JSON |
+| `json`, `json_encode`, `to_json` | Encode as JSON |
 | `length` | Length of a str, list, or map |
 | `upper`, `lower`, `trim` | String transforms |
+| `escape`, `html_attribute_encode` | Explicit escaping |
+| `int`, `float`, `str` | Coercion, refusing what cannot convert |
+| `first`, `last` | List ends; `nil` when empty |
+| `round` | Nearest integer |
+| `truncate(length=N, end="..")` | Shorten, counting characters not bytes |
+| `date(format="%b %d, %Y")` | strftime over Unix seconds |
 
+A separator inside a quoted argument is data, so `date(format="%b %d, %Y")` keeps its
+comma and a `|` inside a literal does not split the pipeline.
 `{{ data | json | safe }}` is the idiom for embedding a value in a `<script>` block,
 and is why `safe` exists: it marks content as intentionally raw. Everything else
 escapes, so reaching for `safe` is a visible decision rather than a default.
@@ -141,9 +170,14 @@ rather than the render.
 
 ### Still unsupported
 
-`{% include %}`, `{% macro %}`, and `{% set %}`. Each is reported by name — with a
-hint where there is an obvious alternative — rather than ignored, so a template
-using one fails loudly instead of rendering a hole.
+`{% macro %}` and `{% set %}`, plus application-specific filters. Each is reported by
+name — with a hint where there is an obvious alternative — rather than ignored, so a
+template using one fails loudly instead of rendering a hole.
+
+Application filters (the reference has `clean_llm_meta`) are deliberately not
+registerable. They belong to the application, so a script computes them into the
+context before rendering. That keeps the engine's behaviour identical everywhere
+rather than varying with what a caller happened to register.
 
 ## Security defaults
 
@@ -215,9 +249,10 @@ because the core build takes no dependencies.
 ## What is not here
 
 - No Redis or any session *store*; only the signed-cookie half.
-- No template includes, macros, or `{% set %}`. `template_render` covers
-  substitution, `if`, `for`, and filters; `template_render_inherited` adds `extends`
-  and `block`. The optional `tera` feature remains the richer path.
+- No template macros or `{% set %}`, and no registerable application filters.
+  `template_render` covers substitution, `if`/`elif`, comparisons, `for`, comments, and
+  the common filters; `template_render_inherited` adds `extends`, `block`, and
+  `include`. The optional `tera` feature remains the richer path.
 - No regex engine, so `validate` uses hand-written scanners and `is_email` is a
   pragmatic filter, not RFC 5322 and not proof of deliverability.
 - No WebSocket upgrade.

@@ -8,8 +8,9 @@ use std::collections::HashMap;
 
 use super::template_blocks::{collect, Blocks};
 use super::template_extends::parent_of;
-use super::template_lookup::source_of;
-use super::template_scan::{scan, to_source};
+use super::template_extends::source_of;
+use super::template_scan::scan;
+use super::template_source::to_source;
 use crate::value::Value;
 
 /// A resolved chain: the root template's source plus the winning block bodies.

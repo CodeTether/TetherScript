@@ -1,26 +1,24 @@
-//! Delimiter location, extraction, and block-boundary discovery.
+//! Delimiter location, extraction, and block-structure discovery.
 //!
-//! All three are byte-level structural concerns over the same token stream, so they
-//! share a file rather than fragmenting into three.
+//! All byte- and index-level structural concerns over the same token stream: finding
+//! delimiters, extracting their bodies, and locating the branches and end of a block.
 
 use super::template_scan::Piece;
 
-/// Byte offset of the next `{{` or `{%`, whichever comes first.
+/// Byte offset of the next `{{`, `{%`, or `{#`, whichever comes first.
 pub(super) fn next_delimiter(rest: &str) -> Option<usize> {
-    match (rest.find("{{"), rest.find("{%")) {
-        (Some(a), Some(b)) => Some(a.min(b)),
-        (Some(a), None) => Some(a),
-        (None, Some(b)) => Some(b),
-        (None, None) => None,
-    }
+    [rest.find("{{"), rest.find("{%"), rest.find("{#")]
+        .into_iter()
+        .flatten()
+        .min()
 }
 
 /// Extract a trimmed body between `open` and `close`, with bytes consumed.
 ///
 /// # Errors
 ///
-/// Returns an error when `close` never appears, or when the body is empty. Both name
-/// the delimiter, since a stray `{{` in a large template is otherwise hard to find.
+/// Returns an error when `close` never appears, or when the body is empty. Both name the
+/// delimiter, since a stray `{{` in a large template is otherwise hard to find.
 pub(super) fn delimited<'a>(
     after: &'a str,
     open: &str,
@@ -37,7 +35,15 @@ pub(super) fn delimited<'a>(
     Ok((body, start + end + close.len()))
 }
 
-/// Find the tag closing the block opened at `open`, and its `else`.
+/// One conditional branch: its condition key, and the tag that opened it.
+pub(super) struct Branch<'a> {
+    /// Condition key, or `None` for the final `else`.
+    pub condition: Option<&'a str>,
+    /// Index of the tag that opened this branch.
+    pub at: usize,
+}
+
+/// Find the index of the tag closing the block opened at `open`.
 ///
 /// Depth-tracked, so an inner block does not terminate an outer one early. `block`
 /// counts alongside `if`/`for`: a block inside an `if` must not let the `if`'s search
@@ -46,22 +52,16 @@ pub(super) fn delimited<'a>(
 /// # Errors
 ///
 /// Returns an error when the block is never closed.
-pub(super) fn matching_end(
-    pieces: &[Piece<'_>],
-    open: usize,
-) -> Result<(usize, Option<usize>), String> {
+pub(super) fn matching_end(pieces: &[Piece<'_>], open: usize) -> Result<usize, String> {
     let mut depth = 0usize;
-    let mut alternate = None;
     for (offset, piece) in pieces.iter().enumerate().skip(open) {
         let Piece::Tag(body) = piece else { continue };
         match body.split_whitespace().next().unwrap_or("") {
             "if" | "for" | "block" => depth += 1,
-            // Only the outermost `else` at depth 1 belongs to this block.
-            "else" if depth == 1 && alternate.is_none() => alternate = Some(offset),
             "endif" | "endfor" | "endblock" => {
                 depth -= 1;
                 if depth == 0 {
-                    return Ok((offset, alternate));
+                    return Ok(offset);
                 }
             }
             _ => {}

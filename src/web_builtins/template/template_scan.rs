@@ -1,7 +1,7 @@
 //! Tag scanning for the Tera-compatible subset.
 //!
-//! Splits a template into literal text, `{{ expression }}` holes, and
-//! `{% statement %}` tags. Keeping the scan separate from evaluation means the
+//! Splits a template into literal text, `{{ expression }}` holes, `{% statement %}`
+//! tags, and `{# comment #}` runs. Keeping the scan separate from evaluation means the
 //! block structure is validated once, before any value is looked up.
 
 use super::template_delimit::{delimited, next_delimiter};
@@ -17,25 +17,8 @@ pub(super) enum Piece<'a> {
     Raw(&'a str),
     /// `{% ... %}`, with the trimmed statement body.
     Tag(&'a str),
-}
-
-/// Re-render pieces to equivalent source text.
-///
-/// Needed because a block's body must be re-scanned in the context of whichever
-/// template ends up rendering it, and reconstructing text is simpler than
-/// threading byte offsets through every layer.
-pub(super) fn to_source(pieces: &[Piece<'_>]) -> String {
-    pieces.iter().map(one_source).collect()
-}
-
-/// Source text for a single piece.
-fn one_source(piece: &Piece<'_>) -> String {
-    match piece {
-        Piece::Text(text) => (*text).to_string(),
-        Piece::Escaped(name) => format!("{{{{ {name} }}}}"),
-        Piece::Raw(name) => format!("{{{{{{ {name} }}}}}}"),
-        Piece::Tag(body) => format!("{{% {body} %}}"),
-    }
+    /// `{# ... #}`, dropped from the output entirely.
+    Comment,
 }
 
 /// Split `template` into pieces in source order.
@@ -64,12 +47,20 @@ pub(super) fn scan(template: &str) -> Result<Vec<Piece<'_>>, String> {
 
 /// Read one delimited piece from the start of `after`.
 fn one(after: &str) -> Result<(Piece<'_>, usize), String> {
+    // A comment is checked first because it shares the opening brace and its body may
+    // legally contain `{{` or `{%`.
+    if let Some(body) = after.strip_prefix("{#") {
+        let end = body
+            .find("#}")
+            .ok_or_else(|| "template: unclosed `{#` comment".to_string())?;
+        return Ok((Piece::Comment, 2 + end + 2));
+    }
     if after.starts_with("{%") {
         let (body, consumed) = delimited(after, "{%", "%}")?;
         return Ok((Piece::Tag(body), consumed));
     }
-    // The triple form must be tested first: it shares its opening characters with
-    // the double form, which would otherwise match and leave a stray brace.
+    // The triple form must be tested before the double: it shares its opening
+    // characters, which would otherwise match and leave a stray brace.
     if after.starts_with("{{{") {
         let (body, consumed) = delimited(after, "{{{", "}}}")?;
         return Ok((Piece::Raw(body), consumed));

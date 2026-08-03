@@ -8,6 +8,7 @@
 use std::collections::HashMap;
 
 use super::template_block::render_with;
+use super::template_block::Render;
 use super::template_delimit::matching_end;
 use super::template_scan::{scan, Piece};
 use crate::value::Value;
@@ -31,7 +32,7 @@ pub(super) fn collect<'a>(pieces: &[Piece<'a>]) -> Result<Blocks<'a>, String> {
             continue;
         }
         let name = name_of(body)?;
-        let (end, _) = matching_end(pieces, index)?;
+        let end = matching_end(pieces, index)?;
         blocks.insert(name.to_string(), pieces[index + 1..end].to_vec());
     }
     Ok(blocks)
@@ -60,17 +61,16 @@ pub(super) fn run(
     index: usize,
     body: &str,
     context: &Value,
-    escaping: bool,
-    overrides: &HashMap<String, String>,
+    state: &Render<'_>,
     out: &mut String,
 ) -> Result<usize, String> {
     let name = name_of(body)?;
-    let (end, _) = matching_end(pieces, index)?;
-    let rendered = match overrides.get(name) {
+    let end = matching_end(pieces, index)?;
+    let rendered = match state.overrides.get(name) {
         // Re-scanned here rather than at collection time so a block body may itself
         // contain blocks, ifs, and loops.
-        Some(source) => render_with(&scan(source)?, context, escaping, overrides)?,
-        None => render_with(&pieces[index + 1..end], context, escaping, overrides)?,
+        Some(source) => render_with(&scan(source)?, context, state)?,
+        None => render_with(&pieces[index + 1..end], context, state)?,
     };
     out.push_str(&rendered);
     Ok(end + 1)
