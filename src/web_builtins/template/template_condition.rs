@@ -5,7 +5,6 @@
 //! a bare key would silently take the wrong branch rather than fail, which is why this
 //! parses the operators rather than ignoring them.
 
-use super::template_context::lookup_value;
 use super::template_filter_arg::literal_of;
 use super::template_subject::{ordered, truthy};
 use crate::value::Value;
@@ -35,10 +34,8 @@ pub(super) fn evaluate(context: &Value, expression: &str) -> Result<bool, String
             return compare(context, left.trim(), operator, right.trim());
         }
     }
-    Ok(match lookup_value(context, expression) {
-        Ok(value) => truthy(&value),
-        Err(_) => false,
-    })
+    // A bare condition may still carry filters, as in `{% if items | length %}`.
+    Ok(truthy(&operand(context, expression)))
 }
 
 /// Resolve both sides and apply `operator`.
@@ -54,6 +51,10 @@ fn compare(context: &Value, left: &str, operator: &str, right: &str) -> Result<b
 
 /// Resolve a side as a context key, falling back to a literal.
 ///
+/// Filters apply here too. `{% if testimonials | length > 0 %}` is the shape a real stored page
+/// uses, and treating `testimonials | length` as one long key name found nothing — so the
+/// comparison saw nil and failed, taking the whole page down rather than one condition.
+///
 /// A missing key yields `nil`, which makes `{% if absent == "x" %}` false rather than an
 /// error — the same tolerance a bare key gets.
 fn operand(context: &Value, text: &str) -> Value {
@@ -64,7 +65,9 @@ fn operand(context: &Value, text: &str) -> Value {
     match text {
         "true" => Value::Bool(true),
         "false" => Value::Bool(false),
-        _ => lookup_value(context, text).unwrap_or(Value::Nil),
+        // A malformed pipeline or unknown filter yields nil rather than an error, keeping a
+        // condition's existing tolerance: an untaken branch must not be able to fail a render.
+        _ => super::template_emit::value_of(text, context).unwrap_or(Value::Nil),
     }
 }
 

@@ -36,6 +36,33 @@ pub(super) fn emit(body: &str, context: &Value, state: &Render<'_>) -> Result<St
     Ok(if escaping { escape(&text) } else { text })
 }
 
+/// Resolve an expression to a value, applying its filters but not rendering it.
+///
+/// A condition needs the value rather than the text: `{% if testimonials | length > 0 %}` has to
+/// compare a number, and rendering to a string first would make it compare `"0"` against `0`.
+/// Without this, a filtered operand fell through to a bare key lookup, found nothing, and the
+/// comparison failed with a type error — which took a whole stored page down with it.
+///
+/// # Arguments
+///
+/// * `body` — The expression, possibly containing `|` filters.
+/// * `context` — Root context map.
+///
+/// # Errors
+///
+/// Returns an error for a malformed pipeline or an unknown filter. A missing key is `nil` rather
+/// than an error, matching the tolerance a bare key already gets in a condition.
+pub(super) fn value_of(body: &str, context: &Value) -> Result<Value, String> {
+    let (key, filters) = split(body)?;
+    let resolved = lookup_value(context, key).ok();
+    if filters.is_empty() {
+        return Ok(resolved.unwrap_or(Value::Nil));
+    }
+    // Escaping is irrelevant here: nothing is emitted, so `safe` is accepted and ignored.
+    let (value, _) = apply(resolved, &filters, false)?;
+    Ok(value)
+}
+
 /// Apply `filters` left to right, returning the value and whether to escape it.
 ///
 /// # Errors

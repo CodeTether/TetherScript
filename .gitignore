@@ -24,3 +24,5 @@ examples/.tetherscript/
 
 # Local HTTPS identities (never commit private keys)
 /certs/
+# Client-specific port work is kept outside this repository.
+.tmp/

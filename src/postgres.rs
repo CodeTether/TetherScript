@@ -111,6 +111,12 @@ mod params;
 mod pool;
 mod query;
 mod rows;
+// Type-directed field conversion. Split by concern: the OID dispatch, the temporal parser, its
+// calendar arithmetic, and the inference used only for unrecognised OIDs.
+mod rows_civil;
+mod rows_infer;
+mod rows_time;
+mod rows_typed;
 mod sasl;
 mod scram;
 mod startup;
@@ -134,3 +140,6 @@ mod md5_tests;
 
 #[cfg(test)]
 mod scram_tests;
+
+#[cfg(test)]
+mod rows_typed_tests;

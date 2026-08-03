@@ -71,7 +71,13 @@ fn decodes_columns_types_and_nulls() {
 
     assert_eq!(field(&rows[0], "id"), Value::Int(1));
     assert_eq!(field(&rows[0], "active"), Value::Bool(true));
-    assert_eq!(field(&rows[0], "score"), Value::Float(9.5));
+    // `score` is `numeric`, which is arbitrary precision, so it decodes to text rather than an
+    // f64. Parsing it as a float would silently round a column a money value could live in, and
+    // the type OID now says so — before, decoding guessed from the text and returned 9.5.
+    assert_eq!(
+        field(&rows[0], "score"),
+        Value::Str("9.5".to_string().into())
+    );
     // SQL NULL decodes to nil, not an empty string.
     assert_eq!(field(&rows[0], "note"), Value::Nil);
 

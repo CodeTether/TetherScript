@@ -13,7 +13,9 @@ use crate::value::Value;
 
 /// Read messages until `ReadyForQuery`, returning the decoded rows.
 pub(super) fn rows(connection: &mut Connection) -> Result<Value, String> {
-    let mut columns: Vec<String> = Vec::new();
+    // Carries each column's type OID as well as its name, so a field's declared type decides how
+    // its text is converted rather than the shape the value happens to have.
+    let mut columns: Vec<rows::Column> = Vec::new();
     let mut collected: Vec<Value> = Vec::new();
     let mut failure: Option<String> = None;
     loop {
