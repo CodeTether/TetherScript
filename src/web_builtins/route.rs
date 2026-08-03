@@ -1,7 +1,7 @@
 //! Actix-compatible route pattern matching.
 //!
-//! This is the gate that blocks the the reference application port. The dispatcher in
-//! `examples/the reference application/server/router.tether` compares `req.path` with `==`,
+//! This is the gate that blocks porting a real web application. A dispatcher that
+//! compares `req.path` with `==`,
 //! so it cannot express a parameterized route at all — and most real routes are
 //! parameterized: `/customers/{id}`, `/api/short-urls/{code}/analytics`,
 //! `/ab-tests/{id}/variants/{variant_id}`.

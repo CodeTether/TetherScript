@@ -1,6 +1,6 @@
 //! JWT built-ins for HS256.
 //!
-//! Provides the token half of the the reference application auth port: the middleware in
+//! Provides the token half of an auth port: the middleware in
 //! `src/middleware/jwt_auth.rs` extracts a `Bearer` token and reads `sub`,
 //! `username`, `email`, `exp`, `iat`, `iss`, and `roles` from its claims. Only
 //! the legacy HS256 shared-secret path is implemented here; the Keycloak JWKS

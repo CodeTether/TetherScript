@@ -116,6 +116,7 @@ mod rows;
 mod rows_civil;
 mod rows_infer;
 mod rows_time;
+mod rows_time_parts;
 mod rows_typed;
 mod sasl;
 mod scram;
@@ -143,3 +144,9 @@ mod scram_tests;
 
 #[cfg(test)]
 mod rows_typed_tests;
+
+#[cfg(test)]
+mod rows_temporal_tests;
+
+#[cfg(test)]
+mod rows_date_tests;

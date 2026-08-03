@@ -2,7 +2,7 @@
 //!
 //! These run real `.tether` programs, because the built-ins are only reachable
 //! through the interpreter: the matcher is a private submodule, and the script
-//! surface is what the the reference application dispatcher actually consumes.
+//! surface is what a real dispatcher actually consumes.
 
 use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};

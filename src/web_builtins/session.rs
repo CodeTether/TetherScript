@@ -1,6 +1,6 @@
 //! Signed session-cookie payload built-ins.
 //!
-//! This ports the cookie half of the reference application's Actix session middleware. The
+//! This ports the cookie half of an Actix session middleware. The
 //! reference keeps session state in Redis and uses a **signed**, not encrypted,
 //! cookie so a Node service can read the same session id. There is no Redis
 //! client in this group, so these built-ins only mint and verify tamper-proof

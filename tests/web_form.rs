@@ -2,7 +2,7 @@
 //!
 //! These run real `.tether` programs, because the built-ins are only reachable
 //! through the interpreter: the codec is a private submodule, so a unit test
-//! could not see it, and the script surface is what the the reference application port
+//! could not see it, and the script surface is what a real application
 //! actually consumes.
 
 use std::process::Command;

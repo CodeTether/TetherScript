@@ -1,6 +1,6 @@
 //! UUID built-ins: `uuid_v4`, `uuid_parse`, and `uuid_is_valid`.
 //!
-//! The the reference application port needs UUID primary keys and request/correlation IDs.
+//! A real web application needs UUID primary keys and request/correlation IDs.
 //! Entropy is drawn the way [`crate::postgres`] does for SCRAM nonces — a fixed
 //! read from `/dev/urandom`, falling back to time and PID — so the core build
 //! stays dependency-free.

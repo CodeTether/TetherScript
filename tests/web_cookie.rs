@@ -2,7 +2,7 @@
 //!
 //! These run real `.tether` programs, because the built-ins are only reachable
 //! through the interpreter: the parser and serializer are private submodules, so a
-//! unit test could not see them, and the script surface is what the the reference application
+//! unit test could not see them, and the script surface is what a real application
 //! session port actually consumes.
 
 use std::process::Command;
@@ -99,7 +99,7 @@ fn cookie_serialize_emits_a_bare_pair_by_default() {
     assert_eq!(stdout_of(src), "id=a1");
 }
 
-/// The attribute set and order the the reference application session middleware relies on.
+/// The attribute set and order an Actix session middleware relies on.
 #[test]
 fn cookie_serialize_emits_every_attribute() {
     let src = "fn main() {\n    \

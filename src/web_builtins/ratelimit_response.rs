@@ -1,6 +1,6 @@
 //! `Retry-After` and the 429 response map.
 //!
-//! The response map matches `examples/the reference application/server/response.tether`
+//! The response map matches the shape a handler builds
 //! exactly — `status`, `headers`, `body` — because that is the shape `http_serve`
 //! already consumes.
 

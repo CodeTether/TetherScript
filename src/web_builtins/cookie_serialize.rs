@@ -1,6 +1,6 @@
 //! `Set-Cookie` header construction.
 //!
-//! Attribute order follows the reference Actix behaviour in the reference application:
+//! Attribute order follows the reference Actix behaviour:
 //! `Path`, `Domain`, `Max-Age`, `Expires`, then the flags. Every attribute value
 //! passes through [`super::cookie_guard::reject_injection`] before it is appended,
 //! so an attribute can never introduce a second cookie or header.

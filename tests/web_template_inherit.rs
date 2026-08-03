@@ -1,7 +1,7 @@
 //! Template inheritance coverage for `template_render_inherited`.
 //!
 //! Inheritance is the construct that blocked every reference view: 200 `extends`
-//! and 496 `block` uses across the reference application's 159 Tera templates. Braces are
+//! and 496 `block` uses across a real application's 159 Tera templates. Braces are
 //! escaped (`\{`) because `{` opens a string interpolation hole in tetherscript.
 
 use std::process::Command;

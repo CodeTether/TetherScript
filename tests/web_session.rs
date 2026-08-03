@@ -5,7 +5,7 @@
 //! real payload or tag, which is how an attacker would produce them.
 //!
 //! These drive the built-ins through the interpreter, because that is the surface
-//! the the reference application session port actually consumes.
+//! a real session port actually consumes.
 
 use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};

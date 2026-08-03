@@ -1,7 +1,7 @@
 //! Dynamic page resolution and cache-key derivation.
 //!
 //! The reference application registers a dynamic-page middleware
-//! (`.tmp/the reference application/src/middleware/dynamic_page.rs`) that turns a request
+//! (a `dynamic_page` middleware) that turns a request
 //! path into a database-backed page — a CMS-style slug lookup — and then caches
 //! the render. The port has no equivalent, so every such route would hand-roll
 //! slug parsing and cache keys. That is dangerous work to duplicate: a cache key

@@ -4,7 +4,7 @@
 //! conditional request, so every reload transfers the whole body. These built-ins
 //! supply the two pieces that were missing: an entity tag derived from the body,
 //! and a `Cache-Control` value with the directives the reference middleware in
-//! the reference application actually emits.
+//! a real application actually emits.
 //!
 //! # Built-ins
 //!

@@ -1,6 +1,6 @@
 //! `Cache-Control` header construction.
 //!
-//! Directive order follows the reference middleware in the reference application
+//! Directive order follows the reference middleware
 //! (`src/middleware/cache_headers.rs`), which emits values such as
 //! `public, max-age=31536000, immutable` and `private, no-cache, must-revalidate`.
 //! Order is fixed rather than map-iteration dependent, so output is stable.

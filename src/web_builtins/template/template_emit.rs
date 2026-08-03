@@ -55,12 +55,11 @@ pub(super) fn emit(body: &str, context: &Value, state: &Render<'_>) -> Result<St
 pub(super) fn value_of(body: &str, context: &Value) -> Result<Value, String> {
     let (key, filters) = split(body)?;
     let resolved = lookup_value(context, key).ok();
-    if filters.is_empty() {
-        return Ok(resolved.unwrap_or(Value::Nil));
+    match filters.is_empty() {
+        true => Ok(resolved.unwrap_or(Value::Nil)),
+        // Escaping is irrelevant here: nothing is emitted, so `safe` is accepted and ignored.
+        false => apply(resolved, &filters, false).map(|(value, _)| value),
     }
-    // Escaping is irrelevant here: nothing is emitted, so `safe` is accepted and ignored.
-    let (value, _) = apply(resolved, &filters, false)?;
-    Ok(value)
 }
 
 /// Apply `filters` left to right, returning the value and whether to escape it.

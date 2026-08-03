@@ -1,6 +1,6 @@
 //! Signed, expiring CSRF and OAuth-state token built-ins.
 //!
-//! The the reference application QuickBooks flow needs a one-time, short-TTL state value:
+//! A QuickBooks OAuth flow needs a one-time, short-TTL state value:
 //! `controllers/quickbooks/connect.rs` mints one with a 10-minute TTL, and
 //! `callback.rs` rejects the callback when it is invalid or expired. That
 //! implementation stores every state row in Postgres. These tokens are instead

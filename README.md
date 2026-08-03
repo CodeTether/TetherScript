@@ -121,7 +121,7 @@ injection in every attribute, and `log_json` writes to stderr so a log line cann
 corrupt an HTTP body on stdout.
 
 See [`docs/web-builtins.md`](docs/web-builtins.md) for the full surface and its
-limits, and `examples/the reference application_server.tether` for a server built on it.
+limits.
 
 ## Database capability
 

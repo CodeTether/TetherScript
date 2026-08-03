@@ -1,7 +1,7 @@
 //! Cookie built-ins.
 //!
 //! Provides `cookie_parse` for request `Cookie` headers and `cookie_serialize`
-//! for `Set-Cookie` response headers, covering the attributes the the reference application
+//! for `Set-Cookie` response headers, covering the attributes a real application
 //! session middleware relies on: `Path`, `Domain`, `Max-Age`, `Expires`,
 //! `HttpOnly`, `Secure`, and `SameSite`.
 //!

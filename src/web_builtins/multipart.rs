@@ -3,7 +3,7 @@
 //! File uploads are the one request shape the port cannot handle at all: handlers
 //! receive `body` as a raw string (see `src/http_server_request_map.rs`) and
 //! nothing could split it. The reference controllers in
-//! `the reference application/src/controllers/video_upload.rs` and `design_upload.rs` read a
+//! a reference application's video and design upload controllers read a
 //! field name and filename off each part, which is the surface provided here.
 //!
 //! # Script surface

@@ -3,7 +3,7 @@
 //! These run real `.tether` programs, because the built-ins are only reachable
 //! through the interpreter: the table and header parser are private submodules,
 //! so a unit test could not see them, and the script surface is what the
-//! the reference application port actually consumes.
+//! a real application actually consumes.
 
 use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};

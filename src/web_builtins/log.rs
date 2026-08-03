@@ -3,7 +3,7 @@
 //! The port could only call `println`, which produces prose no log collector can
 //! query. These built-ins emit one JSON object per line, which is how the
 //! deployed reference service is actually debugged: its telemetry layer
-//! (`.tmp/the reference application/src/telemetry.rs`) configures `.json()` output for the
+//! (a telemetry module) configures `.json()` output for the
 //! same reason.
 //!
 //! # Everything goes to stderr

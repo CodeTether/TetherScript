@@ -1,6 +1,6 @@
 //! Dependency-free HTML template built-ins.
 //!
-//! the reference application renders every page through Tera, but tetherscript's Tera support sits
+//! A Tera-based application renders every page through Tera, but tetherscript's Tera support sits
 //! behind the optional `tera` feature, so the default zero-dependency build cannot render
 //! a page at all. This group provides a small always-available renderer so the port can
 //! serve HTML without a dependency.

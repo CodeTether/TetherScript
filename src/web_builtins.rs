@@ -1,6 +1,6 @@
 //! Installation of built-ins needed for web-application workloads.
 //!
-//! These are the primitives the the reference application port needs that the core did not
+//! These are the primitives a real web application needs that the core did not
 //! yet provide: HMAC/hex, JWT, cookies, URL-encoded forms, UUIDs, and
 //! server-sent events. Each concern owns one submodule with its own `install`,
 //! so a group can be added or changed without editing a shared registration

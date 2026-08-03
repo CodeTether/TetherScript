@@ -1,7 +1,7 @@
 //! Argument coercion and the `304 Not Modified` response map.
 //!
 //! The response shape matches what `http_serve` already consumes and what
-//! `examples/the reference application/server/response.tether` builds by hand: a map with
+//! a handler builds by hand: a map with
 //! `status`, `headers`, and `body`.
 
 use std::cell::RefCell;

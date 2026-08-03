@@ -1,7 +1,7 @@
 //! Password hashing built-ins: `password_hash`, `password_verify`, and
 //! `password_needs_rehash`.
 //!
-//! The the reference application port needs credential storage, and the tree had no password
+//! A real application needs credential storage, and the tree had no password
 //! hashing primitive at all — only raw digests, which must never be used for
 //! passwords because they are fast by design.
 //!

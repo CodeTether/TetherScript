@@ -65,8 +65,8 @@ let captured = route_match("/customers/\{id\}", "/healthz")?
 remainder including slashes. Path segments are percent-decoded *after*
 segmentation, so an encoded `%2F` can never forge a separator.
 
-See `examples/the reference application/server/router.tether` for a dispatch table built on
-this.
+A dispatcher builds a table of patterns and tries each against `req.path`, so one handler
+serves every id.
 
 ## Templating
 
