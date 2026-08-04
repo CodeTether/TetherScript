@@ -35,6 +35,7 @@ pub(super) fn parse_args(inner: &str, context: &Value, lenient: bool) -> Result<
     Ok(RangeArgs { start, end, step })
 }
 
+/// Resolve `5 - stars_shown` or `average_rating_rounded | default(value=5)`.
 fn resolve_value(expr: &str, context: &Value, lenient: bool) -> Result<i64, String> {
     if let Some((l, r)) = expr.split_once(" - ") {
         return Ok(term(l.trim(), context, lenient)? - term(r.trim(), context, lenient)?);
