@@ -39,6 +39,7 @@ pub(super) fn call(
         "trim" => text_map(&value, |text| text.trim().to_string()),
         // Explicit escaping, for a value already marked `safe` upstream.
         "escape" => text_map(&value, escape),
+        "urlencode" | "url_encode" => text_map(&value, super::template_filter_urlencode::urlencode),
         "html_attribute_encode" => text_map(&value, escape_attr),
         "int" | "float" | "str" => super::template_filter_len::coerce(name, &value),
         "first" | "last" | "round" | "truncate" => {

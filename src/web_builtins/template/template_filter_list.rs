@@ -1,29 +1,19 @@
-//! Collection and rounding filters.
-//!
-//! Split by concern from the string and coercion filters so each file stays within the
-//! line budget.
+//! Collection, rounding, and truncation filters.
+
+use std::rc::Rc;
 
 use crate::value::Value;
 
-/// Apply `first`, `last`, `round`, or `truncate`.
-///
-/// # Errors
-///
-/// Returns an error naming the filter and the value's type when it does not apply.
 pub(super) fn call(name: &str, value: &Value, argument: &str) -> Result<Value, String> {
     match name {
         "first" => end_of(value, true),
         "last" => end_of(value, false),
         "round" => round(value),
-        "truncate" => super::template_filter_text::truncate(value, argument),
+        "truncate" => truncate(value, argument),
         _ => Err(format!("template: unknown filter `{name}`")),
     }
 }
 
-/// First or last element of a list.
-///
-/// An empty list yields `nil` rather than an error: `{{ items | first }}` on an empty list
-/// is a legitimate blank, and a view guards it with `{% if items %}` when it matters.
 fn end_of(value: &Value, first: bool) -> Result<Value, String> {
     let Value::List(items) = value else {
         return Err(format!(
@@ -39,14 +29,30 @@ fn end_of(value: &Value, first: bool) -> Result<Value, String> {
     })
 }
 
-/// Round a float to the nearest integer, leaving ints alone.
 fn round(value: &Value) -> Result<Value, String> {
     match value {
-        Value::Float(number) => Ok(Value::Int(number.round() as i64)),
+        Value::Float(n) => Ok(Value::Int(n.round() as i64)),
         Value::Int(_) => Ok(value.clone()),
         other => Err(format!(
             "template: `round` needs a number, got {}",
             other.type_name()
         )),
     }
+}
+
+fn truncate(value: &Value, argument: &str) -> Result<Value, String> {
+    let Value::Str(text) = value else {
+        return Err(format!(
+            "template: `truncate` needs a str, got {}",
+            value.type_name()
+        ));
+    };
+    let (length, suffix) = super::template_filter_truncate_args::parse(argument)?;
+    let chars: Vec<char> = text.chars().collect();
+    if chars.len() <= length {
+        return Ok(Value::Str(Rc::clone(text)));
+    }
+    let mut out: String = chars[..length].iter().collect();
+    out.push_str(&suffix);
+    Ok(Value::Str(Rc::new(out)))
 }

@@ -1,4 +1,4 @@
-//! Always-available Tera-compatible template renderer.
+//! Tera-compatible template renderer.
 pub(super) mod template_block;
 pub(super) mod template_blocks;
 pub(super) mod template_branch;
@@ -12,15 +12,14 @@ pub(super) mod template_escape;
 pub(super) mod template_extends;
 pub(super) mod template_filter;
 pub(super) mod template_filter_arg;
-pub(super) mod template_filter_civil;
 pub(super) mod template_filter_date;
 pub(super) mod template_filter_fn;
 pub(super) mod template_filter_len;
 pub(super) mod template_filter_list;
 pub(super) mod template_filter_split;
 pub(super) mod template_filter_strftime;
-pub(super) mod template_filter_text;
 pub(super) mod template_filter_truncate_args;
+pub(super) mod template_filter_urlencode;
 pub(super) mod template_ifs;
 pub(super) mod template_include;
 pub(super) mod template_inherit;
@@ -45,6 +44,7 @@ pub(super) mod template_range_args;
 pub(super) mod template_render;
 pub(super) mod template_render_loop;
 pub(super) mod template_scan;
+pub(super) mod template_set_var;
 pub(super) mod template_source;
 pub(super) mod template_subject;
 pub(super) mod template_super;
