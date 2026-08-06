@@ -8,6 +8,11 @@ use crate::value::Env;
 
 use super::runtime_native;
 
+#[path = "adblock/mod.rs"]
+mod adblock;
+#[path = "adblock_builtins.rs"]
+mod adblock_builtins;
+
 pub(super) fn install(env: &Rc<RefCell<Env>>) {
     let static_globals = env.clone();
     let mut bindings = env.borrow_mut();
@@ -32,4 +37,6 @@ pub(super) fn install(env: &Rc<RefCell<Env>>) {
         }),
         false,
     );
+    drop(bindings);
+    adblock_builtins::install(env);
 }

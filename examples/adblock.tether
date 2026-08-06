@@ -1,0 +1,22 @@
+// Ad-blocking built-ins: parse uBlock-style filter lists, match network
+// requests, and extract cosmetic CSS selectors for element hiding.
+
+fn main() {
+    let list = "||ads.example.com^\n||tracker.net^$third-party\n! comment\nexample.com##.ad-banner\n@@||allowed.com^\n"
+
+    let rules = adblock_parse(list)
+    println("parsed", adblock_rule_count(rules), "rules")
+
+    // Network blocking
+    assert(adblock_should_block(rules, "https://ads.example.com/banner.gif", "site.com"), "should block ads domain")
+    assert(!adblock_should_block(rules, "https://allowed.com/img.png", "site.com"), "exception should allow")
+    assert(adblock_should_block(rules, "https://tracker.net/pixel.gif", "site.com"), "third-party block")
+    assert(!adblock_should_block(rules, "https://site.com/logo.png", "site.com"), "same-origin allowed")
+
+    // Cosmetic filters
+    let selectors = adblock_cosmetic_selectors(rules, "example.com")
+    assert(selectors.contains(".ad-banner"), "cosmetic selector found")
+    assert(selectors.len() == 1, "exactly one selector")
+
+    println("all ad-block assertions passed")
+}
