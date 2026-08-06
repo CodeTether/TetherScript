@@ -37,6 +37,12 @@ imports are gone and the private module's dangling `pub use` re-exports removed.
 stateless `adblock_*` built-ins, just not wired to a caller — and it gained the
 7 unit tests it never had.
 
+**`cargo doc -D warnings` passes again.** The gate was failing with 33 intra-doc
+link errors, also red at alpha.28: links to private items, unresolved paths for
+`LineCol`/`SourceMap`/`Env`/`ProtocolError`, redundant explicit targets, and an
+ambiguous `crate::rsa::verify` (both a module and a re-exported function). Fixed
+in documentation only — no executable line changed.
+
 ## Known-incomplete, now documented rather than hidden
 
 - `Rule::resource_types` is populated by the parser but never read during
@@ -47,22 +53,22 @@ stateless `adblock_*` built-ins, just not wired to a caller — and it gained th
 
 ## Validation
 
-Local, on the tagged commit. CI did not trigger a run for these pushes, so
-these are local results, not CI-observed:
+All ten gates in `.github/workflows/ci.yml`, run locally on the tagged commit.
+CI did not trigger a run for these pushes, so these are local results, not
+CI-observed:
 
-- `cargo test --release --no-fail-fast` — **4183 passed, 0 failed**
-- `cargo test --doc` — 671 passed, 0 failed, 42 ignored
-- `cargo clippy -- -D warnings` — clean (also with `--all-targets`)
-- `cargo fmt --check` — clean
-- `./check_file_limits.sh` — passes
-- `cargo test --test browser_wpt_like` / `_json` / `_upstream` — 40 / 1 / 3 passed
-- `cargo package` — packaged and verified, 3848 files
-
-`RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` still fails with **33 errors**
-(broken intra-doc links in `bigint`, `bytecode`, `diagnostic_locate`, `jwks`,
-and others). Verified identical at the `v0.1.0-alpha.28` tag, so this is
-pre-existing and untouched here, not a regression. It is the one CI gate this
-release does not clear.
+| Gate | Result |
+|---|---|
+| `./check_file_limits.sh` | pass |
+| `cargo fmt --check` | pass |
+| `cargo clippy -- -D warnings` | pass |
+| `cargo test --test browser_wpt_like` | 40 passed |
+| `cargo test --test browser_wpt_json` | 1 passed |
+| `cargo test --test browser_wpt_upstream` | 3 passed |
+| `cargo test` | **4183 passed, 0 failed** |
+| `cargo test --doc` | 671 passed, 0 failed |
+| `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` | pass (was 33 errors) |
+| `cargo package` | packaged and verified |
 
 No live deployment or platform upload is part of this release.
 
