@@ -29,28 +29,47 @@ the untaken branch.
 `use tetherscript::adblock::Engine` could never resolve and `cargo test --doc`
 failed to compile at alpha.28. Marked `ignore`.
 
-The latter two were red at the `v0.1.0-alpha.28` tag; both are green now.
+**`cargo clippy -- -D warnings` passes again.** alpha.28 shipped 9 warnings that
+fail the gate CI runs: four unused imports, an unused `Value` import in the
+template filter, and dead-code findings across the ad-block engine. The unused
+imports are gone and the private module's dangling `pub use` re-exports removed.
+`Engine` was kept rather than deleted — it is a real stateful layer over the
+stateless `adblock_*` built-ins, just not wired to a caller — and it gained the
+7 unit tests it never had.
+
+## Known-incomplete, now documented rather than hidden
+
+- `Rule::resource_types` is populated by the parser but never read during
+  matching, so `$type` modifiers silently widen to "any resource type".
+  Enforcing them needs a request-type argument threaded through
+  `adblock_should_block`, which is a built-in signature change.
+- `Engine` is not constructed by the built-in installation path.
 
 ## Validation
 
-All local, on this commit:
+Local, on the tagged commit. CI did not trigger a run for these pushes, so
+these are local results, not CI-observed:
 
-- `cargo test --release --no-fail-fast` — **4169 passed, 0 failed**
+- `cargo test --release --no-fail-fast` — **4183 passed, 0 failed**
 - `cargo test --doc` — 671 passed, 0 failed, 42 ignored
+- `cargo clippy -- -D warnings` — clean (also with `--all-targets`)
 - `cargo fmt --check` — clean
-- `cargo clippy --all-targets` — no warnings in changed files
-- `./check_file_limits.sh` — passes (also clears two files that were over the
-  limit at alpha.28)
-- `examples/borrow_not_bitwise.tether` added, plus 12 tests across
-  `src/parser/infix_tests.rs` and `tests/parser_amp_not_bitwise.rs`
+- `./check_file_limits.sh` — passes
+- `cargo test --test browser_wpt_like` / `_json` / `_upstream` — 40 / 1 / 3 passed
+- `cargo package` — packaged and verified, 3848 files
+
+`RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` still fails with **33 errors**
+(broken intra-doc links in `bigint`, `bytecode`, `diagnostic_locate`, `jwks`,
+and others). Verified identical at the `v0.1.0-alpha.28` tag, so this is
+pre-existing and untouched here, not a regression. It is the one CI gate this
+release does not clear.
 
 No live deployment or platform upload is part of this release.
 
-## Known gaps, unchanged
+## Still open
 
 - **TCP resources bypass the capability model.** `resource.tcp_listen` binds a
-  socket with no grant under the default `--access-mode restricted`. This is the
-  same class of ambient-access gap AGENTS.md documents for `fs_*` and
-  `process_*`. Deliberately left for a separate change, since closing it is a
-  capability-model decision.
-- No UDP primitives, no bitwise operators, no `--grant-tcp`/`--grant-udp`.
+  socket with no grant under the default `--access-mode restricted`, the same
+  class of ambient-access gap AGENTS.md documents for `fs_*` and `process_*`.
+  Left deliberately: closing it is a capability-model decision.
+- No UDP primitives, no bitwise operators, no `--grant-tcp` / `--grant-udp`.
