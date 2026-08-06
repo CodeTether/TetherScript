@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.0-alpha.28] - 2026-08-06
+
+### Added
+
+- Added ad-blocking builtins: `adblock_parse`, `adblock_should_block`, `adblock_cosmetic_selectors`, and `adblock_rule_count` for uBlock-style filter list parsing, network request matching, and cosmetic element hiding.
+
 ## [0.1.0-alpha.27] - 2026-08-06
 
 ### Added
