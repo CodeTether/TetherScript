@@ -11,11 +11,13 @@ pub(super) fn evaluate(context: &Value, expr: &str) -> Result<bool, String> {
     for op in OPS {
         if let Some((l, r)) = expr.split_once(op) {
             let (lv, rv) = (operand(context, l.trim()), operand(context, r.trim()));
-            return Ok(match op {
-                "==" => equal(&lv, &rv),
-                "!=" => !equal(&lv, &rv),
-                _ => ordered(&lv, op, &rv).unwrap_or(false),
-            });
+            return match op {
+                "==" => Ok(equal(&lv, &rv)),
+                "!=" => Ok(!equal(&lv, &rv)),
+                // Propagate: `ordered` names the offending types, and swallowing
+                // that into `false` silently takes the untaken branch instead.
+                _ => ordered(&lv, op, &rv),
+            };
         }
     }
     Ok(truthy(&operand(context, expr)))
