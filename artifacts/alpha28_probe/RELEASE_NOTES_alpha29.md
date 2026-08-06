@@ -51,26 +51,40 @@ in documentation only — no executable line changed.
   `adblock_should_block`, which is a built-in signature change.
 - `Engine` is not constructed by the built-in installation path.
 
+## Install
+
+```
+cargo add tetherscript@0.1.0-alpha.29
+```
+
+Published to crates.io and verified installable from a clean external project.
+
 ## Validation
 
-All ten gates in `.github/workflows/ci.yml`, run locally on the tagged commit.
-CI did not trigger a run for these pushes, so these are local results, not
-CI-observed:
+All ten gates in `.github/workflows/ci.yml`, **observed green on GitHub Actions**:
+
+https://github.com/CodeTether/TetherScript/actions/runs/31129261238
 
 | Gate | Result |
 |---|---|
 | `./check_file_limits.sh` | pass |
 | `cargo fmt --check` | pass |
 | `cargo clippy -- -D warnings` | pass |
-| `cargo test --test browser_wpt_like` | 40 passed |
-| `cargo test --test browser_wpt_json` | 1 passed |
-| `cargo test --test browser_wpt_upstream` | 3 passed |
-| `cargo test` | **4183 passed, 0 failed** |
-| `cargo test --doc` | 671 passed, 0 failed |
+| `cargo test --test browser_wpt_like` | pass |
+| `cargo test --test browser_wpt_json` | pass |
+| `cargo test --test browser_wpt_upstream` | pass |
+| `cargo test` | pass (4183 passed, 0 failed locally) |
+| `cargo test --doc` | pass (671 passed locally) |
 | `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` | pass (was 33 errors) |
-| `cargo package` | packaged and verified |
+| `cargo package` | pass |
 
-No live deployment or platform upload is part of this release.
+Registry evidence: `crates.io` reports `max_version` and `default_version` as
+`0.1.0-alpha.29`, not yanked, crate size 2,474,531 bytes. A clean
+`cargo add tetherscript@0.1.0-alpha.29` in an empty project downloaded and
+compiled it.
+
+`ci.yml` also gained `workflow_dispatch`, because pushes made with a bot token
+did not always spawn an automatic run.
 
 ## Still open
 
