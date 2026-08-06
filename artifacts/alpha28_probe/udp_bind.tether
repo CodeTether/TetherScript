@@ -1,0 +1,2 @@
+let s = udp_bind("127.0.0.1", 0);
+println(s);

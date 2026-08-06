@@ -13,7 +13,12 @@ mod async_control;
 mod async_expr;
 #[cfg(test)]
 mod async_tests;
+mod infix;
+#[cfg(test)]
+mod infix_tests;
 mod program;
+
+use infix::{infix_binop, infix_error_message, infix_prec};
 
 pub struct Parser {
     tokens: Vec<Spanned>,
@@ -386,22 +391,8 @@ impl Parser {
         }
 
         // Binary operators
-        let op = match tok {
-            Token::Plus => BinOp::Add,
-            Token::Minus => BinOp::Sub,
-            Token::Star => BinOp::Mul,
-            Token::Slash => BinOp::Div,
-            Token::Percent => BinOp::Mod,
-            Token::Eq => BinOp::Eq,
-            Token::NotEq => BinOp::NotEq,
-            Token::Lt => BinOp::Lt,
-            Token::Gt => BinOp::Gt,
-            Token::LtEq => BinOp::LtEq,
-            Token::GtEq => BinOp::GtEq,
-            Token::And => BinOp::And,
-            Token::Or => BinOp::Or,
-            Token::Assign => BinOp::Assign,
-            _ => return Err(self.error(format!("unexpected infix token: {:?}", tok))),
+        let Some(op) = infix_binop(&tok) else {
+            return Err(self.error(infix_error_message(&tok)));
         };
         self.bump();
 
@@ -581,19 +572,5 @@ impl Prec {
             Prec::Unary => Prec::Call,
             Prec::Call => Prec::Call,
         }
-    }
-}
-
-fn infix_prec(t: &Token) -> Prec {
-    match t {
-        Token::Assign => Prec::Assign,
-        Token::Or => Prec::Or,
-        Token::And => Prec::And,
-        Token::Eq | Token::NotEq => Prec::Equality,
-        Token::Lt | Token::Gt | Token::LtEq | Token::GtEq => Prec::Compare,
-        Token::Plus | Token::Minus => Prec::Term,
-        Token::Star | Token::Slash | Token::Percent => Prec::Factor,
-        Token::LParen | Token::LBracket | Token::Dot | Token::Question => Prec::Call,
-        _ => Prec::None,
     }
 }

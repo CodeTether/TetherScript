@@ -1,0 +1,36 @@
+// `&` in tetherscript is the borrow sigil, never bitwise AND.
+//
+// Before this diagnostic existed, `12 & 10` parsed as two separate statements —
+// `12`, then a discarded borrow `&10` — so the program printed 12 instead of the
+// 8 a C or Python programmer expects. A wrong answer with a zero exit code is
+// worse than an error, so the parser now rejects `&` in infix position.
+//
+// Uncommenting the next line fails with a named parse error:
+//
+//     let wrong = 12 & 10;
+//
+// tetherscript has no bitwise operators at all; `|`, `^`, `<<` and `>>` are
+// likewise rejected by the lexer or parser.
+
+// `&&` is logical and.
+let both = true && false;
+println("true && false = {both}");
+
+// `&` as a *prefix* borrows a value without moving it.
+let xs = [1, 2, 3];
+let borrowed = &xs;
+println("borrowed len = {borrowed.len()}");
+
+// The owner is still usable, because a borrow does not consume it.
+println("xs is still {xs}");
+
+// `&mut` borrows mutably.
+let mut total = 0;
+let slot = &mut total;
+println("mutable borrow of total = {slot}");
+
+// Bit twiddling is spelled with arithmetic until bitwise operators land.
+// Extracting the low bit of 13 (binary 1101) with `% 2` instead of `& 1`:
+let flags = 13;
+let low_bit = flags % 2;
+println("low bit of {flags} = {low_bit}");

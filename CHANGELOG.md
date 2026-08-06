@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Rejected `&` in infix position with a named parse error instead of silently
+  splitting the statement. `let a = 12 & 10;` previously parsed as `let a = 12`
+  followed by a discarded `&10` borrow, so it printed `12` and exited 0 rather
+  than reporting that tetherscript has no bitwise AND. The error now names both
+  alternatives (`&&` for logical and, prefix `&value` to borrow).
+
 ## [0.1.0-alpha.28] - 2026-08-06
 
 ### Added

@@ -1,0 +1,5 @@
+let l = resource.tcp_listen("127.0.0.1", 0);
+match l {
+    Ok(listener) => println("bound port: {listener.port()}"),
+    Err(e) => println("error: {e}"),
+}

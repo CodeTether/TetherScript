@@ -1,0 +1,8 @@
+let b = b"hi";
+println(b.len());
+let c = bytes("abc");
+println(c.hex());
+let d = bytes([1, 2, 255]);
+d.push(7);
+println(d.len());
+println(d.hex());
