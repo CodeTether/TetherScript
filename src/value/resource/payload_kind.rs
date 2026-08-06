@@ -9,6 +9,7 @@ impl Payload {
             Self::ChildProcess(_) => ResourceKind::ChildProcess,
             Self::TcpStream(_) => ResourceKind::TcpStream,
             Self::TcpListener(_) => ResourceKind::TcpListener,
+            Self::UdpSocket(_) => ResourceKind::UdpSocket,
             Self::RequestBody(_) => ResourceKind::RequestBody,
             Self::ResponseWriter(_) => ResourceKind::ResponseWriter,
             Self::Task(_) => ResourceKind::Task,

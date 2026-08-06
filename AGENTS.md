@@ -32,8 +32,14 @@ third-party crate sits behind an opt-in feature (`actix-web`, `openssl-tls`,
 - Lexer, Pratt parser, AST, bytecode compiler, bytecode VM, tree-walking
   interpreter, and an experimental SSA-like Tether IR with a verifier
   (`inspect --ir`).
-- Dynamic values: Int, Float, Bool, Str, Nil, List, Map, Fn, Native, `Result`.
+- Dynamic values: Int, Float, Bool, Str, Bytes, Nil, List, Map, Fn, Native,
+  `Result`.
 - Variables, lexical scopes, closures, recursion, first-class functions.
+- Operators: arithmetic, comparison, short-circuit logic, and bitwise
+  (`& | ^ ~ << >>`) with Rust precedence. Infix `&` is bitwise AND; prefix `&` is
+  a borrow. Bitwise operands must be integers, and shift counts must be `< 64`.
+- Sockets: owned move-only TCP and UDP resources behind `--grant-tcp` /
+  `--grant-udp`, denied by default.
 - Control flow: `if`/`else`, `while`, `for x in iterable`, expression-oriented
   blocks.
 - Ownership: explicit `move`, use-after-move errors, and a **static** ownership
@@ -49,9 +55,10 @@ third-party crate sits behind an opt-in feature (`actix-web`, `openssl-tls`,
 - Standard tools as built-ins: `json_*`, `http_*`/`https_serve`, `fs_*`,
   `process_*`, `path_*`, `env_get`, `time_now_ms`, `sha256_hex`, `base64_*`,
   `url_parse`, `smtp_send`, `tui_*`, `stdio_*`/`jsonrpc_*`.
-- Capability-based security: filesystem, network, provider, and RPC access must
-  be granted explicitly (`--grant-fs`, `--grant-http`, `--grant-provider`,
-  `--grant-rpc`, `--access-mode full`).
+- Capability-based security: filesystem, network, socket, provider, and RPC
+  access must be granted explicitly (`--grant-fs`, `--grant-http`,
+  `--grant-tcp`, `--grant-udp`, `--grant-provider`, `--grant-rpc`,
+  `--access-mode full`).
 - HTTP: blocking client helpers, a dynamic-handler HTTP/1.1 server
   (`http_serve`), HTTPS (`https_serve`), and a native cached static-file server.
 - Optional Tera-compatible rendering via `tera_render` (`--features tera`).
@@ -102,12 +109,13 @@ server as feature-complete.
 - Full Test262 / Web Platform Tests conformance and full browser parity. The
   JS/browser track is a deliberate in-tree subset, not a wrapped engine.
 - Capability audit logs and richer resource budgets.
-- Moving ambient host tools behind explicit capabilities. This is a real gap, not
-  a nicety: the `fs_*` and `process_*` builtins call `std` directly and ignore
-  capability grants, so `fs_read("/etc/hostname")` succeeds with no `--grant-fs`.
-  The `fs` capability object enforces correctly and is undefined without a grant,
-  so scripts should prefer `fs.read` over `fs_read`. Note that `tetherscript
-  --help` currently overstates the guarantee.
+- Moving the remaining ambient host tools behind explicit capabilities. This is a
+  real gap, not a nicety: the `fs_*` and `process_*` builtins call `std` directly
+  and ignore capability grants, so `fs_read("/etc/hostname")` succeeds with no
+  `--grant-fs`. The `fs` capability object enforces correctly and is undefined
+  without a grant, so scripts should prefer `fs.read` over `fs_read`. Sockets are
+  no longer part of this gap: TCP and UDP are denied by default and require
+  `--grant-tcp` / `--grant-udp`.
 - Full AST-to-Tether-IR lowering (control flow, closures, mutable slots,
   ownership ops), optimization passes, machine IR, instruction selection,
   register allocation, native object emission, debug info.
@@ -132,6 +140,7 @@ src/
   modules/       File-relative import graph loading and namespace lowering
   package/       Local manifest discovery, validation, scaffolding
   capability.rs  Capability trait/object model
+  socket_cap.rs  TCP/UDP socket grants, scoping, and deny-by-default checks
   http*.rs       HTTP built-ins, client, and dynamic-handler server
   http_static/   Native cached static-file HTTP server
   https_server.rs Optional TLS server (feature: openssl-tls)

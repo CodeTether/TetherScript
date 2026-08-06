@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use super::{
     channel, file, payload::Payload, request_body, response_writer, task, tcp_listener, tcp_stream,
-    timer, OwnedResource,
+    timer, udp_socket, OwnedResource,
 };
 
 impl OwnedResource {
@@ -61,6 +61,23 @@ impl OwnedResource {
     /// ```
     pub fn tcp_listener(host: &str, port: u16) -> Result<Self, String> {
         tcp_listener::Handle::bind(host, port).map(|handle| Self::new(Payload::TcpListener(handle)))
+    }
+
+    /// Bind an owned nonblocking UDP socket.
+    ///
+    /// # Errors
+    ///
+    /// Returns a host-and-port-qualified bind or configuration error.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tetherscript::value::resource::OwnedResource;
+    /// let socket = OwnedResource::udp_socket("127.0.0.1", 0)?;
+    /// # Ok::<(), String>(())
+    /// ```
+    pub fn udp_socket(host: &str, port: u16) -> Result<Self, String> {
+        udp_socket::Handle::bind(host, port).map(|handle| Self::new(Payload::UdpSocket(handle)))
     }
 
     /// Create a bounded request body from owned bytes.

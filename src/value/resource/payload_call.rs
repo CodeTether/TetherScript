@@ -18,6 +18,7 @@ impl Payload {
             Self::ChildProcess(handle) => handle.call(name, args, deadline),
             Self::TcpStream(handle) => handle.call(name, args),
             Self::TcpListener(handle) => handle.call(name, args),
+            Self::UdpSocket(handle) => handle.call(name, args),
             Self::RequestBody(handle) => handle.call(name, args),
             Self::ResponseWriter(handle) => handle.call(name, args),
             Self::Task(handle) => handle.call(name, args),

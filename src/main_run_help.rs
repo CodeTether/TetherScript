@@ -29,6 +29,8 @@ const OPTIONS: &[&str] = &[
     "--grant-provider-key <k> API key for the provider",
     "--grant-provider-vault <id> Load provider grant from Vault KV v2",
     "--grant-rpc <url>       Grant JSON-RPC capability (http://host:port)",
+    "--grant-tcp <host[:port]> Grant TCP socket access; repeatable, '*' for any",
+    "--grant-udp <host[:port]> Grant UDP socket access; repeatable, '*' for any",
     "-h, --help              Print this help message",
 ];
 
@@ -41,5 +43,7 @@ const EXAMPLES: &[&str] = &[
     "tetherscript run --grant-provider http://localhost:11434 chat.tether",
     "tetherscript run --grant-provider-vault openai chat.tether",
     "tetherscript run --grant-rpc http://127.0.0.1:36627 agent.tether",
+    "tetherscript run --grant-tcp 127.0.0.1:8080 server.tether",
+    "tetherscript run --grant-udp '*' dns_client.tether",
     "tetherscript run examples/cli_args.tether -- --name Riley",
 ];

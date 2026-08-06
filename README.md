@@ -466,6 +466,51 @@ fn main() {
 }
 ```
 
+## Operators
+
+Arithmetic (`+ - * / %`), comparison (`== != < > <= >=`), short-circuit logic
+(`&& || !`), and the full bitwise set (`& | ^ ~ << >>`) with Rust's precedence:
+`|` binds loosest, then `^`, then `&`, then the shifts, all tighter than a
+comparison.
+
+`&` means two different things, and position alone disambiguates them:
+
+```tether
+let borrowed = &xs        // prefix: borrow
+let masked   = flags & 3  // infix:  bitwise AND
+```
+
+Bitwise operators take integers only. `bool & bool` is rejected rather than
+treated as a non-short-circuiting `&&`, because that spelling is almost always a
+mistyped `&&`. `>>` is arithmetic and preserves the sign bit. A shift count of 64
+or more is a named error rather than a silent mask or a panic.
+
+See [`examples/bitwise.tether`](examples/bitwise.tether).
+
+## Sockets
+
+TCP and UDP are owned, move-only resources behind explicit capability grants:
+
+```bash
+tetherscript run --grant-tcp 127.0.0.1:8080 server.tether
+tetherscript run --grant-udp '*' dns_client.tether
+```
+
+```tether
+let socket = resource.udp_bind("127.0.0.1", 0)?
+socket.send_to("ping", "127.0.0.1", peer_port)?
+let datagram = socket.recv_from(1024)?   // { bytes, from }
+```
+
+A grant is a repeatable list of `host`, `host:port`, or `*` patterns. TCP and UDP
+are granted separately: a UDP grant does not authorize TCP. Sockets are **denied
+by default** — with no grant, `resource.tcp_listen`, `resource.tcp_connect`, and
+`resource.udp_bind` fail with a message naming the flag that would allow them.
+`--access-mode full` grants both. UDP sends re-check the destination, so a socket
+bound under a narrow grant cannot be reused to reach an address outside it.
+
+See [`examples/udp_echo.tether`](examples/udp_echo.tether).
+
 ## HTTP and HTTPS
 
 tetherscript ships with blocking HTTP/1.1 clients and servers. Plain listeners
@@ -673,13 +718,13 @@ their source files.
   for agents, with conformance tracked explicitly rather than delegated to an
   external browser engine.
 - Capability audit logs and richer resource budgets.
-- Moving ambient host tools behind explicit capabilities. The `fs_*` and
-  `process_*` builtins call the host directly and do **not** consult capability
-  grants, so `fs_read` succeeds without `--grant-fs`. The capability objects do
-  enforce — `fs` is undefined unless granted, and rejects absolute paths and `..`
-  escapes — so prefer `fs.read(..)` over `fs_read(..)` when a script must be
-  sandboxed. Until this is closed, the capability guarantee applies to the
-  capability objects, not to the ambient builtins.
+- Moving the remaining ambient host tools behind explicit capabilities. The
+  `fs_*` and `process_*` builtins call the host directly and do **not** consult
+  capability grants, so `fs_read` succeeds without `--grant-fs`. The capability
+  objects do enforce — `fs` is undefined unless granted, and rejects absolute
+  paths and `..` escapes — so prefer `fs.read(..)` over `fs_read(..)` when a
+  script must be sandboxed. Sockets are no longer in this category: TCP and UDP
+  require `--grant-tcp` / `--grant-udp` and are denied by default.
 - Async scheduler.
 - Tether IR lowering for control flow, closures, mutable slots, and all ownership
   operations.

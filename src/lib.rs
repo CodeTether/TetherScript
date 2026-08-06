@@ -53,6 +53,7 @@ pub mod rpc_cap;
 pub mod rsa;
 pub mod scheduler;
 pub mod smtp;
+pub mod socket_cap;
 pub mod system;
 mod template;
 pub mod tls;

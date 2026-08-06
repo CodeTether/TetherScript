@@ -75,6 +75,7 @@ mod rpc_cap;
 mod run_reload;
 mod scheduler;
 mod smtp;
+mod socket_cap;
 mod system;
 mod template;
 mod tls;
@@ -189,6 +190,8 @@ fn cmd_run(args: &[String]) {
     let mut browser_grant: Option<String> = None;
     let mut browser_origins: Vec<String> = Vec::new();
     let mut browser_scopes: Vec<String> = Vec::new();
+    let mut tcp_grants: Vec<String> = Vec::new();
+    let mut udp_grants: Vec<String> = Vec::new();
     let mut script_args: Vec<String> = Vec::new();
     let mut path: Option<String> = None;
 
@@ -334,6 +337,24 @@ fn cmd_run(args: &[String]) {
                 }
                 i += 1;
             }
+            "--grant-tcp" => {
+                i += 1;
+                if i >= args.len() {
+                    eprintln!("tetherscript run: --grant-tcp requires a host[:port] or '*'");
+                    process::exit(2);
+                }
+                tcp_grants.push(args[i].clone());
+                i += 1;
+            }
+            "--grant-udp" => {
+                i += 1;
+                if i >= args.len() {
+                    eprintln!("tetherscript run: --grant-udp requires a host[:port] or '*'");
+                    process::exit(2);
+                }
+                udp_grants.push(args[i].clone());
+                i += 1;
+            }
             other => {
                 if other == "--" {
                     i += 1;
@@ -356,6 +377,8 @@ fn cmd_run(args: &[String]) {
     }
 
     let path = main_target::resolve(path.as_deref(), "run");
+
+    main_caps::install_socket_grants(&tcp_grants, &udp_grants, full_access);
 
     run_reload::execute(
         &path,
@@ -574,6 +597,8 @@ fn cmd_run_legacy(args: &[String]) {
     let mut browser_grant: Option<String> = None;
     let mut browser_origins: Vec<String> = Vec::new();
     let mut browser_scopes: Vec<String> = Vec::new();
+    let mut tcp_grants: Vec<String> = Vec::new();
+    let mut udp_grants: Vec<String> = Vec::new();
     let mut path: Option<String> = None;
 
     let mut i = 0;
@@ -682,6 +707,24 @@ fn cmd_run_legacy(args: &[String]) {
                 browser_grant = Some(args[i].clone());
                 i += 1;
             }
+            "--grant-tcp" => {
+                i += 1;
+                if i >= args.len() {
+                    eprintln!("tetherscript: --grant-tcp requires a host[:port] or '*'");
+                    process::exit(2);
+                }
+                tcp_grants.push(args[i].clone());
+                i += 1;
+            }
+            "--grant-udp" => {
+                i += 1;
+                if i >= args.len() {
+                    eprintln!("tetherscript: --grant-udp requires a host[:port] or '*'");
+                    process::exit(2);
+                }
+                udp_grants.push(args[i].clone());
+                i += 1;
+            }
             "--browser-origin" => {
                 i += 1;
                 if i >= args.len() {
@@ -729,6 +772,8 @@ fn cmd_run_legacy(args: &[String]) {
     }
 
     let path = main_target::resolve(path.as_deref(), "run");
+
+    main_caps::install_socket_grants(&tcp_grants, &udp_grants, full_access);
 
     run_reload::execute(
         &path,

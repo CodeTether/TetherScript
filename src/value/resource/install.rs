@@ -18,6 +18,7 @@ pub(crate) fn install(env: &Rc<RefCell<Env>>) {
     native::insert(&mut module, "child_process_bounded", 3, process::child);
     native::insert(&mut module, "tcp_connect", 3, os::tcp_connect);
     native::insert(&mut module, "tcp_listen", 2, os::tcp_listen);
+    native::insert(&mut module, "udp_bind", 2, os::udp_bind);
     native::insert(&mut module, "request_body", 2, memory::request_body);
     native::insert(&mut module, "response_writer", 1, memory::response_writer);
     native::insert(&mut module, "task", 0, memory::task);

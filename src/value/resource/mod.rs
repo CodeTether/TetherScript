@@ -3,7 +3,8 @@
 //! [`OwnedResource`] carries one file, process, socket, HTTP body/writer, task,
 //! timer, or bounded channel behind [`Value::Resource`](crate::value::Value).
 //! Resources are move-only language values with explicit close, cancellation,
-//! deadlines, and pressure-aware nonblocking operations.
+//! deadlines, and pressure-aware nonblocking operations. Socket resources also
+//! require an explicit `--grant-tcp` / `--grant-udp` capability.
 //!
 //! # Usage
 //!
@@ -61,11 +62,10 @@ mod tcp_listener;
 mod tcp_stream;
 mod timer;
 pub(crate) mod transfer;
+mod udp_socket;
 
 #[cfg(test)]
 mod tests;
 
-pub use kind::ResourceKind;
-pub use owned::OwnedResource;
-
 pub(crate) use install::install;
+pub use {kind::ResourceKind, owned::OwnedResource};

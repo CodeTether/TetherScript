@@ -24,6 +24,7 @@ pub(super) fn tcp_connect(values: &[Value]) -> Result<Value, String> {
     Ok(factory::resource(host.and_then(|host| {
         port.and_then(|port| {
             timeout.and_then(|milliseconds| {
+                crate::socket_cap::require_tcp("resource.tcp_connect", &host, port)?;
                 OwnedResource::tcp_stream(&host, port, Duration::from_millis(milliseconds))
             })
         })
@@ -34,6 +35,20 @@ pub(super) fn tcp_listen(values: &[Value]) -> Result<Value, String> {
     let host = args::string(&values[0], "resource.tcp_listen host");
     let port = factory::port(&values[1], "resource.tcp_listen port");
     Ok(factory::resource(host.and_then(|host| {
-        port.and_then(|port| OwnedResource::tcp_listener(&host, port))
+        port.and_then(|port| {
+            crate::socket_cap::require_tcp("resource.tcp_listen", &host, port)?;
+            OwnedResource::tcp_listener(&host, port)
+        })
+    })))
+}
+
+pub(super) fn udp_bind(values: &[Value]) -> Result<Value, String> {
+    let host = args::string(&values[0], "resource.udp_bind host");
+    let port = factory::port(&values[1], "resource.udp_bind port");
+    Ok(factory::resource(host.and_then(|host| {
+        port.and_then(|port| {
+            crate::socket_cap::require("resource.udp_bind", &host, port)?;
+            OwnedResource::udp_socket(&host, port)
+        })
     })))
 }

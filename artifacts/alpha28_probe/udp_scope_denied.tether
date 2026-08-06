@@ -1,0 +1,5 @@
+fn main() {
+    // Granted 127.0.0.1:9999 only; this asks for a different port.
+    let socket = resource.udp_bind("127.0.0.1", 0)
+    println("bind result ok: {socket.is_ok()}")
+}

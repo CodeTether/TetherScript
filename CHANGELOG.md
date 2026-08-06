@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added bitwise operators `&`, `|`, `^`, `~`, `<<`, and `>>` with Rust
+  precedence, on both backends. Infix `&` is bitwise AND while prefix `&` remains
+  a borrow, so position alone disambiguates them. Operands must be integers:
+  `bool & bool` is rejected rather than treated as a non-short-circuiting `&&`,
+  because that spelling is nearly always a mistyped `&&`. `>>` is arithmetic and
+  preserves the sign bit, and a shift count of 64 or more is a named error rather
+  than a silent mask or a debug panic.
+- Added UDP socket primitives as owned move-only resources:
+  `resource.udp_bind(host, port)` with `send_to`, `recv_from`, `local_addr`, and
+  `port`. A received datagram is a `{ bytes, from }` map, since UDP is
+  connectionless and the sender belongs to the payload rather than the socket.
+- Added the `socket` capability with `--grant-tcp` and `--grant-udp`, taking
+  repeatable `host`, `host:port`, or `*` patterns. TCP and UDP are granted
+  separately, and `--access-mode full` grants both.
+
+### Fixed
+
+- Closed an ambient-authority hole: `resource.tcp_listen` and
+  `resource.tcp_connect` previously reached the network with no grant at all, so a
+  script under the default `--access-mode restricted` could bind or dial any
+  address. Sockets are now denied by default and report the flag that would allow
+  them. UDP sends re-check the destination, so a socket bound under a narrow grant
+  cannot be reused to reach an address outside it.
+
 ## [0.1.0-alpha.29] - 2026-08-06
 
 ### Fixed

@@ -1,0 +1,44 @@
+// UDP sockets: bind, send a datagram, receive it back.
+//
+// Requires an explicit grant:
+//   tetherscript run --grant-udp 127.0.0.1 udp_echo.tether
+
+fn main() {
+    let server = resource.udp_bind("127.0.0.1", 0)?
+    let server_port = server.port()?
+    println("server bound on {server_port}")
+
+    let client = resource.udp_bind("127.0.0.1", 0)?
+    let sent = client.send_to("ping", "127.0.0.1", server_port)?
+    println("client sent {sent} bytes")
+
+    // Nonblocking: poll until the datagram lands.
+    let mut received = nil
+    let mut tries = 0
+    while received == nil && tries < 1000 {
+        let attempt = server.recv_from(1024)
+        if attempt.is_ok() {
+            received = attempt.unwrap()
+        }
+        tries = tries + 1
+    }
+
+    println("server got {received.bytes.decode_utf8()}")
+    println("from is present: {received.from != nil}")
+
+    // Echo back to the client.
+    let client_port = client.port()?
+    let echoed = server.send_to("pong", "127.0.0.1", client_port)?
+    println("server echoed {echoed} bytes")
+
+    let mut reply = nil
+    let mut back = 0
+    while reply == nil && back < 1000 {
+        let attempt = client.recv_from(1024)
+        if attempt.is_ok() {
+            reply = attempt.unwrap()
+        }
+        back = back + 1
+    }
+    println("client got {reply.bytes.decode_utf8()}")
+}

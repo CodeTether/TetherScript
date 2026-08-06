@@ -23,6 +23,8 @@ pub enum ResourceKind {
     TcpStream,
     /// Bound nonblocking TCP connection listener.
     TcpListener,
+    /// Owned nonblocking UDP socket.
+    UdpSocket,
     /// Bounded inbound HTTP request bytes.
     RequestBody,
     /// Bounded outbound HTTP response bytes.
@@ -45,6 +47,7 @@ impl ResourceKind {
             Self::ChildProcess => "child_process",
             Self::TcpStream => "tcp_stream",
             Self::TcpListener => "tcp_listener",
+            Self::UdpSocket => "udp_socket",
             Self::RequestBody => "request_body",
             Self::ResponseWriter => "response_writer",
             Self::Task => "task",

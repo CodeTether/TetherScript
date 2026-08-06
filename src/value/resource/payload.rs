@@ -2,7 +2,7 @@
 
 use super::{
     channel, child_process, file, render_surface, request_body, response_writer, task,
-    tcp_listener, tcp_stream, timer,
+    tcp_listener, tcp_stream, timer, udp_socket,
 };
 
 pub(super) enum Payload {
@@ -10,6 +10,7 @@ pub(super) enum Payload {
     ChildProcess(child_process::Handle),
     TcpStream(tcp_stream::Handle),
     TcpListener(tcp_listener::Handle),
+    UdpSocket(udp_socket::Handle),
     RequestBody(request_body::Handle),
     ResponseWriter(response_writer::Handle),
     Task(task::Handle),

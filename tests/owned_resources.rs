@@ -23,12 +23,37 @@ fn assert_example(args: &[&str]) {
 
 #[test]
 fn resource_example_matches_vm_golden_output() {
-    assert_example(&["run", "examples/owned_resources.tether"]);
+    // The example binds a TCP listener, which now requires an explicit grant.
+    assert_example(&[
+        "run",
+        "--grant-tcp",
+        "127.0.0.1",
+        "examples/owned_resources.tether",
+    ]);
 }
 
 #[test]
 fn resource_example_matches_interpreter_golden_output() {
-    assert_example(&["run", "--interp", "examples/owned_resources.tether"]);
+    assert_example(&[
+        "run",
+        "--interp",
+        "--grant-tcp",
+        "127.0.0.1",
+        "examples/owned_resources.tether",
+    ]);
+}
+
+/// The example must fail without the grant, or the gate is not doing anything.
+#[test]
+fn resource_example_is_denied_without_a_tcp_grant() {
+    let output = Command::new(env!("CARGO_BIN_EXE_tetherscript"))
+        .args(["run", "examples/owned_resources.tether"])
+        .output()
+        .expect("example should start");
+
+    assert!(!output.status.success(), "expected a capability denial");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("--grant-tcp"), "got: {stderr}");
 }
 
 #[test]
