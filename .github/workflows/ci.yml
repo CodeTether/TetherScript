@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - main
+  # Allows a maintainer to run the gates on demand, e.g. when a push made with a
+  # bot token does not spawn an automatic run.
+  workflow_dispatch:
 
 jobs:
   test:
