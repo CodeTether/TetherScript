@@ -3,7 +3,7 @@
 use super::rule::{FilterType, Rule};
 use std::collections::HashSet;
 
-use self::lookup::{collect_selectors, domain_ok};
+use self::lookup::collect_selectors;
 
 mod lookup;
 

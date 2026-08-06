@@ -1,9 +1,14 @@
 //! High-level ad-blocking engine combining network and cosmetic rules.
+//!
+//! Scripts reach ad blocking through the stateless `adblock_*` built-ins, which
+//! compile a rule list per call. This engine is the stateful alternative, but
+//! nothing constructs it yet, so `super::engine_tests` is its only consumer.
+#![allow(dead_code, reason = "engine layer is not wired to a caller yet")]
 
 use super::cosmetic::CosmeticMatcher;
 use super::network::NetworkMatcher;
 use super::parse::parse_list;
-use super::rule::{FilterType, Rule};
+use super::rule::FilterType;
 
 /// Combined engine holding compiled network + cosmetic rules and counters.
 pub struct Engine {
@@ -29,7 +34,10 @@ impl Engine {
     /// Compile and add a filter-list text blob.
     pub fn add_list(&mut self, text: &str) {
         let rules = parse_list(text);
-        self.total_rules += rules.iter().filter(active_filter).count();
+        self.total_rules += rules
+            .iter()
+            .filter(|rule| rule.filter_type != FilterType::Comment)
+            .count();
         self.network.add(&rules);
         self.cosmetic.add(&rules);
     }
@@ -53,14 +61,4 @@ impl Engine {
     pub fn rule_count(&self) -> usize {
         self.total_rules
     }
-}
-
-impl Default for Engine {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-fn active_filter(rule: &&Rule) -> bool {
-    rule.filter_type != FilterType::Comment
 }

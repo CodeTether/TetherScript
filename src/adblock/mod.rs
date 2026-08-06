@@ -20,11 +20,13 @@
 mod classify;
 pub(crate) mod cosmetic;
 mod engine;
+#[cfg(test)]
+mod engine_default;
+#[cfg(test)]
+mod engine_tests;
 pub(crate) mod network;
 pub(crate) mod parse;
 mod resource_type;
 pub(crate) mod rule;
 
-pub use engine::Engine;
 pub use resource_type::ResourceType;
-pub use rule::{FilterType, Rule};

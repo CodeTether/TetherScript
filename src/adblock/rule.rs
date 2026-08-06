@@ -18,6 +18,16 @@ pub struct Rule {
     pub domains: Vec<String>,
     pub excluded_domains: Vec<String>,
     pub third_party: Option<bool>,
+    /// Parsed from `$script`, `$image`, and friends.
+    ///
+    /// Populated by the parser but not yet consulted by `network::check_rules`,
+    /// so `$type` modifiers currently widen to "any resource type" at match
+    /// time. Enforcing them needs a request-type argument threaded through
+    /// `adblock_should_block`, which is a built-in signature change.
+    #[allow(
+        dead_code,
+        reason = "parsed but resource-type matching is not wired yet"
+    )]
     pub resource_types: super::ResourceType,
     pub selector: String,
 }

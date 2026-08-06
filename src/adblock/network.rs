@@ -5,7 +5,6 @@ use std::collections::HashSet;
 
 use self::check::check_rules;
 use self::compile::compile_rule;
-use self::helpers::{domain_ok, matches, normalize, third_party_ok};
 use self::host::host_of;
 
 mod check;

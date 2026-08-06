@@ -1,7 +1,5 @@
 //! strftime rendering for the `date` filter, plus civil-date conversion.
 
-use crate::value::Value;
-
 const MONTHS: [(&str, &str); 12] = [
     ("Jan", "January"),
     ("Feb", "February"),
