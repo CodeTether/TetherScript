@@ -7,6 +7,7 @@ pub(crate) fn print_usage() {
     eprintln!("  run [target]         Run a source file or local package");
     eprintln!("  build <file>         Build a standalone launcher");
     eprintln!("  check [target]       Analyze a source file or local package");
+    eprintln!("  new <directory>      Scaffold a new local package");
     eprintln!("  init [directory]     Create a local package");
     eprintln!("  inspect <file>       Inspect source (tokens, AST, IR, bytecode)");
     eprintln!("  render <html>        Render HTML/CSS display list");

@@ -24,3 +24,7 @@ pub(super) fn command(args: &[&str], cwd: Option<&Path>) -> Output {
 pub(super) fn init(root: &Path) -> Output {
     command(&["init", root.to_str().unwrap()], None)
 }
+
+pub(super) fn new_project(root: &Path) -> Output {
+    command(&["new", root.to_str().unwrap()], None)
+}

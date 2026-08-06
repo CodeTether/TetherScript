@@ -52,13 +52,15 @@ to tetherscript bytecode on startup before VM execution.
 Create a package and run it from its root or any nested directory:
 
 ```bash
-tetherscript init hello
+tetherscript new hello
 cd hello
 tetherscript run
 tetherscript check
 ```
 
 Packages use a dependency-free `tetherscript.json` manifest:
+
+`tetherscript init [directory]` remains available for initializing `.` or a named directory.
 
 ```json
 {

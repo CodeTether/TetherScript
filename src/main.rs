@@ -8,6 +8,7 @@
 //! tetherscript run [file-or-package]          run with bytecode VM (default)
 //! tetherscript run --interp [target]          run with tree-walking interpreter
 //! tetherscript check [file-or-package]        resolve, parse, and analyze
+//! tetherscript new <directory>                scaffold a new local package
 //! tetherscript init [directory]               create a local package
 //! tetherscript render <html-file> [css-file] [width] render HTML/CSS files to a text display list
 //! tetherscript raster <html-file> <output.ppm> [css-file] [width] [height] [scale] render to pixels
@@ -138,7 +139,7 @@ fn main() {
         "run" => cmd_run(&args[2..]),
         "build" => cmd_build(&args[2..]),
         "check" => main_check::run(&args[2..]),
-        "init" => main_init::run(&args[2..]),
+        "init" | "new" => main_init::run(first, &args[2..]),
         "render" => cmd_render(&args[2..]),
         "raster" => cmd_raster(&args[2..]),
         "js" => cmd_js(&args[2..]),
