@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.0-alpha.27] - 2026-08-06
+
+### Added
+
+- Added `tetherscript new <directory>` as an explicit project-scaffolding command while preserving `tetherscript init [directory]` compatibility.
+
 ## [0.1.0-alpha.26] - 2026-07-21
 
 ### Added
