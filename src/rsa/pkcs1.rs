@@ -24,7 +24,7 @@
 //!   honoured as a SHA-256 one, and the caller's algorithm choice is decided by
 //!   the attacker. That is algorithm confusion, the RS256/HS256 attack's cousin.
 //!
-//! The digest itself is compared with [`ct_eq`](crate::rsa::ct_eq); see that
+//! The digest itself is compared with [`ct_eq`]; see that
 //! module for why
 //! a short-circuiting compare leaks.
 //!
@@ -62,7 +62,7 @@ use super::pkcs1_padding::walk;
 /// # Arguments
 ///
 /// * `em` — the recovered encoded message, at least 2 octets long. Callers get
-///   this from [`verify`](crate::rsa::verify), which guarantees the length.
+///   this from [`verify`](fn@crate::rsa::verify), which guarantees the length.
 /// * `digest` — the expected message digest.
 /// * `alg` — the digest algorithm the caller claims was used.
 ///

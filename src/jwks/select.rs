@@ -1,9 +1,9 @@
 //! Key selection: dispatch to `kid` lookup or unique-suitability.
 //!
 //! One responsibility: choose which selection strategy applies. The strategies
-//! themselves live in [`crate::jwks::select_kid`] and
-//! [`crate::jwks::select_unique`], and the suitability predicate they share lives
-//! in [`crate::jwks::select_suits`].
+//! themselves live in `crate::jwks::select_kid` and
+//! `crate::jwks::select_unique`, and the suitability predicate they share lives
+//! in `crate::jwks::select_suits`.
 //!
 //! # Security: `kid` is attacker-controlled
 //!

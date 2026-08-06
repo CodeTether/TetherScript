@@ -1,4 +1,5 @@
-//! Handshake failures, kept separate from frame-level [`ProtocolError`].
+//! Handshake failures, kept separate from frame-level
+//! [`ProtocolError`](crate::websocket::error::ProtocolError).
 //!
 //! A handshake failure is answered with an HTTP error response, not a close
 //! frame, because the connection is still HTTP at that point — the two failure

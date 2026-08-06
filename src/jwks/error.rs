@@ -7,7 +7,7 @@
 //! [`JwkSet::skipped`](crate::jwks::keyset::JwkSet::skipped).
 //!
 //! The [`std::fmt::Display`] implementation lives in
-//! [`crate::jwks::error_display`] so this file holds the shape and that one holds
+//! `crate::jwks::error_display` so this file holds the shape and that one holds
 //! the wording.
 
 /// A JWKS document- or selection-level failure.

@@ -1,8 +1,8 @@
 //! The `redis` authority: the object a granted script holds.
 //!
 //! One concern: owning the connection and handing it out under `&mut`. Method
-//! dispatch lives in [`super::invoke`], the command bodies in [`super::methods`]
-//! and [`super::methods_ttl`].
+//! dispatch lives in `super::invoke`, the command bodies in `super::methods`
+//! and `super::methods_ttl`.
 //!
 //! # There is no ambient Redis access
 //!
@@ -24,7 +24,7 @@
 //! [`Connection`] commands need `&mut self` because a command writes a request and
 //! then reads its reply. The connection therefore sits in a [`RefCell`]. The runtime
 //! is single-threaded and no command re-enters the capability, so the borrow is
-//! never contended; [`super::invoke`] still reports a failed borrow as an error
+//! never contended; `super::invoke` still reports a failed borrow as an error
 //! rather than panicking.
 
 use std::cell::RefCell;

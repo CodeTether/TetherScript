@@ -79,7 +79,7 @@ use super::pkcs1::check_encoding;
 ///
 /// [`RsaError::SignatureLength`], [`RsaError::SignatureOutOfRange`],
 /// [`RsaError::BigInt`], and every encoding error from
-/// [`check_encoding`](crate::rsa::check_encoding).
+/// [`check_encoding`].
 pub fn verify(
     signature: &[u8],
     digest: &[u8],

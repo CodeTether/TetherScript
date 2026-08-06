@@ -2,7 +2,7 @@
 //!
 //! One responsibility: own the [`JwkSet`] type and its two operations. All policy
 //! is delegated — bounds to [`crate::jwks::limits`], document shape to
-//! [`crate::jwks::document`], per-key validation to [`crate::jwks::parse_key`], and
+//! [`crate::jwks::document`], per-key validation to `crate::jwks::parse_key`, and
 //! choice to [`crate::jwks::select`].
 //!
 //! # Scope

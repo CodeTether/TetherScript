@@ -86,7 +86,7 @@ impl Frame {
     ///
     /// # Panics
     ///
-    /// Never; see [`crate::websocket::decode`].
+    /// Never; see `crate::websocket::decode`.
     pub fn decode(bytes: &[u8], role: Role) -> Result<DecodeOutcome, ProtocolError> {
         crate::websocket::decode::decode(bytes, role)
     }

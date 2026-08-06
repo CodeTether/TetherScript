@@ -6,7 +6,7 @@
 //! the hashing. Requiring exactly 16 decoded bytes bounds that work to one SHA-1
 //! block-pair and rejects a request that was never a real handshake.
 //!
-//! The base64 decoder is reused from [`crate::system::base64_decode_bytes`].
+//! The base64 decoder is reused from `crate::system::base64_decode_bytes`.
 //!
 //! # Examples
 //!

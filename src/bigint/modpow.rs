@@ -52,7 +52,7 @@ impl BigUint {
     /// # Arguments
     ///
     /// * `exponent` — any width; `0` yields `1 mod modulus`. Cost is linear in
-    ///   its bit length, not its value. See the [module docs](self).
+    ///   its bit length, not its value. See the module docs.
     /// * `modulus` — must be nonzero. Need not be prime or odd. `self` is
     ///   reduced first, so it may exceed the modulus.
     ///

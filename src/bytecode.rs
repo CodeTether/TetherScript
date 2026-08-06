@@ -107,7 +107,8 @@ pub struct Chunk {
     pub names: Vec<String>,
     pub protos: Vec<Rc<FnProto>>,
     /// Reserved local-slot count for future optimized bytecode.
-    /// Current compiler output keeps source variables in [`Env`] slots.
+    /// Current compiler output keeps source variables in [`Env`](crate::value::Env)
+    /// slots.
     pub local_count: u8,
 }
 

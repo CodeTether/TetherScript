@@ -53,8 +53,8 @@ const DEFAULT_POOL_SIZE: usize = 4;
 /// A pooled, script-facing Redis client.
 ///
 /// Command helpers live in the sibling `handler_*` modules; this type owns only the
-/// pool. See [`super::handler_strings`], [`super::handler_expiry`], and
-/// [`super::handler_command`].
+/// pool. See `super::handler_strings`, `super::handler_expiry`, and
+/// `super::handler_command`.
 pub struct RedisHandler {
     pool: Pool,
 }

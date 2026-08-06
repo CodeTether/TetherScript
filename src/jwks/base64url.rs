@@ -5,7 +5,7 @@
 //!
 //! # Which decoder this reuses
 //!
-//! [`crate::system::base64_decode_bytes`] — the in-tree, dependency-free
+//! `crate::system::base64_decode_bytes` — the in-tree, dependency-free
 //! standard-base64 decoder that already backs the `base64_decode` built-in and
 //! the PostgreSQL SCRAM exchange. This file is only an *alphabet adapter*: it
 //! rejects anything outside base64url, translates `-` to `+` and `_` to `/`, and
@@ -42,7 +42,7 @@ use crate::system::base64_decode_bytes;
 /// # Errors
 ///
 /// Returns a named error when `input` is longer than
-/// [`MAX_FIELD_CHARS`](crate::jwks::limits::MAX_FIELD_CHARS), carries `=`
+/// [`MAX_FIELD_CHARS`], carries `=`
 /// padding, uses the standard `+`/`/` alphabet, contains any other non-alphabet
 /// byte, or has length `4n + 1`, which encodes 6 leftover bits and so no byte
 /// string can produce.

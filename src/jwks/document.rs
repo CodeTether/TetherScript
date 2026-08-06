@@ -2,11 +2,11 @@
 //!
 //! One responsibility: apply the size bound, run the in-tree JSON parser, and
 //! partition the `keys` array into usable keys and recorded skips. Top-level shape
-//! rules live in [`crate::jwks::keys_array`].
+//! rules live in `crate::jwks::keys_array`.
 //!
 //! # Which JSON parser this reuses
 //!
-//! [`crate::json::parse_str`] — the in-tree, dependency-free parser that backs the
+//! `crate::json::parse_str` — the in-tree, dependency-free parser that backs the
 //! `json_parse` built-in. It returns a [`Value`] and reports failure as a plain
 //! `String` ending in `at byte N`; that message is wrapped verbatim in
 //! [`JwksError::MalformedJson`] so the byte offset survives to the caller. No

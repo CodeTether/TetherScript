@@ -1,7 +1,7 @@
 //! Validation policy: what a token must say to be accepted here.
 //!
 //! One responsibility: hold the *verifier's* expectations as data. The
-//! constructors and builder methods live in [`crate::jwtrs::config_build`] so this
+//! constructors and builder methods live in `crate::jwtrs::config_build` so this
 //! file is only the shape.
 //!
 //! # Why the algorithm lives in the config

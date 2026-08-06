@@ -1,7 +1,7 @@
 //! The validated RSA public key this module hands to a signature verifier.
 //!
 //! One responsibility: hold already-validated key material. Construction happens
-//! in [`crate::jwks::parse_key`]; nothing here re-checks, because a value of this
+//! in `crate::jwks::parse_key`; nothing here re-checks, because a value of this
 //! type existing *is* the claim that validation passed.
 //!
 //! # Contract for the verifier

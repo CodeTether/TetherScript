@@ -7,7 +7,7 @@
 //!
 //! This type deliberately does **not** compute digests. The caller hashes the
 //! signing input with its own SHA implementation and hands the digest to
-//! [`verify`](crate::rsa::verify); keeping hashing out of this module means the
+//! [`verify`](fn@crate::rsa::verify); keeping hashing out of this module means the
 //! verifier has
 //! exactly one job.
 //!

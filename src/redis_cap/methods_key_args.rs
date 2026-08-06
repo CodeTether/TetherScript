@@ -1,7 +1,7 @@
 //! Coercing a variadic key list.
 //!
 //! One concern: turning `arguments` into owned byte vectors, naming the *position*
-//! of whichever one is wrong. Split from [`super::methods_key`] so that module owns
+//! of whichever one is wrong. Split from `super::methods_key` so that module owns
 //! only the two commands.
 //!
 //! The keys are collected into owned `Vec<u8>` first and only then borrowed as

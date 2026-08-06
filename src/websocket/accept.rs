@@ -7,7 +7,7 @@
 //! so a cached HTTP response or a confused proxy cannot be mistaken for a live
 //! WebSocket peer.
 //!
-//! Base64 is reused from [`crate::system::base64_encode_bytes`]. SHA-1 lives in
+//! Base64 is reused from `crate::system::base64_encode_bytes`. SHA-1 lives in
 //! [`crate::websocket::sha1`]; see that module for why the copy in
 //! `src/rpc_cap.rs` could not be reused.
 //!

@@ -1,4 +1,5 @@
-//! Offset → [`LineCol`] resolution on [`SourceMap`].
+//! Offset → [`LineCol`] resolution on
+//! [`SourceMap`](crate::diagnostic::map::SourceMap).
 //!
 //! Split out of [`crate::diagnostic::map`] so that indexing (construction) and
 //! querying (resolution) stay one responsibility each.

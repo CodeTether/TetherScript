@@ -3,7 +3,7 @@
 //! One responsibility: sum the three stages of RS256 validation into one type.
 //! The per-stage variant sets live in [`crate::jwtrs::error_shape`] and
 //! [`crate::jwtrs::error_claims`]; the wording lives in
-//! [`crate::jwtrs::error_display`].
+//! `crate::jwtrs::error_display`.
 //!
 //! # The type *is* the pipeline
 //!

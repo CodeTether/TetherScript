@@ -109,7 +109,7 @@ pub(super) fn decode(body: &[u8]) -> Result<Value, DecodeError> {
 ///
 /// # Errors
 ///
-/// As [`decode`].
+/// As `decode`.
 ///
 /// # Examples
 ///
