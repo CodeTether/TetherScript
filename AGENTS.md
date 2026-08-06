@@ -13,7 +13,7 @@ v0.1, one focused change at a time.
 - **File extension:** `.tether`
 - **Rust edition:** 2024
 
-## Current state (v0.1.0-alpha.28)
+## Current state (v0.1.0-alpha.29)
 
 A dual-backend implementation: the tree-walking interpreter is the *reference*
 runtime and a stack-based bytecode VM is the **default** backend (`--interp`

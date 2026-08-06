@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.0-alpha.29] - 2026-08-06
+
 ### Fixed
 
 - Rejected `&` in infix position with a named parse error instead of silently
@@ -11,6 +13,12 @@ All notable changes to this project will be documented in this file.
   followed by a discarded `&10` borrow, so it printed `12` and exited 0 rather
   than reporting that tetherscript has no bitwise AND. The error now names both
   alternatives (`&&` for logical and, prefix `&value` to borrow).
+- Propagated template ordering type errors instead of swallowing them into
+  `false`, so comparing a non-number with `>`, `<`, `>=`, or `<=` now reports
+  the offending types rather than silently taking the untaken branch.
+- Marked the internal ad-block `Engine` doc example `ignore` so `cargo test
+  --doc` compiles again; the module is private to the built-in installation
+  path and was never reachable as `tetherscript::adblock::Engine`.
 
 ## [0.1.0-alpha.28] - 2026-08-06
 
