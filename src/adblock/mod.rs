@@ -5,7 +5,11 @@
 //!
 //! # Example
 //!
-//! ```no_run
+//! `Engine` is internal to the `http_builtins` installation path, not part of
+//! the crate's public surface, so this example is illustrative rather than
+//! compiled. Scripts reach these layers through the `adblock_*` built-ins.
+//!
+//! ```ignore
 //! use tetherscript::adblock::Engine;
 //!
 //! let mut engine = Engine::new();
