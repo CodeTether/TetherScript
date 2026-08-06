@@ -124,6 +124,16 @@ pub enum BinOp {
     GtEq,
     And,
     Or,
+    /// Bitwise AND `&` (infix only; prefix `&` is a borrow).
+    BitAnd,
+    /// Bitwise OR `|`.
+    BitOr,
+    /// Bitwise XOR `^`.
+    BitXor,
+    /// Left shift `<<`.
+    Shl,
+    /// Right shift `>>`.
+    Shr,
     Assign,
 }
 
@@ -131,6 +141,8 @@ pub enum BinOp {
 pub enum UnOp {
     Neg,
     Not,
+    /// Bitwise NOT `~`.
+    BitNot,
 }
 
 #[derive(Debug, Clone)]

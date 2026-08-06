@@ -131,8 +131,18 @@ pub enum Token {
     Or,
     /// Logical NOT `!`.
     Not,
-    /// Borrow operator `&`.
+    /// Borrow `&` in prefix position, bitwise AND in infix position.
     Amp,
+    /// Bitwise OR `|`.
+    Pipe,
+    /// Bitwise XOR `^`.
+    Caret,
+    /// Bitwise NOT `~`.
+    Tilde,
+    /// Left shift `<<`.
+    Shl,
+    /// Right shift `>>`.
+    Shr,
 
     // Meta
     /// Represents a line break in the source.

@@ -337,7 +337,10 @@ impl Analyzer {
                 .map(|state| state.copy)
                 .unwrap_or(false),
             Expr::Move(inner) => self.expr_is_copy(inner),
-            Expr::Unary { op, .. } => matches!(op, crate::ast::UnOp::Neg | crate::ast::UnOp::Not),
+            Expr::Unary { op, .. } => matches!(
+                op,
+                crate::ast::UnOp::Neg | crate::ast::UnOp::Not | crate::ast::UnOp::BitNot
+            ),
             Expr::Binary { op, .. } => matches!(
                 op,
                 BinOp::Eq | BinOp::NotEq | BinOp::Lt | BinOp::Gt | BinOp::LtEq | BinOp::GtEq

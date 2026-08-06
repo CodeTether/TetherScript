@@ -205,6 +205,9 @@ impl<'a> Lexer<'a> {
                 if self.peek() == Some(b'=') {
                     self.bump();
                     Token::LtEq
+                } else if self.peek() == Some(b'<') {
+                    self.bump();
+                    Token::Shl
                 } else {
                     Token::Lt
                 }
@@ -213,6 +216,9 @@ impl<'a> Lexer<'a> {
                 if self.peek() == Some(b'=') {
                     self.bump();
                     Token::GtEq
+                } else if self.peek() == Some(b'>') {
+                    self.bump();
+                    Token::Shr
                 } else {
                     Token::Gt
                 }
@@ -230,13 +236,11 @@ impl<'a> Lexer<'a> {
                     self.bump();
                     Token::Or
                 } else {
-                    return Err(LexError {
-                        msg: "bare `|` not yet supported".into(),
-                        line,
-                        col,
-                    });
+                    Token::Pipe
                 }
             }
+            b'^' => Token::Caret,
+            b'~' => Token::Tilde,
             _ => {
                 return Err(LexError {
                     msg: format!("unexpected character: {:?}", c as char),

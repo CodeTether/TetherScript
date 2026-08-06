@@ -15,6 +15,10 @@ mod async_expr;
 mod async_tests;
 mod infix;
 #[cfg(test)]
+mod infix_borrow_tests;
+#[cfg(test)]
+mod infix_test_support;
+#[cfg(test)]
 mod infix_tests;
 mod program;
 
@@ -273,6 +277,14 @@ impl Parser {
                 let rhs = self.parse_precedence(Prec::Unary)?;
                 Ok(Expr::Unary {
                     op: UnOp::Not,
+                    rhs: Box::new(rhs),
+                })
+            }
+            Token::Tilde => {
+                self.bump();
+                let rhs = self.parse_precedence(Prec::Unary)?;
+                Ok(Expr::Unary {
+                    op: UnOp::BitNot,
                     rhs: Box::new(rhs),
                 })
             }
@@ -552,9 +564,13 @@ pub enum Prec {
     And,      // &&
     Equality, // == !=
     Compare,  // < > <= >=
+    BitOr,    // |
+    BitXor,   // ^
+    BitAnd,   // & (infix)
+    Shift,    // << >>
     Term,     // + -
     Factor,   // * / %
-    Unary,    // -x, !x, move x, &x
+    Unary,    // -x, !x, ~x, move x, &x
     Call,     // f() x[] x.y
 }
 
@@ -566,7 +582,11 @@ impl Prec {
             Prec::Or => Prec::And,
             Prec::And => Prec::Equality,
             Prec::Equality => Prec::Compare,
-            Prec::Compare => Prec::Term,
+            Prec::Compare => Prec::BitOr,
+            Prec::BitOr => Prec::BitXor,
+            Prec::BitXor => Prec::BitAnd,
+            Prec::BitAnd => Prec::Shift,
+            Prec::Shift => Prec::Term,
             Prec::Term => Prec::Factor,
             Prec::Factor => Prec::Unary,
             Prec::Unary => Prec::Call,

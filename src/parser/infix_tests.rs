@@ -1,58 +1,33 @@
-//! Tests for infix-position handling, especially the `&` diagnostic.
+//! Tests for infix-position operator mapping.
 //!
-//! Regression lock for the silent-wrong-answer bug where `let a = 12 & 10;`
-//! parsed as `let a = 12` plus a discarded `&10` borrow and printed `12`.
+//! The load-bearing case is `&`: it is the borrow sigil in prefix position and
+//! bitwise AND in infix position, and only position distinguishes them.
 
-use crate::lexer::Lexer;
-use crate::parser::Parser;
+use crate::ast::BinOp;
 
-fn parse_err(src: &str) -> String {
-    let tokens = Lexer::new(src).tokenize().expect("source should lex");
-    let err = Parser::new(tokens)
-        .parse_program()
-        .expect_err("source should not parse");
-    err.msg
-}
+use super::infix_test_support::{let_operator, parses};
 
-fn parses(src: &str) -> bool {
-    let Ok(tokens) = Lexer::new(src).tokenize() else {
-        return false;
-    };
-    Parser::new(tokens).parse_program().is_ok()
+#[test]
+fn infix_amp_is_bitwise_and_not_a_borrow() {
+    assert_eq!(let_operator("let a = 12 & 10;"), BinOp::BitAnd);
 }
 
 #[test]
-fn integer_amp_integer_is_rejected() {
-    let msg = parse_err("let a = 12 & 10;");
-    assert!(msg.contains("`&` is not a binary operator"), "got: {msg}");
-    assert!(msg.contains("bitwise AND"), "got: {msg}");
+fn the_other_bitwise_tokens_map_to_their_operators() {
+    assert_eq!(let_operator("let a = 12 | 10;"), BinOp::BitOr);
+    assert_eq!(let_operator("let a = 12 ^ 10;"), BinOp::BitXor);
+    assert_eq!(let_operator("let a = 1 << 4;"), BinOp::Shl);
+    assert_eq!(let_operator("let a = 1 >> 4;"), BinOp::Shr);
 }
 
 #[test]
-fn amp_error_suggests_logical_and_and_borrow() {
-    let msg = parse_err("let a = 12 & 10;");
-    assert!(msg.contains("`&&`"), "got: {msg}");
-    assert!(msg.contains("borrow"), "got: {msg}");
+fn double_amp_is_still_logical_and() {
+    assert_eq!(let_operator("let a = true && false;"), BinOp::And);
+    assert_eq!(let_operator("let a = true || false;"), BinOp::Or);
 }
 
 #[test]
-fn amp_after_identifier_is_rejected() {
-    let msg = parse_err("let x = 1;\nlet y = x & x;");
-    assert!(msg.contains("`&` is not a binary operator"), "got: {msg}");
-}
-
-#[test]
-fn prefix_borrow_still_parses() {
-    assert!(parses("let x = 1;\nlet y = &x;"));
-    assert!(parses("let mut m = 1;\nlet r = &mut m;"));
-}
-
-#[test]
-fn logical_and_still_parses() {
-    assert!(parses("let a = true && false;"));
-}
-
-#[test]
-fn borrow_argument_still_parses() {
+fn borrow_mut_and_borrow_arguments_still_parse() {
+    assert!(parses("let mut n = 1;\nlet r = &mut n;"));
     assert!(parses("fn f(v) { v }\nlet x = 1;\nf(&x);"));
 }

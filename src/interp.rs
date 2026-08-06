@@ -34,6 +34,8 @@ mod module_method;
 mod resource_transfer;
 #[path = "interp/result_method.rs"]
 mod result_method;
+#[path = "interp/shift.rs"]
+pub mod shift;
 #[path = "tui/mod.rs"]
 pub(crate) mod tui;
 
@@ -565,6 +567,7 @@ pub(crate) fn apply_unary(op: UnOp, v: Value) -> Result<Value, String> {
         (UnOp::Neg, Value::Int(n)) => Ok(Value::Int(-n)),
         (UnOp::Neg, Value::Float(n)) => Ok(Value::Float(-n)),
         (UnOp::Not, v) => Ok(Value::Bool(!v.truthy())),
+        (UnOp::BitNot, Value::Int(n)) => Ok(Value::Int(!n)),
         (op, v) => Err(format!("cannot apply {:?} to {}", op, v.type_name())),
     }
 }
@@ -581,6 +584,14 @@ pub(crate) fn apply_binary(op: BinOp, l: Value, r: Value) -> Result<Value, Strin
         (Div, Int(a), Int(b)) => Ok(Int(a / b)),
         (Mod, Int(_), Int(0)) => Err("integer modulo by zero".into()),
         (Mod, Int(a), Int(b)) => Ok(Int(a % b)),
+
+        // Bitwise. Integers only: `&`/`|` on bools would silently swallow the
+        // `&&`/`||` typo the operators are most often confused with.
+        (BitAnd, Int(a), Int(b)) => Ok(Int(a & b)),
+        (BitOr, Int(a), Int(b)) => Ok(Int(a | b)),
+        (BitXor, Int(a), Int(b)) => Ok(Int(a ^ b)),
+        (Shl, Int(a), Int(b)) => shift::apply(*a, *b, "<<"),
+        (Shr, Int(a), Int(b)) => shift::apply(*a, *b, ">>"),
 
         (Add, Float(a), Float(b)) => Ok(Float(a + b)),
         (Sub, Float(a), Float(b)) => Ok(Float(a - b)),

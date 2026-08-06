@@ -1,0 +1,30 @@
+// Bitwise operators. `&` is bitwise AND in infix position and a borrow in
+// prefix position; position is what disambiguates them.
+
+fn main() {
+    println(12 & 10)
+    println(12 | 10)
+    println(12 ^ 10)
+    println(1 << 4)
+    println(-8 >> 1)
+    println(~0)
+
+    // Precedence follows Rust: | looser than ^ looser than & looser than shifts.
+    println(1 | 2 ^ 3 & 4)
+    println(1 << 2 + 3)
+
+    // Prefix borrow still works, in the same program.
+    let xs = [1, 2, 3]
+    let borrowed = &xs
+    println(borrowed.len())
+
+    // And logical && is untouched.
+    println(true && false)
+
+    // Flag masking, the reason these exist.
+    let read = 1 << 0
+    let write = 1 << 1
+    let combined = read | write
+    println(combined)
+    println(combined & write != 0)
+}

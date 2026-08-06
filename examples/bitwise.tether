@@ -1,0 +1,48 @@
+// Bitwise operators: &, |, ^, ~, <<, >>.
+//
+// `&` means two different things depending on position, and position alone is
+// what tells them apart:
+//
+//   let r = &xs      // prefix: borrow xs
+//   let m = a & b    // infix:  bitwise AND
+//
+// Precedence follows Rust: `|` binds loosest, then `^`, then `&`, then the
+// shifts, all tighter than a comparison.
+
+fn main() {
+    // Integer bit twiddling.
+    println("12 & 10 = {12 & 10}")
+    println("12 | 10 = {12 | 10}")
+    println("12 ^ 10 = {12 ^ 10}")
+    println("1 << 4  = {1 << 4}")
+    println("256 >> 4 = {256 >> 4}")
+    println("~0      = {~0}")
+
+    // `>>` is arithmetic: the sign bit is preserved, as in Rust on i64.
+    println("-8 >> 1 = {-8 >> 1}")
+
+    // Flag sets, the reason these operators exist.
+    let read = 1 << 0
+    let write = 1 << 1
+    let execute = 1 << 2
+
+    let mut mode = read | write
+    println("mode = {mode}")
+    println("readable:   {mode & read != 0}")
+    println("executable: {mode & execute != 0}")
+
+    // Add a flag, then clear it again with AND-NOT.
+    mode = mode | execute
+    println("after adding execute: {mode & execute != 0}")
+    mode = mode & ~execute
+    println("after clearing execute: {mode & execute != 0}")
+
+    // Prefix borrow, in the same program, unambiguous.
+    let flags = [read, write, execute]
+    let borrowed = &flags
+    println("flag count = {borrowed.len()}")
+
+    // A shift count of 64 or more is an error rather than a silent mask:
+    //   println(1 << 64)
+    // => shift count for `<<` must be less than 64, got 64
+}

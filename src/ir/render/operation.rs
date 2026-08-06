@@ -33,5 +33,10 @@ fn binary(operator: BinaryOp) -> &'static str {
         BinaryOp::Gt => "gt",
         BinaryOp::LtEq => "le",
         BinaryOp::GtEq => "ge",
+        BinaryOp::BitAnd => "bitand",
+        BinaryOp::BitOr => "bitor",
+        BinaryOp::BitXor => "bitxor",
+        BinaryOp::Shl => "shl",
+        BinaryOp::Shr => "shr",
     }
 }

@@ -246,6 +246,10 @@ impl VM {
                 let v = self.stack.pop().unwrap();
                 self.stack.push(apply_unary(crate::ast::UnOp::Not, v)?);
             }
+            Instr::BitNot => {
+                let v = self.stack.pop().unwrap();
+                self.stack.push(apply_unary(crate::ast::UnOp::BitNot, v)?);
+            }
             Instr::Add => self.binary(crate::ast::BinOp::Add)?,
             Instr::Sub => self.binary(crate::ast::BinOp::Sub)?,
             Instr::Mul => self.binary(crate::ast::BinOp::Mul)?,
@@ -257,6 +261,11 @@ impl VM {
             Instr::Gt => self.binary(crate::ast::BinOp::Gt)?,
             Instr::LtEq => self.binary(crate::ast::BinOp::LtEq)?,
             Instr::GtEq => self.binary(crate::ast::BinOp::GtEq)?,
+            Instr::BitAnd => self.binary(crate::ast::BinOp::BitAnd)?,
+            Instr::BitOr => self.binary(crate::ast::BinOp::BitOr)?,
+            Instr::BitXor => self.binary(crate::ast::BinOp::BitXor)?,
+            Instr::Shl => self.binary(crate::ast::BinOp::Shl)?,
+            Instr::Shr => self.binary(crate::ast::BinOp::Shr)?,
             Instr::Jump(off) => self.jump(*off),
             Instr::JumpIfFalse(off) => {
                 let v = self.stack.pop().unwrap();
@@ -535,6 +544,10 @@ impl VM {
                 let v = self.stack.pop().unwrap();
                 self.stack.push(apply_unary(crate::ast::UnOp::Not, v)?);
             }
+            Instr::BitNot => {
+                let v = self.stack.pop().unwrap();
+                self.stack.push(apply_unary(crate::ast::UnOp::BitNot, v)?);
+            }
 
             Instr::Add => self.binary(crate::ast::BinOp::Add)?,
             Instr::Sub => self.binary(crate::ast::BinOp::Sub)?,
@@ -547,6 +560,11 @@ impl VM {
             Instr::Gt => self.binary(crate::ast::BinOp::Gt)?,
             Instr::LtEq => self.binary(crate::ast::BinOp::LtEq)?,
             Instr::GtEq => self.binary(crate::ast::BinOp::GtEq)?,
+            Instr::BitAnd => self.binary(crate::ast::BinOp::BitAnd)?,
+            Instr::BitOr => self.binary(crate::ast::BinOp::BitOr)?,
+            Instr::BitXor => self.binary(crate::ast::BinOp::BitXor)?,
+            Instr::Shl => self.binary(crate::ast::BinOp::Shl)?,
+            Instr::Shr => self.binary(crate::ast::BinOp::Shr)?,
 
             Instr::Jump(off) => {
                 self.jump(off);

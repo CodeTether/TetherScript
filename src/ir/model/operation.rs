@@ -21,6 +21,16 @@ pub enum BinaryOp {
     Gt,
     LtEq,
     GtEq,
+    /// Bitwise AND.
+    BitAnd,
+    /// Bitwise OR.
+    BitOr,
+    /// Bitwise XOR.
+    BitXor,
+    /// Left shift.
+    Shl,
+    /// Right shift.
+    Shr,
 }
 
 /// Computes one SSA value.

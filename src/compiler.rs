@@ -241,6 +241,7 @@ impl Compiler {
                 self.emit(match op {
                     UnOp::Neg => Instr::Neg,
                     UnOp::Not => Instr::Not,
+                    UnOp::BitNot => Instr::BitNot,
                 });
             }
 
@@ -279,6 +280,11 @@ impl Compiler {
                     BinOp::Gt => Instr::Gt,
                     BinOp::LtEq => Instr::LtEq,
                     BinOp::GtEq => Instr::GtEq,
+                    BinOp::BitAnd => Instr::BitAnd,
+                    BinOp::BitOr => Instr::BitOr,
+                    BinOp::BitXor => Instr::BitXor,
+                    BinOp::Shl => Instr::Shl,
+                    BinOp::Shr => Instr::Shr,
                     BinOp::And | BinOp::Or | BinOp::Assign => unreachable!(),
                 });
             }

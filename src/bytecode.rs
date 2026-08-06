@@ -46,6 +46,7 @@ pub enum Instr {
     // Unary
     Neg,
     Not,
+    BitNot,
 
     // Binary
     Add,
@@ -59,6 +60,11 @@ pub enum Instr {
     Gt,
     LtEq,
     GtEq,
+    BitAnd,
+    BitOr,
+    BitXor,
+    Shl,
+    Shr,
 
     // Control flow (offsets are relative to the *next* instruction).
     Jump(i32),

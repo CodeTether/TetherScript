@@ -16,6 +16,11 @@ pub(super) fn lower(function: &str, operator: BinOp) -> Result<BinaryOp, LowerEr
         BinOp::Gt => BinaryOp::Gt,
         BinOp::LtEq => BinaryOp::LtEq,
         BinOp::GtEq => BinaryOp::GtEq,
+        BinOp::BitAnd => BinaryOp::BitAnd,
+        BinOp::BitOr => BinaryOp::BitOr,
+        BinOp::BitXor => BinaryOp::BitXor,
+        BinOp::Shl => BinaryOp::Shl,
+        BinOp::Shr => BinaryOp::Shr,
         BinOp::And | BinOp::Or => {
             return Err(LowerError::new(
                 function,

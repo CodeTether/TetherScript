@@ -14,11 +14,11 @@ use super::Prec;
 /// [`Prec::None`] means "not an infix operator", which ends the Pratt loop and
 /// therefore ends the statement.
 ///
-/// `&` is deliberately given the maximum binding power even though it is not a
-/// binary operator. tetherscript has no bitwise AND, so `a & b` is always a
-/// mistake; ranking it highest guarantees [`infix_error_message`] reports it in
-/// every infix position instead of letting the loop end and silently reinterpret
-/// `& b` as a borrow statement.
+/// `&` is bitwise AND here. Position is what disambiguates it from the borrow
+/// sigil: `parse_prefix` claims a leading `&`, so by the time this table is
+/// consulted there is a left operand and the only sensible reading is the
+/// binary operator. The ladder follows Rust's, so `|` binds looser than `^`,
+/// which binds looser than `&`, which binds looser than the shifts.
 pub(super) fn infix_prec(t: &Token) -> Prec {
     match t {
         Token::Assign => Prec::Assign,
@@ -26,9 +26,12 @@ pub(super) fn infix_prec(t: &Token) -> Prec {
         Token::And => Prec::And,
         Token::Eq | Token::NotEq => Prec::Equality,
         Token::Lt | Token::Gt | Token::LtEq | Token::GtEq => Prec::Compare,
+        Token::Pipe => Prec::BitOr,
+        Token::Caret => Prec::BitXor,
+        Token::Amp => Prec::BitAnd,
+        Token::Shl | Token::Shr => Prec::Shift,
         Token::Plus | Token::Minus => Prec::Term,
         Token::Star | Token::Slash | Token::Percent => Prec::Factor,
-        Token::Amp => Prec::Call,
         Token::LParen | Token::LBracket | Token::Dot | Token::Question => Prec::Call,
         _ => Prec::None,
     }
@@ -50,20 +53,17 @@ pub(super) fn infix_binop(t: &Token) -> Option<BinOp> {
         Token::GtEq => BinOp::GtEq,
         Token::And => BinOp::And,
         Token::Or => BinOp::Or,
+        Token::Amp => BinOp::BitAnd,
+        Token::Pipe => BinOp::BitOr,
+        Token::Caret => BinOp::BitXor,
+        Token::Shl => BinOp::Shl,
+        Token::Shr => BinOp::Shr,
         Token::Assign => BinOp::Assign,
         _ => return None,
     })
 }
 
 /// Explain why `tok` cannot join two expressions.
-///
-/// `&` gets a dedicated message because it is the one token that reads like a
-/// binary operator to anyone arriving from C, Python, or Rust's integer types.
 pub(super) fn infix_error_message(tok: &Token) -> String {
-    match tok {
-        Token::Amp => "`&` is not a binary operator; tetherscript has no bitwise AND. \
-             Use `&&` for logical and, or write `&value` as a prefix to borrow."
-            .to_string(),
-        other => format!("unexpected infix token: {:?}", other),
-    }
+    format!("unexpected infix token: {tok:?}")
 }
