@@ -2,6 +2,9 @@
 
 #[path = "bitmap/glyph.rs"]
 mod glyph;
+#[cfg(test)]
+#[path = "bitmap/tests.rs"]
+mod tests;
 
 use crate::browser::{RasterImage, Rgba};
 

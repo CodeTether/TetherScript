@@ -1,21 +1,15 @@
-//! Child-process output forwarding with event-driven egui wakeups.
+//! Child-process output forwarding.
 
 use std::io::{BufRead, BufReader, Read};
 use std::sync::mpsc::Sender;
-
-use eframe::egui;
 
 pub(crate) enum Output {
     Line(String),
     Error(String),
 }
 
-pub(super) fn forward<R>(
-    stream: R,
-    sender: Sender<Output>,
-    context: egui::Context,
-    wrap: fn(String) -> Output,
-) where
+pub(super) fn forward<R>(stream: R, sender: Sender<Output>, wrap: fn(String) -> Output)
+where
     R: Read + Send + 'static,
 {
     std::thread::spawn(move || {
@@ -23,7 +17,6 @@ pub(super) fn forward<R>(
             if sender.send(wrap(line)).is_err() {
                 break;
             }
-            context.request_repaint();
         }
     });
 }

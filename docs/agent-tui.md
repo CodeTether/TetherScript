@@ -80,9 +80,9 @@ duration of the host process.
 If no `provider` capability is granted, prompts stay inside the TUI and render
 a provider-missing message instead of crashing the process.
 
-## Native agent and CPU visualizer
+## Native agent window
 
-Build and run the egui agent shell with Vault HTTPS support:
+Build and run the in-tree native agent shell with Vault HTTPS support:
 
 ```bash
 cargo run --features native-agent --bin tetherscript -- run examples/native_agent.tether
@@ -93,10 +93,9 @@ It therefore uses the same agent authority, Vault/environment provider loading,
 model selection, workspace tools, and `.tetherscript/agent_tui_session.jsonl`
 conversation as the terminal UI.
 
-The right pane reads the running executable's PE or ELF text section and decodes
-real x86-64 instructions. Its table shows **Address / Offset**, **Machine Bytes
-(Hex)**, and **Assembly Instruction**. State cards report the executable entry
-point, text-section range, architecture, and selected instruction address.
+The shell opens a native framebuffer window, renders its dashboard with
+tetherscript's software HTML/CSS and bitmap-text stack, accepts Unicode prompt
+input, and forwards prompts to the script-owned JSON-RPC agent.
 
 ## Tether Fix Runner
 
@@ -106,17 +105,11 @@ Run the repository-task workflow with Vault HTTPS support:
 cargo run --features native-agent --bin tetherscript -- run examples/native_fix_runner.tether
 ```
 
-Enter a concrete repository outcome and choose **Run agent fix** (or press
-`Ctrl+Enter`/`F5`). The runner delegates the task to the same Vault-backed agent,
+Enter a concrete repository outcome and press Enter. The native dashboard labels
+the session as `fix` mode and delegates the prompt to the same Vault-backed agent,
 workspace tools, model selection, and JSONL session as the terminal interface.
-Its task contract requires the agent to inspect before editing, preserve unrelated
-changes, run focused checks, and report observed evidence. It never commits or
-pushes changes.
-
-The review pane asynchronously displays `git status --short` and the unified
-working-tree diff. Its validation field accepts a project command such as
-`cargo test`; stdout, stderr, and the process exit status remain visible for
-review.
+The agent remains responsible for inspecting before editing, preserving unrelated
+changes, running focused checks, and reporting observed evidence.
 
 For a host that needs JSON-RPC over stdio, set explicit RPC mode:
 

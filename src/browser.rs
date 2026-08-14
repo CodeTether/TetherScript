@@ -2262,7 +2262,6 @@ fn named_color(value: &str) -> Option<Rgba> {
     Some(color)
 }
 
-#[cfg(not(feature = "native-window"))]
 fn glyph_rows(ch: char) -> [u8; 7] {
     match ch.to_ascii_uppercase() {
         'A' => [

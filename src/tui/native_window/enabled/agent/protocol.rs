@@ -11,7 +11,7 @@ use crate::value::Value;
 
 use super::model::Event;
 
-pub(super) use request_encode::encode as request;
+pub(crate) use request_encode::encode as request;
 
 pub(super) fn decode(line: &str) -> Option<Event> {
     let Value::Map(root) = crate::json::parse_str(line).ok()? else {
@@ -32,7 +32,9 @@ pub(super) fn decode(line: &str) -> Option<Event> {
         return None;
     };
     let first = content.borrow().first()?.clone();
-    let Value::Map(part) = first else { return None };
+    let Value::Map(part) = first else {
+        return None;
+    };
     Some(Event::Reply(field(&part.borrow(), "text")))
 }
 

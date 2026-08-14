@@ -16,7 +16,7 @@ fn context(value: Value) -> Value {
 }
 
 fn render(args: &[Value]) -> ResultValue {
-    let Value::Result(result) = super::call(args).unwrap() else {
+    let Value::Result(result) = super::render(args).unwrap() else {
         panic!("tera_render must return Result");
     };
     result.as_ref().clone()

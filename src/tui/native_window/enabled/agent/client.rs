@@ -1,34 +1,43 @@
-//! JSON-RPC subprocess bridge to `agent_tui.tether`.
+//! JSON-RPC subprocess bridge to the script-owned agent.
 
 #[path = "client_output.rs"]
-pub(super) mod client_output;
-#[path = "client_spawn.rs"]
-mod client_spawn;
-#[path = "client_drop.rs"]
-mod drop_impl;
+pub(super) mod output;
+#[path = "client_request.rs"]
+mod request;
 
-use std::io::Write;
-use std::process::{Child, ChildStdin};
+use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc::Receiver;
 
 pub(super) struct AgentClient {
     child: Child,
-    input: ChildStdin,
-    pub(super) output: Receiver<client_output::Output>,
-    next_id: i64,
+    pub(super) input: ChildStdin,
+    pub(super) output: Receiver<output::Output>,
+    pub(super) next_id: i64,
 }
 
 impl AgentClient {
-    pub fn send_prompt(&mut self, prompt: &str) -> Result<(), String> {
-        self.request("agent/message", Some(prompt))
-    }
-
-    fn request(&mut self, method: &str, prompt: Option<&str>) -> Result<(), String> {
-        let request = super::protocol::request(self.next_id, method, prompt)?;
-        self.next_id += 1;
-        writeln!(self.input, "{request}").map_err(|e| format!("agent RPC write failed: {e}"))?;
-        self.input
-            .flush()
-            .map_err(|e| format!("agent RPC flush failed: {e}"))
+    pub(super) fn spawn(path: &str) -> Result<Self, String> {
+        let mut child = Command::new(std::env::current_exe().map_err(|e| e.to_string())?)
+            .args(["run", path])
+            .env("TETHERSCRIPT_AGENT_MODE", "rpc")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("agent RPC launch failed: {e}"))?;
+        let input = child.stdin.take().ok_or("agent RPC stdin unavailable")?;
+        let stdout = child.stdout.take().ok_or("agent RPC stdout unavailable")?;
+        let stderr = child.stderr.take().ok_or("agent RPC stderr unavailable")?;
+        let (sender, output) = std::sync::mpsc::channel();
+        self::output::forward(stdout, sender.clone(), self::output::Output::Line);
+        self::output::forward(stderr, sender, self::output::Output::Error);
+        let mut client = Self {
+            child,
+            input,
+            output,
+            next_id: 1,
+        };
+        client.request("agent/state", None)?;
+        Ok(client)
     }
 }

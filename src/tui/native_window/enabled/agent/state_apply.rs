@@ -6,19 +6,17 @@ use super::{
 };
 
 impl AgentState {
-    pub fn apply(&mut self, event: Event) {
+    pub(super) fn apply(&mut self, event: Event) {
         match event {
             Event::State {
                 messages,
                 model,
                 workspace,
-                session,
                 ready,
             } => {
                 self.messages = messages;
                 self.model = model;
                 self.workspace = workspace;
-                self.session = session;
                 self.status = if ready {
                     "Vault provider ready"
                 } else {

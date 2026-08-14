@@ -47,6 +47,14 @@ struct Frame {
     env: Rc<RefCell<Env>>,
     /// Fast local variable slots, indexed by compiler-assigned slot number.
     locals: Vec<Value>,
+    /// Operand stack height when this frame was pushed.
+    ///
+    /// `return` may fire from inside a `for` or `while`, whose loop state lives on
+    /// the operand stack. Popping only the return value would leave that state
+    /// behind, where it becomes an argument or a callee for whatever the caller
+    /// evaluates next — the symptom is an unrelated "int is not callable". Recording
+    /// the base lets a return discard exactly the frame's own operands.
+    base: usize,
 }
 
 pub struct VM {
@@ -118,6 +126,7 @@ impl VM {
             ip: 0,
             env: self.globals.clone(),
             locals: vec![Value::Nil; local_count],
+            base: self.stack.len(),
         });
         if let Err(u) = self.execute() {
             return Err(format_unwind(u));
@@ -818,7 +827,17 @@ impl VM {
 
     fn do_return(&mut self) {
         let val = self.stack.pop().unwrap_or(Value::Nil);
-        self.frames.pop();
+        let frame = self.frames.pop();
+
+        // Discard anything the frame left behind — loop state from a `return` inside
+        // a `for`/`while`, or operands abandoned by an early exit. Without this the
+        // residue is misread as the caller's next operand.
+        if let Some(frame) = frame {
+            if self.stack.len() > frame.base {
+                self.stack.truncate(frame.base);
+            }
+        }
+
         if !self.frames.is_empty() {
             self.stack.push(val);
         }
@@ -876,6 +895,9 @@ impl VM {
                     ip: 0,
                     env: scope,
                     locals: vec![Value::Nil; local_count],
+                    // The arguments were drained before this point, so the current
+                    // height is the callee's own empty operand region.
+                    base: self.stack.len(),
                 });
                 Ok(())
             }

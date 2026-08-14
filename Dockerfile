@@ -1,7 +1,7 @@
 # Docker image for tetherscript
 #
 # Build and push:
-#   docker buildx build --platform linux/amd64,linux/arm64 -t codetether/tetherscript:latest -t codetether/tetherscript:0.1.0-alpha.30 --push .
+#   docker buildx build --platform linux/amd64,linux/arm64 -t codetether/tetherscript:latest -t codetether/tetherscript:0.1.0-alpha.31 --push .
 #
 # Or build locally:
 #   docker build -t tetherscript .

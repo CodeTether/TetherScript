@@ -1,7 +1,4 @@
-//! Native agent configuration, messages, and RPC events.
-
-#[path = "model_authority.rs"]
-mod authority;
+//! Native agent configuration and protocol values.
 
 use crate::value::Value;
 
@@ -19,7 +16,6 @@ pub(super) enum Event {
         messages: Vec<Message>,
         model: String,
         workspace: String,
-        session: String,
         ready: bool,
     },
     Reply(String),
@@ -27,7 +23,7 @@ pub(super) enum Event {
 }
 
 impl Config {
-    pub fn parse(value: &Value) -> Result<Self, String> {
+    pub(super) fn parse(value: &Value) -> Result<Self, String> {
         let Value::Map(map) = value else {
             return Err("tui_native_agent: config must be map".into());
         };
@@ -40,7 +36,12 @@ impl Config {
     }
 }
 
-pub(super) use authority::require;
+pub(super) fn require(value: &Value, name: &str) -> Result<(), String> {
+    match value {
+        Value::Capability(capability) if capability.kind == name => Ok(()),
+        _ => Err(format!("tui_native_agent: missing capability: {name}")),
+    }
+}
 
 fn field(map: &std::collections::HashMap<String, Value>, key: &str, default: &str) -> String {
     map.get(key)

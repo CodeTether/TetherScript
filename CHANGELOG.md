@@ -4,6 +4,34 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.0-alpha.31] - 2026-08-14
+
+### Added
+
+- Added an in-tree native agent dashboard rendered by tetherscript's software
+  HTML/CSS rasterizer and bitmap text stack, with native Unicode prompt input
+  and the existing script-owned JSON-RPC agent backend.
+
+### Changed
+
+- Replaced the optional egui/eframe native UI with tetherscript-owned layout,
+  rendering, input, and agent state code over the existing native framebuffer
+  transport.
+- Removed the optional `eframe`, `fontdue`, `iced-x86`, and `object` crates and
+  their transitive dependency trees. Native and headless browser rendering now
+  share the deterministic in-tree bitmap text renderer.
+- Removed the bundled Inter font because native rendering no longer depends on
+  an external TrueType rasterizer.
+
+### Fixed
+
+- Cleared each VM call frame's abandoned operand-stack state when returning
+  from inside `for` or `while`. Loop iterators and indices could otherwise leak
+  into the caller and make a later chained call fail with an unrelated
+  "int is not callable" error.
+- Repaired the Tera feature's unit-test call path so
+  `cargo test --features tera` compiles and exercises the renderer again.
+
 ## [0.1.0-alpha.30] - 2026-08-06
 
 ### Added

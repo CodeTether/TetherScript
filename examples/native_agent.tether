@@ -5,7 +5,7 @@
 // selection, and JSONL session as examples/agent_tui.tether.
 fn main() {
     let config = map()
-    config.title = "tetherscript agent + CPU state"
+    config.title = "tetherscript native agent"
     config.agent_path = "examples/agent_tui.tether"
 
     // Passing both grants makes the native host verify that this script was
